@@ -1,0 +1,7 @@
+{
+  "source": "Lody iOS packages/cloud-runtime",
+  "commit": "8c741f17dbd690fcce9ae1f5bdd5f250613fe2c8",
+  "license": "AGPL-3.0-only",
+  "path": "packages/cloud-runtime",
+  "note": "Unmodified source snapshot. Build has no dependency on the source checkout."
+}

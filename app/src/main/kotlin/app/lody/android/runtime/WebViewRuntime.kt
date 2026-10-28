@@ -1,0 +1,57 @@
+package app.lody.android.runtime
+
+import android.content.Context
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import org.json.JSONArray
+import org.json.JSONObject
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+/** Coroutine facade. All WebView access and cancellation cleanup uses the main executor. */
+open class WebViewRuntime internal constructor(
+    override val scope: RuntimeScope,
+    internal val backend: WebViewCloudRuntime,
+) : CloudRuntime {
+    constructor(context: Context, scope: RuntimeScope) : this(scope, WebViewCloudRuntime(context))
+    private val mutableState = MutableStateFlow(backend.status)
+    override val state: StateFlow<RuntimeStatus> = mutableState.asStateFlow()
+    private val mutableEvents = MutableSharedFlow<RuntimeEmission>(extraBufferCapacity = 64)
+    override val events: Flow<RuntimeEmission> = mutableEvents.asSharedFlow()
+    private var stateSubscription: AutoCloseable? = null
+    private var eventSubscription: AutoCloseable? = null
+    override suspend fun start() = withContext(Dispatchers.Main.immediate) {
+        if (stateSubscription == null) stateSubscription = backend.observe { mutableState.value = it }
+        if (eventSubscription == null) eventSubscription = backend.observeEvents { check(mutableEvents.tryEmit(it)) { "event_buffer_full" } }
+        backend.start()
+    }
+    override suspend fun setActive(active: Boolean) = withContext(Dispatchers.Main.immediate) { backend.setActive(active) }
+    override suspend fun stop() = withContext(Dispatchers.Main.immediate) {
+        backend.stop()
+        stateSubscription?.close(); stateSubscription = null
+        eventSubscription?.close(); eventSubscription = null
+        mutableState.value = backend.status
+    }
+    override suspend fun execute(command: RuntimeCommand): RuntimeResult = when (command) {
+        RuntimeCommand.Ping -> RuntimeResult.Pong(call("ping") as? Boolean ?: throw RuntimeException(runtimeFault("invalid_ping_reply")))
+        RuntimeCommand.InspectSchema -> {
+            val value = call("probeSchema", deadline = CommandDeadline.QUERY)
+            try { RuntimeProtocol.schema(value as JSONObject) }
+            catch (_: Exception) { throw RuntimeException(runtimeFault("invalid_schema_reply")) }
+        }
+    }
+    internal suspend fun call(method: String, args: JSONArray = JSONArray(), deadline: CommandDeadline = CommandDeadline.CONTROL): Any? = withContext(Dispatchers.Main.immediate) {
+        suspendCancellableCoroutine { continuation ->
+            val handle = backend.request(method, args, deadline) { result ->
+                result.fold(
+                    { continuation.resume(it) },
+                    { continuation.resumeWithException(RuntimeException(runtimeFault((it as? RuntimeFailure)?.code ?: "runtime_failed"))) },
+                )
+            }
+            continuation.invokeOnCancellation {
+                // Cleanup must outlive the cancelled caller, but never own application state.
+                android.os.Handler(android.os.Looper.getMainLooper()).post { handle.close() }
+            }
+        }
+    }
+}
