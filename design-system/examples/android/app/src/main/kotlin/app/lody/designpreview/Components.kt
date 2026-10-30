@@ -39,7 +39,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
@@ -57,7 +56,6 @@ import app.lody.android.designsystem.LodyElevations
 import app.lody.android.designsystem.LodyIconSize
 import app.lody.android.designsystem.LodyIcons
 import app.lody.android.designsystem.LodyLayout
-import app.lody.android.designsystem.LodyOpacity
 import app.lody.android.designsystem.LodyRadius
 import app.lody.android.designsystem.LodySize
 import app.lody.android.designsystem.LodySpacing
@@ -211,8 +209,8 @@ fun LodyButton(
     onClick: () -> Unit = {},
 ) {
     val colors = LodyTheme.colors
-    val (bg, fg) = when (kind) {
-        LodyButtonKind.Primary -> colors.inkDefault to colors.inkOn
+    val (bg, fg) = if (!enabled) colors.fillDisabled to colors.textDisabled else when (kind) {
+        LodyButtonKind.Primary -> colors.accentSolid to colors.textOnAccent
         LodyButtonKind.Secondary -> colors.fillSecondary to colors.textPrimary
         LodyButtonKind.Destructive -> colors.dangerSolid to colors.textOnDanger
         LodyButtonKind.Ghost -> Color.Transparent to colors.textLink
@@ -220,7 +218,6 @@ fun LodyButton(
     val shape = RoundedCornerShape(LodyRadius.md)
     Row(
         modifier = Modifier
-            .alpha(if (enabled) 1f else LodyOpacity.disabled)
             .height(LodySize.controlMd)
             .clip(shape)
             .background(bg, shape)
@@ -294,11 +291,11 @@ fun Composer(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .size(LodySize.controlSm)
                 .clip(CircleShape)
-                .background(colors.inkDefault)
+                .background(colors.accentSolid)
                 .clickable {},
             contentAlignment = Alignment.Center,
         ) {
-            Glyph(LodyIcons.Send, colors.inkOn)
+            Glyph(LodyIcons.Send, colors.textOnAccent)
         }
     }
 }

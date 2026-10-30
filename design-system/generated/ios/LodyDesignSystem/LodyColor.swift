@@ -5,46 +5,43 @@ import UIKit
 
 /// Semantic colors. Every value follows the trait collection's light / dark style.
 public enum LodyColor {
-    /// Screen background for plain lists and content (web: background).
+    /// Screen background for plain lists and content (iOS systemBackground).
     public static let bgBase = Color(uiColor: LodyUIColor.bgBase)
-    /// Behind grouped lists and cards (web: secondaryBackground in light).
+    /// Behind grouped lists and cards (iOS systemGroupedBackground).
     public static let bgGrouped = Color(uiColor: LodyUIColor.bgGrouped)
-    /// Cards, sheets, the composer (web: elevatedBackground).
+    /// Cards and cells on bg.grouped, sheets, the composer (iOS secondarySystemGroupedBackground).
     public static let bgRaised = Color(uiColor: LodyUIColor.bgRaised)
-    /// Text fields and wells: a translucent darkening of whatever they sit on (web: wellBackground).
+    /// Text fields and search bars: a flat fill, no inset.
     public static let bgSunken = Color(uiColor: LodyUIColor.bgSunken)
-    /// Menus, popovers, toasts' surface; pair with an elevation (web: raisedBackground).
+    /// Custom menus, popovers and toasts; pair with an elevation.
     public static let bgOverlay = Color(uiColor: LodyUIColor.bgOverlay)
-    /// Tooltips and inverse toasts; text uses text.inverse.
+    /// Snackbars and tooltips; text uses text.inverse.
     public static let bgInverse = Color(uiColor: LodyUIColor.bgInverse)
-    /// Row / cell highlight while pressed (web: hoverFill). Android uses ripple.
+    /// Row / cell highlight while pressed on iOS. Android uses the platform ripple instead.
     public static let fillPressed = Color(uiColor: LodyUIColor.fillPressed)
-    /// Persistently selected row, chip or segment (web: selectedFill).
+    /// Persistently selected row, chip or segment.
     public static let fillSelected = Color(uiColor: LodyUIColor.fillSelected)
-    /// Secondary buttons, neutral chips, segmented track (web: trayBackground).
+    /// Secondary buttons and neutral chips (iOS tertiarySystemFill, M3 secondary container).
     public static let fillSecondary = Color(uiColor: LodyUIColor.fillSecondary)
     /// Skeletons, avatar placeholders.
     public static let fillTertiary = Color(uiColor: LodyUIColor.fillTertiary)
+    /// Container of a disabled filled control (M3: on-surface 12%).
     public static let fillDisabled = Color(uiColor: LodyUIColor.fillDisabled)
-    /// Primary button fill and the send button (web: label fill).
-    public static let inkDefault = Color(uiColor: LodyUIColor.inkDefault)
-    public static let inkPressed = Color(uiColor: LodyUIColor.inkPressed)
-    /// Text and icons on ink (web: background).
-    public static let inkOn = Color(uiColor: LodyUIColor.inkOn)
-    /// Titles and body copy (web: label).
+    /// Titles and body copy (iOS label).
     public static let textPrimary = Color(uiColor: LodyUIColor.textPrimary)
-    /// Supporting copy, metadata (web: secondaryLabel).
+    /// Supporting copy, metadata (iOS secondaryLabel).
     public static let textSecondary = Color(uiColor: LodyUIColor.textSecondary)
-    /// Section headers, timestamps. One step stronger than the web's tertiaryLabel so short text keeps 3:1.
+    /// Section headers, timestamps. Short text only (iOS tertiaryLabel).
     public static let textTertiary = Color(uiColor: LodyUIColor.textTertiary)
-    /// Placeholders and hints (web: tertiaryLabel).
+    /// Field placeholders (iOS placeholderText).
     public static let textPlaceholder = Color(uiColor: LodyUIColor.textPlaceholder)
+    /// Text and icons of disabled controls (M3: on-surface 38%).
     public static let textDisabled = Color(uiColor: LodyUIColor.textDisabled)
     /// Text on bg.inverse.
     public static let textInverse = Color(uiColor: LodyUIColor.textInverse)
-    /// On accent.default: white in light, black on the dark theme's orange.
+    /// Text and icons on accent.solid.
     public static let textOnAccent = Color(uiColor: LodyUIColor.textOnAccent)
-    /// On danger.solid.
+    /// Text and icons on danger.solid.
     public static let textOnDanger = Color(uiColor: LodyUIColor.textOnDanger)
     public static let textLink = Color(uiColor: LodyUIColor.textLink)
     public static let iconPrimary = Color(uiColor: LodyUIColor.iconPrimary)
@@ -52,29 +49,32 @@ public enum LodyColor {
     /// Decorative only, e.g. the section header plus.
     public static let iconTertiary = Color(uiColor: LodyUIColor.iconTertiary)
     public static let iconDisabled = Color(uiColor: LodyUIColor.iconDisabled)
-    /// Hairline list separators (web: separator).
+    /// Hairline list separators, drawn at one physical pixel (iOS separator).
     public static let borderSubtle = Color(uiColor: LodyUIColor.borderSubtle)
-    /// Outlines where no well or shadow fits (filter chips).
+    /// 1pt outlines: filter chips, cards that need an edge.
     public static let borderDefault = Color(uiColor: LodyUIColor.borderDefault)
     /// Checkbox rings, emphasized outlines.
     public static let borderStrong = Color(uiColor: LodyUIColor.borderStrong)
-    /// 2pt focus ring for hardware keyboards.
+    /// Focus ring for hardware keyboards.
     public static let borderFocus = Color(uiColor: LodyUIColor.borderFocus)
-    /// Switch on, checked, progress, selection, running indicator.
+    /// Tint: switches, checkmarks, progress, selection, toolbar actions, running state.
     public static let accentDefault = Color(uiColor: LodyUIColor.accentDefault)
+    /// Filled primary buttons and the send button, with text.onAccent.
+    public static let accentSolid = Color(uiColor: LodyUIColor.accentSolid)
+    /// accent.solid while pressed (iOS).
     public static let accentPressed = Color(uiColor: LodyUIColor.accentPressed)
-    /// Accent as readable foreground: selected tab, active icon, links.
+    /// Accent as readable foreground: selected tab label, accent text.
     public static let accentFg = Color(uiColor: LodyUIColor.accentFg)
-    /// Tinted background for accent chips and banners.
+    /// Tinted background for accent chips and banners (M3 primary container).
     public static let accentSubtle = Color(uiColor: LodyUIColor.accentSubtle)
     public static let accentOnSubtle = Color(uiColor: LodyUIColor.accentOnSubtle)
-    /// Destructive icons and text (web: destructive).
+    /// Destructive icons and text, e.g. a destructive menu item.
     public static let dangerDefault = Color(uiColor: LodyUIColor.dangerDefault)
     /// Filled destructive buttons, with text.onDanger.
     public static let dangerSolid = Color(uiColor: LodyUIColor.dangerSolid)
     public static let dangerSubtle = Color(uiColor: LodyUIColor.dangerSubtle)
     public static let dangerOnSubtle = Color(uiColor: LodyUIColor.dangerOnSubtle)
-    /// The light key (hsl(32 90% 48%)) is under 3:1 on white, so light icons use the text step.
+    /// Icons and badges. The light brand orange is under 3:1 on white, so light uses the text step.
     public static let warningDefault = Color(uiColor: LodyUIColor.warningDefault)
     public static let warningSubtle = Color(uiColor: LodyUIColor.warningSubtle)
     public static let warningOnSubtle = Color(uiColor: LodyUIColor.warningOnSubtle)
@@ -92,7 +92,7 @@ public enum LodyColor {
     public static let stateWaiting = Color(uiColor: LodyUIColor.stateWaiting)
     public static let stateDone = Color(uiColor: LodyUIColor.stateDone)
     public static let stateFailed = Color(uiColor: LodyUIColor.stateFailed)
-    /// Pull request merged (web --github-merged).
+    /// Pull request merged.
     public static let stateMerged = Color(uiColor: LodyUIColor.stateMerged)
     public static let labelGrayFg = Color(uiColor: LodyUIColor.labelGrayFg)
     public static let labelGrayBg = Color(uiColor: LodyUIColor.labelGrayBg)
@@ -147,7 +147,7 @@ public enum LodyColor {
     public static let selectionText = Color(uiColor: LodyUIColor.selectionText)
     /// Caret and selection handles.
     public static let selectionHandle = Color(uiColor: LodyUIColor.selectionHandle)
-    /// Dimming behind custom modals (web: overlay).
+    /// Dimming behind custom modals.
     public static let overlayScrim = Color(uiColor: LodyUIColor.overlayScrim)
     public static let shadowSm = Color(uiColor: LodyUIColor.shadowSm)
     public static let shadowMd = Color(uiColor: LodyUIColor.shadowMd)
@@ -165,9 +165,6 @@ public enum LodyColor {
         ("fill.secondary", fillSecondary),
         ("fill.tertiary", fillTertiary),
         ("fill.disabled", fillDisabled),
-        ("ink.default", inkDefault),
-        ("ink.pressed", inkPressed),
-        ("ink.on", inkOn),
         ("text.primary", textPrimary),
         ("text.secondary", textSecondary),
         ("text.tertiary", textTertiary),
@@ -186,6 +183,7 @@ public enum LodyColor {
         ("border.strong", borderStrong),
         ("border.focus", borderFocus),
         ("accent.default", accentDefault),
+        ("accent.solid", accentSolid),
         ("accent.pressed", accentPressed),
         ("accent.fg", accentFg),
         ("accent.subtle", accentSubtle),
@@ -262,109 +260,107 @@ public enum LodyColor {
 
 /// UIKit mirror of `LodyColor` for views that are not SwiftUI.
 public enum LodyUIColor {
-    public static let bgBase = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x101010FF)
-    public static let bgGrouped = UIColor(lodyLight: 0xF9F9F9FF, dark: 0x101010FF)
-    public static let bgRaised = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x1A1A1AFF)
-    public static let bgSunken = UIColor(lodyLight: 0x1C1C1C0D, dark: 0x00000047)
-    public static let bgOverlay = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x222222FF)
+    public static let bgBase = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x000000FF)
+    public static let bgGrouped = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x000000FF)
+    public static let bgRaised = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x1C1C1CFF)
+    public static let bgSunken = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x2B2B2BFF)
+    public static let bgOverlay = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x2B2B2BFF)
     public static let bgInverse = UIColor(lodyLight: 0x1C1C1CFF, dark: 0xFFFFFFFF)
-    public static let fillPressed = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x292929FF)
-    public static let fillSelected = UIColor(lodyLight: 0xECECECFF, dark: 0x222222FF)
-    public static let fillSecondary = UIColor(lodyLight: 0x1C1C1C0F, dark: 0xFFFFFF0F)
-    public static let fillTertiary = UIColor(lodyLight: 0xF9F9F9FF, dark: 0x1A1A1AFF)
-    public static let fillDisabled = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x222222FF)
-    public static let inkDefault = UIColor(lodyLight: 0x1C1C1CFF, dark: 0xFFFFFFFF)
-    public static let inkPressed = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xA7A7A7FF)
-    public static let inkOn = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x101010FF)
+    public static let fillPressed = UIColor(lodyLight: 0xE5E5E5FF, dark: 0x393939FF)
+    public static let fillSelected = UIColor(lodyLight: 0xEBEBEBFF, dark: 0x2B2B2BFF)
+    public static let fillSecondary = UIColor(lodyLight: 0xEBEBEBFF, dark: 0x2B2B2BFF)
+    public static let fillTertiary = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x1C1C1CFF)
+    public static let fillDisabled = UIColor(lodyLight: 0xEBEBEBFF, dark: 0x2B2B2BFF)
     public static let textPrimary = UIColor(lodyLight: 0x1C1C1CFF, dark: 0xFFFFFFFF)
-    public static let textSecondary = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xA7A7A7FF)
-    public static let textTertiary = UIColor(lodyLight: 0x8B8B8BFF, dark: 0x8A8A8AFF)
-    public static let textPlaceholder = UIColor(lodyLight: 0x9E9E9EFF, dark: 0x777777FF)
-    public static let textDisabled = UIColor(lodyLight: 0xCCCCCCFF, dark: 0x4A4A4AFF)
-    public static let textInverse = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x101010FF)
-    public static let textOnAccent = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x000000FF)
-    public static let textOnDanger = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x000000FF)
-    public static let textLink = UIColor(lodyLight: 0x3D69C8FF, dark: 0xFFC799FF)
+    public static let textSecondary = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xABABABFF)
+    public static let textTertiary = UIColor(lodyLight: 0x898989FF, dark: 0x8C8C8CFF)
+    public static let textPlaceholder = UIColor(lodyLight: 0x999999FF, dark: 0x7A7A7AFF)
+    public static let textDisabled = UIColor(lodyLight: 0x999999FF, dark: 0x7A7A7AFF)
+    public static let textInverse = UIColor(lodyLight: 0xFFFFFFFF, dark: 0x000000FF)
+    public static let textOnAccent = UIColor(lodyLight: 0xFFFFFFFF, dark: 0xFFFFFFFF)
+    public static let textOnDanger = UIColor(lodyLight: 0xFFFFFFFF, dark: 0xFFFFFFFF)
+    public static let textLink = UIColor(lodyLight: 0x3D69C8FF, dark: 0x7CA8FFFF)
     public static let iconPrimary = UIColor(lodyLight: 0x1C1C1CFF, dark: 0xFFFFFFFF)
-    public static let iconSecondary = UIColor(lodyLight: 0x8B8B8BFF, dark: 0x8A8A8AFF)
-    public static let iconTertiary = UIColor(lodyLight: 0xB6B6B6FF, dark: 0x606060FF)
-    public static let iconDisabled = UIColor(lodyLight: 0xCCCCCCFF, dark: 0x4A4A4AFF)
-    public static let borderSubtle = UIColor(lodyLight: 0xECECECFF, dark: 0x292929FF)
-    public static let borderDefault = UIColor(lodyLight: 0xDEDEDEFF, dark: 0x383838FF)
-    public static let borderStrong = UIColor(lodyLight: 0xCCCCCCFF, dark: 0x4A4A4AFF)
-    public static let borderFocus = UIColor(lodyLight: 0x5D8DEFFF, dark: 0xFFC799FF)
-    public static let accentDefault = UIColor(lodyLight: 0x5D8DEFFF, dark: 0xFFC799FF)
-    public static let accentPressed = UIColor(lodyLight: 0x5382E3FF, dark: 0xFFCCA2FF)
-    public static let accentFg = UIColor(lodyLight: 0x3D69C8FF, dark: 0xFFC799FF)
-    public static let accentSubtle = UIColor(lodyLight: 0xEBF2FFFF, dark: 0x2B2119FF)
-    public static let accentOnSubtle = UIColor(lodyLight: 0x3D69C8FF, dark: 0xFFC799FF)
-    public static let dangerDefault = UIColor(lodyLight: 0xCD212DFF, dark: 0xFF8080FF)
-    public static let dangerSolid = UIColor(lodyLight: 0xCE222DFF, dark: 0xFF8080FF)
-    public static let dangerSubtle = UIColor(lodyLight: 0xFFE7E4FF, dark: 0x2F1818FF)
-    public static let dangerOnSubtle = UIColor(lodyLight: 0xCD212DFF, dark: 0xFF8080FF)
-    public static let warningDefault = UIColor(lodyLight: 0xA65A00FF, dark: 0xFBBD23FF)
-    public static let warningSubtle = UIColor(lodyLight: 0xFFF0E5FF, dark: 0x2B200AFF)
-    public static let warningOnSubtle = UIColor(lodyLight: 0xA65A00FF, dark: 0xFBBD23FF)
-    public static let successDefault = UIColor(lodyLight: 0x298E5DFF, dark: 0x3BCE87FF)
-    public static let successSubtle = UIColor(lodyLight: 0xDFF4E7FF, dark: 0x0F2619FF)
-    public static let successOnSubtle = UIColor(lodyLight: 0x087B4CFF, dark: 0x3BCE87FF)
-    public static let infoDefault = UIColor(lodyLight: 0x5D8DEFFF, dark: 0xFFC799FF)
-    public static let infoSubtle = UIColor(lodyLight: 0xEBF2FFFF, dark: 0x2B2119FF)
-    public static let infoOnSubtle = UIColor(lodyLight: 0x3D69C8FF, dark: 0xFFC799FF)
-    public static let stateIdle = UIColor(lodyLight: 0x8B8B8BFF, dark: 0x8A8A8AFF)
-    public static let stateRunning = UIColor(lodyLight: 0x5D8DEFFF, dark: 0xFFC799FF)
-    public static let stateWaiting = UIColor(lodyLight: 0xA65A00FF, dark: 0xFBBD23FF)
-    public static let stateDone = UIColor(lodyLight: 0x298E5DFF, dark: 0x3BCE87FF)
-    public static let stateFailed = UIColor(lodyLight: 0xCE222DFF, dark: 0xFF8080FF)
-    public static let stateMerged = UIColor(lodyLight: 0x814EDFFF, dark: 0xA373F7FF)
-    public static let labelGrayFg = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xA7A7A7FF)
-    public static let labelGrayBg = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x222222FF)
-    public static let labelRedFg = UIColor(lodyLight: 0xB84541FF, dark: 0xFFA098FF)
-    public static let labelRedBg = UIColor(lodyLight: 0xFFEBE8FF, dark: 0x2D1C1AFF)
-    public static let labelOrangeFg = UIColor(lodyLight: 0xA85500FF, dark: 0xF9A870FF)
-    public static let labelOrangeBg = UIColor(lodyLight: 0xFFECDFFF, dark: 0x2C1E14FF)
-    public static let labelYellowFg = UIColor(lodyLight: 0x856800FF, dark: 0xDCBA5CFF)
-    public static let labelYellowBg = UIColor(lodyLight: 0xF8F0D9FF, dark: 0x272111FF)
-    public static let labelGreenFg = UIColor(lodyLight: 0x007E37FF, dark: 0x83D494FF)
-    public static let labelGreenBg = UIColor(lodyLight: 0xE0F7E3FF, dark: 0x17251AFF)
-    public static let labelTealFg = UIColor(lodyLight: 0x00797AFF, dark: 0x44D6D6FF)
-    public static let labelTealBg = UIColor(lodyLight: 0xDDF6F5FF, dark: 0x0F2625FF)
-    public static let labelBlueFg = UIColor(lodyLight: 0x006EBEFF, dark: 0x89C3FFFF)
-    public static let labelBlueBg = UIColor(lodyLight: 0xE5F2FFFF, dark: 0x18222DFF)
-    public static let labelIndigoFg = UIColor(lodyLight: 0x5763C3FF, dark: 0xAAB9FFFF)
-    public static let labelIndigoBg = UIColor(lodyLight: 0xEBEFFFFF, dark: 0x1E202DFF)
-    public static let labelPurpleFg = UIColor(lodyLight: 0x8555B6FF, dark: 0xD0AAFCFF)
-    public static let labelPurpleBg = UIColor(lodyLight: 0xF4ECFFFF, dark: 0x241E2CFF)
-    public static let labelPinkFg = UIColor(lodyLight: 0xAE457EFF, dark: 0xF89DC9FF)
-    public static let labelPinkBg = UIColor(lodyLight: 0xFFE9F2FF, dark: 0x2C1C23FF)
-    public static let codeBg = UIColor(lodyLight: 0xF9F9F9FF, dark: 0x1A1A1AFF)
-    public static let codeInlineBg = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x222222FF)
+    public static let iconSecondary = UIColor(lodyLight: 0x898989FF, dark: 0x8C8C8CFF)
+    public static let iconTertiary = UIColor(lodyLight: 0xAFAFAFFF, dark: 0x6C6C6CFF)
+    public static let iconDisabled = UIColor(lodyLight: 0xAFAFAFFF, dark: 0x6C6C6CFF)
+    public static let borderSubtle = UIColor(lodyLight: 0xD2D2D2FF, dark: 0x393939FF)
+    public static let borderDefault = UIColor(lodyLight: 0xD2D2D2FF, dark: 0x444444FF)
+    public static let borderStrong = UIColor(lodyLight: 0xC5C5C5FF, dark: 0x525252FF)
+    public static let borderFocus = UIColor(lodyLight: 0x5D8DEFFF, dark: 0x7CA8FFFF)
+    public static let accentDefault = UIColor(lodyLight: 0x5D8DEFFF, dark: 0x7CA8FFFF)
+    public static let accentSolid = UIColor(lodyLight: 0x4673D3FF, dark: 0x4C74C7FF)
+    public static let accentPressed = UIColor(lodyLight: 0x3864C2FF, dark: 0x3E65B6FF)
+    public static let accentFg = UIColor(lodyLight: 0x3D69C8FF, dark: 0x7CA8FFFF)
+    public static let accentSubtle = UIColor(lodyLight: 0xEBF2FFFF, dark: 0x121C30FF)
+    public static let accentOnSubtle = UIColor(lodyLight: 0x3D69C8FF, dark: 0x7CA8FFFF)
+    public static let dangerDefault = UIColor(lodyLight: 0xCD212DFF, dark: 0xFD5554FF)
+    public static let dangerSolid = UIColor(lodyLight: 0xCE222DFF, dark: 0xDD353AFF)
+    public static let dangerSubtle = UIColor(lodyLight: 0xFFE7E4FF, dark: 0x2F0A09FF)
+    public static let dangerOnSubtle = UIColor(lodyLight: 0xCD212DFF, dark: 0xFD5554FF)
+    public static let warningDefault = UIColor(lodyLight: 0xA65A00FF, dark: 0xFF9F4AFF)
+    public static let warningSubtle = UIColor(lodyLight: 0xFFF0E5FF, dark: 0x301A08FF)
+    public static let warningOnSubtle = UIColor(lodyLight: 0xA65A00FF, dark: 0xFF9F4AFF)
+    public static let successDefault = UIColor(lodyLight: 0x298E5DFF, dark: 0x4EAE7BFF)
+    public static let successSubtle = UIColor(lodyLight: 0xDFF4E7FF, dark: 0x081D12FF)
+    public static let successOnSubtle = UIColor(lodyLight: 0x087B4CFF, dark: 0x4EAE7BFF)
+    public static let infoDefault = UIColor(lodyLight: 0x5D8DEFFF, dark: 0x7CA8FFFF)
+    public static let infoSubtle = UIColor(lodyLight: 0xEBF2FFFF, dark: 0x121C30FF)
+    public static let infoOnSubtle = UIColor(lodyLight: 0x3D69C8FF, dark: 0x7CA8FFFF)
+    public static let stateIdle = UIColor(lodyLight: 0x898989FF, dark: 0x8C8C8CFF)
+    public static let stateRunning = UIColor(lodyLight: 0x5D8DEFFF, dark: 0x7CA8FFFF)
+    public static let stateWaiting = UIColor(lodyLight: 0xA65A00FF, dark: 0xFF9F4AFF)
+    public static let stateDone = UIColor(lodyLight: 0x298E5DFF, dark: 0x4EAE7BFF)
+    public static let stateFailed = UIColor(lodyLight: 0xCE222DFF, dark: 0xFD5554FF)
+    public static let stateMerged = UIColor(lodyLight: 0x814EDFFF, dark: 0xA37AFFFF)
+    public static let labelGrayFg = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xABABABFF)
+    public static let labelGrayBg = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x1C1C1CFF)
+    public static let labelRedFg = UIColor(lodyLight: 0xB84541FF, dark: 0xF28881FF)
+    public static let labelRedBg = UIColor(lodyLight: 0xFFEBE8FF, dark: 0x2D1513FF)
+    public static let labelOrangeFg = UIColor(lodyLight: 0xA85500FF, dark: 0xE99355FF)
+    public static let labelOrangeBg = UIColor(lodyLight: 0xFFECDFFF, dark: 0x2B170AFF)
+    public static let labelYellowFg = UIColor(lodyLight: 0x856800FF, dark: 0xCBA63AFF)
+    public static let labelYellowBg = UIColor(lodyLight: 0xF8F0D9FF, dark: 0x241C05FF)
+    public static let labelGreenFg = UIColor(lodyLight: 0x007E37FF, dark: 0x69C27EFF)
+    public static let labelGreenBg = UIColor(lodyLight: 0xE0F7E3FF, dark: 0x0E2213FF)
+    public static let labelTealFg = UIColor(lodyLight: 0x00797AFF, dark: 0x00C3C3FF)
+    public static let labelTealBg = UIColor(lodyLight: 0xDDF6F5FF, dark: 0x012222FF)
+    public static let labelBlueFg = UIColor(lodyLight: 0x006EBEFF, dark: 0x67B0F9FF)
+    public static let labelBlueBg = UIColor(lodyLight: 0xE5F2FFFF, dark: 0x0E1E2EFF)
+    public static let labelIndigoFg = UIColor(lodyLight: 0x5763C3FF, dark: 0x93A3FCFF)
+    public static let labelIndigoBg = UIColor(lodyLight: 0xEBEFFFFF, dark: 0x171B2FFF)
+    public static let labelPurpleFg = UIColor(lodyLight: 0x8555B6FF, dark: 0xBE95ECFF)
+    public static let labelPurpleBg = UIColor(lodyLight: 0xF4ECFFFF, dark: 0x21182BFF)
+    public static let labelPinkFg = UIColor(lodyLight: 0xAE457EFF, dark: 0xE887B6FF)
+    public static let labelPinkBg = UIColor(lodyLight: 0xFFE9F2FF, dark: 0x2A151FFF)
+    public static let codeBg = UIColor(lodyLight: 0xF2F2F2FF, dark: 0x1C1C1CFF)
+    public static let codeInlineBg = UIColor(lodyLight: 0xEBEBEBFF, dark: 0x2B2B2BFF)
     public static let codeText = UIColor(lodyLight: 0x1C1C1CFF, dark: 0xFFFFFFFF)
-    public static let codeBorder = UIColor(lodyLight: 0xECECECFF, dark: 0x292929FF)
-    public static let codeGutter = UIColor(lodyLight: 0x8B8B8BFF, dark: 0x8A8A8AFF)
-    public static let syntaxKeyword = UIColor(lodyLight: 0x8555B6FF, dark: 0xD0AAFCFF)
-    public static let syntaxString = UIColor(lodyLight: 0x007E37FF, dark: 0x83D494FF)
-    public static let syntaxNumber = UIColor(lodyLight: 0xA85500FF, dark: 0xF9A870FF)
-    public static let syntaxConstant = UIColor(lodyLight: 0x006EBEFF, dark: 0x89C3FFFF)
-    public static let syntaxFunction = UIColor(lodyLight: 0x5763C3FF, dark: 0xAAB9FFFF)
-    public static let syntaxType = UIColor(lodyLight: 0x00797AFF, dark: 0x44D6D6FF)
+    public static let codeBorder = UIColor(lodyLight: 0xDEDEDEFF, dark: 0x393939FF)
+    public static let codeGutter = UIColor(lodyLight: 0x898989FF, dark: 0x8C8C8CFF)
+    public static let syntaxKeyword = UIColor(lodyLight: 0x8555B6FF, dark: 0xBE95ECFF)
+    public static let syntaxString = UIColor(lodyLight: 0x007E37FF, dark: 0x69C27EFF)
+    public static let syntaxNumber = UIColor(lodyLight: 0xA85500FF, dark: 0xE99355FF)
+    public static let syntaxConstant = UIColor(lodyLight: 0x006EBEFF, dark: 0x67B0F9FF)
+    public static let syntaxFunction = UIColor(lodyLight: 0x5763C3FF, dark: 0x93A3FCFF)
+    public static let syntaxType = UIColor(lodyLight: 0x00797AFF, dark: 0x00C3C3FF)
     public static let syntaxVariable = UIColor(lodyLight: 0x1C1C1CFF, dark: 0xFFFFFFFF)
-    public static let syntaxProperty = UIColor(lodyLight: 0xB84541FF, dark: 0xFFA098FF)
-    public static let syntaxTag = UIColor(lodyLight: 0xAE457EFF, dark: 0xF89DC9FF)
-    public static let syntaxComment = UIColor(lodyLight: 0x8B8B8BFF, dark: 0x8A8A8AFF)
-    public static let syntaxPunctuation = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xA7A7A7FF)
-    public static let diffAddedBg = UIColor(lodyLight: 0xDFF4E7FF, dark: 0x0F2619FF)
-    public static let diffRemovedBg = UIColor(lodyLight: 0xFFE7E4FF, dark: 0x2F1818FF)
-    public static let diffAddedText = UIColor(lodyLight: 0x087B4CFF, dark: 0x3BCE87FF)
-    public static let diffRemovedText = UIColor(lodyLight: 0xCD212DFF, dark: 0xFF8080FF)
-    public static let diffHunkBg = UIColor(lodyLight: 0xF3F7FFFF, dark: 0x1F1A15FF)
-    public static let diffHunkText = UIColor(lodyLight: 0x3D69C8FF, dark: 0xFFC799FF)
-    public static let selectionText = UIColor(lodyLight: 0x5D8DEF3D, dark: 0xFFC7994D)
-    public static let selectionHandle = UIColor(lodyLight: 0x5D8DEFFF, dark: 0xFFC799FF)
-    public static let overlayScrim = UIColor(lodyLight: 0x1C1C1C80, dark: 0x00000099)
-    public static let shadowSm = UIColor(lodyLight: 0x1C1C1C14, dark: 0x00000066)
-    public static let shadowMd = UIColor(lodyLight: 0x1C1C1C29, dark: 0x00000080)
-    public static let shadowLg = UIColor(lodyLight: 0x1C1C1C33, dark: 0x00000099)
+    public static let syntaxProperty = UIColor(lodyLight: 0xB84541FF, dark: 0xF28881FF)
+    public static let syntaxTag = UIColor(lodyLight: 0xAE457EFF, dark: 0xE887B6FF)
+    public static let syntaxComment = UIColor(lodyLight: 0x898989FF, dark: 0x8C8C8CFF)
+    public static let syntaxPunctuation = UIColor(lodyLight: 0x6D6D6DFF, dark: 0xABABABFF)
+    public static let diffAddedBg = UIColor(lodyLight: 0xDFF4E7FF, dark: 0x081D12FF)
+    public static let diffRemovedBg = UIColor(lodyLight: 0xFFE7E4FF, dark: 0x2F0A09FF)
+    public static let diffAddedText = UIColor(lodyLight: 0x087B4CFF, dark: 0x4EAE7BFF)
+    public static let diffRemovedText = UIColor(lodyLight: 0xCD212DFF, dark: 0xFD5554FF)
+    public static let diffHunkBg = UIColor(lodyLight: 0xF3F7FFFF, dark: 0x0B111DFF)
+    public static let diffHunkText = UIColor(lodyLight: 0x3D69C8FF, dark: 0x7CA8FFFF)
+    public static let selectionText = UIColor(lodyLight: 0x5D8DEF3D, dark: 0x7CA8FF5C)
+    public static let selectionHandle = UIColor(lodyLight: 0x5D8DEFFF, dark: 0x7CA8FFFF)
+    public static let overlayScrim = UIColor(lodyLight: 0x00000066, dark: 0x00000099)
+    public static let shadowSm = UIColor(lodyLight: 0x00000014, dark: 0x00000066)
+    public static let shadowMd = UIColor(lodyLight: 0x0000001F, dark: 0x00000080)
+    public static let shadowLg = UIColor(lodyLight: 0x00000029, dark: 0x00000099)
 }
 
 extension UIColor {

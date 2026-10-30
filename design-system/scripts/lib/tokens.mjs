@@ -44,7 +44,7 @@ export function loadPalette() {
   for (const mode of MODES) {
     const config = json.modes[mode]
     if (!config) throw new Error(`palette: missing mode ${mode}`)
-    const { scales, keys } = generateMode(config, json.algorithm)
+    const { scales, keys } = generateMode(config, json.brand, json.algorithm)
     const map = new Map([
       ['black', '#000000'],
       ['white', '#FFFFFF'],

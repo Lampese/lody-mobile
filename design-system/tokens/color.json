@@ -1,38 +1,32 @@
 {
-  "$description": "Semantic colors over the generated scales in palette.json. A value is either one reference used in both modes (\"{neutral.12}\") or { light, dark }. References are scale steps ({accent.9}), theme key colors ({key.onAccent}), black / white, optionally with alpha percent ({key.foreground/5}). Roles follow the web token rules (lody-oss/packages/ui/src/tokens/RULES.md): ink, not accent, fills primary buttons; accent marks focus, links, on / checked state and the running indicator.",
+  "$description": "Semantic colors over the generated scales in palette.json, assigned by mobile platform conventions (iOS HIG semantic colors, Material 3 roles). A value is one reference used in both modes (\"{neutral.12}\") or { light, dark }. References: scale steps ({accent.9}, {accent.solid}), black / white, optionally with alpha percent ({black/40}).",
   "bg": {
     "$type": "color",
-    "base": { "$value": "{neutral.1}", "$description": "Screen background for plain lists and content (web: background)." },
-    "grouped": { "$value": { "light": "{neutral.2}", "dark": "{neutral.1}" }, "$description": "Behind grouped lists and cards (web: secondaryBackground in light)." },
-    "raised": { "$value": { "light": "{neutral.1}", "dark": "{neutral.2}" }, "$description": "Cards, sheets, the composer (web: elevatedBackground)." },
-    "sunken": { "$value": { "light": "{key.foreground/5}", "dark": "{black/28}" }, "$description": "Text fields and wells: a translucent darkening of whatever they sit on (web: wellBackground)." },
-    "overlay": { "$value": { "light": "{neutral.1}", "dark": "{neutral.3}" }, "$description": "Menus, popovers, toasts' surface; pair with an elevation (web: raisedBackground)." },
-    "inverse": { "$value": "{neutral.12}", "$description": "Tooltips and inverse toasts; text uses text.inverse." }
+    "base": { "$value": "{neutral.1}", "$description": "Screen background for plain lists and content (iOS systemBackground)." },
+    "grouped": { "$value": { "light": "{neutral.2}", "dark": "{neutral.1}" }, "$description": "Behind grouped lists and cards (iOS systemGroupedBackground)." },
+    "raised": { "$value": { "light": "{neutral.1}", "dark": "{neutral.2}" }, "$description": "Cards and cells on bg.grouped, sheets, the composer (iOS secondarySystemGroupedBackground)." },
+    "sunken": { "$value": { "light": "{neutral.2}", "dark": "{neutral.3}" }, "$description": "Text fields and search bars: a flat fill, no inset." },
+    "overlay": { "$value": { "light": "{neutral.1}", "dark": "{neutral.3}" }, "$description": "Custom menus, popovers and toasts; pair with an elevation." },
+    "inverse": { "$value": "{neutral.12}", "$description": "Snackbars and tooltips; text uses text.inverse." }
   },
   "fill": {
     "$type": "color",
-    "pressed": { "$value": { "light": "{neutral.3}", "dark": "{neutral.4}" }, "$description": "Row / cell highlight while pressed (web: hoverFill). Android uses ripple." },
-    "selected": { "$value": { "light": "{neutral.4}", "dark": "{neutral.3}" }, "$description": "Persistently selected row, chip or segment (web: selectedFill)." },
-    "secondary": { "$value": { "light": "{key.foreground/6}", "dark": "{white/6}" }, "$description": "Secondary buttons, neutral chips, segmented track (web: trayBackground)." },
+    "pressed": { "$value": "{neutral.4}", "$description": "Row / cell highlight while pressed on iOS. Android uses the platform ripple instead." },
+    "selected": { "$value": "{neutral.3}", "$description": "Persistently selected row, chip or segment." },
+    "secondary": { "$value": "{neutral.3}", "$description": "Secondary buttons and neutral chips (iOS tertiarySystemFill, M3 secondary container)." },
     "tertiary": { "$value": "{neutral.2}", "$description": "Skeletons, avatar placeholders." },
-    "disabled": { "$value": "{neutral.3}" }
-  },
-  "ink": {
-    "$type": "color",
-    "default": { "$value": "{neutral.12}", "$description": "Primary button fill and the send button (web: label fill)." },
-    "pressed": { "$value": "{neutral.11}" },
-    "on": { "$value": "{neutral.1}", "$description": "Text and icons on ink (web: background)." }
+    "disabled": { "$value": "{neutral.3}", "$description": "Container of a disabled filled control (M3: on-surface 12%)." }
   },
   "text": {
     "$type": "color",
-    "primary": { "$value": "{neutral.12}", "$description": "Titles and body copy (web: label)." },
-    "secondary": { "$value": "{neutral.11}", "$description": "Supporting copy, metadata (web: secondaryLabel)." },
-    "tertiary": { "$value": "{neutral.10}", "$description": "Section headers, timestamps. One step stronger than the web's tertiaryLabel so short text keeps 3:1." },
-    "placeholder": { "$value": "{neutral.9}", "$description": "Placeholders and hints (web: tertiaryLabel)." },
-    "disabled": { "$value": "{neutral.7}" },
+    "primary": { "$value": "{neutral.12}", "$description": "Titles and body copy (iOS label)." },
+    "secondary": { "$value": "{neutral.11}", "$description": "Supporting copy, metadata (iOS secondaryLabel)." },
+    "tertiary": { "$value": "{neutral.10}", "$description": "Section headers, timestamps. Short text only (iOS tertiaryLabel)." },
+    "placeholder": { "$value": "{neutral.9}", "$description": "Field placeholders (iOS placeholderText)." },
+    "disabled": { "$value": "{neutral.9}", "$description": "Text and icons of disabled controls (M3: on-surface 38%)." },
     "inverse": { "$value": "{neutral.1}", "$description": "Text on bg.inverse." },
-    "onAccent": { "$value": "{key.onAccent}", "$description": "On accent.default: white in light, black on the dark theme's orange." },
-    "onDanger": { "$value": "{key.onDanger}", "$description": "On danger.solid." },
+    "onAccent": { "$value": "{white}", "$description": "Text and icons on accent.solid." },
+    "onDanger": { "$value": "{white}", "$description": "Text and icons on danger.solid." },
     "link": { "$value": "{accent.11}" }
   },
   "icon": {
@@ -40,66 +34,65 @@
     "primary": { "$value": "{neutral.12}" },
     "secondary": { "$value": "{neutral.10}" },
     "tertiary": { "$value": "{neutral.8}", "$description": "Decorative only, e.g. the section header plus." },
-    "disabled": { "$value": "{neutral.7}" }
+    "disabled": { "$value": "{neutral.8}" }
   },
   "border": {
     "$type": "color",
-    "subtle": { "$value": "{neutral.4}", "$description": "Hairline list separators (web: separator)." },
-    "default": { "$value": "{neutral.6}", "$description": "Outlines where no well or shadow fits (filter chips)." },
-    "strong": { "$value": "{neutral.7}", "$description": "Checkbox rings, emphasized outlines." },
-    "focus": { "$value": "{accent.9}", "$description": "2pt focus ring for hardware keyboards." }
+    "subtle": { "$value": { "light": "{neutral.6}", "dark": "{neutral.4}" }, "$description": "Hairline list separators, drawn at one physical pixel (iOS separator)." },
+    "default": { "$value": { "light": "{neutral.6}", "dark": "{neutral.5}" }, "$description": "1pt outlines: filter chips, cards that need an edge." },
+    "strong": { "$value": { "light": "{neutral.7}", "dark": "{neutral.6}" }, "$description": "Checkbox rings, emphasized outlines." },
+    "focus": { "$value": "{accent.9}", "$description": "Focus ring for hardware keyboards." }
   },
   "accent": {
     "$type": "color",
-    "$description": "Key color: hsl(220 82% 65%) light, Vesper orange hsl(27 100% 80%) dark. Not a button fill.",
-    "default": { "$value": "{accent.9}", "$description": "Switch on, checked, progress, selection, running indicator." },
-    "pressed": { "$value": "{accent.10}" },
-    "fg": { "$value": "{accent.11}", "$description": "Accent as readable foreground: selected tab, active icon, links." },
-    "subtle": { "$value": "{accent.3}", "$description": "Tinted background for accent chips and banners." },
+    "$description": "Brand blue hsl(220 82% 65%); dark mode lifts the same hue. Works as the platform tint (iOS tint, M3 primary).",
+    "default": { "$value": "{accent.9}", "$description": "Tint: switches, checkmarks, progress, selection, toolbar actions, running state." },
+    "solid": { "$value": "{accent.solid}", "$description": "Filled primary buttons and the send button, with text.onAccent." },
+    "pressed": { "$value": "{accent.solidPressed}", "$description": "accent.solid while pressed (iOS)." },
+    "fg": { "$value": "{accent.11}", "$description": "Accent as readable foreground: selected tab label, accent text." },
+    "subtle": { "$value": "{accent.3}", "$description": "Tinted background for accent chips and banners (M3 primary container)." },
     "onSubtle": { "$value": "{accent.11}" }
   },
   "danger": {
     "$type": "color",
-    "default": { "$value": "{danger.11}", "$description": "Destructive icons and text (web: destructive)." },
-    "solid": { "$value": "{danger.9}", "$description": "Filled destructive buttons, with text.onDanger." },
+    "default": { "$value": "{danger.11}", "$description": "Destructive icons and text, e.g. a destructive menu item." },
+    "solid": { "$value": "{danger.solid}", "$description": "Filled destructive buttons, with text.onDanger." },
     "subtle": { "$value": "{danger.3}" },
     "onSubtle": { "$value": "{danger.11}" }
   },
   "warning": {
     "$type": "color",
-    "$description": "Reports an outcome; marks and tints, never fills a pressable control.",
-    "default": { "$value": { "light": "{warning.11}", "dark": "{warning.9}" }, "$description": "The light key (hsl(32 90% 48%)) is under 3:1 on white, so light icons use the text step." },
+    "default": { "$value": { "light": "{warning.11}", "dark": "{warning.9}" }, "$description": "Icons and badges. The light brand orange is under 3:1 on white, so light uses the text step." },
     "subtle": { "$value": "{warning.3}" },
     "onSubtle": { "$value": "{warning.11}" }
   },
   "success": {
     "$type": "color",
-    "$description": "Reports an outcome; marks and tints, never fills a pressable control.",
     "default": { "$value": "{success.9}" },
     "subtle": { "$value": "{success.3}" },
     "onSubtle": { "$value": "{success.11}" }
   },
   "info": {
     "$type": "color",
-    "$description": "The web has no info role; neutral notices use the accent scale.",
+    "$description": "Neutral notices use the accent scale.",
     "default": { "$value": "{accent.9}" },
     "subtle": { "$value": "{accent.3}" },
     "onSubtle": { "$value": "{accent.11}" }
   },
   "state": {
     "$type": "color",
-    "$description": "Session status glyphs. Running uses accent, as on the web. Shape carries meaning too; color is never the only signal.",
+    "$description": "Session status glyphs. Shape carries meaning too; color is never the only signal.",
     "idle": { "$value": "{neutral.10}", "$description": "Backlog / not started / archived." },
     "running": { "$value": "{accent.9}", "$description": "Agent working." },
     "waiting": { "$value": { "light": "{warning.11}", "dark": "{warning.9}" }, "$description": "Needs user input or approval." },
     "done": { "$value": "{success.9}" },
     "failed": { "$value": "{danger.9}" },
-    "merged": { "$value": "{merged.9}", "$description": "Pull request merged (web --github-merged)." }
+    "merged": { "$value": "{merged.9}", "$description": "Pull request merged." }
   },
   "label": {
     "$type": "color",
     "$description": "Categorical colors for project labels, tags and avatar backgrounds; hues generated to sit in the theme. fg reads on bg.base and on the matching bg.",
-    "gray": { "fg": { "$value": "{neutral.11}" }, "bg": { "$value": "{neutral.3}" } },
+    "gray": { "fg": { "$value": "{neutral.11}" }, "bg": { "$value": "{neutral.2}" } },
     "red": { "fg": { "$value": "{red.11}" }, "bg": { "$value": "{red.3}" } },
     "orange": { "fg": { "$value": "{orange.11}" }, "bg": { "$value": "{orange.3}" } },
     "yellow": { "fg": { "$value": "{yellow.11}" }, "bg": { "$value": "{yellow.3}" } },
@@ -115,7 +108,7 @@
     "bg": { "$value": "{neutral.2}", "$description": "Code blocks and diffs." },
     "inlineBg": { "$value": "{neutral.3}", "$description": "Inline `code` spans inside prose." },
     "text": { "$value": "{neutral.12}" },
-    "border": { "$value": "{neutral.4}" },
+    "border": { "$value": { "light": "{neutral.5}", "dark": "{neutral.4}" } },
     "gutter": { "$value": "{neutral.10}", "$description": "Line numbers." }
   },
   "syntax": {
@@ -144,18 +137,18 @@
   },
   "selection": {
     "$type": "color",
-    "text": { "$value": { "light": "{accent.9/24}", "dark": "{accent.9/30}" }, "$description": "Selected-text highlight." },
+    "text": { "$value": { "light": "{accent.9/24}", "dark": "{accent.9/36}" }, "$description": "Selected-text highlight." },
     "handle": { "$value": "{accent.9}", "$description": "Caret and selection handles." }
   },
   "overlay": {
     "$type": "color",
-    "scrim": { "$value": { "light": "{key.foreground/50}", "dark": "{black/60}" }, "$description": "Dimming behind custom modals (web: overlay)." }
+    "scrim": { "$value": { "light": "{black/40}", "dark": "{black/60}" }, "$description": "Dimming behind custom modals." }
   },
   "shadow": {
     "$type": "color",
-    "$description": "Shadow ink per elevation level (tokens/elevation.json). Zero saturation, as on the web; much stronger in dark mode.",
-    "sm": { "$value": { "light": "{key.foreground/8}", "dark": "{black/40}" } },
-    "md": { "$value": { "light": "{key.foreground/16}", "dark": "{black/50}" } },
-    "lg": { "$value": { "light": "{key.foreground/20}", "dark": "{black/60}" } }
+    "$description": "Shadow ink per elevation level (tokens/elevation.json); much stronger in dark mode to read on black.",
+    "sm": { "$value": { "light": "{black/8}", "dark": "{black/40}" } },
+    "md": { "$value": { "light": "{black/12}", "dark": "{black/50}" } },
+    "lg": { "$value": { "light": "{black/16}", "dark": "{black/60}" } }
   }
 }

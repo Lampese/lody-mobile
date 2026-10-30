@@ -66,7 +66,7 @@ fun LodyTheme(
 
 private fun LodyColors.toMaterial(dark: Boolean): ColorScheme =
     (if (dark) darkColorScheme() else lightColorScheme()).copy(
-        primary = accentDefault,
+        primary = accentSolid,
         onPrimary = textOnAccent,
         primaryContainer = accentSubtle,
         onPrimaryContainer = accentOnSubtle,

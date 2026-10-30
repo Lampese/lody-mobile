@@ -162,8 +162,9 @@ struct LodyButton: View {
     var action: () -> Void = {}
 
     private var colors: (bg: Color, fg: Color) {
+        if !enabled { return (LodyColor.fillDisabled, LodyColor.textDisabled) }
         switch kind {
-        case .primary: (LodyColor.inkDefault, LodyColor.inkOn)
+        case .primary: (LodyColor.accentSolid, LodyColor.textOnAccent)
         case .secondary: (LodyColor.fillSecondary, LodyColor.textPrimary)
         case .destructive: (LodyColor.dangerSolid, LodyColor.textOnDanger)
         case .ghost: (Color.clear, LodyColor.textLink)
@@ -182,7 +183,6 @@ struct LodyButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .opacity(enabled ? 1 : LodyOpacity.disabled)
     }
 }
 
@@ -244,9 +244,9 @@ struct Composer: View {
                 .foregroundStyle(LodyColor.textPrimary)
                 .tint(LodyColor.accentDefault)
             Button {} label: {
-                Glyph(icon: .send, size: LodyIconSize.md, color: LodyColor.inkOn)
+                Glyph(icon: .send, size: LodyIconSize.md, color: LodyColor.textOnAccent)
                     .frame(width: LodySize.controlSm, height: LodySize.controlSm)
-                    .background(LodyColor.inkDefault, in: Circle())
+                    .background(LodyColor.accentSolid, in: Circle())
             }
             .buttonStyle(.plain)
         }

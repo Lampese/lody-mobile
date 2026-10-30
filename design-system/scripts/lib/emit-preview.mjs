@@ -95,13 +95,13 @@ export function emitPreview({ palette, colors, typography, dimensions, elevation
   const shadow = (e) => `0 ${e.y}px ${e.blur}px ${v(`shadow.${e.name}`)}`
   const components = `<div class="stack">
     <div class="card"><div class="cap">Buttons</div><div class="wrap">
-      ${btn('Run', v('ink.default'), v('ink.on'), 'send')}
+      ${btn('Run', v('accent.solid'), v('text.onAccent'), 'send')}
       ${btn('Cancel', v('fill.secondary'), v('text.primary'))}
       ${btn('Delete', v('danger.solid'), v('text.onDanger'), 'trash')}
       ${btn('View diff', 'transparent', v('text.link'))}
-      <span style="opacity:${dimensions.numbers.opacity.find((o) => o.name === 'disabled').value}">${btn('Disabled', v('ink.default'), v('ink.on'))}</span>
+      ${btn('Disabled', v('fill.disabled'), v('text.disabled'))}
     </div></div>
-    <div class="card"><div class="cap">Accent (state, not fills)</div><div class="wrap">
+    <div class="card"><div class="cap">Accent as tint</div><div class="wrap">
       <span class="switch"><i></i></span><span class="t-body" style="color:${v('text.link')}">Open pull request</span>
       <span class="progress"><i></i></span>
     </div></div>
@@ -207,7 +207,7 @@ svg { width: 20px; height: 20px; display: block; flex: none; }
 .label { display: inline-flex; align-items: center; gap: 6px; height: ${size('chipSm')}px; padding: 0 8px; border-radius: ${radius('sm')}px; text-transform: capitalize; }
 .label i { width: 8px; height: 8px; border-radius: 99px; }
 .composer { margin: 16px 16px 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 8px 0 12px; border-radius: ${radius('xl')}px; background: ${v('bg.raised')}; border: 1px solid ${v('border.default')}; }
-.send { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: ${v('ink.default')}; color: ${v('ink.on')}; }
+.send { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: ${v('accent.solid')}; color: ${v('text.onAccent')}; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .card { background: ${v('bg.raised')}; border-radius: ${radius('lg')}px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .cap { font-size: 13px; font-weight: 500; color: ${v('text.tertiary')}; }
@@ -259,7 +259,7 @@ td { border-bottom: 1px solid #eee; padding: 6px 10px; vertical-align: middle; }
 <div class="modes"><div class="mode light">${components}</div><div class="mode dark">${components}</div></div>
 
 <h2>Palette</h2>
-<p class="desc">Generated per mode from the web theme's key colors (Lody Light / Vesper). Step 9 (outlined) is the key color itself; 11 is solved for 4.5:1 text on step 3.</p>
+<p class="desc">Brand hues from the web; neutrals and dark-mode lift follow mobile rules. Step 9 (outlined) is the mode's key color; 11 is solved for 4.6:1 text on step 3; solid carries white text at 4.5:1.</p>
 <div class="modes"><div class="mode light">${keyRows('light')}${paletteRows('light')}</div><div class="mode dark">${keyRows('dark')}${paletteRows('dark')}</div></div>
 
 <h2>Type</h2>

@@ -12,15 +12,15 @@ Principles and integration steps: [README.md](README.md).
   `check.mjs` fails on stale `generated/`, missing fonts, or a broken contrast
   floor from `tokens/contrast.json`.
 - Apps reference semantic tokens only. `palette.json` is never emitted.
-- The palette is generated per mode (OKLCH, `scripts/lib/color.mjs`) from the
-  web theme's key colors (`lody-oss/packages/ui/src/tokens/colors.stylex.ts`);
-  change `palette.json` keys / curves, never hex steps. Step 9 of each chromatic
-  scale is its key color.
-- Color roles follow the web `RULES.md`: ink fills primary buttons, accent is
-  state only (focus, link, on / checked, running).
-- Semantic refs: `{scale.step}`, `{key.name}`, optional alpha `{accent.9/24}`;
-  a string value applies to both modes. Contrast checks composite translucent
-  backgrounds onto `bg.base`.
+- Only brand hues come from web / desktop (`palette.json` `brand`); neutrals,
+  dark-mode lift, button, pressed and disabled roles follow mobile platform
+  conventions. See README "复用桌面端的边界" before importing desktop values.
+- The palette is generated per mode (OKLCH, `scripts/lib/color.mjs`); change
+  `brand` / `modes`, never hex steps. Filled buttons use `accent.solid` /
+  `danger.solid` (white text at 4.5:1); `accent.default` is the tint.
+- Semantic refs: `{scale.step}`, `{scale.solid}`, black / white, optional alpha
+  `{accent.9/24}`; a string value applies to both modes. Contrast checks
+  composite translucent backgrounds onto `bg.base`.
 - Icons: Lucide only, pinned by `lucideVersion`. Both platforms are emitted from
   the same path data (`scripts/lib/svg.mjs`), so geometry matches exactly. Icon
   stroke width (`stroke.icon`) is baked into the generated assets.

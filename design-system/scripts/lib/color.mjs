@@ -1,9 +1,12 @@
 // Theme generation in OKLCH (Björn Ottosson's OKLab), in the spirit of Linear's
-// generated themes: each mode supplies a few key colors and every scale is
-// derived from them. Scales use Radix-style 12 step roles:
-//   1 app background · 2 subtle background · 3 tinted fill · 4 hover · 5 selected
-//   6 subtle border · 7 border · 8 strong border · 9 solid (the key color itself)
-//   10 solid pressed · 11 readable text · 12 high-contrast text
+// generated themes: the brand supplies a few hues, each mode supplies its own
+// neutral endpoints and rules, and every scale is derived. Scales use
+// Radix-style 12 step roles:
+//   1 app background · 2 subtle background · 3 tinted fill · 4 pressed · 5 selected
+//   6 subtle border · 7 border · 8 strong border · 9 key color · 10 key pressed
+//   11 readable text · 12 high-contrast text
+// Chromatic scales add `solid` / `solidPressed`: the key darkened just enough to
+// carry white text at 4.5:1, for filled buttons.
 
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 const toGamma = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055)
@@ -83,19 +86,18 @@ const lerp = (a, b, t) => a + (b - a) * t
 const STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 /** Neutral scale from the mode's background (step 1) to its foreground (step 12). */
-function neutralScale(bg, fg, curve, gamma) {
+function neutralScale(bg, fg, curve) {
   const [a, b] = [hexToOklch(bg), hexToOklch(fg)]
   const out = {}
   STEPS.forEach((step, i) => {
-    const t = curve[i] ** gamma
     out[step] =
-      step === 1 ? bg : step === 12 ? fg : oklchToHex({ l: lerp(a.l, b.l, t), c: lerp(a.c, b.c, t), h: a.c > 0.002 ? a.h : b.h })
+      step === 1 ? bg : step === 12 ? fg : oklchToHex({ l: lerp(a.l, b.l, curve[i]), c: lerp(a.c, b.c, curve[i]), h: a.c > 0.002 ? a.h : b.h })
   })
   return out
 }
 
 /** Finds the lightness between `from` and `to` closest to `from` that reaches `target` contrast on `against`. */
-function solveTextLightness(key, from, to, against, target) {
+function solveLightness(key, from, to, against, target) {
   const at = (l) => oklchToHex({ ...key, l })
   if (contrast(at(from), against) >= target) return at(from)
   let [lo, hi] = [0, 1]
@@ -107,8 +109,8 @@ function solveTextLightness(key, from, to, against, target) {
   return at(lerp(from, to, hi))
 }
 
-/** Chromatic scale whose step 9 is the key color itself. */
-function chromaticScale(keyHex, bg, fg, { tint, text }) {
+/** Chromatic scale whose step 9 is the (mode-adjusted) key color. */
+function chromaticScale(keyHex, bg, fg, { tint, text, solid }) {
   const key = hexToOklch(keyHex)
   const [b, f] = [hexToOklch(bg), hexToOklch(fg)]
   const out = {}
@@ -117,30 +119,51 @@ function chromaticScale(keyHex, bg, fg, { tint, text }) {
     out[i + 1] = oklchToHex({ l: lerp(b.l, key.l, tint.l[i]), c: key.c * tint.c[i], h: key.h })
   }
   out[9] = keyHex
-  // 10: the pressed solid, one small step toward the foreground.
+  // 10: the key while pressed, one small step toward the foreground.
   out[10] = oklchToHex({ ...key, l: lerp(key.l, f.l, 0.08) })
   // 11: text, guaranteed readable on its own tinted fill (step 3) and therefore on step 1.
-  out[11] = solveTextLightness(key, key.l, f.l, out[3], text.contrast)
+  out[11] = solveLightness(key, key.l, f.l, out[3], text.contrast)
   // 12: high-contrast text, close to the foreground with a trace of the hue.
   out[12] = oklchToHex({ l: lerp(key.l, f.l, 0.85), c: key.c * 0.4, h: key.h })
+  // Filled controls: darken toward black until white text reaches the target.
+  out.solid = solveLightness(key, key.l, 0, '#FFFFFF', solid.contrast)
+  const s = hexToOklch(out.solid)
+  out.solidPressed = oklchToHex({ ...s, l: s.l - 0.05 })
   return out
 }
 
+/** Applies a mode's key adjustment: dark mode lifts brand colors (same hue) like iOS system colors. */
+function adjustKey(hex, adjust) {
+  if (!adjust) return hex
+  const k = hexToOklch(hex)
+  const l = Math.max(k.l + (adjust.lift ?? 0), adjust.minL ?? 0)
+  return l === k.l ? hex : oklchToHex({ ...k, l })
+}
+
 /**
- * Builds every scale for one mode. Returns { scales: { name: { step: hex } }, keys }.
- * `mode.keys` are the theme's key colors (web token values); `algorithm` holds the
- * shared curves.
+ * Builds every scale for one mode from the brand hues and the mode's rules.
+ * Returns { scales: { name: { step: hex } }, keys: { name: hex } }.
  */
-export function generateMode(mode, algorithm) {
-  const keys = Object.fromEntries(Object.entries(mode.keys).map(([k, v]) => [k, toHex(v)]))
+export function generateMode(mode, brand, algorithm) {
+  const keys = {
+    background: toHex(mode.neutral.background),
+    foreground: toHex(mode.neutral.foreground),
+  }
+  for (const [role, value] of Object.entries(brand)) {
+    if (role.startsWith('$')) continue
+    keys[role] = adjustKey(toHex(value), mode.keyAdjust)
+  }
   const { background: bg, foreground: fg } = keys
-  const scales = { neutral: neutralScale(bg, fg, algorithm.neutralCurve, mode.contrast) }
-  for (const role of algorithm.chromaticKeys) {
-    scales[role] = chromaticScale(keys[role], bg, fg, algorithm)
+  // A near-black background needs a steeper tint curve for steps 1–8 to read as tinted.
+  const scaleOptions = { ...algorithm, tint: mode.tint ?? algorithm.tint }
+  const scales = { neutral: neutralScale(bg, fg, mode.neutral.curve) }
+  for (const [role, hex] of Object.entries(keys)) {
+    if (role === 'background' || role === 'foreground') continue
+    scales[role] = chromaticScale(hex, bg, fg, scaleOptions)
   }
   for (const [name, hue] of Object.entries(algorithm.categorical.hues)) {
     const key = oklchToHex({ l: mode.categorical.l, c: mode.categorical.c, h: hue })
-    scales[name] = chromaticScale(key, bg, fg, algorithm)
+    scales[name] = chromaticScale(key, bg, fg, scaleOptions)
   }
   return { scales, keys }
 }

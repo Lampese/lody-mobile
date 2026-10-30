@@ -78,7 +78,7 @@
   },
   "opacity": {
     "$type": "number",
-    "disabled": { "$value": 0.45, "$description": "Whole-control opacity when disabled (web: disabled is 45% opacity, not a color)." },
+    "$description": "Disabled controls use text.disabled / fill.disabled instead of an opacity.",
     "pressed": { "$value": 0.7, "$description": "Icon-only buttons while pressed (iOS)." },
     "muted": { "$value": 0.6, "$description": "De-emphasized media, archived rows." }
   },

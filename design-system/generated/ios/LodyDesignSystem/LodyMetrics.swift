@@ -185,8 +185,6 @@ public enum LodyBreakpoint {
 }
 
 public enum LodyOpacity {
-    /// Whole-control opacity when disabled (web: disabled is 45% opacity, not a color).
-    public static let disabled: Double = 0.45
     /// Icon-only buttons while pressed (iOS).
     public static let pressed: Double = 0.7
     /// De-emphasized media, archived rows.

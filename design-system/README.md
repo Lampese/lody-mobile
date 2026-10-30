@@ -16,45 +16,56 @@ iOS（`../ios`，SwiftUI）与 Android（`../android`，Compose）共享的设�
 
 | 类别 | 文件 | 内容 |
 |---|---|---|
-| 色板（原始值） | `palette.json` | 每个模式只给 Web 主题的关键色（背景、文字、强调、危险、成功、警告、PR 合并），按 Linear 式算法在 OKLCH 中生成 12 档色阶 |
-| 语义色 | `color.json` | 背景层级、填充（按下 / 选中 / 禁用）、墨色（主按钮）、文字、图标、边框、强调色、危险 / 警告 / 成功 / 信息、会话状态、10 色分类标签、代码与语法高亮、diff、选区、遮罩、阴影色 |
+| 色板（原始值） | `palette.json` | 只输入品牌色相（来自 Web）和各模式的规则，按 Linear 式算法在 OKLCH 中生成 12 档色阶 + 按钮实色档 |
+| 语义色 | `color.json` | 背景层级、填充（按下 / 选中 / 禁用）、文字、图标、边框、强调色（tint / 实色）、危险 / 警告 / 成功 / 信息、会话状态、10 色分类标签、代码与语法高亮、diff、选区、遮罩、阴影色 |
 | 字体 | `typography.json` | Inter + JetBrains Mono，16 档文字样式（display 到 codeSmall），字距按 Inter 公式推导 |
 | 尺寸 | `dimension.json` | 间距、圆角、图标尺寸、描边、控件 / 行 / 头像尺寸、布局、窗口断点 |
-| 数值 | `dimension.json` | 透明度（禁用、按下、弱化） |
+| 数值 | `dimension.json` | 透明度（按下、弱化）；禁用态用专用颜色，不用透明度 |
 | 动效 | `dimension.json` | 时长、缓动曲线、弹簧（SwiftUI duration/bounce，Compose 自动换算 stiffness/damping） |
 | 阴影 | `elevation.json` | sm / md / lg 三级，颜色引用语义色，暗色自动加深 |
 | 图标 | `icons/manifest.json` | 语义名 -> Lucide |
 
+### 复用桌面端的边界
+
+移动端只从桌面 / Web 带入**品牌层**，交互和材质层按移动端准则（iOS HIG、Material 3）重新定义：
+
+| 复用 | 不复用（按移动端准则） |
+|---|---|
+| 品牌色相：强调蓝、危险、成功、警告、PR 合并 | 中性灰的具体取值（按 iOS 背景 / 文字层级生成，而不是桌面的 hover / selected） |
+| 中性色零饱和的气质 | 深色模式配色：同色相提亮，不用桌面的 Vesper 主题 |
+| Inter、JetBrains Mono 字体 | 按钮配色规则：主操作用强调色实色填充（平台惯例） |
+| Lucide 图标 | 输入框凹槽、半透明托盘等拟物材质；桌面阴影体系 |
+| | 禁用态（用专用颜色）、按下态（iOS 高亮 / Android ripple） |
+| | 字号、控件高度、圆角、间距、时长等尺度 |
+
+新增 token 时先判断它属于品牌层还是平台层：品牌层与 Web 保持同值，平台层以移动端准则为准。
+
 ### 色板如何生成
 
-生成方式参考 Linear 的主题引擎：每个模式只输入少数关键色，其余全部由算法推导（`scripts/lib/color.mjs`）。关键色原样取自 Web 端 token（`lody-oss/packages/ui/src/tokens/colors.stylex.ts`），保证移动端和 Web 端是同一个主题：
+生成方式参考 Linear 的主题引擎：只输入少数值，其余全部由算法推导（`scripts/lib/color.mjs`）。
 
-| 关键色 | 浅色（Lody Light） | 深色（Vesper） |
-|---|---|---|
-| background / foreground | `hsl(0 0% 100%)` / `hsl(0 0% 11%)` | `hsl(0 0% 6.3%)` / `hsl(0 0% 100%)` |
-| accent / onAccent | `hsl(220 82% 65%)` / 白 | `hsl(27 100% 80%)` / 黑 |
-| danger / onDanger | `hsl(356 72% 47%)` / 白 | `hsl(0 100% 75%)` / 黑 |
-| success / warning | `hsl(151 55% 36%)` / `hsl(32 90% 48%)` | `hsl(151 60% 52%)` / `hsl(43 96% 56%)` |
-| merged | `hsl(261 69% 59%)` | `hsl(262 89% 71%)` |
+- **品牌色相**（`brand`）：取自 Web 的 `colors.stylex.ts` 浅色主题，强调 `hsl(220 82% 65%)`、危险 `hsl(356 72% 47%)`、成功 `hsl(151 55% 36%)`、警告 `hsl(32 90% 48%)`、合并 `hsl(261 69% 59%)`。
+- **浅色模式**：品牌色原样作为第 9 档。
+- **深色模式**：保持色相，提亮亮度（`keyAdjust`），和 iOS 系统色在深色下的适配方式一致；例如强调色 `#5D8DEF` → `#7CA8FF`。
+- **中性色阶**：每个模式给定背景、文字两端和一条曲线（`neutral.curve`），曲线对齐 iOS 的系统灰层级。深色背景为纯黑，与 iOS 原生导航栏、Tab bar 融为一体。
+- 每个色阶 12 档，角色参考 Radix：1 背景 · 2 次级背景 · 3 浅底 · 4 按下 · 5 选中 · 6–8 边框 · 9 关键色 · 10 关键色按下 · 11 文字 · 12 高对比文字。第 11 档用二分法求解，保证在第 3 档浅底上 ≥ 4.6:1。
+- 彩色色阶额外生成 `solid` / `solidPressed`：关键色压暗到刚好能承载白字 4.5:1，用于填充按钮（浅色强调色本身配白字只有 3.3:1）。
+- 分类标签色只固定色相，亮度和彩度跟随模式。
+- 改品牌色：只改 `brand`；改模式风格：只改 `modes`，然后 build + check。
 
-- 每个色阶 12 档，角色参考 Radix：1 背景 · 2 次级背景 · 3 浅底 · 4 按下 · 5 选中 · 6–8 边框 · **9 实色 = 关键色原值** · 10 实色按下 · 11 文字 · 12 高对比文字。
-- 中性色阶在背景和文字之间按 `neutralCurve` 插值，曲线拟合了 Web 的 secondaryBackground / hover / selected / tertiaryLabel；深色模式用 `contrast` 指数（0.78）整体提亮，两套 Web 主题都能对上。
-- 彩色色阶的第 11 档用二分法求解，保证在自己的第 3 档浅底上达到 4.6:1。
-- 分类标签色（红橙黄绿青蓝靛紫粉）只有色相是固定的，亮度和彩度跟随模式，所以会自然融入主题。
-- 换主题 / 改品牌色：只改 `palette.json` 的 `keys`，跑 build + check。
+### 颜色角色
 
-### 颜色角色（与 Web 规则一致）
-
-- **墨色（`ink.*`）填充主按钮和发送按钮**；强调色不做按钮底色，只用于焦点、链接、开关 / 勾选、进度、选区和"运行中"状态。
-- 成功 / 警告只用于标记和浅底，不填充可按的控件；危险既表示破坏性操作，也表示失败结果。
-- 禁用态 = 整个控件 45% 透明度，不单独定义颜色。
-- 输入框底色（`bg.sunken`）和托盘（`fill.secondary`）用半透明，放在任何表面上都是同一层级差。
+- **强调色**：`accent.default` 是平台 tint（开关、勾选、进度、选区、工具栏操作、运行中状态）；`accent.solid` 填充主按钮和发送按钮，配 `text.onAccent`。
+- **危险**：`danger.solid` 填充破坏性按钮；`danger.default` 用于破坏性菜单项的文字和图标。
+- **成功 / 警告 / 信息**：用于标记和浅底提示。
+- **按下**：iOS 用 `fill.pressed` 高亮，Android 用系统 ripple。
+- **禁用**：`fill.disabled` + `text.disabled`，不用整体透明度。
 
 ### 语义色写法
 
 ```jsonc
 "default": { "$value": "{accent.9}" },                                   // 两个模式同一档位
-"sunken":  { "$value": { "light": "{key.foreground/5}", "dark": "{black/28}" } } // 分模式 + 透明度
+"scrim":   { "$value": { "light": "{black/40}", "dark": "{black/60}" } }    // 分模式 + 透明度
 ```
 
 对比度检查会先把半透明背景合成到 `bg.base` 上再计算。
@@ -108,8 +119,8 @@ node design-system/scripts/fetch-fonts.mjs  # 重新拉取字体（联网）
 | `spacing: lg` | `LodySpacing.lg` | `LodySpacing.lg` |
 | `icon: inbox` | `LodyIcon.inbox.image` | `LodyIcons.Inbox` |
 | `color: label.red.fg` | `LodyColor.labelRedFg` | `LodyTheme.colors.labelRedFg` |
-| `color: ink.default` | `LodyColor.inkDefault` | `LodyTheme.colors.inkDefault` |
-| `opacity: disabled` | `LodyOpacity.disabled` | `LodyOpacity.disabled` |
+| `color: accent.solid` | `LodyColor.accentSolid` | `LodyTheme.colors.accentSolid` |
+| `opacity: pressed` | `LodyOpacity.pressed` | `LodyOpacity.pressed` |
 | `motion: duration.base` | `LodyMotion.base`、`LodyMotion.standard()` | `LodyMotion.baseMillis`、`LodyMotion.standard` |
 | `motion: spring.snappy` | `withAnimation(LodySpring.snappy)` | `LodySpring.snappy<Float>()` |
 | `elevation: md` | `.lodyElevation(.md)` | `Modifier.dropShadow(shape, LodyElevations.md.shadow())` |
