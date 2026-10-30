@@ -1,0 +1,413 @@
+<doc>
+  <h1 id="HptOuob8">Lody Android 实现路径</h1>
+  <p id="ZFAcjMDT">评审草案：先跑通真实云端文字会话，再补可靠性与功能覆盖。已确认的决策不再重复选择；其余均为建议，尚未批准或执行。你可以在文档中评论，也可以直接在聊天里调整优先级。</p>
+  <h2 id="Xpr7TIVE">当前起点与目标</h2>
+  <p id="QsFGzMvJ">独立 Kotlin 工程与离线 WebView 宿主已建立，真实共享运行时、Loro/Flock WASM 和生命周期测试已通过。当前只覆盖 Android 14 / WebView 149，尚未接入登录、云同步、持久化和发送。目标先形成可以日常试用的项目→会话→消息闭环，再逐步对齐 iOS 的功能，而 UI 按两端新设计分别实现。</p>
+  <h2 id="k_u8qlc4">已确定的边界</h2>
+  <ul id="f8Q2J0v1">
+    <li>用户决定：独立 Android 原生 Kotlin 客户端；Compose + Foundation，按需使用 Material 3。</li>
+    <li>用户决定：先用原生托管 WebView 复用共享运行时，保持同一命令、事件和错误语义，保留未来原生替换能力。</li>
+    <li>用户决定：两端可以重做 UI，统一设计语义与产品组件职责，各自保留平台交互。</li>
+    <li>当前实现选择：暂用带来源版本的共享源码快照，运行时资产在本工程生成。</li>
+  </ul>
+  <h2 id="JbFConuJ">架构与数据所有权</h2>
+  <mermaid id="kJlgSpdX">flowchart TD
+ UI[Compose 页面与产品组件] --&gt; VM[ViewModel / StateFlow]
+ VM --&gt; R[业务 Repository 与用例]
+ R --&gt; API[Runtime 合同：Catalog / Session / Commands]
+ R --&gt; DB[Room：投影、草稿、Outbox]
+ API --&gt; WV[WebViewRuntime：原生持有]
+ API -. 未来替换 .-&gt; N[NativeRuntime]
+ WV --&gt; JS[共享 JS：Streams / CRDT / RPC]
+ A[原生 Auth / GrantProvider] --&gt; WV
+ A --&gt; K[Keystore 密钥 + 加密凭据文件]
+ JS --&gt; C[官方 Lody Cloud]
+</mermaid>
+  <table id="u2bWcOyu">
+    <tr>
+      <th>
+        <p>所有者</p>
+      </th>
+      <th>
+        <p>负责</p>
+      </th>
+      <th>
+        <p>不应承担</p>
+      </th>
+    </tr>
+    <tr>
+      <td>
+        <p>共享 JS runtime</p>
+      </td>
+      <td>
+        <p>CRDT 副本、Streams 读写、游标、协议及 Machine RPC</p>
+      </td>
+      <td>
+        <p>Android 页面、长期凭据、本地 UI 状态</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>Android RuntimeHost</p>
+      </td>
+      <td>
+        <p>工作区作用域、WebView 生命周期、桥接、原生 watchdog、订阅与取消</p>
+      </td>
+      <td>
+        <p>第二套 Streams/CRDT 实现、任意 JS 暴露给页面</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>原生 Auth / GrantProvider</p>
+      </td>
+      <td>
+        <p>设备授权、账号切换、长期凭据保护、签发短期 workspace grant</p>
+      </td>
+      <td>
+        <p>把长期凭据交给 JS，或使用桌面凭据</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>Room / Repository / Outbox</p>
+      </td>
+      <td>
+        <p>显示投影、草稿、发送意图与恢复判断；向 UI 输出统一状态</p>
+      </td>
+      <td>
+        <p>把缓存称为已同步，或复制一套实时 CRDT 副本</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>ViewModel / Compose</p>
+      </td>
+      <td>
+        <p>页面状态、交互、组件和导航</p>
+      </td>
+      <td>
+        <p>持有 WebView、解析桥接 JSON、直接读写数据库</p>
+      </td>
+    </tr>
+  </table>
+  <p id="1GoEZgUm">建议先在现有 app 模块内按 feature 和 core 分包；把 runtime 合同逐步抽成纯 Kotlin 模块，WebView 实现单独放 Android 模块。为明确依赖方向而拆分，不先拆出十几个空模块。Repository 保留业务接口；运行时合同再按目录、会话、命令能力拆分，避免形成一个无边界的万能接口。</p>
+  <ul id="csPC2PfC">
+    <li>数据作用域统一为 accountId / workspaceId / sessionId；运行时再带 generation 和 requestId。账号或工作区切换时取消旧请求和订阅，拒绝旧事件写入新作用域。</li>
+    <li>运行时由账号/工作区级容器持有，生命周期独立于 Activity、导航和重组。进后台暂停，回前台恢复；进程被杀后从原生缓存展示，再从服务器 bootstrap 重建副本。</li>
+    <li>Room 是可恢复的显示投影；DataStore 保存非敏感偏好。凭据使用 Keystore 管理的密钥加密后写入应用私有文件，明确备份排除与密钥失效后的重新登录行为。</li>
+    <li>稳定协议需要版本标记、能力声明、结构化错误、取消和超时语义。Swift/Kotlin 接口可以符合各自语言习惯，但同一组协议样例必须得到一致的命令和事件结果。</li>
+    <li>现有 5 秒请求超时与 512 KiB 桥接上限仅适用于探针。正式集成按命令分类配置超时，并测量大型目录/消息投影；8 MiB 副本输入上限与桥接传输上限不能混为一谈。</li>
+  </ul>
+  <h2 id="GA3IwwCm">分阶段交付与验收</h2>
+  <p id="Hy2lEUqG"><b>建议顺序：宿主合同 → 登录和只读连接 → 目录/历史 → 安全发送 → 日常使用 → 发布与功能扩展。</b>每阶段都交付可运行的入口和故障证据；完成标准按行为定义，不以页面数量计算。</p>
+  <table id="rbRjePWM">
+    <tr>
+      <th>
+        <p>阶段</p>
+      </th>
+      <th>
+        <p>具体交付</p>
+      </th>
+      <th>
+        <p>验收门槛</p>
+      </th>
+    </tr>
+    <tr>
+      <td>
+        <p>0. 当前基线，已完成</p>
+      </td>
+      <td>
+        <p>独立工程、共享 runtime 快照、离线宿主、诊断页</p>
+      </td>
+      <td>
+        <p>现有 4 JS + 3 Kotlin + 8 设备测试通过；目前仅 Android 14 / WebView 149，不能推导全设备可用</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>1. 正式宿主与合同</p>
+      </td>
+      <td>
+        <p>RuntimeOwner 脱离 Activity；结构化命令/事件、能力与错误；Coroutines/Flow 适配；规范化共享快照更新流程；输入边界与依赖审计</p>
+      </td>
+      <td>
+        <p>旋转、导航切换、后台与进程重启行为明确；切 workspace 后旧回调不污染；替换为测试实现无需修改页面；大消息、取消、超时、renderer 丢失验证</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>2. 登录与云端只读探针</p>
+      </td>
+      <td>
+        <p>官方 Device Flow；原生凭据与 GrantProvider；工作区选择；严格网络准入；真实 Streams bootstrap/持续读取探针</p>
+      </td>
+      <td>
+        <p>真实设备授权、过期/取消/退出；WebView 的 CORS、HTTP streaming、grant 刷新、断网恢复实测；日志无 token；账号切换隔离。到此得到第一个“能连真实云”的版本</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>3. 项目 → 会话 → 消息只读版</p>
+      </td>
+      <td>
+        <p>Catalog/Session 类型化 API；Room 投影与缓存恢复；项目/会话列表、历史与流式更新；应用导航和可操作连接状态</p>
+      </td>
+      <td>
+        <p>冷启动先展示缓存并标明状态，认证同步后更新；断网、空目录、无权限、历史很长等有明确表现；重进会话无重复消息；不完整同步不能显示 live</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>4. 可靠文字交互闭环</p>
+      </td>
+      <td>
+        <p>现有会话输入与草稿；原生持久化 Outbox；调用共享 sendTurn；回复流、工具状态、必要的权限/问题回应；清晰的发送、交付、执行状态</p>
+      </td>
+      <td>
+        <p>文字发送→服务端保存→机器交付→回复可见；在关键步骤杀进程、断网、超时均不盲重发；unknown 可对账；重复点击只产生一个发送意图。到此是第一版可试用核心客户端</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>5. 日常使用版与 UI 定型</p>
+      </td>
+      <td>
+        <p>新建会话、机器/agent/model/mode 配置；附件与失败恢复；Markdown/代码/Diff；按优先级支持取消、排队、引导、编辑；应用设置</p>
+      </td>
+      <td>
+        <p>新会话和首条消息衔接；附件失败保留整份草稿；键盘/返回/滚动/文本选择可用；长会话流式更新不卡顿；暗色、TalkBack、大字体与横屏验证</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>6. 分发、通知与功能扩展</p>
+      </td>
+      <td>
+        <p>渠道确定后的推送与深链、系统分享接收；正式签名/应用标识/隐私与备份规则；按使用价值扩展设置、MCP、角色、快捷提示、GitHub、历史和分享等</p>
+      </td>
+      <td>
+        <p>真实设备矩阵、升级与数据库迁移、账号切换后的通知路由、后台/被杀恢复；release 无诊断入口；发布流程可复现</p>
+      </td>
+    </tr>
+  </table>
+  <h3 id="eCFw_WGj">阶段 2：网络开放必须是独立交付</h3>
+  <p id="gYBSQr27">当前探针没有 INTERNET 权限，CSP 与请求拦截也拒绝所有网络。联网不能只增加权限：文档仍只从本地加载，脚本不远程加载；仅允许已验证的 Cloud/Streams endpoint，动态 shard 地址必须由受信任 grant 约束并校验，检查重定向和实际 CORS。原生 HTTP 登录成功不等于 WebView Streams 读取成功。</p>
+  <p id="saA1jzy7">Device Flow 先沿用服务端现有注册行为；如仍使用 lody-cli，不声称已获得 Android 专用 client。用应用内独立授权，不复用其他客户端 token。共享 Zod 审计问题需在此阶段开放真实数据前完成复核与兼容修复，并保留协议回归证据。</p>
+  <h3 id="SY9MJ2W8">阶段 4：发送状态与恢复</h3>
+  <mermaid id="LQCKVFeM">flowchart LR
+ D[草稿] --&gt; O[原生落盘发送意图]
+ O --&gt; S[共享 runtime 保存用户历史]
+ S --&gt; P[更新 durable dispatch pointer]
+ P --&gt; M[Machine RPC]
+ M --&gt; A[交付 ACK]
+ A --&gt; R[同步回复与执行状态]
+ M -. 超时或进程中断 .-&gt; U[结果不确定：对账]
+ U --&gt; C[检查服务端历史与消息 ID]
+</mermaid>
+  <p id="JeawICF-">先沿用 iOS 的 waiting / creating / sending / accepted / queued / uploaded / unknown / failed 语义做映射，不另造冲突状态机。原生 Outbox 记录意图与结果，共享 runtime 保持云端历史、dispatch pointer、RPC 的既有顺序。机器 ACK 表示交付，不表示执行完成。未知结果优先读取服务器状态；只有明确尚未提交且具备可证明的安全条件时才考虑重试。首版不新增自动重放写入机制。</p>
+  <h3 id="DlRg_Tk0">设计与功能的配合</h3>
+  <p id="VtfAwixl">阶段 1 同时准备 LodyTheme、语义 token 和组件预览；阶段 3 确定项目/会话/聊天的信息结构，阶段 4 验证输入框、键盘和消息流，阶段 5 再定型视觉与交互细节。业务数据通过稳定 UiState 进入组件，避免每次视觉调整牵动同步与发送。</p>
+  <h2 id="hpbJDOy2">依赖与设计演进</h2>
+  <table id="iypfRswd">
+    <tr>
+      <th>
+        <p>用途</p>
+      </th>
+      <th>
+        <p>建议</p>
+      </th>
+      <th>
+        <p>引入时机与理由</p>
+      </th>
+    </tr>
+    <tr>
+      <td>
+        <p>UI</p>
+      </td>
+      <td>
+        <p>Compose / Foundation / Material 3</p>
+      </td>
+      <td>
+        <p>已确认并在诊断页采用。封装有产品语义的组件，普通控件按需使用 Material 3</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>异步与状态</p>
+      </td>
+      <td>
+        <p>Coroutines + Flow / StateFlow + ViewModel</p>
+      </td>
+      <td>
+        <p>阶段 1；业务异步与取消不再扩散回调，WebView 操作仍在主线程。采用单向数据流</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>导航</p>
+      </td>
+      <td>
+        <p>优先评估稳定版 Navigation 3</p>
+      </td>
+      <td>
+        <p>阶段 3；用项目→会话→消息小切片验证返回栈、进程恢复、深链与返回手势，再锁定版本</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>原生 HTTP / JSON</p>
+      </td>
+      <td>
+        <p>OkHttp + kotlinx.serialization，Retrofit 按接口数量决定</p>
+      </td>
+      <td>
+        <p>阶段 2；原生先只负责 Auth、grant 等少量接口。Streams 仍由共享 JS 发起，不接两套云协议栈</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>数据库 / 偏好</p>
+      </td>
+      <td>
+        <p>Room + DataStore</p>
+      </td>
+      <td>
+        <p>阶段 3；Room 保存投影、草稿、Outbox，DataStore 保存非敏感偏好。选与当前 Kotlin/KSP/AGP 兼容的稳定组合</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>凭据</p>
+      </td>
+      <td>
+        <p>Android Keystore + 经过审查的 AES-GCM 封装</p>
+      </td>
+      <td>
+        <p>阶段 2；Keystore 存密钥，token 密文放私有文件，避免把 token 误当成可直接存入 Keystore 的普通数据</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>依赖注入</p>
+      </td>
+      <td>
+        <p>构造函数注入 + 简单 AppContainer</p>
+      </td>
+      <td>
+        <p>阶段 1；等实例图和作用域复杂后再决定是否引入 Hilt</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>后台任务 / 推送</p>
+      </td>
+      <td>
+        <p>按需求评估 WorkManager 和推送 SDK</p>
+      </td>
+      <td>
+        <p>阶段 6；WorkManager 不承担 WebView 保活，也不能自动重试结果不确定的发送。渠道与后台体验确定后再选 SDK</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>内容渲染</p>
+      </td>
+      <td>
+        <p>先验证 Markdown、代码、Diff 的样例，再选库</p>
+      </td>
+      <td>
+        <p>阶段 3 提供完整可读的基础内容，阶段 5 优化复杂展示。不要为了完整复制 iOS DOM 渲染提前引入第二个 WebView</p>
+      </td>
+    </tr>
+  </table>
+  <p id="rB9Rr49b">这些新增依赖是计划建议，不属于已批准的架构决策。具体版本在对应阶段落地时核验兼容矩阵并锁定；不追求把所有库一次升到各自最新版本。</p>
+  <p id="_XEFIBri">官方依据：<a href="https://developer.android.com/topic/architecture/recommendations">Android 架构与单向数据流</a>；<a href="https://developer.android.com/privacy-and-security/keystore">Keystore 密钥保护</a>；<a href="https://developer.android.com/training/data-storage/room">Room</a>；<a href="https://developer.android.com/topic/libraries/architecture/datastore">DataStore</a>；<a href="https://developer.android.com/guide/navigation/navigation-3/basics">Navigation 3 返回栈</a>；<a href="https://developer.android.com/develop/background-work/background-tasks">后台任务选择</a>。这些文档支持技术方向，不能代替 Lody 协议和设备实测。</p>
+  <h2 id="Y9F4izf6">实施切分与待定选择</h2>
+  <h3 id="v_vqjemj">建议的第一批工作</h3>
+  <ol id="uSon39qq">
+    <li>把 RuntimeOwner 从诊断 Activity 移到受账号/工作区作用域管理的容器，增加旋转、导航离开、进程重启和旧作用域事件测试。</li>
+    <li>定义最小合同：RuntimeStatus、GrantProvider、CatalogSnapshot、SessionSubscription、CommandResult；先接目录只读需要的命令和事件。JSON 只停留在适配器，错误分为鉴权、网络、协议、运行时与业务拒绝。</li>
+    <li>加入协程取消、分类超时、大消息与能力协商测试；建立与 iOS 共用的协议输入输出样例，记录 runtime snapshot 升级流程。</li>
+    <li>完成共享依赖审计修复后，落地原生 Device Flow 与凭据保护；做一个真实工作区的只读联网探针。</li>
+    <li>通过真实 Streams 读取和断网恢复后，再交付项目/会话/消息页面与 Room 缓存。</li>
+  </ol>
+  <h3 id="BZdUPNEY">里程碑</h3>
+  <ul id="h5TE0Bc7">
+    <li><b>M1：可连云</b> = 阶段 1–2；独立授权并稳定读取真实工作区，退出和换账号正确。</li>
+    <li><b>M2：核心可用</b> = 阶段 3–4；从项目进入会话、可靠发送文字并收到回复，异常状态可解释、可恢复。</li>
+    <li><b>M3：日常使用</b> = 阶段 5；新建、附件、模型选择、消息呈现与交互达到可持续使用水平。</li>
+    <li><b>M4：可分发</b> = 阶段 6 的发布必需部分；其他 iOS 功能依实际优先级继续补齐。</li>
+  </ul>
+  <p id="BXtZXYqD">建议以这些门槛安排迭代，先不承诺日历日期。真实授权/Streams 联调、发送恢复和长消息渲染的未知量最大；M1 验证后再给后续排期，避免只按页面数量估工期。</p>
+  <h3 id="rUoOeNhJ">待定选择：建议供你调整</h3>
+  <table id="koOlJlNR">
+    <tr>
+      <th>
+        <p>问题</p>
+      </th>
+      <th>
+        <p>我的建议</p>
+      </th>
+      <th>
+        <p>影响</p>
+      </th>
+    </tr>
+    <tr>
+      <td>
+        <p>1. 第一版目标是什么？</p>
+      </td>
+      <td>
+        <p>以 M2 的可靠文字会话闭环为首个产品里程碑，暂不追求全部 iOS 功能对齐</p>
+      </td>
+      <td>
+        <p>决定何时进入试用及第一轮范围</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>2. 最低系统与设备范围？</p>
+      </td>
+      <td>
+        <p>暂保留 Android 8 / API 26 的声明，但在 M1 前验证最低可支持 WebView；至少覆盖最低版本、Android 14、当前 Android 17，以及一台实际用户设备</p>
+      </td>
+      <td>
+        <p>若最低组合不支持，明确提高门槛或提供更新提示，不承诺无法验证的兼容性</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>3. 新 UI 如何推进？</p>
+      </td>
+      <td>
+        <p>先定主题与组件职责，随阶段 3–5 逐个确认核心页面；当前诊断页不作为产品设计基线</p>
+      </td>
+      <td>
+        <p>视觉改动不会阻塞协议验证，也不会将业务实现绑定旧 iOS 布局</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>4. 需要什么后台发送体验？</p>
+      </td>
+      <td>
+        <p>首版保留发送意图、前台同步和结果对账，不承诺应用被杀后继续发送，也不做常驻保活</p>
+      </td>
+      <td>
+        <p>如果要求后台持续上传/发送，单独设计用户可感知任务与通知，而非直接照搬 iOS 后台 allowance</p>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>5. 发布地区与渠道？</p>
+      </td>
+      <td>
+        <p>目前留待明确；在此之前不锁定 FCM/OneSignal 等推送依赖</p>
+      </td>
+      <td>
+        <p>影响推送可达性、设备矩阵、分发和发布准备；不阻塞 M1–M2</p>
+      </td>
+    </tr>
+  </table>
+  <p id="drObVSr3">当前没有更改生产实现或启动联网操作。此文档是建议计划；未回复的选项仍是未决，不视为批准。现有验证依据来自本工程 verification/results.json 与 iOS 运行时/Outbox/LocalStore 源码；Nowledge Mem 本轮不可达，未采用未检索到的历史结论。</p>
+</doc>
