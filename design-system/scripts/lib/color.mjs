@@ -4,7 +4,7 @@
 // Radix-style 12 step roles:
 //   1 app background · 2 subtle background · 3 tinted fill · 4 pressed · 5 selected
 //   6 subtle border · 7 border · 8 strong border · 9 key color · 10 key pressed
-//   11 readable text · 12 high-contrast text
+//   11 readable text (on the worst tinted backdrop) · 12 high-contrast text
 // Chromatic scales add `solid` / `solidPressed`: the key darkened just enough to
 // carry white text at 4.5:1, for filled buttons.
 
@@ -121,8 +121,9 @@ function chromaticScale(keyHex, bg, fg, { tint, text, solid }) {
   out[9] = keyHex
   // 10: the key while pressed, one small step toward the foreground.
   out[10] = oklchToHex({ ...key, l: lerp(key.l, f.l, 0.08) })
-  // 11: text, guaranteed readable on its own tinted fill (step 3) and therefore on step 1.
-  out[11] = solveLightness(key, key.l, f.l, out[3], text.contrast)
+  // 11: text. Solved against a tint step that matches the darkest real backdrop:
+  // a translucent tint composited onto the deepest surface (grouped bg / cards).
+  out[11] = solveLightness(key, key.l, f.l, out[text.againstStep], text.contrast)
   // 12: high-contrast text, close to the foreground with a trace of the hue.
   out[12] = oklchToHex({ l: lerp(key.l, f.l, 0.85), c: key.c * 0.4, h: key.h })
   // Filled controls: darken toward black until white text reaches the target.
@@ -155,7 +156,7 @@ export function generateMode(mode, brand, algorithm) {
   }
   const { background: bg, foreground: fg } = keys
   // A near-black background needs a steeper tint curve for steps 1–8 to read as tinted.
-  const scaleOptions = { ...algorithm, tint: mode.tint ?? algorithm.tint }
+  const scaleOptions = { ...algorithm, tint: mode.tint ?? algorithm.tint, text: { ...algorithm.text, ...mode.text } }
   const scales = { neutral: neutralScale(bg, fg, mode.neutral.curve) }
   for (const [role, hex] of Object.entries(keys)) {
     if (role === 'background' || role === 'foreground') continue

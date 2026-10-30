@@ -5,16 +5,16 @@
     "base": { "$value": "{neutral.1}", "$description": "Screen background for plain lists and content (iOS systemBackground)." },
     "grouped": { "$value": { "light": "{neutral.2}", "dark": "{neutral.1}" }, "$description": "Behind grouped lists and cards (iOS systemGroupedBackground)." },
     "raised": { "$value": { "light": "{neutral.1}", "dark": "{neutral.2}" }, "$description": "Cards and cells on bg.grouped, sheets, the composer (iOS secondarySystemGroupedBackground)." },
-    "sunken": { "$value": { "light": "{neutral.2}", "dark": "{neutral.3}" }, "$description": "Text fields and search bars: a flat fill, no inset." },
+    "sunken": { "$value": { "light": "{black/5}", "dark": "{white/10}" }, "$description": "Text fields and search bars: a flat translucent fill (iOS search field), no inset." },
     "overlay": { "$value": { "light": "{neutral.1}", "dark": "{neutral.3}" }, "$description": "Custom menus, popovers and toasts; pair with an elevation." },
     "inverse": { "$value": "{neutral.12}", "$description": "Snackbars and tooltips; text uses text.inverse." }
   },
   "fill": {
     "$type": "color",
     "pressed": { "$value": "{neutral.4}", "$description": "Row / cell highlight while pressed on iOS. Android uses the platform ripple instead." },
-    "selected": { "$value": "{neutral.3}", "$description": "Persistently selected row, chip or segment." },
-    "secondary": { "$value": "{neutral.3}", "$description": "Secondary buttons and neutral chips (iOS tertiarySystemFill, M3 secondary container)." },
-    "tertiary": { "$value": "{neutral.2}", "$description": "Skeletons, avatar placeholders." },
+    "selected": { "$value": { "light": "{black/8}", "dark": "{white/12}" }, "$description": "Persistently selected row, chip or segment. Translucent." },
+    "secondary": { "$value": { "light": "{black/7}", "dark": "{white/12}" }, "$description": "Secondary buttons and neutral chips. Translucent like iOS tertiarySystemFill, so it reads on every surface." },
+    "tertiary": { "$value": { "light": "{black/5}", "dark": "{white/8}" }, "$description": "Skeletons, avatar placeholders. Translucent." },
     "disabled": { "$value": "{neutral.3}", "$description": "Container of a disabled filled control (M3: on-surface 12%)." }
   },
   "text": {
@@ -50,33 +50,33 @@
     "solid": { "$value": "{accent.solid}", "$description": "Filled primary buttons and the send button, with text.onAccent." },
     "pressed": { "$value": "{accent.solidPressed}", "$description": "accent.solid while pressed (iOS)." },
     "fg": { "$value": "{accent.11}", "$description": "Accent as readable foreground: selected tab label, accent text." },
-    "subtle": { "$value": "{accent.3}", "$description": "Tinted background for accent chips and banners (M3 primary container)." },
+    "subtle": { "$value": { "light": "{accent.9/12}", "dark": "{accent.9/20}" }, "$description": "Tinted background for accent chips and banners (M3 primary container)." },
     "onSubtle": { "$value": "{accent.11}" }
   },
   "danger": {
     "$type": "color",
     "default": { "$value": "{danger.11}", "$description": "Destructive icons and text, e.g. a destructive menu item." },
     "solid": { "$value": "{danger.solid}", "$description": "Filled destructive buttons, with text.onDanger." },
-    "subtle": { "$value": "{danger.3}" },
+    "subtle": { "$value": { "light": "{danger.9/10}", "dark": "{danger.9/22}" } },
     "onSubtle": { "$value": "{danger.11}" }
   },
   "warning": {
     "$type": "color",
     "default": { "$value": { "light": "{warning.11}", "dark": "{warning.9}" }, "$description": "Icons and badges. The light brand orange is under 3:1 on white, so light uses the text step." },
-    "subtle": { "$value": "{warning.3}" },
+    "subtle": { "$value": { "light": "{warning.9/14}", "dark": "{warning.9/20}" } },
     "onSubtle": { "$value": "{warning.11}" }
   },
   "success": {
     "$type": "color",
     "default": { "$value": "{success.9}" },
-    "subtle": { "$value": "{success.3}" },
+    "subtle": { "$value": { "light": "{success.9/12}", "dark": "{success.9/20}" } },
     "onSubtle": { "$value": "{success.11}" }
   },
   "info": {
     "$type": "color",
     "$description": "Neutral notices use the accent scale.",
     "default": { "$value": "{accent.9}" },
-    "subtle": { "$value": "{accent.3}" },
+    "subtle": { "$value": { "light": "{accent.9/12}", "dark": "{accent.9/20}" } },
     "onSubtle": { "$value": "{accent.11}" }
   },
   "state": {
@@ -92,24 +92,24 @@
   "label": {
     "$type": "color",
     "$description": "Categorical colors for project labels, tags and avatar backgrounds; hues generated to sit in the theme. fg reads on bg.base and on the matching bg.",
-    "gray": { "fg": { "$value": "{neutral.11}" }, "bg": { "$value": "{neutral.2}" } },
-    "red": { "fg": { "$value": "{red.11}" }, "bg": { "$value": "{red.3}" } },
-    "orange": { "fg": { "$value": "{orange.11}" }, "bg": { "$value": "{orange.3}" } },
-    "yellow": { "fg": { "$value": "{yellow.11}" }, "bg": { "$value": "{yellow.3}" } },
-    "green": { "fg": { "$value": "{green.11}" }, "bg": { "$value": "{green.3}" } },
-    "teal": { "fg": { "$value": "{teal.11}" }, "bg": { "$value": "{teal.3}" } },
-    "blue": { "fg": { "$value": "{blue.11}" }, "bg": { "$value": "{blue.3}" } },
-    "indigo": { "fg": { "$value": "{indigo.11}" }, "bg": { "$value": "{indigo.3}" } },
-    "purple": { "fg": { "$value": "{purple.11}" }, "bg": { "$value": "{purple.3}" } },
-    "pink": { "fg": { "$value": "{pink.11}" }, "bg": { "$value": "{pink.3}" } }
+    "gray": { "fg": { "$value": "{neutral.11}" }, "bg": { "$value": { "light": "{black/6}", "dark": "{white/10}" } } },
+    "red": { "fg": { "$value": "{red.11}" }, "bg": { "$value": { "light": "{red.9/14}", "dark": "{red.9/20}" } } },
+    "orange": { "fg": { "$value": "{orange.11}" }, "bg": { "$value": { "light": "{orange.9/14}", "dark": "{orange.9/20}" } } },
+    "yellow": { "fg": { "$value": "{yellow.11}" }, "bg": { "$value": { "light": "{yellow.9/14}", "dark": "{yellow.9/20}" } } },
+    "green": { "fg": { "$value": "{green.11}" }, "bg": { "$value": { "light": "{green.9/14}", "dark": "{green.9/20}" } } },
+    "teal": { "fg": { "$value": "{teal.11}" }, "bg": { "$value": { "light": "{teal.9/14}", "dark": "{teal.9/20}" } } },
+    "blue": { "fg": { "$value": "{blue.11}" }, "bg": { "$value": { "light": "{blue.9/14}", "dark": "{blue.9/20}" } } },
+    "indigo": { "fg": { "$value": "{indigo.11}" }, "bg": { "$value": { "light": "{indigo.9/14}", "dark": "{indigo.9/20}" } } },
+    "purple": { "fg": { "$value": "{purple.11}" }, "bg": { "$value": { "light": "{purple.9/14}", "dark": "{purple.9/20}" } } },
+    "pink": { "fg": { "$value": "{pink.11}" }, "bg": { "$value": { "light": "{pink.9/14}", "dark": "{pink.9/20}" } } }
   },
   "code": {
     "$type": "color",
-    "bg": { "$value": "{neutral.2}", "$description": "Code blocks and diffs." },
-    "inlineBg": { "$value": "{neutral.3}", "$description": "Inline `code` spans inside prose." },
+    "bg": { "$value": { "light": "{black/5}", "dark": "{white/7}" }, "$description": "Code blocks and diffs. Translucent so a block reads on lists and cards alike." },
+    "inlineBg": { "$value": { "light": "{black/7}", "dark": "{white/12}" }, "$description": "Inline `code` spans inside prose." },
     "text": { "$value": "{neutral.12}" },
     "border": { "$value": { "light": "{neutral.5}", "dark": "{neutral.4}" } },
-    "gutter": { "$value": "{neutral.10}", "$description": "Line numbers." }
+    "gutter": { "$value": { "light": "{neutral.11}", "dark": "{neutral.10}" }, "$description": "Line numbers." }
   },
   "syntax": {
     "$type": "color",
@@ -123,16 +123,16 @@
     "variable": { "$value": "{neutral.12}" },
     "property": { "$value": "{red.11}", "$description": "Object keys, HTML / JSX attributes." },
     "tag": { "$value": "{pink.11}" },
-    "comment": { "$value": "{neutral.10}" },
+    "comment": { "$value": { "light": "{neutral.11}", "dark": "{neutral.10}" } },
     "punctuation": { "$value": "{neutral.11}", "$description": "Operators and punctuation." }
   },
   "diff": {
     "$type": "color",
-    "addedBg": { "$value": "{success.3}" },
-    "removedBg": { "$value": "{danger.3}" },
+    "addedBg": { "$value": { "light": "{success.9/12}", "dark": "{success.9/18}" } },
+    "removedBg": { "$value": { "light": "{danger.9/10}", "dark": "{danger.9/20}" } },
     "addedText": { "$value": "{success.11}" },
     "removedText": { "$value": "{danger.11}" },
-    "hunkBg": { "$value": "{accent.2}", "$description": "@@ hunk header rows." },
+    "hunkBg": { "$value": { "light": "{accent.9/10}", "dark": "{accent.9/14}" }, "$description": "@@ hunk header rows." },
     "hunkText": { "$value": "{accent.11}" }
   },
   "selection": {

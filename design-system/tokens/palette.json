@@ -14,8 +14,9 @@
         "$description": "Zero-saturation neutrals. Curve positions follow iOS light system grays: 2 grouped background, 4 cell highlight, 6 separator, 9-11 tertiary / secondary labels.",
         "background": "#FFFFFF",
         "foreground": "#1C1C1C",
-        "curve": [0, 0.05, 0.078, 0.102, 0.129, 0.178, 0.23, 0.32, 0.41, 0.48, 0.6, 1]
+        "curve": [0, 0.05, 0.078, 0.102, 0.129, 0.178, 0.23, 0.32, 0.41, 0.48, 0.64, 1]
       },
+      "text": { "againstStep": 5 },
       "categorical": { "l": 0.62, "c": 0.15 }
     },
     "dark": {
@@ -35,6 +36,7 @@
         "l": [0.16, 0.24, 0.31, 0.37, 0.43, 0.5, 0.6, 0.75],
         "c": [0.12, 0.2, 0.3, 0.4, 0.5, 0.62, 0.76, 0.9]
       },
+      "text": { "againstStep": 6 },
       "categorical": { "l": 0.74, "c": 0.13 }
     }
   },
@@ -43,7 +45,7 @@
       "l": [0.03, 0.07, 0.12, 0.18, 0.25, 0.34, 0.48, 0.68],
       "c": [0.06, 0.14, 0.24, 0.34, 0.45, 0.58, 0.74, 0.9]
     },
-    "text": { "contrast": 4.6 },
+    "text": { "$description": "Step 11 reaches this contrast on step againstStep (per mode), which approximates translucent tints on the darkest surface.", "contrast": 4.6, "againstStep": 3 },
     "solid": { "contrast": 4.5 },
     "categorical": {
       "$description": "Label / avatar hues (OKLCH h). Lightness and chroma come from each mode so labels sit in the theme.",

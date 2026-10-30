@@ -19,8 +19,12 @@ Principles and integration steps: [README.md](README.md).
   `brand` / `modes`, never hex steps. Filled buttons use `accent.solid` /
   `danger.solid` (white text at 4.5:1); `accent.default` is the tint.
 - Semantic refs: `{scale.step}`, `{scale.solid}`, black / white, optional alpha
-  `{accent.9/24}`; a string value applies to both modes. Contrast checks
-  composite translucent backgrounds onto `bg.base`.
+  `{accent.9/24}`; a string value applies to both modes.
+- Tinted and neutral fills (`*.subtle`, `label.*.bg`, `code.*Bg`, `diff.*Bg`,
+  `fill.*`, `bg.sunken`) are translucent so they read on every surface; do not
+  make them solid steps. `check.mjs` composites translucent colors onto
+  `bg.base` / `bg.grouped` / `bg.raised` for contrast (worst case wins) and
+  enforces a minimum lightness separation from each surface.
 - Icons: Lucide only, pinned by `lucideVersion`. Both platforms are emitted from
   the same path data (`scripts/lib/svg.mjs`), so geometry matches exactly. Icon
   stroke width (`stroke.icon`) is baked into the generated assets.

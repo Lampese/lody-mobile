@@ -204,8 +204,9 @@ export function loadElevation(colors) {
   })
 }
 
-export function loadContrastPairs() {
-  return readJson('tokens/contrast.json').pairs
+export function loadContrastRules() {
+  const { pairs, surfaces, separation } = readJson('tokens/contrast.json')
+  return { pairs, surfaces, separation }
 }
 
 export function loadIconManifest() {

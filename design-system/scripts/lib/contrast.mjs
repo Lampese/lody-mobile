@@ -13,15 +13,21 @@ function over(fg, bg) {
   return { r: fg.r * a + bg.r * (1 - a), g: fg.g * a + bg.g * (1 - a), b: fg.b * a + bg.b * (1 - a) }
 }
 
+const hex = ({ r, g, b }) => `#${[r, g, b].map((v) => Math.round(v).toString(16).toUpperCase().padStart(2, '0')).join('')}`
+
+/** The opaque color a (possibly translucent) color shows when drawn on `surfaceHex`. */
+export function composite(colorHex, surfaceHex) {
+  const color = parseHex(colorHex)
+  return color.a < 255 ? hex(over(color, parseHex(surfaceHex))) : colorHex.slice(0, 7)
+}
+
 /**
  * WCAG 2.x contrast ratio. A translucent background is first composited onto
- * `baseHex` (the surface it sits on, e.g. bg.base); a translucent foreground is
+ * `surfaceHex` (what it sits on, e.g. bg.raised); a translucent foreground is
  * then composited onto that background.
  */
-export function contrastRatio(fgHex, bgHex, baseHex = '#FFFFFF') {
-  const base = parseHex(baseHex)
-  const rawBg = parseHex(bgHex)
-  const bg = rawBg.a < 255 ? { ...over(rawBg, base), a: 255 } : rawBg
+export function contrastRatio(fgHex, bgHex, surfaceHex = '#FFFFFF') {
+  const bg = parseHex(composite(bgHex, surfaceHex))
   const l1 = luminance(over(parseHex(fgHex), bg))
   const l2 = luminance(bg)
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)

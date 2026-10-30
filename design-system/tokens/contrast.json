@@ -1,5 +1,39 @@
 {
-  "$description": "WCAG contrast floors checked by scripts/check.mjs in both modes. 4.5 = body text, 3 = large text, icons and UI glyphs. Translucent backgrounds are composited onto bg.base first.",
+  "$description": "Accessibility floors checked by scripts/check.mjs in both modes. pairs: WCAG contrast (4.5 body text, 3 large text and glyphs); a translucent background is composited onto every surface below and the worst case must pass. separation: tinted fills must differ from every surface by at least minDeltaL (OKLCH lightness) so they stay visible on lists, grouped backgrounds and cards alike.",
+  "surfaces": [
+    "bg.base",
+    "bg.grouped",
+    "bg.raised"
+  ],
+  "separation": {
+    "minDeltaL": 0.03,
+    "tokens": [
+      "fill.secondary",
+      "fill.tertiary",
+      "fill.selected",
+      "bg.sunken",
+      "accent.subtle",
+      "danger.subtle",
+      "warning.subtle",
+      "success.subtle",
+      "info.subtle",
+      "label.gray.bg",
+      "label.red.bg",
+      "label.orange.bg",
+      "label.yellow.bg",
+      "label.green.bg",
+      "label.teal.bg",
+      "label.blue.bg",
+      "label.indigo.bg",
+      "label.purple.bg",
+      "label.pink.bg",
+      "code.bg",
+      "code.inlineBg",
+      "diff.addedBg",
+      "diff.removedBg",
+      "diff.hunkBg"
+    ]
+  },
   "pairs": [
     ["text.primary", "bg.base", 4.5],
     ["text.primary", "bg.grouped", 4.5],
