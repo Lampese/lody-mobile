@@ -28,7 +28,20 @@ public extension LodyTextStyle {
     /// Diffs, inline code in dense rows.
     static let codeSmall = LodyTextStyle(fontName: "JetBrainsMono-Regular", size: 12, lineHeight: 18, tracking: 0, dynamicType: .footnote)
 
-    static let all: [LodyTextStyle] = [.largeTitle, .title, .headline, .body, .bodyEmphasis, .reading, .subhead, .footnote, .caption, .micro, .code, .codeSmall]
+    static let all: [(name: String, style: LodyTextStyle)] = [
+        ("largeTitle", .largeTitle),
+        ("title", .title),
+        ("headline", .headline),
+        ("body", .body),
+        ("bodyEmphasis", .bodyEmphasis),
+        ("reading", .reading),
+        ("subhead", .subhead),
+        ("footnote", .footnote),
+        ("caption", .caption),
+        ("micro", .micro),
+        ("code", .code),
+        ("codeSmall", .codeSmall),
+    ]
 }
 
 public enum LodyFontFiles {

@@ -13,6 +13,19 @@ public enum LodySpacing {
     public static let xxl: CGFloat = 24
     public static let xxxl: CGFloat = 32
     public static let huge: CGFloat = 48
+
+    public static let all: [(name: String, value: CGFloat)] = [
+        ("none", none),
+        ("xxs", xxs),
+        ("xs", xs),
+        ("sm", sm),
+        ("md", md),
+        ("lg", lg),
+        ("xl", xl),
+        ("xxl", xxl),
+        ("xxxl", xxxl),
+        ("huge", huge),
+    ]
 }
 
 public enum LodyRadius {
@@ -28,6 +41,15 @@ public enum LodyRadius {
     public static let xl: CGFloat = 20
     /// Pills, avatars.
     public static let full: CGFloat = 9999
+
+    public static let all: [(name: String, value: CGFloat)] = [
+        ("xs", xs),
+        ("sm", sm),
+        ("md", md),
+        ("lg", lg),
+        ("xl", xl),
+        ("full", full),
+    ]
 }
 
 public enum LodyIconSize {
@@ -39,6 +61,14 @@ public enum LodyIconSize {
     /// Tab bar, prominent actions.
     public static let lg: CGFloat = 24
     public static let xl: CGFloat = 28
+
+    public static let all: [(name: String, value: CGFloat)] = [
+        ("xs", xs),
+        ("sm", sm),
+        ("md", md),
+        ("lg", lg),
+        ("xl", xl),
+    ]
 }
 
 public enum LodyStroke {
@@ -47,6 +77,12 @@ public enum LodyStroke {
     public static let focus: CGFloat = 2
     /// Icon stroke on the 24pt grid; baked into generated icons.
     public static let icon: CGFloat = 1.75
+
+    public static let all: [(name: String, value: CGFloat)] = [
+        ("default", `default`),
+        ("focus", focus),
+        ("icon", icon),
+    ]
 }
 
 public enum LodySize {
@@ -64,6 +100,21 @@ public enum LodySize {
     public static let avatarMd: CGFloat = 28
     public static let avatarLg: CGFloat = 40
     public static let composerMin: CGFloat = 48
+
+    public static let all: [(name: String, value: CGFloat)] = [
+        ("touchTarget", touchTarget),
+        ("controlSm", controlSm),
+        ("controlMd", controlMd),
+        ("controlLg", controlLg),
+        ("chip", chip),
+        ("listRow", listRow),
+        ("listRowTwoLine", listRowTwoLine),
+        ("sectionHeader", sectionHeader),
+        ("avatarSm", avatarSm),
+        ("avatarMd", avatarMd),
+        ("avatarLg", avatarLg),
+        ("composerMin", composerMin),
+    ]
 }
 
 public enum LodyLayout {
@@ -76,6 +127,15 @@ public enum LodyLayout {
     public static let sectionGap: CGFloat = 24
     /// Max text column width on tablets / foldables.
     public static let readableMaxWidth: CGFloat = 680
+
+    public static let all: [(name: String, value: CGFloat)] = [
+        ("screenPaddingX", screenPaddingX),
+        ("listRowPaddingX", listRowPaddingX),
+        ("listRowPaddingY", listRowPaddingY),
+        ("listRowGap", listRowGap),
+        ("sectionGap", sectionGap),
+        ("readableMaxWidth", readableMaxWidth),
+    ]
 }
 
 public enum LodyMotion {
@@ -86,11 +146,11 @@ public enum LodyMotion {
     /// Large content changes.
     public static let slow: TimeInterval = 0.32
 
-    public static func standard(duration: TimeInterval = base) -> Animation {
+    public static func standard(duration: TimeInterval = LodyMotion.base) -> Animation {
         .timingCurve(0.2, 0, 0, 1, duration: duration)
     }
 
-    public static func emphasized(duration: TimeInterval = base) -> Animation {
+    public static func emphasized(duration: TimeInterval = LodyMotion.base) -> Animation {
         .timingCurve(0.3, 0, 0, 1, duration: duration)
     }
 }

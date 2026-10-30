@@ -1,0 +1,35 @@
+name: LodyDesignPreview
+options:
+  bundleIdPrefix: app.lody
+  deploymentTarget:
+    iOS: '26.0'
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    GENERATE_INFOPLIST_FILE: 'YES'
+    INFOPLIST_KEY_CFBundleDisplayName: Lody Design
+    INFOPLIST_KEY_UILaunchScreen_Generation: 'YES'
+    INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+    SUPPORTS_MACCATALYST: 'NO'
+targets:
+  LodyDesignPreview:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: ../../generated/ios/LodyDesignSystem
+        group: DesignSystem/Generated
+      - path: ../../runtime/ios
+        group: DesignSystem/Runtime
+      - path: ../../generated/ios/LodyIcons.xcassets
+        group: DesignSystem/Generated
+      - path: ../../fonts/font
+        group: DesignSystem/Fonts
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.lody.designpreview

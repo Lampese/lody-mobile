@@ -90,15 +90,17 @@ private fun LodyColors.toMaterial(dark: Boolean): ColorScheme =
         scrim = overlayScrim,
     )
 
+// LargeTopAppBar renders headlineMedium expanded and titleLarge collapsed, which
+// mirrors the iOS large title (largeTitle) collapsing into the bar title (headline).
 private fun LodyTypography.toMaterial(): Typography =
     Typography(
         displayLarge = largeTitle,
         displayMedium = largeTitle,
         displaySmall = largeTitle,
         headlineLarge = largeTitle,
-        headlineMedium = title,
+        headlineMedium = largeTitle,
         headlineSmall = title,
-        titleLarge = title,
+        titleLarge = headline,
         titleMedium = headline,
         titleSmall = subhead,
         bodyLarge = body,

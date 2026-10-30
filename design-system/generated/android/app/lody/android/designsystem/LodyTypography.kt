@@ -51,7 +51,22 @@ class LodyTypography(
     val code: TextStyle,
     /** Diffs, inline code in dense rows. */
     val codeSmall: TextStyle,
-)
+) {
+    fun entries(): List<Pair<String, TextStyle>> = listOf(
+        "largeTitle" to largeTitle,
+        "title" to title,
+        "headline" to headline,
+        "body" to body,
+        "bodyEmphasis" to bodyEmphasis,
+        "reading" to reading,
+        "subhead" to subhead,
+        "footnote" to footnote,
+        "caption" to caption,
+        "micro" to micro,
+        "code" to code,
+        "codeSmall" to codeSmall,
+    )
+}
 
 val LodyDefaultTypography = LodyTypography(
     largeTitle = lodyTextStyle(LodySansFontFamily, FontWeight.W700, 28, 34, -0.59f),

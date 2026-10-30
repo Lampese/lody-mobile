@@ -4,6 +4,7 @@ package app.lody.android.designsystem
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object LodySpacing {
@@ -17,6 +18,19 @@ object LodySpacing {
     val xxl = 24.dp
     val xxxl = 32.dp
     val huge = 48.dp
+
+    val all: List<Pair<String, Dp>> = listOf(
+        "none" to none,
+        "xxs" to xxs,
+        "xs" to xs,
+        "sm" to sm,
+        "md" to md,
+        "lg" to lg,
+        "xl" to xl,
+        "xxl" to xxl,
+        "xxxl" to xxxl,
+        "huge" to huge,
+    )
 }
 
 object LodyRadius {
@@ -32,6 +46,15 @@ object LodyRadius {
     val xl = 20.dp
     /** Pills, avatars. */
     val full = 9999.dp
+
+    val all: List<Pair<String, Dp>> = listOf(
+        "xs" to xs,
+        "sm" to sm,
+        "md" to md,
+        "lg" to lg,
+        "xl" to xl,
+        "full" to full,
+    )
 }
 
 object LodyIconSize {
@@ -43,6 +66,14 @@ object LodyIconSize {
     /** Tab bar, prominent actions. */
     val lg = 24.dp
     val xl = 28.dp
+
+    val all: List<Pair<String, Dp>> = listOf(
+        "xs" to xs,
+        "sm" to sm,
+        "md" to md,
+        "lg" to lg,
+        "xl" to xl,
+    )
 }
 
 object LodyStroke {
@@ -51,6 +82,12 @@ object LodyStroke {
     val focus = 2.dp
     /** Icon stroke on the 24pt grid; baked into generated icons. */
     val icon = 1.75.dp
+
+    val all: List<Pair<String, Dp>> = listOf(
+        "default" to default,
+        "focus" to focus,
+        "icon" to icon,
+    )
 }
 
 object LodySize {
@@ -68,6 +105,21 @@ object LodySize {
     val avatarMd = 28.dp
     val avatarLg = 40.dp
     val composerMin = 48.dp
+
+    val all: List<Pair<String, Dp>> = listOf(
+        "touchTarget" to touchTarget,
+        "controlSm" to controlSm,
+        "controlMd" to controlMd,
+        "controlLg" to controlLg,
+        "chip" to chip,
+        "listRow" to listRow,
+        "listRowTwoLine" to listRowTwoLine,
+        "sectionHeader" to sectionHeader,
+        "avatarSm" to avatarSm,
+        "avatarMd" to avatarMd,
+        "avatarLg" to avatarLg,
+        "composerMin" to composerMin,
+    )
 }
 
 object LodyLayout {
@@ -80,6 +132,15 @@ object LodyLayout {
     val sectionGap = 24.dp
     /** Max text column width on tablets / foldables. */
     val readableMaxWidth = 680.dp
+
+    val all: List<Pair<String, Dp>> = listOf(
+        "screenPaddingX" to screenPaddingX,
+        "listRowPaddingX" to listRowPaddingX,
+        "listRowPaddingY" to listRowPaddingY,
+        "listRowGap" to listRowGap,
+        "sectionGap" to sectionGap,
+        "readableMaxWidth" to readableMaxWidth,
+    )
 }
 
 object LodyMotion {

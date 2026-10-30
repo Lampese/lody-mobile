@@ -29,6 +29,10 @@ import UIKit
 /// Semantic colors. Every value follows the trait collection's light / dark style.
 public enum LodyColor {
 ${swiftUI}
+
+    public static let all: [(name: String, color: Color)] = [
+${list.map((c) => `        ("${c.id}", ${id(c.name)}),`).join('\n')}
+    ]
 }
 
 /// UIKit mirror of \`LodyColor\` for views that are not SwiftUI.
@@ -69,7 +73,9 @@ import CoreGraphics
 public extension LodyTextStyle {
 ${statics}
 
-    static let all: [LodyTextStyle] = [${styles.map((s) => `.${id(s.name)}`).join(', ')}]
+    static let all: [(name: String, style: LodyTextStyle)] = [
+${styles.map((s) => `        ("${s.name}", .${id(s.name)}),`).join('\n')}
+    ]
 }
 
 public enum LodyFontFiles {
@@ -88,7 +94,8 @@ function metrics({ groups, motion }) {
       const body = items
         .map((t) => `${doc(t.description, '    ')}    public static let ${id(t.name)}: CGFloat = ${t.value}`)
         .join('\n')
-      return `public enum ${name} {\n${body}\n}`
+      const all = items.map((t) => `        ("${t.name}", ${id(t.name)}),`).join('\n')
+      return `public enum ${name} {\n${body}\n\n    public static let all: [(name: String, value: CGFloat)] = [\n${all}\n    ]\n}`
     })
     .join('\n\n')
   const durations = motion.durations
@@ -97,7 +104,7 @@ function metrics({ groups, motion }) {
   const easings = motion.easings
     .map(
       (e) =>
-        `    public static func ${id(e.name)}(duration: TimeInterval = base) -> Animation {\n        .timingCurve(${e.value.join(', ')}, duration: duration)\n    }`,
+        `    public static func ${id(e.name)}(duration: TimeInterval = LodyMotion.base) -> Animation {\n        .timingCurve(${e.value.join(', ')}, duration: duration)\n    }`,
     )
     .join('\n\n')
   return `${header('tokens/dimension.json')}

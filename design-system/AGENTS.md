@@ -24,6 +24,8 @@ Principles and integration steps: [README.md](README.md).
 
 ## Files
 
+- `examples/{ios,android}`: native preview apps; screens are kept 1:1 across
+  platforms (see `examples/README.md`).
 - `scripts/lib/tokens.mjs`: loads and validates tokens, derives Inter tracking.
 - `scripts/lib/emit-{swift,kotlin,preview}.mjs`: platform emitters.
 - `scripts/lib/outputs.mjs`: in-memory `generated/` tree shared by build/check.

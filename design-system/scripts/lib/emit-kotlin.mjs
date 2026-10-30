@@ -27,7 +27,11 @@ import androidx.compose.ui.graphics.Color
 @Immutable
 class LodyColors(
 ${fields}
-)
+) {
+    fun entries(): List<Pair<String, Color>> = listOf(
+${list.map((c) => `        "${c.id}" to ${c.name},`).join('\n')}
+    )
+}
 
 val LodyLightColors = LodyColors(
 ${set('light')}
@@ -69,7 +73,11 @@ ${familyVals}
 @Immutable
 class LodyTypography(
 ${fields}
-)
+) {
+    fun entries(): List<Pair<String, TextStyle>> = listOf(
+${styles.map((s) => `        "${s.name}" to ${s.name},`).join('\n')}
+    )
+}
 
 val LodyDefaultTypography = LodyTypography(
 ${values}
@@ -98,7 +106,8 @@ function dimensions({ groups, motion }) {
   const objects = Object.entries(groups)
     .map(([group, items]) => {
       const body = items.map((t) => `${kdoc(t.description, '    ')}    val ${t.name} = ${t.value}.dp`).join('\n')
-      return `object Lody${pascal(group)} {\n${body}\n}`
+      const all = items.map((t) => `        "${t.name}" to ${t.name},`).join('\n')
+      return `object Lody${pascal(group)} {\n${body}\n\n    val all: List<Pair<String, Dp>> = listOf(\n${all}\n    )\n}`
     })
     .join('\n\n')
   const durations = motion.durations
@@ -110,6 +119,7 @@ function dimensions({ groups, motion }) {
   return `${header('tokens/dimension.json')}
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 ${objects}
@@ -144,6 +154,12 @@ import androidx.compose.ui.unit.dp
  */
 object LodyIcons {
 ${vals}
+
+    val all: List<Pair<String, ImageVector>> by lazy {
+        listOf(
+${[...iconPaths.keys()].map((n) => `            "${n}" to ${pascal(n)},`).join('\n')}
+        )
+    }
 }
 
 private fun lodyIcon(name: String, vararg paths: String): ImageVector =
