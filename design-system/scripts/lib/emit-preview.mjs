@@ -37,34 +37,63 @@ export function emitPreview({ palette, colors, typography, dimensions, elevation
     .join('\n')
   const textClasses = typography.styles.map((s) => `.t-${s.name} { ${typeCss(s)} }`).join('\n')
 
-  // --- Sample screen -------------------------------------------------------
-  const rows = [
-    ['stateRunning', 'state.running', '同一个 worktree 多个 tabs', 'lody · Claude Code', '2m', 'indigo'],
-    ['stateRunning', 'state.running', 'Migrate mobile tokens to Compose', 'lody-mobile · Codex', '5m', 'green'],
-    ['stateWaiting', 'state.waiting', 'Review auth middleware changes', 'Approve 3 file edits', '12m', 'orange'],
-    ['stateDone', 'state.done', '为 loro swift 添加 debug trait 的支持', 'loro-swift · PR #42', '1h', 'purple'],
-    ['merge', 'state.merged', 'Fix flaky sync test', 'lody · PR #3935 merged', '3h', null],
-    ['stateFailed', 'state.failed', 'worktree 环境 setup 配置', 'Exited with code 1', '4h', null],
-    ['stateIdle', 'state.idle', '实现 refresh token', 'lody-ios', 'Yesterday', 'blue'],
+  // --- Sample screen: the chat list (same data as the native SampleData) -------
+  const L = (id) => dimensions.groups.layout.find((t) => t.name === id).value
+  const S = (id) => dimensions.groups.size.find((t) => t.name === id).value
+  const groups = [
+    { name: 'Chats', icon: 'session', chats: [['Untitled session']] },
+    {
+      name: 'foliant', icon: 'folder', project: true,
+      chats: [
+        ['为 foliant serve 增加服务端密钥保护新 Vault 流程', 'running'],
+        ['Keyhive 用于 foliant 协作成员管理', 'waiting'],
+        ['Build and verify iOS redesign', 'unread'],
+        ['桌面端同步管理与历史恢复界面'],
+        ['Foliant 首次使用与同步流程体验分析'],
+        ['Foliant 高频使用场景端到端体验审查', 'failed'],
+        ['实现 Foliant 恢复包与全量恢复流程'],
+        ['协作分享与成员权限体验审计'],
+      ],
+    },
+    { name: 'lody', icon: 'folder', project: true, collapsed: true, chats: [['Mobile design tokens', 'running'], [''], [''], ['']] },
+    { name: 'loro-streams', icon: 'folder', project: true, collapsed: true, chats: [[''], ['']] },
   ]
-  const mockRows = rows
-    .map(
-      ([glyph, color, title, sub, meta, label]) =>
-        `<div class="row"><span class="g" style="color:${v(color)}">${icon(glyph)}</span>` +
-        `<div class="grow"><div class="t-body clip">${esc(title)}</div><div class="t-footnote" style="color:${v('text.secondary')}">${esc(sub)}</div></div>` +
-        (label ? `<span class="label t-caption" style="background:${v(`label.${label}.bg`)};color:${v(`label.${label}.fg`)}"><i style="background:${v(`label.${label}.fg`)}"></i>${label}</span>` : '') +
-        `<span class="t-footnote" style="color:${v('text.tertiary')}">${meta}</span></div>`,
-    )
-    .join('')
-  const chips = ['All', 'Running', 'Needs input', 'Done']
-    .map((c, i) => `<span class="chip t-subhead ${i === 0 ? 'on' : ''}">${c}</span>`)
+  const LIMIT = 6
+  const attention = (kind) =>
+    !kind
+      ? ''
+      : kind === 'unread'
+        ? `<i class="dot"></i>`
+        : `<span class="sm" style="color:${v(`state.${kind}`)}">${icon({ running: 'stateRunning', waiting: 'stateWaiting', failed: 'stateFailed' }[kind])}</span>`
+  const urgent = (chats) => ['waiting', 'failed', 'running', 'unread'].find((k) => chats.some((c) => c[1] === k))
+  const listHtml = groups
+    .map((g, i) => {
+      const header =
+        `<div class="ghead" style="margin-top:${i ? 8 : 0}px"><span style="color:${v('icon.primary')}">${icon(g.icon)}</span>` +
+        `<span class="t-bodyEmphasis grow clip">${g.name}</span>` +
+        (g.collapsed ? `${attention(urgent(g.chats))}<span class="t-footnote" style="color:${v('text.tertiary')}">${g.chats.length}</span>` : '') +
+        (g.project ? `<span class="act" style="color:${v('icon.secondary')}">${icon('compose')}</span>` : '<span class="act"></span>') +
+        `</div>`
+      if (g.collapsed) return header
+      const rows = g.chats
+        .slice(0, LIMIT)
+        .map(([title, kind]) => `<div class="chat"><span class="gutter">${attention(kind)}</span><span class="${kind === 'unread' ? 't-bodyEmphasis' : 't-body'} clip">${esc(title)}</span></div>`)
+        .join('')
+      const more = g.chats.length > LIMIT ? `<div class="chat more t-body"><span class="gutter"></span>Show ${g.chats.length - LIMIT} more</div>` : ''
+      return header + rows + more
+    })
     .join('')
   const mock = `<div class="phone">
-    <div class="nav"><span class="t-largeTitle">Sessions</span><span style="color:${v('icon.primary')}">${icon('sun')}${icon('compose')}</span></div>
-    <div class="chips">${chips}</div>
-    <div class="section t-subhead">Running <span style="color:${v('text.placeholder')}">2</span><span class="grow"></span><span style="color:${v('icon.tertiary')}">${icon('plus')}</span></div>
-    ${mockRows}
-    <div class="composer"><span style="color:${v('icon.secondary')}">${icon('attach')}</span><span class="t-callout grow" style="color:${v('text.placeholder')}">Ask Lody…</span><span class="send">${icon('send')}</span></div>
+    <div class="nav">
+      <span class="glass circle t-subhead">L</span>
+      <span class="title"><span class="t-headline">Kurage</span><span class="t-footnote" style="color:${v('text.secondary')}">Lody</span></span>
+      <span class="glass circle" style="color:${v('icon.primary')}">${icon('more')}</span>
+    </div>
+    <div class="list">${listHtml}</div>
+    <div class="bottom">
+      <span class="glass search t-body"><span style="color:${v('icon.secondary')}">${icon('search')}</span><span style="color:${v('text.placeholder')}">Search chats</span></span>
+      <span class="glass circle lg" style="color:${v('icon.primary')}">${icon('compose')}</span>
+    </div>
   </div>`
 
   // --- Components ----------------------------------------------------------
@@ -195,19 +224,22 @@ svg { width: 20px; height: 20px; display: block; flex: none; }
 .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .mode { min-width: 0; overflow: hidden; padding: 20px; border-radius: 14px; background: ${v('bg.grouped')}; color: ${v('text.primary')}; }
 .light { ${vars('light')} } .dark { ${vars('dark')} }
-.phone { width: 390px; margin: 0 auto; background: ${v('bg.base')}; border-radius: 28px; padding: 12px 0 16px; overflow: hidden; border: 1px solid ${v('border.default')}; }
-.nav { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; }
-.nav span:last-child { display: flex; gap: 16px; }
-.chips { display: flex; gap: 8px; padding: 4px 16px 8px; }
-.chip { height: 32px; padding: 0 12px; display: flex; align-items: center; border-radius: 999px; border: 1px solid ${v('border.default')}; color: ${v('text.secondary')}; }
-.chip.on { background: ${v('fill.selected')}; border-color: transparent; color: ${v('text.primary')}; }
-.section { display: flex; gap: 8px; align-items: center; height: 36px; padding: 0 16px; color: ${v('text.tertiary')}; }
-.row { display: flex; gap: 12px; align-items: center; min-height: 60px; padding: 0 16px; position: relative; }
-.row::after { content: ''; position: absolute; left: 48px; right: 0; bottom: 0; border-bottom: 0.5px solid ${v('border.subtle')}; }
-.label { display: inline-flex; align-items: center; gap: 6px; height: ${size('chipSm')}px; padding: 0 8px; border-radius: ${radius('sm')}px; text-transform: capitalize; }
-.label i { width: 8px; height: 8px; border-radius: 99px; }
-.composer { margin: 16px 16px 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 8px 0 12px; border-radius: ${radius('xl')}px; background: ${v('bg.raised')}; border: 1px solid ${v('border.default')}; }
-.send { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: ${v('accent.solid')}; color: ${v('text.onAccent')}; }
+.phone { width: 390px; height: 844px; margin: 0 auto; background: ${v('bg.base')}; border-radius: 44px; overflow: hidden; border: 1px solid ${v('border.default')}; position: relative; display: flex; flex-direction: column; }
+.nav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 54px ${L('screenPaddingX')}px 8px; }
+.nav .title { display: flex; flex-direction: column; align-items: center; }
+.glass { background: ${v('bg.overlay')}; border: 0.5px solid ${v('border.subtle')}; box-shadow: 0 1px 3px ${v('shadow.sm')}; color: ${v('text.primary')}; }
+.circle { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; }
+.circle.lg { width: ${S('controlLg')}px; height: ${S('controlLg')}px; flex: none; }
+.list { flex: 1; overflow: hidden; padding-top: 8px; }
+.ghead { display: flex; align-items: center; gap: ${L('listRowGap')}px; min-height: ${S('listRow')}px; padding-left: ${L('screenPaddingX')}px; padding-right: 4px; }
+.ghead .act { width: 44px; height: 44px; display: grid; place-items: center; }
+.chat { display: flex; align-items: center; min-height: ${S('listRow')}px; padding-right: ${L('screenPaddingX')}px; }
+.chat .gutter { width: ${L('childIndent')}px; flex: none; display: grid; place-items: center; padding-left: ${L('screenPaddingX')}px; box-sizing: border-box; }
+.chat.more { color: ${v('text.tertiary')}; }
+.sm svg { width: 16px; height: 16px; }
+.dot { width: ${S('dot')}px; height: ${S('dot')}px; border-radius: 99px; background: ${v('accent.default')}; display: block; }
+.bottom { display: flex; gap: 12px; align-items: center; padding: 8px ${L('screenPaddingX')}px 34px; }
+.search { flex: 1; height: ${S('controlLg')}px; border-radius: 999px; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .card { background: ${v('bg.raised')}; border-radius: ${radius('lg')}px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .cap { font-size: 13px; font-weight: 500; color: ${v('text.tertiary')}; }

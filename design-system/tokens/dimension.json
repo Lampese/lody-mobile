@@ -66,6 +66,7 @@
     "listRowPaddingX": { "$value": 16 },
     "listRowPaddingY": { "$value": 10 },
     "listRowGap": { "$value": 12, "$description": "Leading icon to title." },
+    "childIndent": { "$value": 48, "$description": "Leading inset of rows nested under a group header, so their text aligns with the header title (screenPaddingX + iconSize.md + listRowGap). The gutter holds status glyphs." },
     "sectionGap": { "$value": 24, "$description": "Between grouped sections / cards." },
     "stackGap": { "$value": 12, "$description": "Between controls inside a card." },
     "readableMaxWidth": { "$value": 680, "$description": "Max text column width on tablets / foldables." }

@@ -33,101 +33,6 @@ struct StateGlyph: View {
     }
 }
 
-struct Hairline: View {
-    @Environment(\.displayScale) private var scale
-    var leadingInset: CGFloat = 0
-
-    var body: some View {
-        Rectangle()
-            .fill(LodyColor.borderSubtle)
-            .frame(height: 1 / scale)
-            .padding(.leading, leadingInset)
-    }
-}
-
-/// Pressed-state highlight for custom rows: iOS highlights, Android ripples.
-struct RowPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(configuration.isPressed ? LodyColor.fillPressed : LodyColor.bgBase)
-    }
-}
-
-struct SessionRow: View {
-    let session: SampleSession
-
-    var body: some View {
-        Button {} label: {
-            HStack(spacing: LodyLayout.listRowGap) {
-                StateGlyph(state: session.state)
-                VStack(alignment: .leading, spacing: LodySpacing.xxs) {
-                    Text(session.title)
-                        .lodyTextStyle(.body)
-                        .foregroundStyle(LodyColor.textPrimary)
-                        .lineLimit(1)
-                    Text(session.subtitle)
-                        .lodyTextStyle(.footnote)
-                        .foregroundStyle(LodyColor.textSecondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: LodySpacing.sm)
-                if let label = session.label { LabelChip(label: label) }
-                Text(session.meta)
-                    .lodyTextStyle(.footnote)
-                    .foregroundStyle(LodyColor.textTertiary)
-            }
-            .padding(.horizontal, LodyLayout.listRowPaddingX)
-            .frame(maxWidth: .infinity, minHeight: LodySize.listRowTwoLine, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(RowPressStyle())
-    }
-}
-
-struct SectionHeader: View {
-    let title: String
-    var count: Int? = nil
-    var showsAdd = false
-
-    var body: some View {
-        HStack(spacing: LodySpacing.sm) {
-            Text(title)
-                .lodyTextStyle(.subhead)
-                .foregroundStyle(LodyColor.textTertiary)
-            if let count {
-                Text("\(count)")
-                    .lodyTextStyle(.subhead)
-                    .foregroundStyle(LodyColor.textPlaceholder)
-            }
-            Spacer()
-            if showsAdd {
-                Glyph(icon: .plus, size: LodyIconSize.md, color: LodyColor.iconTertiary)
-            }
-        }
-        .padding(.horizontal, LodyLayout.listRowPaddingX)
-        .frame(height: LodySize.sectionHeader)
-    }
-}
-
-struct FilterChip: View {
-    let title: String
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .lodyTextStyle(.subhead)
-                .foregroundStyle(selected ? LodyColor.textPrimary : LodyColor.textSecondary)
-                .padding(.horizontal, LodySpacing.md)
-                .frame(height: LodySize.chip + LodySpacing.xs)
-                .background(selected ? LodyColor.fillSelected : Color.clear, in: Capsule())
-                .overlay(Capsule().strokeBorder(selected ? Color.clear : LodyColor.borderDefault, lineWidth: LodyStroke.default))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 struct StatusBadge: View {
     let state: SessionState
 
@@ -392,19 +297,5 @@ struct GroupCard<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(LodyColor.bgRaised, in: RoundedRectangle(cornerRadius: LodyRadius.lg))
         }
-    }
-}
-
-/// Cycles system -> light -> dark so both modes can be reviewed on one device.
-struct AppearanceButton: View {
-    @AppStorage("appearance") private var appearance = 0
-
-    var body: some View {
-        Button {
-            appearance = (appearance + 1) % 3
-        } label: {
-            Glyph(icon: appearance == 2 ? .moon : .sun, size: LodyIconSize.md, color: LodyColor.iconPrimary)
-        }
-        .accessibilityLabel("Toggle appearance")
     }
 }

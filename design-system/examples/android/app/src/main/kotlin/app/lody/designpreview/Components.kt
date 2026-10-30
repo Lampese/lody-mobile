@@ -84,40 +84,6 @@ fun StateGlyph(state: SessionState, size: Dp = LodyIconSize.md) {
 }
 
 @Composable
-fun Hairline(leadingInset: Dp = 0.dp) {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = leadingInset),
-        thickness = Dp.Hairline,
-        color = LodyTheme.colors.borderSubtle,
-    )
-}
-
-/** Platform press feedback: Android ripples, iOS highlights. */
-@Composable
-fun SessionRow(session: SampleSession) {
-    val colors = LodyTheme.colors
-    val type = LodyTheme.typography
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.bgBase)
-            .clickable {}
-            .heightIn(min = LodySize.listRowTwoLine)
-            .padding(horizontal = LodyLayout.listRowPaddingX),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodyLayout.listRowGap),
-    ) {
-        StateGlyph(session.state)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
-            Text(session.title, style = type.body, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(session.subtitle, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        session.label?.let { LabelChip(it) }
-        Text(session.meta, style = type.footnote, color = colors.textTertiary)
-    }
-}
-
-@Composable
 fun LabelChip(label: LabelColor) {
     Row(
         modifier = Modifier
@@ -132,45 +98,6 @@ fun LabelChip(label: LabelColor) {
             label.name,
             style = LodyTheme.typography.caption,
             color = label.fg,
-        )
-    }
-}
-
-@Composable
-fun SectionHeader(title: String, count: Int? = null, showsAdd: Boolean = false) {
-    val colors = LodyTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(LodySize.sectionHeader)
-            .padding(horizontal = LodyLayout.listRowPaddingX),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-    ) {
-        Text(title, style = LodyTheme.typography.subhead, color = colors.textTertiary)
-        if (count != null) Text("$count", style = LodyTheme.typography.subhead, color = colors.textPlaceholder)
-        Spacer(Modifier.weight(1f))
-        if (showsAdd) Glyph(LodyIcons.Plus, colors.iconTertiary)
-    }
-}
-
-@Composable
-fun FilterChip(title: String, selected: Boolean, onClick: () -> Unit) {
-    val colors = LodyTheme.colors
-    Box(
-        modifier = Modifier
-            .height(LodySize.chip + LodySpacing.xs)
-            .clip(CircleShape)
-            .background(if (selected) colors.fillSelected else Color.Transparent)
-            .border(LodyStroke.default, if (selected) Color.Transparent else colors.borderDefault, CircleShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = LodySpacing.md),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            title,
-            style = LodyTheme.typography.subhead,
-            color = if (selected) colors.textPrimary else colors.textSecondary,
         )
     }
 }
@@ -455,13 +382,5 @@ fun GroupCard(title: String, content: @Composable ColumnScope.() -> Unit) {
             verticalArrangement = Arrangement.spacedBy(LodySpacing.md),
             content = content,
         )
-    }
-}
-
-/** Cycles system -> light -> dark so both modes can be reviewed on one device. */
-@Composable
-fun AppearanceButton(appearance: Int, onToggle: () -> Unit) {
-    IconButton(onClick = onToggle) {
-        Glyph(if (appearance == 2) LodyIcons.Moon else LodyIcons.Sun, LodyTheme.colors.iconPrimary)
     }
 }

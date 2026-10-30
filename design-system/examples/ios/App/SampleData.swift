@@ -39,41 +39,57 @@ enum SessionState: CaseIterable {
     }
 }
 
-struct SampleSession: Identifiable {
+struct SampleChat: Identifiable {
     let id = UUID()
     let title: String
-    let subtitle: String
-    let meta: String
-    let state: SessionState
-    var label: LabelColor? = nil
+    var state: SessionState = .idle
+    var unread = false
 }
 
-struct SampleSection: Identifiable {
-    let id = UUID()
-    let title: String
-    let sessions: [SampleSession]
+struct SampleGroup: Identifiable {
+    enum Kind { case chats, project }
+
+    let id: String
+    let name: String
+    let kind: Kind
+    let chats: [SampleChat]
+
+    var icon: LodyIcon { kind == .chats ? .session : .folder }
 }
 
 enum SampleData {
-    static let sections: [SampleSection] = [
-        SampleSection(title: "Running", sessions: [
-            SampleSession(title: "同一个 worktree 多个 tabs", subtitle: "lody · Claude Code", meta: "2m", state: .running, label: .indigo),
-            SampleSession(title: "Migrate mobile tokens to Compose", subtitle: "lody-mobile · Codex", meta: "5m", state: .running, label: .green),
+    static let workspace = (name: "Kurage", organization: "Lody", initial: "L")
+
+    /// Groups beyond this many chats show a "Show N more" row.
+    static let visibleChatLimit = 6
+
+    static let initiallyCollapsed: Set<String> = ["lody", "loro-streams"]
+
+    static let groups: [SampleGroup] = [
+        SampleGroup(id: "chats", name: "Chats", kind: .chats, chats: [
+            SampleChat(title: "Untitled session"),
         ]),
-        SampleSection(title: "Needs input", sessions: [
-            SampleSession(title: "Review auth middleware changes", subtitle: "Approve 3 file edits", meta: "12m", state: .waiting, label: .orange),
+        SampleGroup(id: "foliant", name: "foliant", kind: .project, chats: [
+            SampleChat(title: "为 foliant serve 增加服务端密钥保护新 Vault 流程", state: .running),
+            SampleChat(title: "Keyhive 用于 foliant 协作成员管理", state: .waiting),
+            SampleChat(title: "Build and verify iOS redesign", unread: true),
+            SampleChat(title: "桌面端同步管理与历史恢复界面"),
+            SampleChat(title: "Foliant 首次使用与同步流程体验分析"),
+            SampleChat(title: "Foliant 高频使用场景端到端体验审查", state: .failed),
+            SampleChat(title: "实现 Foliant 恢复包与全量恢复流程"),
+            SampleChat(title: "协作分享与成员权限体验审计"),
         ]),
-        SampleSection(title: "Done", sessions: [
-            SampleSession(title: "为 loro swift 添加 debug trait 的支持", subtitle: "loro-swift · PR #42", meta: "1h", state: .done, label: .purple),
-            SampleSession(title: "Fix flaky sync test", subtitle: "lody · PR #3935 merged", meta: "3h", state: .merged),
-            SampleSession(title: "worktree 环境 setup 配置", subtitle: "Exited with code 1", meta: "4h", state: .failed),
+        SampleGroup(id: "lody", name: "lody", kind: .project, chats: [
+            SampleChat(title: "Mobile design tokens", state: .running),
+            SampleChat(title: "同一个 worktree 多个 tabs"),
+            SampleChat(title: "Fix flaky sync test"),
+            SampleChat(title: "实现 refresh token"),
         ]),
-        SampleSection(title: "Backlog", sessions: [
-            SampleSession(title: "实现 refresh token", subtitle: "lody-ios", meta: "Yesterday", state: .idle, label: .blue),
+        SampleGroup(id: "loro-streams", name: "loro-streams", kind: .project, chats: [
+            SampleChat(title: "Bounded persistence retry"),
+            SampleChat(title: "Live-read spin after failed flush"),
         ]),
     ]
-
-    static let filters = ["All", "Running", "Needs input", "Done"]
 
     /// Pre-tokenized so the code block shows every syntax color; mirrors the HTML preview.
     static let code: [[(SyntaxKind, String)]] = [

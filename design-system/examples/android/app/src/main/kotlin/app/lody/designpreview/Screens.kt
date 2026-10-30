@@ -41,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.lody.android.designsystem.LodyElevations
 import app.lody.android.designsystem.LodyIconSize
@@ -58,10 +60,7 @@ import app.lody.android.designsystem.LodyTheme
 private fun Screen(
     title: String,
     background: Color,
-    appearance: Int,
-    onToggleAppearance: () -> Unit,
-    extraAction: (@Composable () -> Unit)? = null,
-    bottomBar: @Composable () -> Unit = {},
+    onBack: () -> Unit,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -72,9 +71,10 @@ private fun Screen(
         topBar = {
             LargeTopAppBar(
                 title = { Text(title) },
-                actions = {
-                    AppearanceButton(appearance, onToggleAppearance)
-                    extraAction?.invoke()
+                navigationIcon = {
+                    IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) {
+                        Glyph(LodyIcons.Back, LodyTheme.colors.iconPrimary)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = background,
@@ -84,62 +84,17 @@ private fun Screen(
                 scrollBehavior = scrollBehavior,
             )
         },
-        bottomBar = bottomBar,
         content = content,
     )
 }
 
-@Composable
-fun SessionsScreen(appearance: Int, onToggleAppearance: () -> Unit) {
-    var filter by remember { mutableStateOf(SampleData.filters.first()) }
-    Screen(
-        title = "Sessions",
-        background = LodyTheme.colors.bgBase,
-        appearance = appearance,
-        onToggleAppearance = onToggleAppearance,
-        extraAction = {
-            IconButton(onClick = {}) { Glyph(LodyIcons.Compose, LodyTheme.colors.iconPrimary) }
-        },
-        bottomBar = {
-            Composer(
-                Modifier
-                    .background(LodyTheme.colors.bgBase)
-                    .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.sm),
-            )
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = LodyLayout.screenPaddingX)
-                        .padding(bottom = LodySpacing.sm),
-                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-                ) {
-                    SampleData.filters.forEach { item ->
-                        FilterChip(item, item == filter) { filter = item }
-                    }
-                }
-            }
-            for (section in SampleData.sections) {
-                item { SectionHeader(section.title, section.sessions.size, showsAdd = true) }
-                items(section.sessions) { session ->
-                    SessionRow(session)
-                    Hairline(LodyLayout.listRowPaddingX + LodyIconSize.md + LodyLayout.listRowGap)
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ComponentsScreen(appearance: Int, onToggleAppearance: () -> Unit) {
+fun ComponentsScreen(onBack: () -> Unit) {
     var notify by remember { mutableStateOf(true) }
     var mode by remember { mutableStateOf("Agent") }
     val colors = LodyTheme.colors
-    Screen("Components", colors.bgGrouped, appearance, onToggleAppearance) { padding ->
+    Screen("Components", colors.bgGrouped, onBack) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -197,6 +152,7 @@ fun ComponentsScreen(appearance: Int, onToggleAppearance: () -> Unit) {
                 }
             }
             GroupCard("Inputs") {
+                Composer()
                 LodyTextField("Session name")
                 Banner("Agent needs approval to run `pnpm install` in lody-mobile.")
             }
@@ -224,10 +180,10 @@ fun ComponentsScreen(appearance: Int, onToggleAppearance: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TokensScreen(appearance: Int, onToggleAppearance: () -> Unit) {
+fun TokensScreen(onBack: () -> Unit) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
-    Screen("Tokens", colors.bgGrouped, appearance, onToggleAppearance) { padding ->
+    Screen("Tokens", colors.bgGrouped, onBack) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

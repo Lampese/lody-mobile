@@ -161,6 +161,8 @@ object LodyLayout {
     val listRowPaddingY = 10.dp
     /** Leading icon to title. */
     val listRowGap = 12.dp
+    /** Leading inset of rows nested under a group header, so their text aligns with the header title (screenPaddingX + iconSize.md + listRowGap). The gutter holds status glyphs. */
+    val childIndent = 48.dp
     /** Between grouped sections / cards. */
     val sectionGap = 24.dp
     /** Between controls inside a card. */
@@ -173,6 +175,7 @@ object LodyLayout {
         "listRowPaddingX" to listRowPaddingX,
         "listRowPaddingY" to listRowPaddingY,
         "listRowGap" to listRowGap,
+        "childIndent" to childIndent,
         "sectionGap" to sectionGap,
         "stackGap" to stackGap,
         "readableMaxWidth" to readableMaxWidth,

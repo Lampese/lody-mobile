@@ -39,15 +39,18 @@ enum class SessionState(val label: String) {
         }
 }
 
-data class SampleSession(
+data class SampleChat(
     val title: String,
-    val subtitle: String,
-    val meta: String,
-    val state: SessionState,
-    val label: LabelColor? = null,
+    val state: SessionState = SessionState.Idle,
+    val unread: Boolean = false,
 )
 
-data class SampleSection(val title: String, val sessions: List<SampleSession>)
+data class SampleGroup(val id: String, val name: String, val kind: Kind, val chats: List<SampleChat>) {
+    enum class Kind { Chats, Project }
+
+    val icon: ImageVector
+        get() = if (kind == Kind.Chats) LodyIcons.Session else LodyIcons.Folder
+}
 
 enum class DiffKind { Hunk, Context, Added, Removed }
 
@@ -109,33 +112,50 @@ enum class LabelColor {
 }
 
 object SampleData {
-    val sections = listOf(
-        SampleSection(
-            "Running",
+    const val workspaceName = "Kurage"
+    const val organization = "Lody"
+    const val workspaceInitial = "L"
+
+    /** Groups beyond this many chats show a "Show N more" row. */
+    const val visibleChatLimit = 6
+
+    val initiallyCollapsed = setOf("lody", "loro-streams")
+
+    val groups = listOf(
+        SampleGroup("chats", "Chats", SampleGroup.Kind.Chats, listOf(SampleChat("Untitled session"))),
+        SampleGroup(
+            "foliant",
+            "foliant",
+            SampleGroup.Kind.Project,
             listOf(
-                SampleSession("同一个 worktree 多个 tabs", "lody · Claude Code", "2m", SessionState.Running, LabelColor.Indigo),
-                SampleSession("Migrate mobile tokens to Compose", "lody-mobile · Codex", "5m", SessionState.Running, LabelColor.Green),
+                SampleChat("为 foliant serve 增加服务端密钥保护新 Vault 流程", SessionState.Running),
+                SampleChat("Keyhive 用于 foliant 协作成员管理", SessionState.Waiting),
+                SampleChat("Build and verify iOS redesign", unread = true),
+                SampleChat("桌面端同步管理与历史恢复界面"),
+                SampleChat("Foliant 首次使用与同步流程体验分析"),
+                SampleChat("Foliant 高频使用场景端到端体验审查", SessionState.Failed),
+                SampleChat("实现 Foliant 恢复包与全量恢复流程"),
+                SampleChat("协作分享与成员权限体验审计"),
             ),
         ),
-        SampleSection(
-            "Needs input",
-            listOf(SampleSession("Review auth middleware changes", "Approve 3 file edits", "12m", SessionState.Waiting, LabelColor.Orange)),
-        ),
-        SampleSection(
-            "Done",
+        SampleGroup(
+            "lody",
+            "lody",
+            SampleGroup.Kind.Project,
             listOf(
-                SampleSession("为 loro swift 添加 debug trait 的支持", "loro-swift · PR #42", "1h", SessionState.Done, LabelColor.Purple),
-                SampleSession("Fix flaky sync test", "lody · PR #3935 merged", "3h", SessionState.Merged),
-                SampleSession("worktree 环境 setup 配置", "Exited with code 1", "4h", SessionState.Failed),
+                SampleChat("Mobile design tokens", SessionState.Running),
+                SampleChat("同一个 worktree 多个 tabs"),
+                SampleChat("Fix flaky sync test"),
+                SampleChat("实现 refresh token"),
             ),
         ),
-        SampleSection(
-            "Backlog",
-            listOf(SampleSession("实现 refresh token", "lody-ios", "Yesterday", SessionState.Idle, LabelColor.Blue)),
+        SampleGroup(
+            "loro-streams",
+            "loro-streams",
+            SampleGroup.Kind.Project,
+            listOf(SampleChat("Bounded persistence retry"), SampleChat("Live-read spin after failed flush")),
         ),
     )
-
-    val filters = listOf("All", "Running", "Needs input", "Done")
 
     /** Pre-tokenized so the code block shows every syntax color; mirrors the HTML preview. */
     val code: List<List<Pair<SyntaxKind, String>>> = listOf(

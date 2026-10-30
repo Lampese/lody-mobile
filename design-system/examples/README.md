@@ -1,14 +1,17 @@
 # Design system previews
 
-Two native apps that render the same three screens from the shared tokens, so iOS
+Two native apps that render the same screens from the shared tokens, so iOS
 and Android can be compared side by side:
 
-- **Sessions**: a session list with filters, section headers, state glyphs and the composer.
-- **Components**: buttons, status badges, native controls (switch, segmented), inputs,
-  banner, code block, diff and empty state.
-- **Tokens**: type scale, all icons, all semantic colors, spacing and radius.
-
-The sun / moon button in the top bar cycles system → light → dark.
+- **Chat list** (home): the reference design for the app's main screen. Chats
+  grouped by project, one line each, no separators or metadata. The indent gutter
+  shows a glyph only when a chat needs attention (running, waiting, failed,
+  unread); collapsed groups show a count and their most urgent state; long groups
+  show the first 6 plus "Show N more". Search and new chat sit at the bottom
+  (iOS 26 bottom search toolbar; a floating pill + button on Android). Swipe to
+  archive (iOS) and long-press menus act in place.
+- **Components** and **Tokens**: open from the More (⋯) menu, which also switches
+  appearance (system / light / dark).
 
 Screens and components are kept 1:1 between `ios/App/*.swift` and
 `android/app/src/main/kotlin/app/lody/designpreview/*.kt`; change both together.

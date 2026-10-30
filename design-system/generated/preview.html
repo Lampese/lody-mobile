@@ -36,19 +36,22 @@ svg { width: 20px; height: 20px; display: block; flex: none; }
 .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .mode { min-width: 0; overflow: hidden; padding: 20px; border-radius: 14px; background: var(--bg-grouped); color: var(--text-primary); }
 .light { --bg-base: #FFFFFF; --bg-grouped: #F2F2F2; --bg-raised: #FFFFFF; --bg-sunken: #0000000D; --bg-overlay: #FFFFFF; --bg-inverse: #1C1C1C; --fill-pressed: #E5E5E5; --fill-selected: #00000014; --fill-secondary: #00000012; --fill-tertiary: #0000000D; --fill-disabled: #EBEBEB; --text-primary: #1C1C1C; --text-secondary: #646464; --text-tertiary: #898989; --text-placeholder: #999999; --text-disabled: #999999; --text-inverse: #FFFFFF; --text-onAccent: #FFFFFF; --text-onDanger: #FFFFFF; --text-link: #345FBD; --icon-primary: #1C1C1C; --icon-secondary: #898989; --icon-tertiary: #AFAFAF; --icon-disabled: #AFAFAF; --border-subtle: #D2D2D2; --border-default: #D2D2D2; --border-strong: #C5C5C5; --border-focus: #5D8DEF; --accent-default: #5D8DEF; --accent-solid: #4673D3; --accent-pressed: #3864C2; --accent-fg: #345FBD; --accent-subtle: #5D8DEF1F; --accent-onSubtle: #345FBD; --danger-default: #BD001E; --danger-solid: #CE222D; --danger-subtle: #CE222D1A; --danger-onSubtle: #BD001E; --warning-default: #9B5300; --warning-subtle: #E9820C24; --warning-onSubtle: #9B5300; --success-default: #298E5D; --success-subtle: #298E5D1F; --success-onSubtle: #006F43; --info-default: #5D8DEF; --info-subtle: #5D8DEF1F; --info-onSubtle: #345FBD; --state-idle: #898989; --state-running: #5D8DEF; --state-waiting: #9B5300; --state-done: #298E5D; --state-failed: #CE222D; --state-merged: #814EDF; --label-gray-fg: #646464; --label-gray-bg: #0000000F; --label-red-fg: #AB3937; --label-red-bg: #D15C5624; --label-orange-fg: #984C00; --label-orange-bg: #C9690C24; --label-yellow-fg: #785F00; --label-yellow-bg: #A4820024; --label-green-fg: #007332; --label-green-bg: #2E9E5224; --label-teal-fg: #006E6F; --label-teal-bg: #009A9A24; --label-blue-fg: #0064AE; --label-blue-bg: #2F8ADC24; --label-indigo-fg: #4D58B8; --label-indigo-bg: #6D7CDF24; --label-purple-fg: #7A4AAA; --label-purple-bg: #9B6BCE24; --label-pink-fg: #A13972; --label-pink-bg: #C65B9324; --code-bg: #0000000D; --code-inlineBg: #00000012; --code-text: #1C1C1C; --code-border: #DEDEDE; --code-gutter: #646464; --syntax-keyword: #7A4AAA; --syntax-string: #007332; --syntax-number: #984C00; --syntax-constant: #0064AE; --syntax-function: #4D58B8; --syntax-type: #006E6F; --syntax-variable: #1C1C1C; --syntax-property: #AB3937; --syntax-tag: #A13972; --syntax-comment: #646464; --syntax-punctuation: #646464; --diff-addedBg: #298E5D1F; --diff-removedBg: #CE222D1A; --diff-addedText: #006F43; --diff-removedText: #BD001E; --diff-hunkBg: #5D8DEF1A; --diff-hunkText: #345FBD; --selection-text: #5D8DEF3D; --selection-handle: #5D8DEF; --overlay-scrim: #00000066; --shadow-sm: #00000014; --shadow-md: #0000001F; --shadow-lg: #00000029; } .dark { --bg-base: #000000; --bg-grouped: #000000; --bg-raised: #1C1C1C; --bg-sunken: #FFFFFF1A; --bg-overlay: #2B2B2B; --bg-inverse: #FFFFFF; --fill-pressed: #393939; --fill-selected: #FFFFFF1F; --fill-secondary: #FFFFFF1F; --fill-tertiary: #FFFFFF14; --fill-disabled: #2B2B2B; --text-primary: #FFFFFF; --text-secondary: #ABABAB; --text-tertiary: #8C8C8C; --text-placeholder: #7A7A7A; --text-disabled: #7A7A7A; --text-inverse: #000000; --text-onAccent: #FFFFFF; --text-onDanger: #FFFFFF; --text-link: #80ABFF; --icon-primary: #FFFFFF; --icon-secondary: #8C8C8C; --icon-tertiary: #6C6C6C; --icon-disabled: #6C6C6C; --border-subtle: #393939; --border-default: #444444; --border-strong: #525252; --border-focus: #7CA8FF; --accent-default: #7CA8FF; --accent-solid: #4C74C7; --accent-pressed: #3E65B6; --accent-fg: #80ABFF; --accent-subtle: #7CA8FF33; --accent-onSubtle: #80ABFF; --danger-default: #FF706A; --danger-solid: #DD353A; --danger-subtle: #FD555438; --danger-onSubtle: #FF706A; --warning-default: #FF9F4A; --warning-subtle: #FF9F4A33; --warning-onSubtle: #FF9F4A; --success-default: #4EAE7B; --success-subtle: #4EAE7B33; --success-onSubtle: #57B783; --info-default: #7CA8FF; --info-subtle: #7CA8FF33; --info-onSubtle: #80ABFF; --state-idle: #8C8C8C; --state-running: #7CA8FF; --state-waiting: #FF9F4A; --state-done: #4EAE7B; --state-failed: #FD5554; --state-merged: #A37AFF; --label-gray-fg: #ABABAB; --label-gray-bg: #FFFFFF1A; --label-red-fg: #F58B84; --label-red-bg: #F2888133; --label-orange-fg: #EB9557; --label-orange-bg: #E9935533; --label-yellow-fg: #CDA83C; --label-yellow-bg: #CBA63A33; --label-green-fg: #69C27E; --label-green-bg: #69C27E33; --label-teal-fg: #00C3C3; --label-teal-bg: #00C3C333; --label-blue-fg: #68B2FB; --label-blue-bg: #67B0F933; --label-indigo-fg: #95A6FF; --label-indigo-bg: #93A3FC33; --label-purple-fg: #C198EF; --label-purple-bg: #BE95EC33; --label-pink-fg: #EC8AB9; --label-pink-bg: #E887B633; --code-bg: #FFFFFF12; --code-inlineBg: #FFFFFF1F; --code-text: #FFFFFF; --code-border: #393939; --code-gutter: #8C8C8C; --syntax-keyword: #C198EF; --syntax-string: #69C27E; --syntax-number: #EB9557; --syntax-constant: #68B2FB; --syntax-function: #95A6FF; --syntax-type: #00C3C3; --syntax-variable: #FFFFFF; --syntax-property: #F58B84; --syntax-tag: #EC8AB9; --syntax-comment: #8C8C8C; --syntax-punctuation: #ABABAB; --diff-addedBg: #4EAE7B2E; --diff-removedBg: #FD555433; --diff-addedText: #57B783; --diff-removedText: #FF706A; --diff-hunkBg: #7CA8FF24; --diff-hunkText: #80ABFF; --selection-text: #7CA8FF5C; --selection-handle: #7CA8FF; --overlay-scrim: #00000099; --shadow-sm: #00000066; --shadow-md: #00000080; --shadow-lg: #00000099; }
-.phone { width: 390px; margin: 0 auto; background: var(--bg-base); border-radius: 28px; padding: 12px 0 16px; overflow: hidden; border: 1px solid var(--border-default); }
-.nav { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; }
-.nav span:last-child { display: flex; gap: 16px; }
-.chips { display: flex; gap: 8px; padding: 4px 16px 8px; }
-.chip { height: 32px; padding: 0 12px; display: flex; align-items: center; border-radius: 999px; border: 1px solid var(--border-default); color: var(--text-secondary); }
-.chip.on { background: var(--fill-selected); border-color: transparent; color: var(--text-primary); }
-.section { display: flex; gap: 8px; align-items: center; height: 36px; padding: 0 16px; color: var(--text-tertiary); }
-.row { display: flex; gap: 12px; align-items: center; min-height: 60px; padding: 0 16px; position: relative; }
-.row::after { content: ''; position: absolute; left: 48px; right: 0; bottom: 0; border-bottom: 0.5px solid var(--border-subtle); }
-.label { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 6px; text-transform: capitalize; }
-.label i { width: 8px; height: 8px; border-radius: 99px; }
-.composer { margin: 16px 16px 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 8px 0 12px; border-radius: 18px; background: var(--bg-raised); border: 1px solid var(--border-default); }
-.send { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: var(--accent-solid); color: var(--text-onAccent); }
+.phone { width: 390px; height: 844px; margin: 0 auto; background: var(--bg-base); border-radius: 44px; overflow: hidden; border: 1px solid var(--border-default); position: relative; display: flex; flex-direction: column; }
+.nav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 54px 16px 8px; }
+.nav .title { display: flex; flex-direction: column; align-items: center; }
+.glass { background: var(--bg-overlay); border: 0.5px solid var(--border-subtle); box-shadow: 0 1px 3px var(--shadow-sm); color: var(--text-primary); }
+.circle { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; }
+.circle.lg { width: 48px; height: 48px; flex: none; }
+.list { flex: 1; overflow: hidden; padding-top: 8px; }
+.ghead { display: flex; align-items: center; gap: 12px; min-height: 44px; padding-left: 16px; padding-right: 4px; }
+.ghead .act { width: 44px; height: 44px; display: grid; place-items: center; }
+.chat { display: flex; align-items: center; min-height: 44px; padding-right: 16px; }
+.chat .gutter { width: 48px; flex: none; display: grid; place-items: center; padding-left: 16px; box-sizing: border-box; }
+.chat.more { color: var(--text-tertiary); }
+.sm svg { width: 16px; height: 16px; }
+.dot { width: 8px; height: 8px; border-radius: 99px; background: var(--accent-default); display: block; }
+.bottom { display: flex; gap: 12px; align-items: center; padding: 8px 16px 34px; }
+.search { flex: 1; height: 48px; border-radius: 999px; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .card { background: var(--bg-raised); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .cap { font-size: 13px; font-weight: 500; color: var(--text-tertiary); }
@@ -95,139 +98,133 @@ td { border-bottom: 1px solid #eee; padding: 6px 10px; vertical-align: middle; }
 
 <h2>Sample screen</h2>
 <div class="modes"><div class="mode light"><div class="phone">
-    <div class="nav"><span class="t-largeTitle">Sessions</span><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z"/>
-  <path d="M12 2v2"/>
-  <path d="M12 20v2"/>
-  <path d="m4.93 4.93 1.41 1.41"/>
-  <path d="m17.66 17.66 1.41 1.41"/>
-  <path d="M2 12h2"/>
-  <path d="M20 12h2"/>
-  <path d="m6.34 17.66-1.41 1.41"/>
-  <path d="m19.07 4.93-1.41 1.41"/>
+    <div class="nav">
+      <span class="glass circle t-subhead">L</span>
+      <span class="title"><span class="t-headline">Kurage</span><span class="t-footnote" style="color:var(--text-secondary)">Lody</span></span>
+      <span class="glass circle" style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"/>
+  <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"/>
+  <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"/>
 </svg>
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span>
+    </div>
+    <div class="list"><div class="ghead" style="margin-top:0px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+</svg>
+</span><span class="t-bodyEmphasis grow clip">Chats</span><span class="act"></span></div><div class="chat"><span class="gutter"></span><span class="t-body clip">Untitled session</span></div><div class="ghead" style="margin-top:8px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+</svg>
+</span><span class="t-bodyEmphasis grow clip">foliant</span><span class="act" style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
   <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
 </svg>
-</span></div>
-    <div class="chips"><span class="chip t-subhead on">All</span><span class="chip t-subhead ">Running</span><span class="chip t-subhead ">Needs input</span><span class="chip t-subhead ">Done</span></div>
-    <div class="section t-subhead">Running <span style="color:var(--text-placeholder)">2</span><span class="grow"></span><span style="color:var(--icon-tertiary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M5 12h14"/>
-  <path d="M12 5v14"/>
-</svg>
-</span></div>
-    <div class="row"><span class="g" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span></div><div class="chat"><span class="gutter"><span class="sm" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">同一个 worktree 多个 tabs</div><div class="t-footnote" style="color:var(--text-secondary)">lody · Claude Code</div></div><span class="label t-caption" style="background:var(--label-indigo-bg);color:var(--label-indigo-fg)"><i style="background:var(--label-indigo-fg)"></i>indigo</span><span class="t-footnote" style="color:var(--text-tertiary)">2m</span></div><div class="row"><span class="g" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-</svg>
-</span><div class="grow"><div class="t-body clip">Migrate mobile tokens to Compose</div><div class="t-footnote" style="color:var(--text-secondary)">lody-mobile · Codex</div></div><span class="label t-caption" style="background:var(--label-green-bg);color:var(--label-green-fg)"><i style="background:var(--label-green-fg)"></i>green</span><span class="t-footnote" style="color:var(--text-tertiary)">5m</span></div><div class="row"><span class="g" style="color:var(--state-waiting)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span></span><span class="t-body clip">为 foliant serve 增加服务端密钥保护新 Vault 流程</span></div><div class="chat"><span class="gutter"><span class="sm" style="color:var(--state-waiting)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
   <path d="M10 15L10 9"/>
   <path d="M14 15L14 9"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">Review auth middleware changes</div><div class="t-footnote" style="color:var(--text-secondary)">Approve 3 file edits</div></div><span class="label t-caption" style="background:var(--label-orange-bg);color:var(--label-orange-fg)"><i style="background:var(--label-orange-fg)"></i>orange</span><span class="t-footnote" style="color:var(--text-tertiary)">12m</span></div><div class="row"><span class="g" style="color:var(--state-done)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
-  <path d="m9 12 2 2 4-4"/>
-</svg>
-</span><div class="grow"><div class="t-body clip">为 loro swift 添加 debug trait 的支持</div><div class="t-footnote" style="color:var(--text-secondary)">loro-swift · PR #42</div></div><span class="label t-caption" style="background:var(--label-purple-bg);color:var(--label-purple-fg)"><i style="background:var(--label-purple-fg)"></i>purple</span><span class="t-footnote" style="color:var(--text-tertiary)">1h</span></div><div class="row"><span class="g" style="color:var(--state-merged)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z"/>
-  <path d="M3 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z"/>
-  <path d="M6 21V9a9 9 0 0 0 9 9"/>
-</svg>
-</span><div class="grow"><div class="t-body clip">Fix flaky sync test</div><div class="t-footnote" style="color:var(--text-secondary)">lody · PR #3935 merged</div></div><span class="t-footnote" style="color:var(--text-tertiary)">3h</span></div><div class="row"><span class="g" style="color:var(--state-failed)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span></span><span class="t-body clip">Keyhive 用于 foliant 协作成员管理</span></div><div class="chat"><span class="gutter"><i class="dot"></i></span><span class="t-bodyEmphasis clip">Build and verify iOS redesign</span></div><div class="chat"><span class="gutter"></span><span class="t-body clip">桌面端同步管理与历史恢复界面</span></div><div class="chat"><span class="gutter"></span><span class="t-body clip">Foliant 首次使用与同步流程体验分析</span></div><div class="chat"><span class="gutter"><span class="sm" style="color:var(--state-failed)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
   <path d="m15 9-6 6"/>
   <path d="m9 9 6 6"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">worktree 环境 setup 配置</div><div class="t-footnote" style="color:var(--text-secondary)">Exited with code 1</div></div><span class="t-footnote" style="color:var(--text-tertiary)">4h</span></div><div class="row"><span class="g" style="color:var(--state-idle)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M10.1 2.182a10 10 0 0 1 3.8 0"/>
-  <path d="M13.9 21.818a10 10 0 0 1-3.8 0"/>
-  <path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/>
-  <path d="M2.182 13.9a10 10 0 0 1 0-3.8"/>
-  <path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/>
-  <path d="M21.818 10.1a10 10 0 0 1 0 3.8"/>
-  <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/>
-  <path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/>
+</span></span><span class="t-body clip">Foliant 高频使用场景端到端体验审查</span></div><div class="chat more t-body"><span class="gutter"></span>Show 2 more</div><div class="ghead" style="margin-top:8px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">实现 refresh token</div><div class="t-footnote" style="color:var(--text-secondary)">lody-ios</div></div><span class="label t-caption" style="background:var(--label-blue-bg);color:var(--label-blue-fg)"><i style="background:var(--label-blue-fg)"></i>blue</span><span class="t-footnote" style="color:var(--text-tertiary)">Yesterday</span></div>
-    <div class="composer"><span style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>
+</span><span class="t-bodyEmphasis grow clip">lody</span><span class="sm" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
 </svg>
-</span><span class="t-callout grow" style="color:var(--text-placeholder)">Ask Lody…</span><span class="send"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="m5 12 7-7 7 7"/>
-  <path d="M12 19V5"/>
+</span><span class="t-footnote" style="color:var(--text-tertiary)">4</span><span class="act" style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
 </svg>
-</span></div>
+</span></div><div class="ghead" style="margin-top:8px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+</svg>
+</span><span class="t-bodyEmphasis grow clip">loro-streams</span><span class="t-footnote" style="color:var(--text-tertiary)">2</span><span class="act" style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+</svg>
+</span></div></div>
+    <div class="bottom">
+      <span class="glass search t-body"><span style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m21 21-4.34-4.34"/>
+  <path d="M3 11a8 8 0 1 0 16 0a8 8 0 1 0 -16 0Z"/>
+</svg>
+</span><span style="color:var(--text-placeholder)">Search chats</span></span>
+      <span class="glass circle lg" style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+</svg>
+</span>
+    </div>
   </div></div><div class="mode dark"><div class="phone">
-    <div class="nav"><span class="t-largeTitle">Sessions</span><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z"/>
-  <path d="M12 2v2"/>
-  <path d="M12 20v2"/>
-  <path d="m4.93 4.93 1.41 1.41"/>
-  <path d="m17.66 17.66 1.41 1.41"/>
-  <path d="M2 12h2"/>
-  <path d="M20 12h2"/>
-  <path d="m6.34 17.66-1.41 1.41"/>
-  <path d="m19.07 4.93-1.41 1.41"/>
+    <div class="nav">
+      <span class="glass circle t-subhead">L</span>
+      <span class="title"><span class="t-headline">Kurage</span><span class="t-footnote" style="color:var(--text-secondary)">Lody</span></span>
+      <span class="glass circle" style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"/>
+  <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"/>
+  <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z"/>
 </svg>
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span>
+    </div>
+    <div class="list"><div class="ghead" style="margin-top:0px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+</svg>
+</span><span class="t-bodyEmphasis grow clip">Chats</span><span class="act"></span></div><div class="chat"><span class="gutter"></span><span class="t-body clip">Untitled session</span></div><div class="ghead" style="margin-top:8px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+</svg>
+</span><span class="t-bodyEmphasis grow clip">foliant</span><span class="act" style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
   <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
 </svg>
-</span></div>
-    <div class="chips"><span class="chip t-subhead on">All</span><span class="chip t-subhead ">Running</span><span class="chip t-subhead ">Needs input</span><span class="chip t-subhead ">Done</span></div>
-    <div class="section t-subhead">Running <span style="color:var(--text-placeholder)">2</span><span class="grow"></span><span style="color:var(--icon-tertiary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M5 12h14"/>
-  <path d="M12 5v14"/>
-</svg>
-</span></div>
-    <div class="row"><span class="g" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span></div><div class="chat"><span class="gutter"><span class="sm" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">同一个 worktree 多个 tabs</div><div class="t-footnote" style="color:var(--text-secondary)">lody · Claude Code</div></div><span class="label t-caption" style="background:var(--label-indigo-bg);color:var(--label-indigo-fg)"><i style="background:var(--label-indigo-fg)"></i>indigo</span><span class="t-footnote" style="color:var(--text-tertiary)">2m</span></div><div class="row"><span class="g" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-</svg>
-</span><div class="grow"><div class="t-body clip">Migrate mobile tokens to Compose</div><div class="t-footnote" style="color:var(--text-secondary)">lody-mobile · Codex</div></div><span class="label t-caption" style="background:var(--label-green-bg);color:var(--label-green-fg)"><i style="background:var(--label-green-fg)"></i>green</span><span class="t-footnote" style="color:var(--text-tertiary)">5m</span></div><div class="row"><span class="g" style="color:var(--state-waiting)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span></span><span class="t-body clip">为 foliant serve 增加服务端密钥保护新 Vault 流程</span></div><div class="chat"><span class="gutter"><span class="sm" style="color:var(--state-waiting)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
   <path d="M10 15L10 9"/>
   <path d="M14 15L14 9"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">Review auth middleware changes</div><div class="t-footnote" style="color:var(--text-secondary)">Approve 3 file edits</div></div><span class="label t-caption" style="background:var(--label-orange-bg);color:var(--label-orange-fg)"><i style="background:var(--label-orange-fg)"></i>orange</span><span class="t-footnote" style="color:var(--text-tertiary)">12m</span></div><div class="row"><span class="g" style="color:var(--state-done)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
-  <path d="m9 12 2 2 4-4"/>
-</svg>
-</span><div class="grow"><div class="t-body clip">为 loro swift 添加 debug trait 的支持</div><div class="t-footnote" style="color:var(--text-secondary)">loro-swift · PR #42</div></div><span class="label t-caption" style="background:var(--label-purple-bg);color:var(--label-purple-fg)"><i style="background:var(--label-purple-fg)"></i>purple</span><span class="t-footnote" style="color:var(--text-tertiary)">1h</span></div><div class="row"><span class="g" style="color:var(--state-merged)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z"/>
-  <path d="M3 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z"/>
-  <path d="M6 21V9a9 9 0 0 0 9 9"/>
-</svg>
-</span><div class="grow"><div class="t-body clip">Fix flaky sync test</div><div class="t-footnote" style="color:var(--text-secondary)">lody · PR #3935 merged</div></div><span class="t-footnote" style="color:var(--text-tertiary)">3h</span></div><div class="row"><span class="g" style="color:var(--state-failed)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+</span></span><span class="t-body clip">Keyhive 用于 foliant 协作成员管理</span></div><div class="chat"><span class="gutter"><i class="dot"></i></span><span class="t-bodyEmphasis clip">Build and verify iOS redesign</span></div><div class="chat"><span class="gutter"></span><span class="t-body clip">桌面端同步管理与历史恢复界面</span></div><div class="chat"><span class="gutter"></span><span class="t-body clip">Foliant 首次使用与同步流程体验分析</span></div><div class="chat"><span class="gutter"><span class="sm" style="color:var(--state-failed)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
   <path d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"/>
   <path d="m15 9-6 6"/>
   <path d="m9 9 6 6"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">worktree 环境 setup 配置</div><div class="t-footnote" style="color:var(--text-secondary)">Exited with code 1</div></div><span class="t-footnote" style="color:var(--text-tertiary)">4h</span></div><div class="row"><span class="g" style="color:var(--state-idle)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M10.1 2.182a10 10 0 0 1 3.8 0"/>
-  <path d="M13.9 21.818a10 10 0 0 1-3.8 0"/>
-  <path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/>
-  <path d="M2.182 13.9a10 10 0 0 1 0-3.8"/>
-  <path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/>
-  <path d="M21.818 10.1a10 10 0 0 1 0 3.8"/>
-  <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/>
-  <path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/>
+</span></span><span class="t-body clip">Foliant 高频使用场景端到端体验审查</span></div><div class="chat more t-body"><span class="gutter"></span>Show 2 more</div><div class="ghead" style="margin-top:8px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
 </svg>
-</span><div class="grow"><div class="t-body clip">实现 refresh token</div><div class="t-footnote" style="color:var(--text-secondary)">lody-ios</div></div><span class="label t-caption" style="background:var(--label-blue-bg);color:var(--label-blue-fg)"><i style="background:var(--label-blue-fg)"></i>blue</span><span class="t-footnote" style="color:var(--text-tertiary)">Yesterday</span></div>
-    <div class="composer"><span style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>
+</span><span class="t-bodyEmphasis grow clip">lody</span><span class="sm" style="color:var(--state-running)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
 </svg>
-</span><span class="t-callout grow" style="color:var(--text-placeholder)">Ask Lody…</span><span class="send"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <path d="m5 12 7-7 7 7"/>
-  <path d="M12 19V5"/>
+</span><span class="t-footnote" style="color:var(--text-tertiary)">4</span><span class="act" style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
 </svg>
-</span></div>
+</span></div><div class="ghead" style="margin-top:8px"><span style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+</svg>
+</span><span class="t-bodyEmphasis grow clip">loro-streams</span><span class="t-footnote" style="color:var(--text-tertiary)">2</span><span class="act" style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+</svg>
+</span></div></div>
+    <div class="bottom">
+      <span class="glass search t-body"><span style="color:var(--icon-secondary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m21 21-4.34-4.34"/>
+  <path d="M3 11a8 8 0 1 0 16 0a8 8 0 1 0 -16 0Z"/>
+</svg>
+</span><span style="color:var(--text-placeholder)">Search chats</span></span>
+      <span class="glass circle lg" style="color:var(--icon-primary)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+</svg>
+</span>
+    </div>
   </div></div></div>
 
 <h2>Components</h2>
@@ -1169,5 +1166,5 @@ Session archived</div>
 </table>
 
 <h2>Dimensions (pt = dp), numbers, motion</h2>
-<h3>spacing</h3><div class="dims"><div><code>none</code> 0</div><div><code>xxs</code> 2</div><div><code>xs</code> 4</div><div><code>sm</code> 8</div><div><code>md</code> 12</div><div><code>lg</code> 16</div><div><code>xl</code> 20</div><div><code>xxl</code> 24</div><div><code>xxxl</code> 32</div><div><code>huge</code> 48</div></div><h3>radius</h3><div class="dims"><div><code>none</code> 0</div><div><code>xs</code> 4</div><div><code>sm</code> 6</div><div><code>md</code> 8</div><div><code>lg</code> 12</div><div><code>xl</code> 18</div><div><code>full</code> 9999</div></div><h3>iconSize</h3><div class="dims"><div><code>xs</code> 12</div><div><code>sm</code> 16</div><div><code>md</code> 20</div><div><code>lg</code> 24</div><div><code>xl</code> 28</div></div><h3>stroke</h3><div class="dims"><div><code>default</code> 1</div><div><code>strong</code> 1.5</div><div><code>focus</code> 2</div><div><code>icon</code> 1.75</div></div><h3>size</h3><div class="dims"><div><code>touchTarget</code> 44</div><div><code>controlXs</code> 24</div><div><code>controlSm</code> 32</div><div><code>controlMd</code> 40</div><div><code>controlLg</code> 48</div><div><code>chip</code> 28</div><div><code>chipSm</code> 22</div><div><code>badge</code> 18</div><div><code>dot</code> 8</div><div><code>progress</code> 4</div><div><code>listRow</code> 44</div><div><code>listRowTwoLine</code> 60</div><div><code>sectionHeader</code> 36</div><div><code>avatarXs</code> 16</div><div><code>avatarSm</code> 20</div><div><code>avatarMd</code> 28</div><div><code>avatarLg</code> 40</div><div><code>avatarXl</code> 56</div><div><code>composerMin</code> 48</div></div><h3>layout</h3><div class="dims"><div><code>screenPaddingX</code> 16</div><div><code>listRowPaddingX</code> 16</div><div><code>listRowPaddingY</code> 10</div><div><code>listRowGap</code> 12</div><div><code>sectionGap</code> 24</div><div><code>stackGap</code> 12</div><div><code>readableMaxWidth</code> 680</div></div><h3>breakpoint</h3><div class="dims"><div><code>medium</code> 600</div><div><code>expanded</code> 840</div></div><h3>opacity</h3><div class="dims"><div><code>pressed</code> 0.7</div><div><code>muted</code> 0.6</div></div><h3>motion.duration</h3><div class="dims"><div><code>instant</code> 80ms</div><div><code>fast</code> 120ms</div><div><code>base</code> 200ms</div><div><code>slow</code> 320ms</div><div><code>slower</code> 480ms</div></div><h3>motion.easing</h3><div class="dims"><div><code>standard</code> cubic-bezier(0.2, 0, 0, 1)</div><div><code>emphasized</code> cubic-bezier(0.3, 0, 0, 1)</div><div><code>decelerate</code> cubic-bezier(0, 0, 0, 1)</div><div><code>accelerate</code> cubic-bezier(0.3, 0, 1, 1)</div></div><h3>motion.spring</h3><div class="dims"><div><code>smooth</code> 0.4s · bounce 0 (k 246.7, ζ 1)</div><div><code>snappy</code> 0.3s · bounce 0.12 (k 438.6, ζ 0.88)</div><div><code>bouncy</code> 0.5s · bounce 0.3 (k 157.9, ζ 0.7)</div></div>
+<h3>spacing</h3><div class="dims"><div><code>none</code> 0</div><div><code>xxs</code> 2</div><div><code>xs</code> 4</div><div><code>sm</code> 8</div><div><code>md</code> 12</div><div><code>lg</code> 16</div><div><code>xl</code> 20</div><div><code>xxl</code> 24</div><div><code>xxxl</code> 32</div><div><code>huge</code> 48</div></div><h3>radius</h3><div class="dims"><div><code>none</code> 0</div><div><code>xs</code> 4</div><div><code>sm</code> 6</div><div><code>md</code> 8</div><div><code>lg</code> 12</div><div><code>xl</code> 18</div><div><code>full</code> 9999</div></div><h3>iconSize</h3><div class="dims"><div><code>xs</code> 12</div><div><code>sm</code> 16</div><div><code>md</code> 20</div><div><code>lg</code> 24</div><div><code>xl</code> 28</div></div><h3>stroke</h3><div class="dims"><div><code>default</code> 1</div><div><code>strong</code> 1.5</div><div><code>focus</code> 2</div><div><code>icon</code> 1.75</div></div><h3>size</h3><div class="dims"><div><code>touchTarget</code> 44</div><div><code>controlXs</code> 24</div><div><code>controlSm</code> 32</div><div><code>controlMd</code> 40</div><div><code>controlLg</code> 48</div><div><code>chip</code> 28</div><div><code>chipSm</code> 22</div><div><code>badge</code> 18</div><div><code>dot</code> 8</div><div><code>progress</code> 4</div><div><code>listRow</code> 44</div><div><code>listRowTwoLine</code> 60</div><div><code>sectionHeader</code> 36</div><div><code>avatarXs</code> 16</div><div><code>avatarSm</code> 20</div><div><code>avatarMd</code> 28</div><div><code>avatarLg</code> 40</div><div><code>avatarXl</code> 56</div><div><code>composerMin</code> 48</div></div><h3>layout</h3><div class="dims"><div><code>screenPaddingX</code> 16</div><div><code>listRowPaddingX</code> 16</div><div><code>listRowPaddingY</code> 10</div><div><code>listRowGap</code> 12</div><div><code>childIndent</code> 48</div><div><code>sectionGap</code> 24</div><div><code>stackGap</code> 12</div><div><code>readableMaxWidth</code> 680</div></div><h3>breakpoint</h3><div class="dims"><div><code>medium</code> 600</div><div><code>expanded</code> 840</div></div><h3>opacity</h3><div class="dims"><div><code>pressed</code> 0.7</div><div><code>muted</code> 0.6</div></div><h3>motion.duration</h3><div class="dims"><div><code>instant</code> 80ms</div><div><code>fast</code> 120ms</div><div><code>base</code> 200ms</div><div><code>slow</code> 320ms</div><div><code>slower</code> 480ms</div></div><h3>motion.easing</h3><div class="dims"><div><code>standard</code> cubic-bezier(0.2, 0, 0, 1)</div><div><code>emphasized</code> cubic-bezier(0.3, 0, 0, 1)</div><div><code>decelerate</code> cubic-bezier(0, 0, 0, 1)</div><div><code>accelerate</code> cubic-bezier(0.3, 0, 1, 1)</div></div><h3>motion.spring</h3><div class="dims"><div><code>smooth</code> 0.4s · bounce 0 (k 246.7, ζ 1)</div><div><code>snappy</code> 0.3s · bounce 0.12 (k 438.6, ζ 0.88)</div><div><code>bouncy</code> 0.5s · bounce 0.3 (k 157.9, ζ 0.7)</div></div>
 </main></body></html>

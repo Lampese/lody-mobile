@@ -37,7 +37,8 @@ Principles and integration steps: [README.md](README.md).
 ## Files
 
 - `examples/{ios,android}`: native preview apps; screens are kept 1:1 across
-  platforms (see `examples/README.md`).
+  platforms (see `examples/README.md`). `SessionListScreen` is the reference
+  chat list; the HTML preview's sample screen mirrors it.
 - `scripts/lib/tokens.mjs`: loads and validates tokens, derives Inter tracking and spring physics.
 - `scripts/lib/color.mjs`: OKLCH conversion and per-mode scale generation.
 - `scripts/lib/emit-{swift,kotlin,preview}.mjs`: platform emitters.

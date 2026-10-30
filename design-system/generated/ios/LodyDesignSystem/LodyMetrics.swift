@@ -154,6 +154,8 @@ public enum LodyLayout {
     public static let listRowPaddingY: CGFloat = 10
     /// Leading icon to title.
     public static let listRowGap: CGFloat = 12
+    /// Leading inset of rows nested under a group header, so their text aligns with the header title (screenPaddingX + iconSize.md + listRowGap). The gutter holds status glyphs.
+    public static let childIndent: CGFloat = 48
     /// Between grouped sections / cards.
     public static let sectionGap: CGFloat = 24
     /// Between controls inside a card.
@@ -166,6 +168,7 @@ public enum LodyLayout {
         ("listRowPaddingX", listRowPaddingX),
         ("listRowPaddingY", listRowPaddingY),
         ("listRowGap", listRowGap),
+        ("childIndent", childIndent),
         ("sectionGap", sectionGap),
         ("stackGap", stackGap),
         ("readableMaxWidth", readableMaxWidth),
