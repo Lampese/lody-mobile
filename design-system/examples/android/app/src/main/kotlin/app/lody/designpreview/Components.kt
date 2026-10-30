@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,22 +39,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.lody.android.designsystem.LodyElevation
+import app.lody.android.designsystem.LodyElevations
 import app.lody.android.designsystem.LodyIconSize
 import app.lody.android.designsystem.LodyIcons
 import app.lody.android.designsystem.LodyLayout
+import app.lody.android.designsystem.LodyOpacity
 import app.lody.android.designsystem.LodyRadius
 import app.lody.android.designsystem.LodySize
 import app.lody.android.designsystem.LodySpacing
 import app.lody.android.designsystem.LodyStroke
 import app.lody.android.designsystem.LodyTheme
+import app.lody.android.designsystem.shadow
 
 @Composable
 fun Glyph(icon: ImageVector, tint: Color, modifier: Modifier = Modifier, size: Dp = LodyIconSize.md) {
@@ -104,7 +114,27 @@ fun SessionRow(session: SampleSession) {
             Text(session.title, style = type.body, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(session.subtitle, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        session.label?.let { LabelChip(it) }
         Text(session.meta, style = type.footnote, color = colors.textTertiary)
+    }
+}
+
+@Composable
+fun LabelChip(label: LabelColor) {
+    Row(
+        modifier = Modifier
+            .height(LodySize.chipSm)
+            .background(label.bg, RoundedCornerShape(LodyRadius.sm))
+            .padding(horizontal = LodySpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs + LodySpacing.xxs),
+    ) {
+        Box(Modifier.size(LodySize.dot).background(label.fg, CircleShape))
+        Text(
+            label.name,
+            style = LodyTheme.typography.caption,
+            color = label.fg,
+        )
     }
 }
 
@@ -159,7 +189,7 @@ fun StatusBadge(state: SessionState) {
     }
     Row(
         modifier = Modifier
-            .height(LodySize.chip - LodySpacing.xs)
+            .height(LodySize.chipSm)
             .background(bg, RoundedCornerShape(LodyRadius.sm))
             .padding(horizontal = LodySpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -173,27 +203,73 @@ fun StatusBadge(state: SessionState) {
 enum class LodyButtonKind { Primary, Secondary, Destructive, Ghost }
 
 @Composable
-fun LodyButton(title: String, icon: ImageVector? = null, kind: LodyButtonKind = LodyButtonKind.Primary, onClick: () -> Unit = {}) {
+fun LodyButton(
+    title: String,
+    icon: ImageVector? = null,
+    kind: LodyButtonKind = LodyButtonKind.Primary,
+    enabled: Boolean = true,
+    onClick: () -> Unit = {},
+) {
     val colors = LodyTheme.colors
     val (bg, fg) = when (kind) {
         LodyButtonKind.Primary -> colors.accentDefault to colors.textOnAccent
         LodyButtonKind.Secondary -> colors.fillSecondary to colors.textPrimary
-        LodyButtonKind.Destructive -> colors.dangerSubtle to colors.dangerOnSubtle
+        LodyButtonKind.Destructive -> colors.dangerSolid to colors.textOnAccent
         LodyButtonKind.Ghost -> Color.Transparent to colors.textLink
     }
     val shape = RoundedCornerShape(LodyRadius.md)
     Row(
         modifier = Modifier
+            .alpha(if (enabled) 1f else LodyOpacity.disabled)
             .height(LodySize.controlMd)
             .clip(shape)
             .background(bg, shape)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = LodySpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
     ) {
         if (icon != null) Glyph(icon, fg, size = LodyIconSize.sm)
         Text(title, style = LodyTheme.typography.subhead, color = fg)
+    }
+}
+
+@Composable
+fun Toast(text: String) {
+    val colors = LodyTheme.colors
+    val shape = RoundedCornerShape(LodyRadius.md)
+    Row(
+        modifier = Modifier
+            .dropShadow(shape, LodyElevations.md.shadow())
+            .height(LodySize.controlMd)
+            .background(colors.bgInverse, shape)
+            .padding(horizontal = LodySpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        Glyph(LodyIcons.Check, colors.textInverse)
+        Text(text, style = LodyTheme.typography.subhead, color = colors.textInverse)
+    }
+}
+
+@Composable
+fun ElevationTile(name: String, elevation: LodyElevation) {
+    val colors = LodyTheme.colors
+    val shape = RoundedCornerShape(LodyRadius.md)
+    Column(
+        modifier = Modifier
+            .width(104.dp)
+            .dropShadow(shape, elevation.shadow())
+            .background(colors.bgOverlay, shape)
+            .padding(LodySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs),
+    ) {
+        Text(name, style = LodyTheme.typography.footnote, color = colors.textPrimary)
+        Text(
+            "y ${elevation.y.value.toInt()} · blur ${elevation.blur.value.toInt()}",
+            style = LodyTheme.typography.caption,
+            color = colors.textTertiary,
+        )
     }
 }
 
@@ -281,9 +357,16 @@ fun Banner(text: String) {
 }
 
 @Composable
-fun CodeBlock(code: String) {
+fun CodeBlock(lines: List<List<Pair<SyntaxKind, String>>>) {
     val colors = LodyTheme.colors
     val shape = RoundedCornerShape(LodyRadius.md)
+    val spans = lines.map { line -> line.map { (kind, text) -> kind.color to text } }
+    val highlighted = buildAnnotatedString {
+        spans.forEachIndexed { index, line ->
+            for ((color, text) in line) withStyle(SpanStyle(color = color)) { append(text) }
+            if (index < spans.lastIndex) append("\n")
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -292,7 +375,7 @@ fun CodeBlock(code: String) {
             .horizontalScroll(rememberScrollState())
             .padding(LodySpacing.md),
     ) {
-        Text(code, style = LodyTheme.typography.code, color = colors.codeText, softWrap = false)
+        Text(highlighted, style = LodyTheme.typography.code, softWrap = false)
     }
 }
 
@@ -310,6 +393,7 @@ fun DiffView(lines: List<Pair<DiffKind, String>>) {
     ) {
         for ((kind, text) in lines) {
             val (bg, fg) = when (kind) {
+                DiffKind.Hunk -> colors.diffHunkBg to colors.diffHunkText
                 DiffKind.Context -> Color.Transparent to colors.codeText
                 DiffKind.Added -> colors.diffAddedBg to colors.diffAddedText
                 DiffKind.Removed -> colors.diffRemovedBg to colors.diffRemovedText

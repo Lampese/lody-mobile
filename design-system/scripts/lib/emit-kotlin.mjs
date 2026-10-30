@@ -102,7 +102,7 @@ private fun lodyTextStyle(family: FontFamily, weight: FontWeight, size: Int, lin
 `
 }
 
-function dimensions({ groups, motion }) {
+function dimensions({ groups, numbers, motion }) {
   const objects = Object.entries(groups)
     .map(([group, items]) => {
       const body = items.map((t) => `${kdoc(t.description, '    ')}    val ${t.name} = ${t.value}.dp`).join('\n')
@@ -110,6 +110,18 @@ function dimensions({ groups, motion }) {
       return `object Lody${pascal(group)} {\n${body}\n\n    val all: List<Pair<String, Dp>> = listOf(\n${all}\n    )\n}`
     })
     .join('\n\n')
+  const numberObjects = Object.entries(numbers)
+    .map(([group, items]) => {
+      const body = items.map((t) => `${kdoc(t.description, '    ')}    const val ${t.name} = ${float(t.value)}`).join('\n')
+      return `object Lody${pascal(group)} {\n${body}\n}`
+    })
+    .join('\n\n')
+  const springs = motion.springs
+    .map(
+      (t) =>
+        `${kdoc(`${t.description ?? ''} SwiftUI: duration ${t.value.duration}s, bounce ${t.value.bounce}.`.trim(), '    ')}    fun <T> ${t.name}(): SpringSpec<T> = spring(dampingRatio = ${float(t.dampingRatio)}, stiffness = ${float(t.stiffness)})`,
+    )
+    .join('\n')
   const durations = motion.durations
     .map((d) => `${kdoc(d.description, '    ')}    const val ${d.name}Millis = ${d.value}`)
     .join('\n')
@@ -119,15 +131,48 @@ function dimensions({ groups, motion }) {
   return `${header('tokens/dimension.json')}
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 ${objects}
 
+${numberObjects}
+
 object LodyMotion {
 ${durations}
 
 ${easings}
+}
+
+/** Springs matching iOS \`LodySpring\` (SwiftUI duration / bounce converted to stiffness / damping). */
+object LodySpring {
+${springs}
+}
+`
+}
+
+function elevation(levels) {
+  const vals = levels
+    .map((e) => `${kdoc(e.description, '    ')}    val ${e.name} = LodyElevation(blur = ${e.blur}.dp, y = ${e.y}.dp) { it.${e.color} }`)
+    .join('\n')
+  return `${header('tokens/elevation.json')}
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+/**
+ * Shadow for custom floating surfaces. Apply with
+ * \`Modifier.dropShadow(shape, LodyElevations.md.shadow())\`.
+ * [blur] is in Figma / CSS terms; [color] resolves against the active [LodyColors].
+ */
+@Immutable
+class LodyElevation(val blur: Dp, val y: Dp, val color: (LodyColors) -> Color)
+
+object LodyElevations {
+${vals}
 }
 `
 }
@@ -183,12 +228,13 @@ private fun lodyIcon(name: String, vararg paths: String): ImageVector =
 `
 }
 
-export function emitKotlin({ colors: colorList, typography: type, dimensions: dims, iconPaths, iconStroke }) {
+export function emitKotlin({ colors: colorList, typography: type, dimensions: dims, elevation: levels, iconPaths, iconStroke }) {
   const dir = `generated/android/${ANDROID_PACKAGE.replaceAll('.', '/')}`
   return {
     [`${dir}/LodyColors.kt`]: colors(colorList),
     [`${dir}/LodyTypography.kt`]: typography(type),
     [`${dir}/LodyDimens.kt`]: dimensions(dims),
+    [`${dir}/LodyElevation.kt`]: elevation(levels),
     [`${dir}/LodyIcons.kt`]: icons(iconPaths, iconStroke),
   }
 }

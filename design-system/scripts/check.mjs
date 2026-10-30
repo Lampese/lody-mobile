@@ -18,7 +18,7 @@ for (const [fg, bg, min] of loadContrastPairs()) {
       problems.push(`contrast: unknown token in [${fg}, ${bg}]`)
       break
     }
-    const ratio = contrastRatio(f[mode], b[mode])
+    const ratio = contrastRatio(f[mode], b[mode], byId.get('bg.base')[mode])
     if (ratio < min) problems.push(`contrast ${mode}: ${fg} on ${bg} is ${ratio.toFixed(2)}, needs ${min}`)
   }
 }

@@ -3,6 +3,8 @@
 import CoreGraphics
 
 public extension LodyTextStyle {
+    /// Onboarding and empty-screen hero titles.
+    static let display = LodyTextStyle(fontName: "Inter-Bold", size: 34, lineHeight: 40, tracking: -0.74, dynamicType: .largeTitle)
     /// Root screen titles ("Sessions", "My issues").
     static let largeTitle = LodyTextStyle(fontName: "Inter-Bold", size: 28, lineHeight: 34, tracking: -0.59, dynamicType: .largeTitle)
     /// Detail screen headers, empty-state titles.
@@ -15,8 +17,14 @@ public extension LodyTextStyle {
     static let bodyEmphasis = LodyTextStyle(fontName: "Inter-Medium", size: 16, lineHeight: 22, tracking: -0.18, dynamicType: .body)
     /// Long-form chat and markdown.
     static let reading = LodyTextStyle(fontName: "Inter-Regular", size: 16, lineHeight: 25, tracking: -0.18, dynamicType: .body)
+    /// Composer text, dense paragraphs in cards.
+    static let callout = LodyTextStyle(fontName: "Inter-Regular", size: 15, lineHeight: 20, tracking: -0.13, dynamicType: .callout)
+    /// Descriptions under titles, settings footers.
+    static let bodySmall = LodyTextStyle(fontName: "Inter-Regular", size: 14, lineHeight: 20, tracking: -0.09, dynamicType: .subheadline)
     /// Section headers, segmented controls, buttons.
     static let subhead = LodyTextStyle(fontName: "Inter-Medium", size: 14, lineHeight: 20, tracking: -0.09, dynamicType: .subheadline)
+    /// Compact buttons, segmented items, form labels.
+    static let label = LodyTextStyle(fontName: "Inter-Medium", size: 13, lineHeight: 16, tracking: -0.04, dynamicType: .footnote)
     /// Row subtitles, metadata, timestamps.
     static let footnote = LodyTextStyle(fontName: "Inter-Regular", size: 13, lineHeight: 18, tracking: -0.04, dynamicType: .footnote)
     /// Badges, chip labels.
@@ -29,13 +37,17 @@ public extension LodyTextStyle {
     static let codeSmall = LodyTextStyle(fontName: "JetBrainsMono-Regular", size: 12, lineHeight: 18, tracking: 0, dynamicType: .footnote)
 
     static let all: [(name: String, style: LodyTextStyle)] = [
+        ("display", .display),
         ("largeTitle", .largeTitle),
         ("title", .title),
         ("headline", .headline),
         ("body", .body),
         ("bodyEmphasis", .bodyEmphasis),
         ("reading", .reading),
+        ("callout", .callout),
+        ("bodySmall", .bodySmall),
         ("subhead", .subhead),
+        ("label", .label),
         ("footnote", .footnote),
         ("caption", .caption),
         ("micro", .micro),

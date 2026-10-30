@@ -2,6 +2,7 @@
 // emitters consume. All validation lives here so emitters can stay dumb.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { generateRamp, hexToOklch } from './color.mjs'
 
 export const ROOT = new URL('../../', import.meta.url).pathname
 
@@ -30,21 +31,54 @@ function* leaves(node, path = [], type = undefined) {
 
 const HEX = /^#([0-9a-f]{6}|[0-9a-f]{8})$/i
 
-function loadPalette() {
-  const palette = new Map()
-  for (const [path, token] of leaves(readJson('tokens/palette.json'))) {
-    if (!HEX.test(token.$value)) throw new Error(`palette ${path.join('.')}: bad color ${token.$value}`)
-    palette.set(path.join('.'), token.$value.toUpperCase())
+/**
+ * Returns { groups, map }: groups keeps the per-family ramps for the preview,
+ * map resolves "family.step" to a hex for semantic references.
+ */
+export function loadPalette() {
+  const json = readJson('tokens/palette.json')
+  const groups = []
+  const add = (name, steps, anchorStep) => groups.push({ name, steps, anchorStep })
+
+  const gray = Object.fromEntries(Object.entries(json.gray).filter(([k]) => !isMeta(k)))
+  add('gray', gray)
+  const ramp = Object.fromEntries(Object.entries(json.ramp).filter(([k]) => !isMeta(k)))
+  for (const [name, family] of Object.entries(json.families)) {
+    if (isMeta(name)) continue
+    if (!HEX.test(family.anchor)) throw new Error(`palette ${name}: bad anchor ${family.anchor}`)
+    const { steps, anchorStep } = generateRamp(family.anchor, ramp)
+    add(name, steps, anchorStep)
   }
-  return palette
+
+  const map = new Map([
+    ['black', json.black],
+    ['white', json.white],
+  ])
+  for (const group of groups) {
+    const lightness = []
+    for (const [step, hex] of Object.entries(group.steps)) {
+      if (!HEX.test(hex)) throw new Error(`palette ${group.name}.${step}: bad color ${hex}`)
+      map.set(`${group.name}.${step}`, hex.toUpperCase())
+      lightness.push(hexToOklch(hex).l)
+    }
+    // Steps are ordered light -> dark; an anchor far from its ramp slot would break that.
+    if (lightness.some((l, i) => i > 0 && l > lightness[i - 1])) {
+      throw new Error(`palette ${group.name}: lightness is not monotonic`)
+    }
+  }
+  return { groups, map }
 }
 
+/** "{indigo.600}" or "{indigo.600/12}" (12% alpha) or a literal #RRGGBB[AA]. */
 function resolveColor(value, palette, where) {
-  const ref = /^\{(.+)\}$/.exec(value)
+  const ref = /^\{([^}/]+)(?:\/(\d{1,3}))?\}$/.exec(value)
   if (ref) {
     const hit = palette.get(ref[1])
     if (!hit) throw new Error(`${where}: unknown palette reference ${value}`)
-    return hit
+    if (ref[2] === undefined) return hit
+    const alpha = Number(ref[2])
+    if (alpha > 100) throw new Error(`${where}: alpha above 100 in ${value}`)
+    return `${hit}${Math.round((alpha / 100) * 255).toString(16).toUpperCase().padStart(2, '0')}`
   }
   if (!HEX.test(value)) throw new Error(`${where}: expected palette reference or hex, got ${value}`)
   return value.toUpperCase()
@@ -62,7 +96,7 @@ export function parseHex(hex) {
 }
 
 export function loadColors() {
-  const palette = loadPalette()
+  const palette = loadPalette().map
   const colors = []
   for (const [path, token, type] of leaves(readJson('tokens/color.json'))) {
     const id = path.join('.')
@@ -133,27 +167,53 @@ export function loadTypography() {
   return { families: Object.values(families), styles }
 }
 
-/** Returns { groupName: [{ name, value, description }] } for every dimension group, plus motion. */
+/**
+ * Returns dimension groups ({ groupName: [{ name, value, description }] }, pt = dp),
+ * unitless number groups (opacity), and motion (durations, easings, springs).
+ */
 export function loadDimensions() {
   const json = readJson('tokens/dimension.json')
   const groups = {}
+  const numbers = {}
   for (const [group, node] of Object.entries(json)) {
     if (isMeta(group) || group === 'motion') continue
-    groups[group] = [...leaves(node)].map(([path, token]) => {
+    const items = [...leaves(node)].map(([path, token]) => {
       if (typeof token.$value !== 'number') throw new Error(`${group}.${path.join('.')}: expected number`)
       return { name: camel(path), value: token.$value, description: token.$description }
     })
+    if (node.$type === 'number') numbers[group] = items
+    else if (node.$type === 'dimension') groups[group] = items
+    else throw new Error(`${group}: $type must be dimension or number`)
   }
+  const describe = ([path, token]) => ({ name: camel(path), description: token.$description, value: token.$value })
   const motion = {
-    durations: [...leaves(json.motion.duration)].map(([path, token]) => ({
-      name: camel(path), value: token.$value, description: token.$description,
-    })),
-    easings: [...leaves(json.motion.easing)].map(([path, token]) => {
-      if (!Array.isArray(token.$value) || token.$value.length !== 4) throw new Error(`easing ${path}: expected 4 numbers`)
-      return { name: camel(path), value: token.$value }
+    durations: [...leaves(json.motion.duration)].map(describe),
+    easings: [...leaves(json.motion.easing)].map((entry) => {
+      const t = describe(entry)
+      if (!Array.isArray(t.value) || t.value.length !== 4) throw new Error(`easing ${t.name}: expected 4 numbers`)
+      return t
+    }),
+    springs: [...leaves(json.motion.spring)].map((entry) => {
+      const t = describe(entry)
+      const { duration, bounce } = t.value
+      if (!(duration > 0) || !(bounce >= 0 && bounce < 1)) throw new Error(`spring ${t.name}: needs duration > 0, 0 <= bounce < 1`)
+      // SwiftUI's spring(duration:bounce:) mapping; Compose takes the same physics as stiffness / damping.
+      t.stiffness = Math.round(((2 * Math.PI) / duration) ** 2 * 10) / 10
+      t.dampingRatio = Math.round((1 - bounce) * 1000) / 1000
+      return t
     }),
   }
-  return { groups, motion }
+  return { groups, numbers, motion }
+}
+
+/** Shadow levels; color is a semantic color token id so it follows light / dark. */
+export function loadElevation(colors) {
+  const ids = new Set(colors.map((c) => c.id))
+  return [...leaves(readJson('tokens/elevation.json'))].map(([path, token]) => {
+    const { y, blur, color } = token.$value
+    if (!ids.has(color)) throw new Error(`elevation ${path.join('.')}: unknown color ${color}`)
+    return { name: camel(path), description: token.$description, y, blur, color: camel(color.split('.')) }
+  })
 }
 
 export function loadContrastPairs() {

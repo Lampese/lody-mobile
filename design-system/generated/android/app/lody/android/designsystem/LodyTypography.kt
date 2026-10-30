@@ -27,6 +27,8 @@ val LodyMonoFontFamily = FontFamily(
 /** Type scale. Read the active set through `LodyTheme.typography`. */
 @Immutable
 class LodyTypography(
+    /** Onboarding and empty-screen hero titles. */
+    val display: TextStyle,
     /** Root screen titles ("Sessions", "My issues"). */
     val largeTitle: TextStyle,
     /** Detail screen headers, empty-state titles. */
@@ -39,8 +41,14 @@ class LodyTypography(
     val bodyEmphasis: TextStyle,
     /** Long-form chat and markdown. */
     val reading: TextStyle,
+    /** Composer text, dense paragraphs in cards. */
+    val callout: TextStyle,
+    /** Descriptions under titles, settings footers. */
+    val bodySmall: TextStyle,
     /** Section headers, segmented controls, buttons. */
     val subhead: TextStyle,
+    /** Compact buttons, segmented items, form labels. */
+    val label: TextStyle,
     /** Row subtitles, metadata, timestamps. */
     val footnote: TextStyle,
     /** Badges, chip labels. */
@@ -53,13 +61,17 @@ class LodyTypography(
     val codeSmall: TextStyle,
 ) {
     fun entries(): List<Pair<String, TextStyle>> = listOf(
+        "display" to display,
         "largeTitle" to largeTitle,
         "title" to title,
         "headline" to headline,
         "body" to body,
         "bodyEmphasis" to bodyEmphasis,
         "reading" to reading,
+        "callout" to callout,
+        "bodySmall" to bodySmall,
         "subhead" to subhead,
+        "label" to label,
         "footnote" to footnote,
         "caption" to caption,
         "micro" to micro,
@@ -69,13 +81,17 @@ class LodyTypography(
 }
 
 val LodyDefaultTypography = LodyTypography(
+    display = lodyTextStyle(LodySansFontFamily, FontWeight.W700, 34, 40, -0.74f),
     largeTitle = lodyTextStyle(LodySansFontFamily, FontWeight.W700, 28, 34, -0.59f),
     title = lodyTextStyle(LodySansFontFamily, FontWeight.W600, 22, 28, -0.4f),
     headline = lodyTextStyle(LodySansFontFamily, FontWeight.W600, 17, 22, -0.22f),
     body = lodyTextStyle(LodySansFontFamily, FontWeight.W400, 16, 22, -0.18f),
     bodyEmphasis = lodyTextStyle(LodySansFontFamily, FontWeight.W500, 16, 22, -0.18f),
     reading = lodyTextStyle(LodySansFontFamily, FontWeight.W400, 16, 25, -0.18f),
+    callout = lodyTextStyle(LodySansFontFamily, FontWeight.W400, 15, 20, -0.13f),
+    bodySmall = lodyTextStyle(LodySansFontFamily, FontWeight.W400, 14, 20, -0.09f),
     subhead = lodyTextStyle(LodySansFontFamily, FontWeight.W500, 14, 20, -0.09f),
+    label = lodyTextStyle(LodySansFontFamily, FontWeight.W500, 13, 16, -0.04f),
     footnote = lodyTextStyle(LodySansFontFamily, FontWeight.W400, 13, 18, -0.04f),
     caption = lodyTextStyle(LodySansFontFamily, FontWeight.W500, 12, 16, 0.01f),
     micro = lodyTextStyle(LodySansFontFamily, FontWeight.W500, 11, 14, 0.05f),

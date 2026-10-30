@@ -6,11 +6,39 @@ iOS（`../ios`，SwiftUI）与 Android（`../android`，Compose）共享的设�
 
 ## 设计原则
 
-1. **内容优先，不做拟物。** 面向文字密集、高频操作的工作流（参考 Linear / Notion）：纯色底、细分割线，层级靠字重、颜色和留白表达，不用阴影和质感。
+1. **内容优先，不做拟物。** 面向文字密集、高频操作的工作流（参考 Linear / Notion）：纯色底、细分割线，层级靠字重、颜色和留白表达。阴影只用于少数自定义浮层（菜单、toast），内容区保持扁平。
 2. **系统外壳交给原生，内容层由我们定义。** 导航栏、Tab bar、Sheet、菜单、Alert、开关、日期选择器、转场与返回手势都用平台组件（iOS 26 的 Liquid Glass、Material 3），只通过 token 调整它们的字体、强调色和圆角。列表行、状态图标、消息、代码和 diff、输入框（composer）、空状态由我们实现，两端像素级一致。
 3. **只用语义 token。** App 代码只引用语义名（`bgBase`、`textSecondary`），不直接引用色板。需要新颜色时先加语义 token。
 4. **颜色不是唯一信号。** 状态同时用图形区分（`stateIdle` 虚线圈、`stateRunning` 进度圈、`stateWaiting` 暂停圈……），对比度由 `scripts/check.mjs` 卡住底线。
 5. **尊重系统缩放。** 字号跟随 iOS Dynamic Type 和 Android 字体缩放；暗色模式跟随系统。Android 不启用 Dynamic Color。
+
+## Token 体系
+
+| 类别 | 文件 | 内容 |
+|---|---|---|
+| 色板（原始值） | `palette.json` | Linear 风格冷灰（18 档，含 Linear 实测灰）+ 9 个彩色色系，每个色系由 Linear 的一个锚点色在 OKLCH 中生成 11 档 |
+| 语义色 | `color.json` | 背景层级、填充（按下 / 选中 / 禁用）、文字四档、图标、边框、强调色、危险 / 警告 / 成功 / 信息、会话状态、10 色分类标签、代码与语法高亮、diff、选区、遮罩、阴影色 |
+| 字体 | `typography.json` | Inter + JetBrains Mono，16 档文字样式（display 到 codeSmall），字距按 Inter 公式推导 |
+| 尺寸 | `dimension.json` | 间距、圆角、图标尺寸、描边、控件 / 行 / 头像尺寸、布局、窗口断点 |
+| 数值 | `dimension.json` | 透明度（禁用、按下、弱化） |
+| 动效 | `dimension.json` | 时长、缓动曲线、弹簧（SwiftUI duration/bounce，Compose 自动换算 stiffness/damping） |
+| 阴影 | `elevation.json` | sm / md / lg 三级，颜色引用语义色，暗色自动加深 |
+| 图标 | `icons/manifest.json` | 语义名 -> Lucide |
+
+### 色板如何生成
+
+- 灰阶手工定义，锚定 Linear 界面实测值（`#08090A`、`#0F1011`、`#23252A`、`#6B6F76`、`#8A8F98`、`#F7F8F8`）。
+- 彩色色系只写锚点色（indigo `#5E6AD2` 是 Linear 品牌色，其余来自 Linear 的标签 / 状态色）。`scripts/lib/color.mjs` 用统一的 OKLCH 亮度 / 彩度梯度生成 50–950，锚点原样落在亮度最接近的那一档，色域外的颜色降低彩度映射回 sRGB。所以任意色系的同一档，亮度和对比度表现一致。
+- 调整色板：改锚点或 `ramp`，跑 build + check；`preview.html` 的 Palette 区会标出锚点所在档位。
+
+### 语义色写法
+
+```jsonc
+"subtle": { "$value": { "light": "{indigo.600/10}", "dark": "{indigo.500/20}" } }
+//                               色系.档位/透明度%
+```
+
+浅色底（`*.subtle`、`label.*.bg`、diff 背景）统一用半透明，同一个 token 叠在任何背景上都自然；对比度检查会先把半透明背景合成到 `bg.base` 上再计算。
 
 ## 两端一致性边界
 
@@ -26,10 +54,11 @@ iOS（`../ios`，SwiftUI）与 Android（`../android`，Compose）共享的设�
 
 ```
 tokens/            唯一数据源（DTCG 风格 JSON）
-  palette.json       原始色板，仅被 color.json 引用
+  palette.json       原始色板（灰阶 + 生成式色系），仅被 color.json 引用
   color.json         语义色，每个都有 light / dark
   typography.json    字体族与字号体系
-  dimension.json     间距、圆角、图标尺寸、组件尺寸、动效
+  dimension.json     间距、圆角、尺寸、断点、透明度、动效
+  elevation.json     阴影层级
   contrast.json      对比度底线（check 会校验）
 icons/manifest.json  语义图标名 -> Lucide 图标名
 icons/lucide/        内置的 Lucide 原始 SVG（sync-icons 拉取）
@@ -59,7 +88,11 @@ node design-system/scripts/fetch-fonts.mjs  # 重新拉取字体（联网）
 | `textStyle: body` | `.lodyTextStyle(.body)` | `LodyTheme.typography.body` |
 | `spacing: lg` | `LodySpacing.lg` | `LodySpacing.lg` |
 | `icon: inbox` | `LodyIcon.inbox.image` | `LodyIcons.Inbox` |
+| `color: label.red.fg` | `LodyColor.labelRedFg` | `LodyTheme.colors.labelRedFg` |
+| `opacity: disabled` | `LodyOpacity.disabled` | `LodyOpacity.disabled` |
 | `motion: duration.base` | `LodyMotion.base`、`LodyMotion.standard()` | `LodyMotion.baseMillis`、`LodyMotion.standard` |
+| `motion: spring.snappy` | `withAnimation(LodySpring.snappy)` | `LodySpring.snappy<Float>()` |
+| `elevation: md` | `.lodyElevation(.md)` | `Modifier.dropShadow(shape, LodyElevations.md.shadow())` |
 
 ## 接入
 

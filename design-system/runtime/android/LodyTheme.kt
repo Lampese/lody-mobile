@@ -4,6 +4,8 @@ package app.lody.android.designsystem
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -14,6 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.dp
 
 private val LocalLodyColors = staticCompositionLocalOf { LodyLightColors }
 private val LocalLodyTypography = staticCompositionLocalOf { LodyDefaultTypography }
@@ -46,8 +51,16 @@ fun LodyTheme(
             colorScheme = colors.toMaterial(darkTheme),
             typography = LodyDefaultTypography.toMaterial(),
             shapes = LodyShapes,
-            content = content,
-        )
+        ) {
+            // MaterialTheme derives selection colors from primary; use the Lody tokens instead.
+            CompositionLocalProvider(
+                LocalTextSelectionColors provides TextSelectionColors(
+                    handleColor = colors.selectionHandle,
+                    backgroundColor = colors.selectionText,
+                ),
+                content = content,
+            )
+        }
     }
 }
 
@@ -57,7 +70,7 @@ private fun LodyColors.toMaterial(dark: Boolean): ColorScheme =
         onPrimary = textOnAccent,
         primaryContainer = accentSubtle,
         onPrimaryContainer = accentOnSubtle,
-        inversePrimary = accentOnSubtle,
+        inversePrimary = accentFg,
         secondary = textSecondary,
         onSecondary = textInverse,
         secondaryContainer = fillSecondary,
@@ -79,7 +92,7 @@ private fun LodyColors.toMaterial(dark: Boolean): ColorScheme =
         surfaceContainer = bgRaised,
         surfaceContainerHigh = bgOverlay,
         surfaceContainerHighest = fillSecondary,
-        inverseSurface = textPrimary,
+        inverseSurface = bgInverse,
         inverseOnSurface = textInverse,
         outline = borderStrong,
         outlineVariant = borderSubtle,
@@ -118,3 +131,13 @@ private val LodyShapes = Shapes(
     large = RoundedCornerShape(LodyRadius.lg),
     extraLarge = RoundedCornerShape(LodyRadius.xl),
 )
+
+/**
+ * Resolves an elevation level against the active colors, for
+ * `Modifier.dropShadow(shape, LodyElevations.md.shadow())`.
+ */
+@Composable
+@ReadOnlyComposable
+fun LodyElevation.shadow(): Shadow =
+    // Compose's radius is roughly half the Figma / CSS blur, like SwiftUI's.
+    Shadow(radius = blur / 2, color = color(LodyTheme.colors), offset = DpOffset(0.dp, y))

@@ -87,7 +87,7 @@ ${files}
 `
 }
 
-function metrics({ groups, motion }) {
+function metrics({ groups, numbers, motion }) {
   const enums = Object.entries(groups)
     .map(([group, items]) => {
       const name = `Lody${group[0].toUpperCase()}${group.slice(1)}`
@@ -98,6 +98,21 @@ function metrics({ groups, motion }) {
       return `public enum ${name} {\n${body}\n\n    public static let all: [(name: String, value: CGFloat)] = [\n${all}\n    ]\n}`
     })
     .join('\n\n')
+  const numberEnums = Object.entries(numbers)
+    .map(([group, items]) => {
+      const name = `Lody${group[0].toUpperCase()}${group.slice(1)}`
+      const body = items
+        .map((t) => `${doc(t.description, '    ')}    public static let ${id(t.name)}: Double = ${t.value}`)
+        .join('\n')
+      return `public enum ${name} {\n${body}\n}`
+    })
+    .join('\n\n')
+  const springs = motion.springs
+    .map(
+      (t) =>
+        `${doc(t.description, '    ')}    public static var ${id(t.name)}: Animation { .spring(duration: ${t.value.duration}, bounce: ${t.value.bounce}) }`,
+    )
+    .join('\n')
   const durations = motion.durations
     .map((d) => `${doc(d.description, '    ')}    public static let ${id(d.name)}: TimeInterval = ${d.value / 1000}`)
     .join('\n')
@@ -112,10 +127,41 @@ import SwiftUI
 
 ${enums}
 
+${numberEnums}
+
 public enum LodyMotion {
 ${durations}
 
 ${easings}
+}
+
+/// Springs in SwiftUI's duration / bounce terms; Android uses the equivalent stiffness and damping.
+public enum LodySpring {
+${springs}
+}
+`
+}
+
+function elevation(levels) {
+  const statics = levels
+    .map(
+      (e) =>
+        `${doc(e.description, '    ')}    static let ${id(e.name)} = LodyElevation(color: LodyColor.${id(e.color)}, blur: ${e.blur}, y: ${e.y})`,
+    )
+    .join('\n')
+  return `${header('tokens/elevation.json')}
+import SwiftUI
+
+/// Shadow for custom floating surfaces. Apply with \`.lodyElevation(_:)\`.
+public struct LodyElevation: Sendable {
+    public let color: Color
+    /// Figma / CSS blur; SwiftUI's shadow radius is half of it.
+    public let blur: CGFloat
+    public let y: CGFloat
+}
+
+public extension LodyElevation {
+${statics}
 }
 `
 }
@@ -158,12 +204,13 @@ function assetCatalog(iconPaths, strokeWidth) {
   return out
 }
 
-export function emitSwift({ colors: colorList, typography: type, dimensions, iconPaths, iconStroke }) {
+export function emitSwift({ colors: colorList, typography: type, dimensions, elevation: levels, iconPaths, iconStroke }) {
   const dir = 'generated/ios/LodyDesignSystem'
   return {
     [`${dir}/LodyColor.swift`]: colors(colorList),
     [`${dir}/LodyTextStyles.swift`]: typography(type),
     [`${dir}/LodyMetrics.swift`]: metrics(dimensions),
+    [`${dir}/LodyElevation.swift`]: elevation(levels),
     [`${dir}/LodyIcon.swift`]: icons([...iconPaths.keys()]),
     ...assetCatalog(iconPaths, iconStroke),
   }

@@ -71,6 +71,7 @@ struct SessionRow: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: LodySpacing.sm)
+                if let label = session.label { LabelChip(label: label) }
                 Text(session.meta)
                     .lodyTextStyle(.footnote)
                     .foregroundStyle(LodyColor.textTertiary)
@@ -146,7 +147,7 @@ struct StatusBadge: View {
             Text(state.label).lodyTextStyle(.caption).foregroundStyle(colors.fg)
         }
         .padding(.horizontal, LodySpacing.sm)
-        .frame(height: LodySize.chip - LodySpacing.xs)
+        .frame(height: LodySize.chipSm)
         .background(colors.bg, in: RoundedRectangle(cornerRadius: LodyRadius.sm))
     }
 }
@@ -157,13 +158,14 @@ struct LodyButton: View {
     let title: String
     var icon: LodyIcon? = nil
     var kind: LodyButtonKind = .primary
+    var enabled = true
     var action: () -> Void = {}
 
     private var colors: (bg: Color, fg: Color) {
         switch kind {
         case .primary: (LodyColor.accentDefault, LodyColor.textOnAccent)
         case .secondary: (LodyColor.fillSecondary, LodyColor.textPrimary)
-        case .destructive: (LodyColor.dangerSubtle, LodyColor.dangerOnSubtle)
+        case .destructive: (LodyColor.dangerSolid, LodyColor.textOnAccent)
         case .ghost: (Color.clear, LodyColor.textLink)
         }
     }
@@ -179,6 +181,55 @@ struct LodyButton: View {
             .background(colors.bg, in: RoundedRectangle(cornerRadius: LodyRadius.md))
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : LodyOpacity.disabled)
+    }
+}
+
+struct LabelChip: View {
+    let label: LabelColor
+
+    var body: some View {
+        HStack(spacing: LodySpacing.xs + LodySpacing.xxs) {
+            Circle().fill(label.fg).frame(width: LodySize.dot, height: LodySize.dot)
+            Text(label.rawValue.capitalized).lodyTextStyle(.caption).foregroundStyle(label.fg)
+        }
+        .padding(.horizontal, LodySpacing.sm)
+        .frame(height: LodySize.chipSm)
+        .background(label.bg, in: RoundedRectangle(cornerRadius: LodyRadius.sm))
+    }
+}
+
+struct Toast: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: LodySpacing.sm) {
+            Glyph(icon: .check, size: LodyIconSize.md, color: LodyColor.textInverse)
+            Text(text).lodyTextStyle(.subhead).foregroundStyle(LodyColor.textInverse)
+        }
+        .padding(.horizontal, LodySpacing.md)
+        .frame(height: LodySize.controlMd)
+        .background(LodyColor.bgInverse, in: RoundedRectangle(cornerRadius: LodyRadius.md))
+        .lodyElevation(.md)
+    }
+}
+
+struct ElevationTile: View {
+    let name: String
+    let elevation: LodyElevation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LodySpacing.xxs) {
+            Text(name).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textPrimary)
+            Text("y \(Int(elevation.y)) · blur \(Int(elevation.blur))")
+                .lodyTextStyle(.caption)
+                .foregroundStyle(LodyColor.textTertiary)
+        }
+        .padding(LodySpacing.md)
+        .frame(width: 104, alignment: .leading)
+        .background(LodyColor.bgOverlay, in: RoundedRectangle(cornerRadius: LodyRadius.md))
+        .lodyElevation(elevation)
     }
 }
 
@@ -240,13 +291,25 @@ struct Banner: View {
 }
 
 struct CodeBlock: View {
-    let code: String
+    let lines: [[(SyntaxKind, String)]]
+
+    private var highlighted: AttributedString {
+        var result = AttributedString()
+        for (index, line) in lines.enumerated() {
+            for (kind, text) in line {
+                var run = AttributedString(text)
+                run.foregroundColor = kind.color
+                result += run
+            }
+            if index < lines.count - 1 { result += AttributedString("\n") }
+        }
+        return result
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            Text(code)
+            Text(highlighted)
                 .lodyTextStyle(.code)
-                .foregroundStyle(LodyColor.codeText)
                 .fixedSize()
                 .padding(LodySpacing.md)
         }
@@ -278,6 +341,7 @@ struct DiffView: View {
 
     private func foreground(_ kind: DiffKind) -> Color {
         switch kind {
+        case .hunk: LodyColor.diffHunkText
         case .context: LodyColor.codeText
         case .added: LodyColor.diffAddedText
         case .removed: LodyColor.diffRemovedText
@@ -286,6 +350,7 @@ struct DiffView: View {
 
     private func background(_ kind: DiffKind) -> Color {
         switch kind {
+        case .hunk: LodyColor.diffHunkBg
         case .context: .clear
         case .added: LodyColor.diffAddedBg
         case .removed: LodyColor.diffRemovedBg

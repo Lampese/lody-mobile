@@ -13,9 +13,15 @@ function over(fg, bg) {
   return { r: fg.r * a + bg.r * (1 - a), g: fg.g * a + bg.g * (1 - a), b: fg.b * a + bg.b * (1 - a) }
 }
 
-/** WCAG 2.x contrast ratio. Translucent colors are composited onto the background first. */
-export function contrastRatio(fgHex, bgHex) {
-  const bg = parseHex(bgHex)
+/**
+ * WCAG 2.x contrast ratio. A translucent background is first composited onto
+ * `baseHex` (the surface it sits on, e.g. bg.base); a translucent foreground is
+ * then composited onto that background.
+ */
+export function contrastRatio(fgHex, bgHex, baseHex = '#FFFFFF') {
+  const base = parseHex(baseHex)
+  const rawBg = parseHex(bgHex)
+  const bg = rawBg.a < 255 ? { ...over(rawBg, base), a: 255 } : rawBg
   const l1 = luminance(over(parseHex(fgHex), bg))
   const l2 = luminance(bg)
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)

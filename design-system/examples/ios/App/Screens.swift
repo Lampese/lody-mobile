@@ -60,11 +60,17 @@ struct ComponentsScreen: View {
                         HStack(spacing: LodySpacing.sm) {
                             LodyButton(title: "Delete", icon: .trash, kind: .destructive)
                             LodyButton(title: "View diff", kind: .ghost)
+                            LodyButton(title: "Disabled", enabled: false)
                         }
                     }
                     GroupCard(title: "Status") {
                         FlowRow {
                             ForEach(SessionState.allCases, id: \.self) { StatusBadge(state: $0) }
+                        }
+                    }
+                    GroupCard(title: "Labels") {
+                        FlowRow {
+                            ForEach(LabelColor.allCases, id: \.self) { LabelChip(label: $0) }
                         }
                     }
                     GroupCard(title: "Native controls (platform)") {
@@ -82,8 +88,17 @@ struct ComponentsScreen: View {
                         Banner(text: "Agent needs approval to run `pnpm install` in lody-mobile.")
                     }
                     GroupCard(title: "Code") {
-                        CodeBlock(code: SampleData.code)
+                        CodeBlock(lines: SampleData.code)
                         DiffView(lines: SampleData.diff)
+                    }
+                    GroupCard(title: "Elevation") {
+                        HStack(spacing: LodySpacing.lg) {
+                            ElevationTile(name: "sm", elevation: .sm)
+                            ElevationTile(name: "md", elevation: .md)
+                            ElevationTile(name: "lg", elevation: .lg)
+                        }
+                        .padding(.vertical, LodySpacing.sm)
+                        Toast(text: "Session archived")
                     }
                     GroupCard(title: "Empty state") {
                         EmptyState()

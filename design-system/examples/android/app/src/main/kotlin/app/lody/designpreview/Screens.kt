@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import app.lody.android.designsystem.LodyElevations
 import app.lody.android.designsystem.LodyIconSize
 import app.lody.android.designsystem.LodyIcons
 import app.lody.android.designsystem.LodyLayout
@@ -155,6 +156,15 @@ fun ComponentsScreen(appearance: Int, onToggleAppearance: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
                     LodyButton("Delete", LodyIcons.Trash, LodyButtonKind.Destructive)
                     LodyButton("View diff", kind = LodyButtonKind.Ghost)
+                    LodyButton("Disabled", enabled = false)
+                }
+            }
+            GroupCard("Labels") {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                ) {
+                    LabelColor.entries.forEach { LabelChip(it) }
                 }
             }
             GroupCard("Status") {
@@ -193,6 +203,17 @@ fun ComponentsScreen(appearance: Int, onToggleAppearance: () -> Unit) {
             GroupCard("Code") {
                 CodeBlock(SampleData.code)
                 DiffView(SampleData.diff)
+            }
+            GroupCard("Elevation") {
+                Row(
+                    modifier = Modifier.padding(vertical = LodySpacing.sm),
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.lg),
+                ) {
+                    ElevationTile("sm", LodyElevations.sm)
+                    ElevationTile("md", LodyElevations.md)
+                    ElevationTile("lg", LodyElevations.lg)
+                }
+                Toast("Session archived")
             }
             GroupCard("Empty state") {
                 EmptyState()

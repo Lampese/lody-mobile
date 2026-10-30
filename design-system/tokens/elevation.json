@@ -1,0 +1,6 @@
+{
+  "$description": "Shadows for custom floating surfaces only (menus, toasts, floating buttons). Content stays flat and native chrome brings its own material. y and blur in pt = dp, blur in Figma / CSS terms; color is a semantic color token so it follows light / dark.",
+  "sm": { "$value": { "y": 1, "blur": 3, "color": "shadow.sm" }, "$description": "Floating chips, the composer when content scrolls under it." },
+  "md": { "$value": { "y": 4, "blur": 16, "color": "shadow.md" }, "$description": "Menus, popovers, toasts." },
+  "lg": { "$value": { "y": 12, "blur": 32, "color": "shadow.lg" }, "$description": "Custom sheets and dialogs." }
+}

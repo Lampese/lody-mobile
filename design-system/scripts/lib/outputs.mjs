@@ -6,7 +6,7 @@ import { emitKotlin } from './emit-kotlin.mjs'
 import { emitPreview } from './emit-preview.mjs'
 import { emitSwift } from './emit-swift.mjs'
 import { svgToPaths } from './svg.mjs'
-import { ROOT, loadColors, loadDimensions, loadIconManifest, loadTypography } from './tokens.mjs'
+import { ROOT, loadColors, loadDimensions, loadElevation, loadIconManifest, loadPalette, loadTypography } from './tokens.mjs'
 
 export function loadAll() {
   const dimensions = loadDimensions()
@@ -16,7 +16,16 @@ export function loadAll() {
     const svg = readFileSync(join(ROOT, 'icons/lucide', `${lucide}.svg`), 'utf8')
     iconPaths.set(name, svgToPaths(svg, `${name} (${lucide})`))
   }
-  return { colors: loadColors(), typography: loadTypography(), dimensions, iconPaths, iconStroke }
+  const colors = loadColors()
+  return {
+    palette: loadPalette().groups,
+    colors,
+    typography: loadTypography(),
+    dimensions,
+    elevation: loadElevation(colors),
+    iconPaths,
+    iconStroke,
+  }
 }
 
 export function buildOutputs(tokens = loadAll()) {

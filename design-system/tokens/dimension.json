@@ -1,5 +1,5 @@
 {
-  "$description": "Dimensions in pt (iOS) = dp (Android), on a 4pt grid. Durations in ms.",
+  "$description": "Dimensions in pt (iOS) = dp (Android), on a 4pt grid. Groups typed number are unitless. Durations in ms.",
   "spacing": {
     "$type": "dimension",
     "none": { "$value": 0 },
@@ -15,62 +15,95 @@
   },
   "radius": {
     "$type": "dimension",
-    "xs": { "$value": 4, "$description": "Inline code, small badges." },
-    "sm": { "$value": 6, "$description": "Chips, checkboxes." },
-    "md": { "$value": 10, "$description": "Buttons, text fields, code blocks." },
-    "lg": { "$value": 14, "$description": "Cards, grouped list sections." },
-    "xl": { "$value": 20, "$description": "Composer, sheets (custom)." },
-    "full": { "$value": 9999, "$description": "Pills, avatars." }
+    "none": { "$value": 0 },
+    "xs": { "$value": 4, "$description": "Inline code, small badges, checkboxes." },
+    "sm": { "$value": 6, "$description": "Chips, labels, segmented items." },
+    "md": { "$value": 8, "$description": "Buttons, text fields, code blocks, menus." },
+    "lg": { "$value": 12, "$description": "Cards, grouped list sections." },
+    "xl": { "$value": 18, "$description": "Composer, custom sheets." },
+    "full": { "$value": 9999, "$description": "Pills, avatars, dots. Use the platform capsule / circle shape." }
   },
   "iconSize": {
     "$type": "dimension",
     "xs": { "$value": 12 },
-    "sm": { "$value": 16, "$description": "Inline with footnote / caption text." },
+    "sm": { "$value": 16, "$description": "Inline with footnote / caption text, in chips and small buttons." },
     "md": { "$value": 20, "$description": "Default: list rows, toolbars." },
     "lg": { "$value": 24, "$description": "Tab bar, prominent actions." },
-    "xl": { "$value": 28 }
+    "xl": { "$value": 28, "$description": "Empty states." }
   },
   "stroke": {
     "$type": "dimension",
     "default": { "$value": 1, "$description": "Outlines. List separators use the platform hairline instead." },
+    "strong": { "$value": 1.5, "$description": "Selected outlines, checkbox rings." },
     "focus": { "$value": 2 },
     "icon": { "$value": 1.75, "$description": "Icon stroke on the 24pt grid; baked into generated icons." }
   },
   "size": {
     "$type": "dimension",
-    "touchTarget": { "$value": 44, "$description": "Minimum hit area. Android Material reserves 48dp; we keep 44 visually and let Compose pad the hit area." },
-    "controlSm": { "$value": 32 },
-    "controlMd": { "$value": 40 },
-    "controlLg": { "$value": 48 },
-    "chip": { "$value": 28 },
-    "listRow": { "$value": 48, "$description": "Single-line row minimum height." },
-    "listRowTwoLine": { "$value": 64 },
-    "sectionHeader": { "$value": 40 },
+    "touchTarget": { "$value": 44, "$description": "Minimum hit area. Android Material reserves 48dp; keep 44 visually and let Compose pad the hit area." },
+    "controlXs": { "$value": 24, "$description": "Inline icon buttons inside rows." },
+    "controlSm": { "$value": 32, "$description": "Compact buttons, the composer send button." },
+    "controlMd": { "$value": 40, "$description": "Default buttons and text fields." },
+    "controlLg": { "$value": 48, "$description": "Full-width primary actions." },
+    "chip": { "$value": 28, "$description": "Filter chips." },
+    "chipSm": { "$value": 22, "$description": "Labels and status badges." },
+    "badge": { "$value": 18, "$description": "Unread / count badge height (min width)." },
+    "dot": { "$value": 8, "$description": "Unread and presence dots." },
+    "progress": { "$value": 4, "$description": "Linear progress track height." },
+    "listRow": { "$value": 44, "$description": "Single-line row minimum height." },
+    "listRowTwoLine": { "$value": 60, "$description": "Title + subtitle row minimum height." },
+    "sectionHeader": { "$value": 36 },
+    "avatarXs": { "$value": 16 },
     "avatarSm": { "$value": 20 },
     "avatarMd": { "$value": 28 },
     "avatarLg": { "$value": 40 },
+    "avatarXl": { "$value": 56 },
     "composerMin": { "$value": 48 }
   },
   "layout": {
     "$type": "dimension",
     "screenPaddingX": { "$value": 16, "$description": "Horizontal content inset on phones." },
     "listRowPaddingX": { "$value": 16 },
-    "listRowPaddingY": { "$value": 12 },
+    "listRowPaddingY": { "$value": 10 },
     "listRowGap": { "$value": 12, "$description": "Leading icon to title." },
-    "sectionGap": { "$value": 24 },
+    "sectionGap": { "$value": 24, "$description": "Between grouped sections / cards." },
+    "stackGap": { "$value": 12, "$description": "Between controls inside a card." },
     "readableMaxWidth": { "$value": 680, "$description": "Max text column width on tablets / foldables." }
+  },
+  "breakpoint": {
+    "$type": "dimension",
+    "$description": "Window width classes, matching Material compact / medium / expanded. iOS regular width starts near medium.",
+    "medium": { "$value": 600, "$description": "Two-pane layouts become possible (foldables, iPad split view)." },
+    "expanded": { "$value": 840, "$description": "Persistent sidebar." }
+  },
+  "opacity": {
+    "$type": "number",
+    "disabled": { "$value": 0.4, "$description": "Whole-control opacity when disabled and no dedicated disabled color fits." },
+    "pressed": { "$value": 0.7, "$description": "Icon-only buttons while pressed (iOS)." },
+    "muted": { "$value": 0.6, "$description": "De-emphasized media, archived rows." }
   },
   "motion": {
     "duration": {
       "$type": "duration",
+      "instant": { "$value": 80, "$description": "Color / opacity feedback." },
       "fast": { "$value": 120, "$description": "Press feedback, toggles." },
       "base": { "$value": 200, "$description": "Expand / collapse, fades." },
-      "slow": { "$value": 320, "$description": "Large content changes." }
+      "slow": { "$value": 320, "$description": "Large content changes." },
+      "slower": { "$value": 480, "$description": "Full-screen transitions of custom views." }
     },
     "easing": {
       "$type": "cubicBezier",
-      "standard": { "$value": [0.2, 0, 0, 1] },
-      "emphasized": { "$value": [0.3, 0, 0, 1] }
+      "standard": { "$value": [0.2, 0, 0, 1], "$description": "Most on-screen movement." },
+      "emphasized": { "$value": [0.3, 0, 0, 1] },
+      "decelerate": { "$value": [0, 0, 0, 1], "$description": "Entering elements." },
+      "accelerate": { "$value": [0.3, 0, 1, 1], "$description": "Exiting elements." }
+    },
+    "spring": {
+      "$type": "spring",
+      "$description": "duration (s) / bounce in SwiftUI terms; Compose gets the equivalent stiffness and damping ratio.",
+      "smooth": { "$value": { "duration": 0.4, "bounce": 0 }, "$description": "Default for interactive movement." },
+      "snappy": { "$value": { "duration": 0.3, "bounce": 0.12 }, "$description": "Small controls, selection changes." },
+      "bouncy": { "$value": { "duration": 0.5, "bounce": 0.3 }, "$description": "Playful confirmations. Use sparingly." }
     }
   }
 }
