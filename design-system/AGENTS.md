@@ -20,8 +20,8 @@ Principles and integration steps: [README.md](README.md).
   `danger.solid` (white text at 4.5:1); `accent.default` is the tint.
 - Semantic refs: `{scale.step}`, `{scale.solid}`, black / white, optional alpha
   `{accent.9/24}`; a string value applies to both modes.
-- Tinted and neutral fills (`*.subtle`, `label.*.bg`, `code.*Bg`, `diff.*Bg`,
-  `fill.*`, `bg.sunken`) are translucent so they read on every surface; do not
+- Tinted and neutral fills (`*.subtle`, `label.*.bg`, `code.bg` / `inlineBg`, `diff.*Bg`,
+  `fill.secondary` / `selected` / `tertiary`, `bg.sunken`) are translucent so they read on every surface; do not
   make them solid steps. `check.mjs` composites translucent colors onto
   `bg.base` / `bg.grouped` / `bg.raised` for contrast (worst case wins) and
   enforces a minimum lightness separation from each surface.
