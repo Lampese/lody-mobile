@@ -1,0 +1,94 @@
+{
+  "$description": "Semantic colors. Each token has a light and a dark value; values are palette references or #RRGGBB[AA]. Generated names are the camelCased path (bg.base -> bgBase).",
+  "bg": {
+    "$type": "color",
+    "base": { "$value": { "light": "{gray.0}", "dark": "{gray.950}" }, "$description": "Screen background for plain lists and content." },
+    "grouped": { "$value": { "light": "{gray.50}", "dark": "{gray.1000}" }, "$description": "Screen background behind grouped (inset) lists, e.g. settings." },
+    "raised": { "$value": { "light": "{gray.0}", "dark": "{gray.900}" }, "$description": "Cards on bg.grouped, sheets, the composer." },
+    "sunken": { "$value": { "light": "{gray.50}", "dark": "{gray.900}" }, "$description": "Text fields and recessed wells on bg.base." },
+    "overlay": { "$value": { "light": "{gray.0}", "dark": "{gray.850}" }, "$description": "Custom popovers and menus not drawn by the platform." }
+  },
+  "fill": {
+    "$type": "color",
+    "pressed": { "$value": { "light": "{gray.100}", "dark": "{gray.850}" }, "$description": "Row / cell highlight while pressed." },
+    "selected": { "$value": { "light": "{gray.100}", "dark": "{gray.800}" }, "$description": "Persistently selected row or segment." },
+    "secondary": { "$value": { "light": "{gray.100}", "dark": "{gray.800}" }, "$description": "Chips, pills, secondary buttons." },
+    "tertiary": { "$value": { "light": "{gray.50}", "dark": "{gray.850}" }, "$description": "Quiet fills: skeletons, avatar placeholders." }
+  },
+  "text": {
+    "$type": "color",
+    "primary": { "$value": { "light": "{gray.900}", "dark": "{gray.50}" }, "$description": "Titles and body copy." },
+    "secondary": { "$value": { "light": "{gray.600}", "dark": "{gray.400}" }, "$description": "Supporting copy, metadata." },
+    "tertiary": { "$value": { "light": "{gray.500}", "dark": "{gray.500}" }, "$description": "Section headers, timestamps. Not for long text." },
+    "placeholder": { "$value": { "light": "{gray.400}", "dark": "{gray.600}" }, "$description": "Field placeholders." },
+    "disabled": { "$value": { "light": "{gray.300}", "dark": "{gray.700}" } },
+    "inverse": { "$value": { "light": "{gray.0}", "dark": "{gray.900}" }, "$description": "Text on text.primary-colored fills (toasts)." },
+    "onAccent": { "$value": { "light": "{white}", "dark": "{white}" }, "$description": "Text and icons on accent.default / danger.default fills." },
+    "link": { "$value": { "light": "{blue.600}", "dark": "{blue.300}" } }
+  },
+  "icon": {
+    "$type": "color",
+    "primary": { "$value": { "light": "{gray.800}", "dark": "{gray.150}" } },
+    "secondary": { "$value": { "light": "{gray.500}", "dark": "{gray.400}" } },
+    "tertiary": { "$value": { "light": "{gray.400}", "dark": "{gray.600}" } }
+  },
+  "border": {
+    "$type": "color",
+    "subtle": { "$value": { "light": "{gray.100}", "dark": "{gray.850}" }, "$description": "Hairline list separators." },
+    "default": { "$value": { "light": "{gray.150}", "dark": "{gray.800}" }, "$description": "Card and field outlines." },
+    "strong": { "$value": { "light": "{gray.300}", "dark": "{gray.700}" }, "$description": "Dashed / emphasized outlines, checkbox rings." },
+    "focus": { "$value": { "light": "{blue.400}", "dark": "{blue.400}" } }
+  },
+  "accent": {
+    "$type": "color",
+    "default": { "$value": { "light": "{blue.500}", "dark": "{blue.500}" }, "$description": "Primary buttons, send button, selection." },
+    "pressed": { "$value": { "light": "{blue.600}", "dark": "{blue.600}" } },
+    "subtle": { "$value": { "light": "{blue.50}", "dark": "{blue.900}" }, "$description": "Tinted background for accent chips and banners." },
+    "onSubtle": { "$value": { "light": "{blue.600}", "dark": "{blue.300}" }, "$description": "Text and icons on accent.subtle." }
+  },
+  "danger": {
+    "$type": "color",
+    "default": { "$value": { "light": "{red.500}", "dark": "{red.400}" } },
+    "subtle": { "$value": { "light": "{red.50}", "dark": "{red.900}" } },
+    "onSubtle": { "$value": { "light": "{red.600}", "dark": "{red.300}" } }
+  },
+  "warning": {
+    "$type": "color",
+    "default": { "$value": { "light": "{amber.600}", "dark": "{amber.400}" }, "$description": "Icons and badges; for body text use warning.onSubtle on warning.subtle." },
+    "subtle": { "$value": { "light": "{amber.50}", "dark": "{amber.900}" } },
+    "onSubtle": { "$value": { "light": "{amber.700}", "dark": "{amber.300}" } }
+  },
+  "success": {
+    "$type": "color",
+    "default": { "$value": { "light": "{green.600}", "dark": "{green.400}" } },
+    "subtle": { "$value": { "light": "{green.50}", "dark": "{green.900}" } },
+    "onSubtle": { "$value": { "light": "{green.700}", "dark": "{green.300}" } }
+  },
+  "state": {
+    "$type": "color",
+    "$description": "Session / task status glyphs. Shape carries meaning too; color is never the only signal.",
+    "idle": { "$value": { "light": "{gray.400}", "dark": "{gray.500}" }, "$description": "Not started / archived." },
+    "running": { "$value": { "light": "{blue.500}", "dark": "{blue.400}" }, "$description": "Agent working." },
+    "waiting": { "$value": { "light": "{amber.600}", "dark": "{amber.400}" }, "$description": "Needs user input or approval." },
+    "done": { "$value": { "light": "{green.600}", "dark": "{green.400}" } },
+    "failed": { "$value": { "light": "{red.500}", "dark": "{red.400}" } },
+    "merged": { "$value": { "light": "{purple.600}", "dark": "{purple.400}" } }
+  },
+  "code": {
+    "$type": "color",
+    "bg": { "$value": { "light": "{gray.50}", "dark": "{gray.900}" } },
+    "text": { "$value": { "light": "{gray.900}", "dark": "{gray.100}" } },
+    "border": { "$value": { "light": "{gray.150}", "dark": "{gray.800}" } }
+  },
+  "diff": {
+    "$type": "color",
+    "addedBg": { "$value": { "light": "#298E5D1F", "dark": "#3BCE8726" } },
+    "removedBg": { "$value": { "light": "#DC28281A", "dark": "#EC646426" } },
+    "addedText": { "$value": { "light": "{green.700}", "dark": "{green.300}" } },
+    "removedText": { "$value": { "light": "{red.600}", "dark": "{red.300}" } }
+  },
+  "overlay": {
+    "$type": "color",
+    "scrim": { "$value": { "light": "#00000066", "dark": "#00000099" }, "$description": "Dimming behind custom modals." }
+  }
+}

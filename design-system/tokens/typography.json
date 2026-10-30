@@ -1,0 +1,37 @@
+{
+  "$description": "Type scale. size / lineHeight in pt (iOS) = sp (Android). Tracking is derived from Inter's dynamic-metrics formula unless a style sets letterSpacing. dynamicType anchors iOS Dynamic Type scaling; Android scales sp by the system font scale.",
+  "fontFamily": {
+    "sans": {
+      "$description": "Inter 4.1 static text cut. No CJK glyphs: Chinese falls back to PingFang (iOS) / Noto Sans CJK (Android).",
+      "faces": {
+        "400": { "file": "Inter-Regular.ttf", "postScriptName": "Inter-Regular" },
+        "500": { "file": "Inter-Medium.ttf", "postScriptName": "Inter-Medium" },
+        "600": { "file": "Inter-SemiBold.ttf", "postScriptName": "Inter-SemiBold" },
+        "700": { "file": "Inter-Bold.ttf", "postScriptName": "Inter-Bold" }
+      }
+    },
+    "mono": {
+      "$description": "JetBrains Mono, same as the desktop code font.",
+      "trackingFormula": "none",
+      "faces": {
+        "400": { "file": "JetBrainsMono-Regular.ttf", "postScriptName": "JetBrainsMono-Regular" },
+        "500": { "file": "JetBrainsMono-Medium.ttf", "postScriptName": "JetBrainsMono-Medium" },
+        "700": { "file": "JetBrainsMono-Bold.ttf", "postScriptName": "JetBrainsMono-Bold" }
+      }
+    }
+  },
+  "textStyle": {
+    "largeTitle": { "family": "sans", "weight": 700, "size": 28, "lineHeight": 34, "dynamicType": "largeTitle", "$description": "Root screen titles (\"Sessions\", \"My issues\")." },
+    "title": { "family": "sans", "weight": 600, "size": 22, "lineHeight": 28, "dynamicType": "title2", "$description": "Detail screen headers, empty-state titles." },
+    "headline": { "family": "sans", "weight": 600, "size": 17, "lineHeight": 22, "dynamicType": "headline", "$description": "Navigation bar titles, sheet titles, card titles." },
+    "body": { "family": "sans", "weight": 400, "size": 16, "lineHeight": 22, "dynamicType": "body", "$description": "List row titles, form values." },
+    "bodyEmphasis": { "family": "sans", "weight": 500, "size": 16, "lineHeight": 22, "dynamicType": "body", "$description": "Unread rows, emphasized values." },
+    "reading": { "family": "sans", "weight": 400, "size": 16, "lineHeight": 25, "dynamicType": "body", "$description": "Long-form chat and markdown." },
+    "subhead": { "family": "sans", "weight": 500, "size": 14, "lineHeight": 20, "dynamicType": "subheadline", "$description": "Section headers, segmented controls, buttons." },
+    "footnote": { "family": "sans", "weight": 400, "size": 13, "lineHeight": 18, "dynamicType": "footnote", "$description": "Row subtitles, metadata, timestamps." },
+    "caption": { "family": "sans", "weight": 500, "size": 12, "lineHeight": 16, "dynamicType": "caption", "$description": "Badges, chip labels." },
+    "micro": { "family": "sans", "weight": 500, "size": 11, "lineHeight": 14, "dynamicType": "caption2", "$description": "Tab bar labels, counters." },
+    "code": { "family": "mono", "weight": 400, "size": 13, "lineHeight": 20, "dynamicType": "callout", "$description": "Code blocks." },
+    "codeSmall": { "family": "mono", "weight": 400, "size": 12, "lineHeight": 18, "dynamicType": "footnote", "$description": "Diffs, inline code in dense rows." }
+  }
+}

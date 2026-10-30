@@ -1,0 +1,31 @@
+{
+  "$description": "WCAG contrast floors checked by scripts/check.mjs in both modes. 4.5 = body text, 3 = large text, icons and UI glyphs.",
+  "pairs": [
+    ["text.primary", "bg.base", 4.5],
+    ["text.primary", "bg.grouped", 4.5],
+    ["text.primary", "bg.raised", 4.5],
+    ["text.secondary", "bg.base", 4.5],
+    ["text.secondary", "bg.raised", 4.5],
+    ["text.tertiary", "bg.base", 3],
+    ["text.tertiary", "bg.grouped", 3],
+    ["text.link", "bg.base", 4.5],
+    ["text.onAccent", "accent.default", 4.5],
+    ["text.onAccent", "accent.pressed", 4.5],
+    ["text.onAccent", "danger.default", 3],
+    ["icon.primary", "bg.base", 3],
+    ["icon.secondary", "bg.base", 3],
+    ["accent.onSubtle", "accent.subtle", 4.5],
+    ["danger.onSubtle", "danger.subtle", 4.5],
+    ["warning.onSubtle", "warning.subtle", 4.5],
+    ["success.onSubtle", "success.subtle", 4.5],
+    ["danger.default", "bg.base", 3],
+    ["warning.default", "bg.base", 3],
+    ["success.default", "bg.base", 3],
+    ["state.running", "bg.base", 3],
+    ["state.waiting", "bg.base", 3],
+    ["state.done", "bg.base", 3],
+    ["state.failed", "bg.base", 3],
+    ["state.merged", "bg.base", 3],
+    ["code.text", "code.bg", 4.5]
+  ]
+}

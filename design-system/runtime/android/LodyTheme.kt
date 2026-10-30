@@ -1,0 +1,118 @@
+// Hand-written runtime for the generated Lody* token files. Edit freely.
+
+package app.lody.android.designsystem
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
+
+private val LocalLodyColors = staticCompositionLocalOf { LodyLightColors }
+private val LocalLodyTypography = staticCompositionLocalOf { LodyDefaultTypography }
+
+object LodyTheme {
+    val colors: LodyColors
+        @Composable @ReadOnlyComposable get() = LocalLodyColors.current
+
+    val typography: LodyTypography
+        @Composable @ReadOnlyComposable get() = LocalLodyTypography.current
+}
+
+/**
+ * Provides Lody tokens and maps them onto MaterialTheme, so native Material 3
+ * components (switches, text fields, top app bars) pick up the same palette,
+ * type and corner radii. Dynamic color is intentionally off: iOS has no
+ * equivalent and the two apps must look the same.
+ */
+@Composable
+fun LodyTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    val colors = if (darkTheme) LodyDarkColors else LodyLightColors
+    CompositionLocalProvider(
+        LocalLodyColors provides colors,
+        LocalLodyTypography provides LodyDefaultTypography,
+    ) {
+        MaterialTheme(
+            colorScheme = colors.toMaterial(darkTheme),
+            typography = LodyDefaultTypography.toMaterial(),
+            shapes = LodyShapes,
+            content = content,
+        )
+    }
+}
+
+private fun LodyColors.toMaterial(dark: Boolean): ColorScheme =
+    (if (dark) darkColorScheme() else lightColorScheme()).copy(
+        primary = accentDefault,
+        onPrimary = textOnAccent,
+        primaryContainer = accentSubtle,
+        onPrimaryContainer = accentOnSubtle,
+        inversePrimary = accentOnSubtle,
+        secondary = textSecondary,
+        onSecondary = textInverse,
+        secondaryContainer = fillSecondary,
+        onSecondaryContainer = textPrimary,
+        tertiary = stateMerged,
+        onTertiary = textOnAccent,
+        background = bgBase,
+        onBackground = textPrimary,
+        surface = bgBase,
+        onSurface = textPrimary,
+        surfaceVariant = fillSecondary,
+        onSurfaceVariant = textSecondary,
+        // Flat design: no tonal elevation tint.
+        surfaceTint = bgBase,
+        surfaceBright = bgRaised,
+        surfaceDim = bgGrouped,
+        surfaceContainerLowest = bgBase,
+        surfaceContainerLow = bgRaised,
+        surfaceContainer = bgRaised,
+        surfaceContainerHigh = bgOverlay,
+        surfaceContainerHighest = fillSecondary,
+        inverseSurface = textPrimary,
+        inverseOnSurface = textInverse,
+        outline = borderStrong,
+        outlineVariant = borderSubtle,
+        error = dangerDefault,
+        onError = textOnAccent,
+        errorContainer = dangerSubtle,
+        onErrorContainer = dangerOnSubtle,
+        scrim = overlayScrim,
+    )
+
+private fun LodyTypography.toMaterial(): Typography =
+    Typography(
+        displayLarge = largeTitle,
+        displayMedium = largeTitle,
+        displaySmall = largeTitle,
+        headlineLarge = largeTitle,
+        headlineMedium = title,
+        headlineSmall = title,
+        titleLarge = title,
+        titleMedium = headline,
+        titleSmall = subhead,
+        bodyLarge = body,
+        bodyMedium = body,
+        bodySmall = footnote,
+        labelLarge = subhead,
+        labelMedium = caption,
+        labelSmall = micro,
+    )
+
+private val LodyShapes = Shapes(
+    extraSmall = RoundedCornerShape(LodyRadius.xs),
+    small = RoundedCornerShape(LodyRadius.sm),
+    medium = RoundedCornerShape(LodyRadius.md),
+    large = RoundedCornerShape(LodyRadius.lg),
+    extraLarge = RoundedCornerShape(LodyRadius.xl),
+)
