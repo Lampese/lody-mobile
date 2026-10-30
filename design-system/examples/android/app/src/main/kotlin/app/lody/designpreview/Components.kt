@@ -212,9 +212,9 @@ fun LodyButton(
 ) {
     val colors = LodyTheme.colors
     val (bg, fg) = when (kind) {
-        LodyButtonKind.Primary -> colors.accentDefault to colors.textOnAccent
+        LodyButtonKind.Primary -> colors.inkDefault to colors.inkOn
         LodyButtonKind.Secondary -> colors.fillSecondary to colors.textPrimary
-        LodyButtonKind.Destructive -> colors.dangerSolid to colors.textOnAccent
+        LodyButtonKind.Destructive -> colors.dangerSolid to colors.textOnDanger
         LodyButtonKind.Ghost -> Color.Transparent to colors.textLink
     }
     val shape = RoundedCornerShape(LodyRadius.md)
@@ -294,11 +294,11 @@ fun Composer(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .size(LodySize.controlSm)
                 .clip(CircleShape)
-                .background(colors.accentDefault)
+                .background(colors.inkDefault)
                 .clickable {},
             contentAlignment = Alignment.Center,
         ) {
-            Glyph(LodyIcons.Send, colors.textOnAccent)
+            Glyph(LodyIcons.Send, colors.inkOn)
         }
     }
 }

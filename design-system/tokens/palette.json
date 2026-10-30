@@ -1,51 +1,51 @@
 {
-  "$description": "Primitive palette, modeled on Linear. Never referenced by app code; semantic tokens in color.json point here. Chromatic families are generated in OKLCH from one anchor color each (scripts/lib/color.mjs): every family shares the same lightness ramp, so step N has comparable contrast across hues.",
-  "gray": {
-    "$description": "Hand-tuned cool neutral. 50/500/600/850/950/1000 are Linear's own UI grays; the rest fill the ramp on the same hue (OKLCH h≈262).",
-    "0": "#FFFFFF",
-    "25": "#FBFBFC",
-    "50": "#F7F8F8",
-    "100": "#F0F1F2",
-    "150": "#E8E9EB",
-    "200": "#DCDDE0",
-    "300": "#C6C8CC",
-    "400": "#A7ABB3",
-    "500": "#8A8F98",
-    "600": "#6B6F76",
-    "700": "#54585F",
-    "750": "#43464D",
-    "800": "#33373D",
-    "850": "#23252A",
-    "900": "#1A1C1F",
-    "925": "#141619",
-    "950": "#0F1011",
-    "1000": "#08090A"
+  "$description": "Generated theme palette. Like Linear's theme engine, each mode supplies a few key colors and every scale is derived from them in OKLCH (scripts/lib/color.mjs). Key colors are copied verbatim from the web tokens so mobile matches the product's theme. Scales have 12 Radix-style steps: 1 app bg · 2 subtle bg · 3 tinted fill · 4 hover · 5 selected · 6 subtle border · 7 border · 8 strong border · 9 solid (= key) · 10 solid pressed · 11 text · 12 high-contrast text.",
+  "modes": {
+    "light": {
+      "$description": "Lody Light. Source: lody-oss/packages/ui/src/tokens/colors.stylex.ts (lightTheme); merged from --github-merged in components/src/tailwind/index.css.",
+      "contrast": 1,
+      "keys": {
+        "background": "hsl(0 0% 100%)",
+        "foreground": "hsl(0 0% 11%)",
+        "accent": "hsl(220 82% 65%)",
+        "onAccent": "hsl(0 0% 100%)",
+        "danger": "hsl(356 72% 47%)",
+        "onDanger": "hsl(0 0% 100%)",
+        "success": "hsl(151 55% 36%)",
+        "warning": "hsl(32 90% 48%)",
+        "merged": "hsl(261 69% 59%)"
+      },
+      "categorical": { "l": 0.62, "c": 0.15 }
+    },
+    "dark": {
+      "$description": "Vesper, the web's default dark theme. Same sources as light (darkTheme).",
+      "contrast": 0.78,
+      "keys": {
+        "background": "hsl(0 0% 6.3%)",
+        "foreground": "hsl(0 0% 100%)",
+        "accent": "hsl(27 100% 80%)",
+        "onAccent": "hsl(0 0% 0%)",
+        "danger": "hsl(0 100% 75%)",
+        "onDanger": "hsl(0 0% 0%)",
+        "success": "hsl(151 60% 52%)",
+        "warning": "hsl(43 96% 56%)",
+        "merged": "hsl(262 89% 71%)"
+      },
+      "categorical": { "l": 0.8, "c": 0.12 }
+    }
   },
-  "ramp": {
-    "$description": "OKLCH lightness per step and chroma as a fraction of the family's peak. The anchor lands unchanged on the step with the closest lightness.",
-    "50": { "l": 0.975, "c": 0.1 },
-    "100": { "l": 0.945, "c": 0.2 },
-    "200": { "l": 0.89, "c": 0.4 },
-    "300": { "l": 0.815, "c": 0.62 },
-    "400": { "l": 0.725, "c": 0.85 },
-    "500": { "l": 0.64, "c": 1 },
-    "600": { "l": 0.56, "c": 1 },
-    "700": { "l": 0.48, "c": 0.92 },
-    "800": { "l": 0.4, "c": 0.8 },
-    "900": { "l": 0.32, "c": 0.66 },
-    "950": { "l": 0.25, "c": 0.52 }
-  },
-  "families": {
-    "indigo": { "anchor": "#5E6AD2", "$description": "Accent. Linear's brand indigo." },
-    "blue": { "anchor": "#4EA7FC" },
-    "red": { "anchor": "#EB5757" },
-    "orange": { "anchor": "#F2994A" },
-    "yellow": { "anchor": "#F2C94C", "$description": "Linear's In Progress yellow." },
-    "green": { "anchor": "#4CB782" },
-    "teal": { "anchor": "#26B5CE" },
-    "purple": { "anchor": "#BB87FC" },
-    "pink": { "anchor": "#E85DA8" }
-  },
-  "black": "#000000",
-  "white": "#FFFFFF"
+  "algorithm": {
+    "$description": "Shared curves. neutralCurve is the position of each neutral step between background (0) and foreground (1), raised to the mode's contrast exponent; it is fitted so steps 2/3/4/9 land on the web's secondaryBackground / hover / selected / tertiaryLabel in both modes; step 11 sits slightly past secondaryLabel so it keeps 4.5:1 on step 2.",
+    "neutralCurve": [0, 0.023, 0.05, 0.074, 0.1, 0.13, 0.2, 0.29, 0.389, 0.47, 0.6, 1],
+    "chromaticKeys": ["accent", "danger", "success", "warning", "merged"],
+    "tint": {
+      "l": [0.03, 0.07, 0.12, 0.18, 0.25, 0.34, 0.48, 0.68],
+      "c": [0.06, 0.14, 0.24, 0.34, 0.45, 0.58, 0.74, 0.9]
+    },
+    "text": { "contrast": 4.6 },
+    "categorical": {
+      "$description": "Label / avatar hues (OKLCH h). Lightness and chroma come from each mode so labels sit in the theme.",
+      "hues": { "red": 25, "orange": 55, "yellow": 90, "green": 150, "teal": 195, "blue": 250, "indigo": 275, "purple": 305, "pink": 350 }
+    }
+  }
 }

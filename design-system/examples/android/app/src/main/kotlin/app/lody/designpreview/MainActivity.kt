@@ -74,8 +74,8 @@ private fun PreviewApp(appearance: Int, onToggleAppearance: () -> Unit) {
                         icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(LodyIconSize.lg)) },
                         label = { Text(label, style = LodyTheme.typography.micro) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = colors.accentDefault,
-                            selectedTextColor = colors.accentDefault,
+                            selectedIconColor = colors.accentFg,
+                            selectedTextColor = colors.accentFg,
                             indicatorColor = colors.accentSubtle,
                             unselectedIconColor = colors.iconSecondary,
                             unselectedTextColor = colors.textSecondary,

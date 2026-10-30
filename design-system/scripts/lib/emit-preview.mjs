@@ -95,11 +95,15 @@ export function emitPreview({ palette, colors, typography, dimensions, elevation
   const shadow = (e) => `0 ${e.y}px ${e.blur}px ${v(`shadow.${e.name}`)}`
   const components = `<div class="stack">
     <div class="card"><div class="cap">Buttons</div><div class="wrap">
-      ${btn('Run', v('accent.default'), v('text.onAccent'), 'send')}
+      ${btn('Run', v('ink.default'), v('ink.on'), 'send')}
       ${btn('Cancel', v('fill.secondary'), v('text.primary'))}
-      ${btn('Delete', v('danger.solid'), v('text.onAccent'), 'trash')}
+      ${btn('Delete', v('danger.solid'), v('text.onDanger'), 'trash')}
       ${btn('View diff', 'transparent', v('text.link'))}
-      <span style="opacity:${dimensions.numbers.opacity.find((o) => o.name === 'disabled').value}">${btn('Disabled', v('accent.default'), v('text.onAccent'))}</span>
+      <span style="opacity:${dimensions.numbers.opacity.find((o) => o.name === 'disabled').value}">${btn('Disabled', v('ink.default'), v('ink.on'))}</span>
+    </div></div>
+    <div class="card"><div class="cap">Accent (state, not fills)</div><div class="wrap">
+      <span class="switch"><i></i></span><span class="t-body" style="color:${v('text.link')}">Open pull request</span>
+      <span class="progress"><i></i></span>
     </div></div>
     <div class="card"><div class="cap">Status</div><div class="wrap">
       ${badge('Running', 'accent.subtle', 'accent.onSubtle', 'stateRunning')}
@@ -122,17 +126,22 @@ export function emitPreview({ palette, colors, typography, dimensions, elevation
   </div>`
 
   // --- Reference tables ----------------------------------------------------
-  const paletteRows = palette
-    .map(
-      (g) =>
-        `<div class="ramp"><code>${g.name}</code>${Object.entries(g.steps)
-          .map(
-            ([step, hex]) =>
-              `<div class="step ${step === g.anchorStep ? 'anchor' : ''}" title="${g.name}.${step} ${hex}"><span style="background:${hex}"></span><code>${step}</code></div>`,
-          )
-          .join('')}</div>`,
-    )
-    .join('')
+  const paletteRows = (mode) =>
+    Object.entries(palette[mode].scales)
+      .map(
+        ([name, steps]) =>
+          `<div class="ramp"><code>${name}</code>${Object.entries(steps)
+            .map(
+              ([step, hex]) =>
+                `<div class="step ${step === '9' && name !== 'neutral' ? 'anchor' : ''}" title="${name}.${step} ${hex}"><span style="background:${hex}"></span><code>${step}</code></div>`,
+            )
+            .join('')}</div>`,
+      )
+      .join('')
+  const keyRows = (mode) =>
+    `<div class="wrap">${Object.entries(palette[mode].keys)
+      .map(([k, hex]) => `<span class="key"><span style="background:${hex}"></span><code>${k} ${hex}</code></span>`)
+      .join('')}</div>`
 
   const colorRows = colors
     .map((c) => {
@@ -198,7 +207,7 @@ svg { width: 20px; height: 20px; display: block; flex: none; }
 .label { display: inline-flex; align-items: center; gap: 6px; height: ${size('chipSm')}px; padding: 0 8px; border-radius: ${radius('sm')}px; text-transform: capitalize; }
 .label i { width: 8px; height: 8px; border-radius: 99px; }
 .composer { margin: 16px 16px 0; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 8px 0 12px; border-radius: ${radius('xl')}px; background: ${v('bg.raised')}; border: 1px solid ${v('border.default')}; }
-.send { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: ${v('accent.default')}; color: ${v('text.onAccent')}; }
+.send { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: ${v('ink.default')}; color: ${v('ink.on')}; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .card { background: ${v('bg.raised')}; border-radius: ${radius('lg')}px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .cap { font-size: 13px; font-weight: 500; color: ${v('text.tertiary')}; }
@@ -214,12 +223,21 @@ code.inline { background: ${v('code.inlineBg')}; color: ${v('code.text')}; paddi
 .elev { gap: 20px; padding: 8px 4px 12px; }
 .lift { width: 104px; padding: 12px; border-radius: ${radius('md')}px; background: ${v('bg.overlay')}; }
 .toast { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-radius: ${radius('md')}px; background: ${v('bg.inverse')}; color: ${v('text.inverse')}; }
-.ramp { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.ramp { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
 .ramp > code { width: 56px; }
 .step { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.step span { width: 52px; height: 32px; border-radius: 6px; border: 1px solid #0001; }
+.step span { width: 28px; height: 24px; border-radius: 6px; border: 1px solid #8882; }
 .step code { font-size: 10px; color: #6b6f76; }
-.step.anchor span { outline: 2px solid #23252a; outline-offset: 2px; }
+.step.anchor span { outline: 2px solid ${v('text.primary')}; outline-offset: 2px; }
+.step code { color: ${v('text.tertiary')}; }
+.ramp > code { color: ${v('text.secondary')}; }
+.key { display: inline-flex; align-items: center; gap: 6px; margin: 0 8px 10px 0; }
+.key span { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #8884; }
+.key code { color: ${v('text.secondary')}; font-size: 11px; }
+.switch { width: 44px; height: 26px; border-radius: 99px; background: ${v('accent.default')}; position: relative; }
+.switch i { position: absolute; right: 3px; top: 3px; width: 20px; height: 20px; border-radius: 99px; background: #fff; }
+.progress { width: 120px; height: ${size('progress')}px; border-radius: 99px; background: ${v('fill.secondary')}; overflow: hidden; }
+.progress i { display: block; width: 60%; height: 100%; background: ${v('accent.default')}; }
 table { border-collapse: collapse; width: 100%; background: #fff; border-radius: 12px; overflow: hidden; }
 td { border-bottom: 1px solid #eee; padding: 6px 10px; vertical-align: middle; }
 .sw { display: inline-block; width: 28px; height: 20px; border-radius: 4px; border: 1px solid #0002; vertical-align: middle; margin-right: 8px; }
@@ -241,8 +259,8 @@ td { border-bottom: 1px solid #eee; padding: 6px 10px; vertical-align: middle; }
 <div class="modes"><div class="mode light">${components}</div><div class="mode dark">${components}</div></div>
 
 <h2>Palette</h2>
-<p class="desc">Chromatic families are generated in OKLCH from a Linear anchor (outlined). Steps share lightness across hues.</p>
-${paletteRows}
+<p class="desc">Generated per mode from the web theme's key colors (Lody Light / Vesper). Step 9 (outlined) is the key color itself; 11 is solved for 4.5:1 text on step 3.</p>
+<div class="modes"><div class="mode light">${keyRows('light')}${paletteRows('light')}</div><div class="mode dark">${keyRows('dark')}${paletteRows('dark')}</div></div>
 
 <h2>Type</h2>
 <div class="modes"><div class="mode light">${typeRows}</div><div class="mode dark">${typeRows}</div></div>

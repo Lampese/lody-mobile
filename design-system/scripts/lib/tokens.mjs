@@ -2,7 +2,7 @@
 // emitters consume. All validation lives here so emitters can stay dumb.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { generateRamp, hexToOklch } from './color.mjs'
+import { generateMode } from './color.mjs'
 
 export const ROOT = new URL('../../', import.meta.url).pathname
 
@@ -31,45 +31,34 @@ function* leaves(node, path = [], type = undefined) {
 
 const HEX = /^#([0-9a-f]{6}|[0-9a-f]{8})$/i
 
+export const MODES = ['light', 'dark']
+
 /**
- * Returns { groups, map }: groups keeps the per-family ramps for the preview,
- * map resolves "family.step" to a hex for semantic references.
+ * Generates every scale for both modes from tokens/palette.json. Returns
+ * { modes: { light: { scales, keys, map }, dark: ... } } where map resolves
+ * "scale.step" (and "key.<name>", "black", "white") to a hex for that mode.
  */
 export function loadPalette() {
   const json = readJson('tokens/palette.json')
-  const groups = []
-  const add = (name, steps, anchorStep) => groups.push({ name, steps, anchorStep })
-
-  const gray = Object.fromEntries(Object.entries(json.gray).filter(([k]) => !isMeta(k)))
-  add('gray', gray)
-  const ramp = Object.fromEntries(Object.entries(json.ramp).filter(([k]) => !isMeta(k)))
-  for (const [name, family] of Object.entries(json.families)) {
-    if (isMeta(name)) continue
-    if (!HEX.test(family.anchor)) throw new Error(`palette ${name}: bad anchor ${family.anchor}`)
-    const { steps, anchorStep } = generateRamp(family.anchor, ramp)
-    add(name, steps, anchorStep)
-  }
-
-  const map = new Map([
-    ['black', json.black],
-    ['white', json.white],
-  ])
-  for (const group of groups) {
-    const lightness = []
-    for (const [step, hex] of Object.entries(group.steps)) {
-      if (!HEX.test(hex)) throw new Error(`palette ${group.name}.${step}: bad color ${hex}`)
-      map.set(`${group.name}.${step}`, hex.toUpperCase())
-      lightness.push(hexToOklch(hex).l)
+  const modes = {}
+  for (const mode of MODES) {
+    const config = json.modes[mode]
+    if (!config) throw new Error(`palette: missing mode ${mode}`)
+    const { scales, keys } = generateMode(config, json.algorithm)
+    const map = new Map([
+      ['black', '#000000'],
+      ['white', '#FFFFFF'],
+    ])
+    for (const [name, hex] of Object.entries(keys)) map.set(`key.${name}`, hex)
+    for (const [name, steps] of Object.entries(scales)) {
+      for (const [step, hex] of Object.entries(steps)) map.set(`${name}.${step}`, hex)
     }
-    // Steps are ordered light -> dark; an anchor far from its ramp slot would break that.
-    if (lightness.some((l, i) => i > 0 && l > lightness[i - 1])) {
-      throw new Error(`palette ${group.name}: lightness is not monotonic`)
-    }
+    modes[mode] = { scales, keys, map }
   }
-  return { groups, map }
+  return { modes }
 }
 
-/** "{indigo.600}" or "{indigo.600/12}" (12% alpha) or a literal #RRGGBB[AA]. */
+/** "{accent.9}" or "{accent.9/12}" (12% alpha) or a literal #RRGGBB[AA], resolved in one mode. */
 function resolveColor(value, palette, where) {
   const ref = /^\{([^}/]+)(?:\/(\d{1,3}))?\}$/.exec(value)
   if (ref) {
@@ -96,20 +85,19 @@ export function parseHex(hex) {
 }
 
 export function loadColors() {
-  const palette = loadPalette().map
+  const { modes } = loadPalette()
   const colors = []
   for (const [path, token, type] of leaves(readJson('tokens/color.json'))) {
     const id = path.join('.')
     if (type !== 'color') throw new Error(`${id}: expected $type color`)
-    const { light, dark } = token.$value
-    if (!light || !dark) throw new Error(`${id}: needs both light and dark values`)
-    colors.push({
-      id,
-      name: camel(path),
-      description: token.$description,
-      light: resolveColor(light, palette, `${id}.light`),
-      dark: resolveColor(dark, palette, `${id}.dark`),
-    })
+    // A plain string applies the same scale step to both modes.
+    const value = typeof token.$value === 'string' ? { light: token.$value, dark: token.$value } : token.$value
+    const color = { id, name: camel(path), description: token.$description }
+    for (const mode of MODES) {
+      if (!value[mode]) throw new Error(`${id}: needs a ${mode} value`)
+      color[mode] = resolveColor(value[mode], modes[mode].map, `${id}.${mode}`)
+    }
+    colors.push(color)
   }
   return colors
 }

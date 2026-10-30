@@ -1,180 +1,161 @@
 {
-  "$description": "Semantic colors. Each token has a light and a dark value: a palette reference ({indigo.600}), a reference with alpha percent ({indigo.600/12}), or #RRGGBB[AA]. Generated names are the camelCased path (bg.base -> bgBase).",
+  "$description": "Semantic colors over the generated scales in palette.json. A value is either one reference used in both modes (\"{neutral.12}\") or { light, dark }. References are scale steps ({accent.9}), theme key colors ({key.onAccent}), black / white, optionally with alpha percent ({key.foreground/5}). Roles follow the web token rules (lody-oss/packages/ui/src/tokens/RULES.md): ink, not accent, fills primary buttons; accent marks focus, links, on / checked state and the running indicator.",
   "bg": {
     "$type": "color",
-    "base": { "$value": { "light": "{gray.0}", "dark": "{gray.1000}" }, "$description": "Screen background for plain lists and content." },
-    "grouped": { "$value": { "light": "{gray.50}", "dark": "{gray.1000}" }, "$description": "Screen background behind grouped (inset) lists and cards." },
-    "raised": { "$value": { "light": "{gray.0}", "dark": "{gray.950}" }, "$description": "Cards on bg.grouped, sheets, the composer." },
-    "sunken": { "$value": { "light": "{gray.50}", "dark": "{gray.950}" }, "$description": "Text fields and recessed wells on bg.base." },
-    "overlay": { "$value": { "light": "{gray.0}", "dark": "{gray.900}" }, "$description": "Custom menus and popovers; pair with an elevation." },
-    "inverse": { "$value": { "light": "{gray.850}", "dark": "{gray.100}" }, "$description": "Toasts and tooltips; text uses text.inverse." }
+    "base": { "$value": "{neutral.1}", "$description": "Screen background for plain lists and content (web: background)." },
+    "grouped": { "$value": { "light": "{neutral.2}", "dark": "{neutral.1}" }, "$description": "Behind grouped lists and cards (web: secondaryBackground in light)." },
+    "raised": { "$value": { "light": "{neutral.1}", "dark": "{neutral.2}" }, "$description": "Cards, sheets, the composer (web: elevatedBackground)." },
+    "sunken": { "$value": { "light": "{key.foreground/5}", "dark": "{black/28}" }, "$description": "Text fields and wells: a translucent darkening of whatever they sit on (web: wellBackground)." },
+    "overlay": { "$value": { "light": "{neutral.1}", "dark": "{neutral.3}" }, "$description": "Menus, popovers, toasts' surface; pair with an elevation (web: raisedBackground)." },
+    "inverse": { "$value": "{neutral.12}", "$description": "Tooltips and inverse toasts; text uses text.inverse." }
   },
   "fill": {
     "$type": "color",
-    "pressed": { "$value": { "light": "{gray.100}", "dark": "{gray.925}" }, "$description": "Row / cell highlight while pressed (iOS). Android uses ripple." },
-    "selected": { "$value": { "light": "{gray.150}", "dark": "{gray.850}" }, "$description": "Persistently selected row, chip or segment." },
-    "secondary": { "$value": { "light": "{gray.100}", "dark": "{gray.900}" }, "$description": "Secondary buttons, neutral chips." },
-    "tertiary": { "$value": { "light": "{gray.50}", "dark": "{gray.950}" }, "$description": "Quiet fills: skeletons, avatar placeholders, inline code." },
-    "disabled": { "$value": { "light": "{gray.100}", "dark": "{gray.900}" }, "$description": "Background of a disabled filled control." }
+    "pressed": { "$value": { "light": "{neutral.3}", "dark": "{neutral.4}" }, "$description": "Row / cell highlight while pressed (web: hoverFill). Android uses ripple." },
+    "selected": { "$value": { "light": "{neutral.4}", "dark": "{neutral.3}" }, "$description": "Persistently selected row, chip or segment (web: selectedFill)." },
+    "secondary": { "$value": { "light": "{key.foreground/6}", "dark": "{white/6}" }, "$description": "Secondary buttons, neutral chips, segmented track (web: trayBackground)." },
+    "tertiary": { "$value": "{neutral.2}", "$description": "Skeletons, avatar placeholders." },
+    "disabled": { "$value": "{neutral.3}" }
+  },
+  "ink": {
+    "$type": "color",
+    "default": { "$value": "{neutral.12}", "$description": "Primary button fill and the send button (web: label fill)." },
+    "pressed": { "$value": "{neutral.11}" },
+    "on": { "$value": "{neutral.1}", "$description": "Text and icons on ink (web: background)." }
   },
   "text": {
     "$type": "color",
-    "primary": { "$value": { "light": "{gray.850}", "dark": "{gray.50}" }, "$description": "Titles and body copy." },
-    "secondary": { "$value": { "light": "{gray.600}", "dark": "{gray.500}" }, "$description": "Supporting copy, metadata." },
-    "tertiary": { "$value": { "light": "{gray.500}", "dark": "{gray.600}" }, "$description": "Section headers, timestamps. Short text only." },
-    "placeholder": { "$value": { "light": "{gray.400}", "dark": "{gray.700}" }, "$description": "Field placeholders." },
-    "disabled": { "$value": { "light": "{gray.300}", "dark": "{gray.750}" } },
-    "inverse": { "$value": { "light": "{gray.0}", "dark": "{gray.900}" }, "$description": "Text on bg.inverse." },
-    "onAccent": { "$value": { "light": "{white}", "dark": "{white}" }, "$description": "Text and icons on accent.default and danger.solid." },
-    "link": { "$value": { "light": "{indigo.600}", "dark": "{indigo.400}" } }
+    "primary": { "$value": "{neutral.12}", "$description": "Titles and body copy (web: label)." },
+    "secondary": { "$value": "{neutral.11}", "$description": "Supporting copy, metadata (web: secondaryLabel)." },
+    "tertiary": { "$value": "{neutral.10}", "$description": "Section headers, timestamps. One step stronger than the web's tertiaryLabel so short text keeps 3:1." },
+    "placeholder": { "$value": "{neutral.9}", "$description": "Placeholders and hints (web: tertiaryLabel)." },
+    "disabled": { "$value": "{neutral.7}" },
+    "inverse": { "$value": "{neutral.1}", "$description": "Text on bg.inverse." },
+    "onAccent": { "$value": "{key.onAccent}", "$description": "On accent.default: white in light, black on the dark theme's orange." },
+    "onDanger": { "$value": "{key.onDanger}", "$description": "On danger.solid." },
+    "link": { "$value": "{accent.11}" }
   },
   "icon": {
     "$type": "color",
-    "primary": { "$value": { "light": "{gray.800}", "dark": "{gray.150}" } },
-    "secondary": { "$value": { "light": "{gray.500}", "dark": "{gray.500}" } },
-    "tertiary": { "$value": { "light": "{gray.400}", "dark": "{gray.700}" }, "$description": "Decorative only, e.g. the section header plus." },
-    "disabled": { "$value": { "light": "{gray.300}", "dark": "{gray.750}" } }
+    "primary": { "$value": "{neutral.12}" },
+    "secondary": { "$value": "{neutral.10}" },
+    "tertiary": { "$value": "{neutral.8}", "$description": "Decorative only, e.g. the section header plus." },
+    "disabled": { "$value": "{neutral.7}" }
   },
   "border": {
     "$type": "color",
-    "subtle": { "$value": { "light": "{gray.100}", "dark": "{gray.900}" }, "$description": "Hairline list separators." },
-    "default": { "$value": { "light": "{gray.150}", "dark": "{gray.850}" }, "$description": "Card and field outlines." },
-    "strong": { "$value": { "light": "{gray.300}", "dark": "{gray.750}" }, "$description": "Checkbox rings, emphasized outlines." },
-    "focus": { "$value": { "light": "{indigo.500}", "dark": "{indigo.400}" }, "$description": "Focus ring for hardware keyboards." }
+    "subtle": { "$value": "{neutral.4}", "$description": "Hairline list separators (web: separator)." },
+    "default": { "$value": "{neutral.6}", "$description": "Outlines where no well or shadow fits (filter chips)." },
+    "strong": { "$value": "{neutral.7}", "$description": "Checkbox rings, emphasized outlines." },
+    "focus": { "$value": "{accent.9}", "$description": "2pt focus ring for hardware keyboards." }
   },
   "accent": {
     "$type": "color",
-    "default": { "$value": { "light": "{indigo.600}", "dark": "{indigo.600}" }, "$description": "Primary buttons, send button, switches." },
-    "pressed": { "$value": { "light": "{indigo.700}", "dark": "{indigo.700}" } },
-    "fg": { "$value": { "light": "{indigo.700}", "dark": "{indigo.400}" }, "$description": "Accent as foreground: selected tab, active icon." },
-    "subtle": { "$value": { "light": "{indigo.600/10}", "dark": "{indigo.500/20}" }, "$description": "Tinted background for accent chips and banners." },
-    "onSubtle": { "$value": { "light": "{indigo.700}", "dark": "{indigo.300}" }, "$description": "Text and icons on accent.subtle." }
+    "$description": "Key color: hsl(220 82% 65%) light, Vesper orange hsl(27 100% 80%) dark. Not a button fill.",
+    "default": { "$value": "{accent.9}", "$description": "Switch on, checked, progress, selection, running indicator." },
+    "pressed": { "$value": "{accent.10}" },
+    "fg": { "$value": "{accent.11}", "$description": "Accent as readable foreground: selected tab, active icon, links." },
+    "subtle": { "$value": "{accent.3}", "$description": "Tinted background for accent chips and banners." },
+    "onSubtle": { "$value": "{accent.11}" }
   },
   "danger": {
     "$type": "color",
-    "default": { "$value": { "light": "{red.600}", "dark": "{red.500}" }, "$description": "Destructive icons and text." },
-    "solid": { "$value": { "light": "{red.600}", "dark": "{red.600}" }, "$description": "Filled destructive buttons, with text.onAccent." },
-    "subtle": { "$value": { "light": "{red.600/10}", "dark": "{red.500/18}" } },
-    "onSubtle": { "$value": { "light": "{red.700}", "dark": "{red.300}" } }
+    "default": { "$value": "{danger.11}", "$description": "Destructive icons and text (web: destructive)." },
+    "solid": { "$value": "{danger.9}", "$description": "Filled destructive buttons, with text.onDanger." },
+    "subtle": { "$value": "{danger.3}" },
+    "onSubtle": { "$value": "{danger.11}" }
   },
   "warning": {
     "$type": "color",
-    "default": { "$value": { "light": "{orange.500}", "dark": "{orange.400}" }, "$description": "Icons and badges; body text goes on warning.subtle with warning.onSubtle." },
-    "subtle": { "$value": { "light": "{orange.500/12}", "dark": "{orange.400/16}" } },
-    "onSubtle": { "$value": { "light": "{orange.700}", "dark": "{orange.300}" } }
+    "$description": "Reports an outcome; marks and tints, never fills a pressable control.",
+    "default": { "$value": { "light": "{warning.11}", "dark": "{warning.9}" }, "$description": "The light key (hsl(32 90% 48%)) is under 3:1 on white, so light icons use the text step." },
+    "subtle": { "$value": "{warning.3}" },
+    "onSubtle": { "$value": "{warning.11}" }
   },
   "success": {
     "$type": "color",
-    "default": { "$value": { "light": "{green.600}", "dark": "{green.400}" } },
-    "subtle": { "$value": { "light": "{green.600/10}", "dark": "{green.400/16}" } },
-    "onSubtle": { "$value": { "light": "{green.700}", "dark": "{green.300}" } }
+    "$description": "Reports an outcome; marks and tints, never fills a pressable control.",
+    "default": { "$value": "{success.9}" },
+    "subtle": { "$value": "{success.3}" },
+    "onSubtle": { "$value": "{success.11}" }
   },
   "info": {
     "$type": "color",
-    "default": { "$value": { "light": "{blue.600}", "dark": "{blue.400}" } },
-    "subtle": { "$value": { "light": "{blue.600/10}", "dark": "{blue.400/16}" } },
-    "onSubtle": { "$value": { "light": "{blue.700}", "dark": "{blue.300}" } }
+    "$description": "The web has no info role; neutral notices use the accent scale.",
+    "default": { "$value": "{accent.9}" },
+    "subtle": { "$value": "{accent.3}" },
+    "onSubtle": { "$value": "{accent.11}" }
   },
   "state": {
     "$type": "color",
-    "$description": "Session / task status glyphs, following Linear's workflow colors (In Progress yellow, Done green-or-indigo, Canceled gray). Shape carries meaning too; color is never the only signal.",
-    "idle": { "$value": { "light": "{gray.500}", "dark": "{gray.600}" }, "$description": "Backlog / not started / archived." },
-    "running": { "$value": { "light": "{yellow.500}", "dark": "{yellow.300}" }, "$description": "Agent working (Linear: In Progress)." },
-    "waiting": { "$value": { "light": "{orange.500}", "dark": "{orange.400}" }, "$description": "Needs user input or approval." },
-    "done": { "$value": { "light": "{green.600}", "dark": "{green.400}" } },
-    "failed": { "$value": { "light": "{red.600}", "dark": "{red.500}" } },
-    "merged": { "$value": { "light": "{purple.600}", "dark": "{purple.400}" }, "$description": "Pull request merged (GitHub convention)." }
+    "$description": "Session status glyphs. Running uses accent, as on the web. Shape carries meaning too; color is never the only signal.",
+    "idle": { "$value": "{neutral.10}", "$description": "Backlog / not started / archived." },
+    "running": { "$value": "{accent.9}", "$description": "Agent working." },
+    "waiting": { "$value": { "light": "{warning.11}", "dark": "{warning.9}" }, "$description": "Needs user input or approval." },
+    "done": { "$value": "{success.9}" },
+    "failed": { "$value": "{danger.9}" },
+    "merged": { "$value": "{merged.9}", "$description": "Pull request merged (web --github-merged)." }
   },
   "label": {
     "$type": "color",
-    "$description": "Categorical colors for project labels, tags and avatar backgrounds. fg works as text / icon on bg.base and on the matching bg.",
-    "gray": {
-      "fg": { "$value": { "light": "{gray.700}", "dark": "{gray.500}" } },
-      "bg": { "$value": { "light": "{gray.500/12}", "dark": "{gray.500/20}" } }
-    },
-    "red": {
-      "fg": { "$value": { "light": "{red.700}", "dark": "{red.400}" } },
-      "bg": { "$value": { "light": "{red.500/12}", "dark": "{red.400/16}" } }
-    },
-    "orange": {
-      "fg": { "$value": { "light": "{orange.700}", "dark": "{orange.400}" } },
-      "bg": { "$value": { "light": "{orange.500/12}", "dark": "{orange.400/16}" } }
-    },
-    "yellow": {
-      "fg": { "$value": { "light": "{yellow.700}", "dark": "{yellow.300}" } },
-      "bg": { "$value": { "light": "{yellow.400/14}", "dark": "{yellow.300/14}" } }
-    },
-    "green": {
-      "fg": { "$value": { "light": "{green.700}", "dark": "{green.400}" } },
-      "bg": { "$value": { "light": "{green.500/12}", "dark": "{green.400/16}" } }
-    },
-    "teal": {
-      "fg": { "$value": { "light": "{teal.700}", "dark": "{teal.400}" } },
-      "bg": { "$value": { "light": "{teal.500/12}", "dark": "{teal.400/16}" } }
-    },
-    "blue": {
-      "fg": { "$value": { "light": "{blue.700}", "dark": "{blue.400}" } },
-      "bg": { "$value": { "light": "{blue.500/12}", "dark": "{blue.400/16}" } }
-    },
-    "indigo": {
-      "fg": { "$value": { "light": "{indigo.700}", "dark": "{indigo.400}" } },
-      "bg": { "$value": { "light": "{indigo.500/12}", "dark": "{indigo.400/18}" } }
-    },
-    "purple": {
-      "fg": { "$value": { "light": "{purple.700}", "dark": "{purple.400}" } },
-      "bg": { "$value": { "light": "{purple.500/12}", "dark": "{purple.400/16}" } }
-    },
-    "pink": {
-      "fg": { "$value": { "light": "{pink.700}", "dark": "{pink.400}" } },
-      "bg": { "$value": { "light": "{pink.500/12}", "dark": "{pink.400/16}" } }
-    }
+    "$description": "Categorical colors for project labels, tags and avatar backgrounds; hues generated to sit in the theme. fg reads on bg.base and on the matching bg.",
+    "gray": { "fg": { "$value": "{neutral.11}" }, "bg": { "$value": "{neutral.3}" } },
+    "red": { "fg": { "$value": "{red.11}" }, "bg": { "$value": "{red.3}" } },
+    "orange": { "fg": { "$value": "{orange.11}" }, "bg": { "$value": "{orange.3}" } },
+    "yellow": { "fg": { "$value": "{yellow.11}" }, "bg": { "$value": "{yellow.3}" } },
+    "green": { "fg": { "$value": "{green.11}" }, "bg": { "$value": "{green.3}" } },
+    "teal": { "fg": { "$value": "{teal.11}" }, "bg": { "$value": "{teal.3}" } },
+    "blue": { "fg": { "$value": "{blue.11}" }, "bg": { "$value": "{blue.3}" } },
+    "indigo": { "fg": { "$value": "{indigo.11}" }, "bg": { "$value": "{indigo.3}" } },
+    "purple": { "fg": { "$value": "{purple.11}" }, "bg": { "$value": "{purple.3}" } },
+    "pink": { "fg": { "$value": "{pink.11}" }, "bg": { "$value": "{pink.3}" } }
   },
   "code": {
     "$type": "color",
-    "bg": { "$value": { "light": "{gray.50}", "dark": "{gray.950}" }, "$description": "Code blocks and diffs." },
-    "inlineBg": { "$value": { "light": "{gray.100}", "dark": "{gray.900}" }, "$description": "Inline `code` spans inside prose." },
-    "text": { "$value": { "light": "{gray.850}", "dark": "{gray.100}" } },
-    "border": { "$value": { "light": "{gray.150}", "dark": "{gray.850}" } },
-    "gutter": { "$value": { "light": "{gray.500}", "dark": "{gray.600}" }, "$description": "Line numbers." }
+    "bg": { "$value": "{neutral.2}", "$description": "Code blocks and diffs." },
+    "inlineBg": { "$value": "{neutral.3}", "$description": "Inline `code` spans inside prose." },
+    "text": { "$value": "{neutral.12}" },
+    "border": { "$value": "{neutral.4}" },
+    "gutter": { "$value": "{neutral.10}", "$description": "Line numbers." }
   },
   "syntax": {
     "$type": "color",
-    "$description": "Syntax highlighting on code.bg.",
-    "keyword": { "$value": { "light": "{purple.600}", "dark": "{purple.300}" } },
-    "string": { "$value": { "light": "{green.700}", "dark": "{green.300}" } },
-    "number": { "$value": { "light": "{orange.700}", "dark": "{orange.300}" } },
-    "constant": { "$value": { "light": "{indigo.700}", "dark": "{indigo.300}" }, "$description": "true / false / null and named constants." },
-    "function": { "$value": { "light": "{blue.700}", "dark": "{blue.300}" } },
-    "type": { "$value": { "light": "{teal.700}", "dark": "{teal.300}" } },
-    "variable": { "$value": { "light": "{gray.850}", "dark": "{gray.100}" } },
-    "property": { "$value": { "light": "{red.700}", "dark": "{red.300}" }, "$description": "Object keys, HTML / JSX attributes." },
-    "tag": { "$value": { "light": "{pink.700}", "dark": "{pink.300}" } },
-    "comment": { "$value": { "light": "{gray.500}", "dark": "{gray.600}" } },
-    "punctuation": { "$value": { "light": "{gray.600}", "dark": "{gray.500}" }, "$description": "Operators and punctuation." }
+    "$description": "Syntax highlighting on code.bg, drawn from the categorical scales so it follows the theme.",
+    "keyword": { "$value": "{purple.11}" },
+    "string": { "$value": "{green.11}" },
+    "number": { "$value": "{orange.11}" },
+    "constant": { "$value": "{blue.11}", "$description": "true / false / null and named constants." },
+    "function": { "$value": "{indigo.11}" },
+    "type": { "$value": "{teal.11}" },
+    "variable": { "$value": "{neutral.12}" },
+    "property": { "$value": "{red.11}", "$description": "Object keys, HTML / JSX attributes." },
+    "tag": { "$value": "{pink.11}" },
+    "comment": { "$value": "{neutral.10}" },
+    "punctuation": { "$value": "{neutral.11}", "$description": "Operators and punctuation." }
   },
   "diff": {
     "$type": "color",
-    "addedBg": { "$value": { "light": "{green.500/12}", "dark": "{green.400/14}" } },
-    "removedBg": { "$value": { "light": "{red.500/10}", "dark": "{red.500/16}" } },
-    "addedText": { "$value": { "light": "{green.700}", "dark": "{green.300}" } },
-    "removedText": { "$value": { "light": "{red.700}", "dark": "{red.300}" } },
-    "hunkBg": { "$value": { "light": "{indigo.500/8}", "dark": "{indigo.500/14}" }, "$description": "@@ hunk header rows." },
-    "hunkText": { "$value": { "light": "{indigo.700}", "dark": "{indigo.300}" } }
+    "addedBg": { "$value": "{success.3}" },
+    "removedBg": { "$value": "{danger.3}" },
+    "addedText": { "$value": "{success.11}" },
+    "removedText": { "$value": "{danger.11}" },
+    "hunkBg": { "$value": "{accent.2}", "$description": "@@ hunk header rows." },
+    "hunkText": { "$value": "{accent.11}" }
   },
   "selection": {
     "$type": "color",
-    "text": { "$value": { "light": "{indigo.500/22}", "dark": "{indigo.500/40}" }, "$description": "Selected-text highlight." },
-    "handle": { "$value": { "light": "{indigo.600}", "dark": "{indigo.400}" }, "$description": "Caret and selection handles." }
+    "text": { "$value": { "light": "{accent.9/24}", "dark": "{accent.9/30}" }, "$description": "Selected-text highlight." },
+    "handle": { "$value": "{accent.9}", "$description": "Caret and selection handles." }
   },
   "overlay": {
     "$type": "color",
-    "scrim": { "$value": { "light": "{black/40}", "dark": "{black/60}" }, "$description": "Dimming behind custom modals." }
+    "scrim": { "$value": { "light": "{key.foreground/50}", "dark": "{black/60}" }, "$description": "Dimming behind custom modals (web: overlay)." }
   },
   "shadow": {
     "$type": "color",
-    "$description": "Shadow colors per elevation level (tokens/elevation.json). Dark mode needs much stronger shadows to read on near-black.",
-    "sm": { "$value": { "light": "{black/6}", "dark": "{black/40}" } },
-    "md": { "$value": { "light": "{black/10}", "dark": "{black/50}" } },
-    "lg": { "$value": { "light": "{black/14}", "dark": "{black/60}" } }
+    "$description": "Shadow ink per elevation level (tokens/elevation.json). Zero saturation, as on the web; much stronger in dark mode.",
+    "sm": { "$value": { "light": "{key.foreground/8}", "dark": "{black/40}" } },
+    "md": { "$value": { "light": "{key.foreground/16}", "dark": "{black/50}" } },
+    "lg": { "$value": { "light": "{key.foreground/20}", "dark": "{black/60}" } }
   }
 }

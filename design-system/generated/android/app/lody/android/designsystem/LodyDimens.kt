@@ -192,8 +192,8 @@ object LodyBreakpoint {
 }
 
 object LodyOpacity {
-    /** Whole-control opacity when disabled and no dedicated disabled color fits. */
-    const val disabled = 0.4f
+    /** Whole-control opacity when disabled (web: disabled is 45% opacity, not a color). */
+    const val disabled = 0.45f
     /** Icon-only buttons while pressed (iOS). */
     const val pressed = 0.7f
     /** De-emphasized media, archived rows. */

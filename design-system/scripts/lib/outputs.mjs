@@ -18,7 +18,7 @@ export function loadAll() {
   }
   const colors = loadColors()
   return {
-    palette: loadPalette().groups,
+    palette: loadPalette().modes,
     colors,
     typography: loadTypography(),
     dimensions,

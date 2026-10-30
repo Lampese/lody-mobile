@@ -1,11 +1,31 @@
-// OKLCH helpers (Björn Ottosson's OKLab) used to generate chromatic ramps with
-// perceptually even lightness steps, gamut-mapped into sRGB.
+// Theme generation in OKLCH (Björn Ottosson's OKLab), in the spirit of Linear's
+// generated themes: each mode supplies a few key colors and every scale is
+// derived from them. Scales use Radix-style 12 step roles:
+//   1 app background · 2 subtle background · 3 tinted fill · 4 hover · 5 selected
+//   6 subtle border · 7 border · 8 strong border · 9 solid (the key color itself)
+//   10 solid pressed · 11 readable text · 12 high-contrast text
 
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 const toGamma = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055)
 
+/** Accepts #RRGGBB or the web tokens' `hsl(H S% L%)` notation; returns #RRGGBB. */
+export function toHex(value) {
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toUpperCase()
+  const m = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/.exec(value)
+  if (!m) throw new Error(`Unsupported color ${value}; use #RRGGBB or hsl(H S% L%)`)
+  const [h, s, l] = [Number(m[1]), Number(m[2]) / 100, Number(m[3]) / 100]
+  const k = (n) => (n + h / 30) % 12
+  const a = s * Math.min(l, 1 - l)
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))
+  return `#${[f(0), f(8), f(4)].map((v) => Math.round(v * 255).toString(16).toUpperCase().padStart(2, '0')).join('')}`
+}
+
+function hexToLinear(hex) {
+  return [1, 3, 5].map((i) => toLinear(parseInt(hex.slice(i, i + 2), 16) / 255))
+}
+
 export function hexToOklch(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => toLinear(parseInt(hex.slice(i, i + 2), 16) / 255))
+  const [r, g, b] = hexToLinear(hex)
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
@@ -32,18 +52,16 @@ const inGamut = (rgb) => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4)
 
 /** Converts to sRGB hex, reducing chroma (keeping lightness and hue) until it fits. */
 export function oklchToHex(color) {
-  let { c } = color
   let rgb = oklchToLinearRgb(color)
   if (!inGamut(rgb)) {
     let lo = 0
-    let hi = c
+    let hi = color.c
     for (let i = 0; i < 24; i++) {
       const mid = (lo + hi) / 2
       if (inGamut(oklchToLinearRgb({ ...color, c: mid }))) lo = mid
       else hi = mid
     }
-    c = lo
-    rgb = oklchToLinearRgb({ ...color, c })
+    rgb = oklchToLinearRgb({ ...color, c: lo })
   }
   return `#${rgb
     .map((v) => Math.round(Math.min(1, Math.max(0, toGamma(Math.min(1, Math.max(0, v))))) * 255))
@@ -51,24 +69,78 @@ export function oklchToHex(color) {
     .join('')}`
 }
 
-/**
- * Builds a ramp for one hue. The anchor (a brand color) lands unchanged on the
- * step whose ramp lightness is closest to its own; every other step reuses the
- * anchor's hue and scales its chroma by the step's chroma factor.
- */
-export function generateRamp(anchorHex, ramp) {
-  const anchor = hexToOklch(anchorHex)
-  const steps = Object.keys(ramp)
-  const anchorStep = steps.reduce((best, s) =>
-    Math.abs(ramp[s].l - anchor.l) < Math.abs(ramp[best].l - anchor.l) ? s : best,
-  )
-  const peak = anchor.c / ramp[anchorStep].c
+function luminance(hex) {
+  const [r, g, b] = hexToLinear(hex)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+export function contrast(a, b) {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p)
+  return (x + 0.05) / (y + 0.05)
+}
+
+const lerp = (a, b, t) => a + (b - a) * t
+const STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+/** Neutral scale from the mode's background (step 1) to its foreground (step 12). */
+function neutralScale(bg, fg, curve, gamma) {
+  const [a, b] = [hexToOklch(bg), hexToOklch(fg)]
   const out = {}
-  for (const step of steps) {
+  STEPS.forEach((step, i) => {
+    const t = curve[i] ** gamma
     out[step] =
-      step === anchorStep
-        ? anchorHex.toUpperCase()
-        : oklchToHex({ l: ramp[step].l, c: peak * ramp[step].c, h: anchor.h })
+      step === 1 ? bg : step === 12 ? fg : oklchToHex({ l: lerp(a.l, b.l, t), c: lerp(a.c, b.c, t), h: a.c > 0.002 ? a.h : b.h })
+  })
+  return out
+}
+
+/** Finds the lightness between `from` and `to` closest to `from` that reaches `target` contrast on `against`. */
+function solveTextLightness(key, from, to, against, target) {
+  const at = (l) => oklchToHex({ ...key, l })
+  if (contrast(at(from), against) >= target) return at(from)
+  let [lo, hi] = [0, 1]
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2
+    if (contrast(at(lerp(from, to, mid)), against) >= target) hi = mid
+    else lo = mid
   }
-  return { steps: out, anchorStep }
+  return at(lerp(from, to, hi))
+}
+
+/** Chromatic scale whose step 9 is the key color itself. */
+function chromaticScale(keyHex, bg, fg, { tint, text }) {
+  const key = hexToOklch(keyHex)
+  const [b, f] = [hexToOklch(bg), hexToOklch(fg)]
+  const out = {}
+  // 1–8: tints from the background toward the key, chroma rising with them.
+  for (let i = 0; i < 8; i++) {
+    out[i + 1] = oklchToHex({ l: lerp(b.l, key.l, tint.l[i]), c: key.c * tint.c[i], h: key.h })
+  }
+  out[9] = keyHex
+  // 10: the pressed solid, one small step toward the foreground.
+  out[10] = oklchToHex({ ...key, l: lerp(key.l, f.l, 0.08) })
+  // 11: text, guaranteed readable on its own tinted fill (step 3) and therefore on step 1.
+  out[11] = solveTextLightness(key, key.l, f.l, out[3], text.contrast)
+  // 12: high-contrast text, close to the foreground with a trace of the hue.
+  out[12] = oklchToHex({ l: lerp(key.l, f.l, 0.85), c: key.c * 0.4, h: key.h })
+  return out
+}
+
+/**
+ * Builds every scale for one mode. Returns { scales: { name: { step: hex } }, keys }.
+ * `mode.keys` are the theme's key colors (web token values); `algorithm` holds the
+ * shared curves.
+ */
+export function generateMode(mode, algorithm) {
+  const keys = Object.fromEntries(Object.entries(mode.keys).map(([k, v]) => [k, toHex(v)]))
+  const { background: bg, foreground: fg } = keys
+  const scales = { neutral: neutralScale(bg, fg, algorithm.neutralCurve, mode.contrast) }
+  for (const role of algorithm.chromaticKeys) {
+    scales[role] = chromaticScale(keys[role], bg, fg, algorithm)
+  }
+  for (const [name, hue] of Object.entries(algorithm.categorical.hues)) {
+    const key = oklchToHex({ l: mode.categorical.l, c: mode.categorical.c, h: hue })
+    scales[name] = chromaticScale(key, bg, fg, algorithm)
+  }
+  return { scales, keys }
 }

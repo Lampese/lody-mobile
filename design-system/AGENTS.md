@@ -12,11 +12,15 @@ Principles and integration steps: [README.md](README.md).
   `check.mjs` fails on stale `generated/`, missing fonts, or a broken contrast
   floor from `tokens/contrast.json`.
 - Apps reference semantic tokens only. `palette.json` is never emitted.
-- Chromatic palette families are generated (OKLCH, `scripts/lib/color.mjs`) from
-  one anchor each; edit anchors / `ramp`, not hex steps. Gray is hand-tuned.
-- Semantic refs may carry alpha: `{indigo.600/12}`. Contrast checks composite
-  translucent backgrounds onto `bg.base`.
-- Every semantic color needs both `light` and `dark`.
+- The palette is generated per mode (OKLCH, `scripts/lib/color.mjs`) from the
+  web theme's key colors (`lody-oss/packages/ui/src/tokens/colors.stylex.ts`);
+  change `palette.json` keys / curves, never hex steps. Step 9 of each chromatic
+  scale is its key color.
+- Color roles follow the web `RULES.md`: ink fills primary buttons, accent is
+  state only (focus, link, on / checked, running).
+- Semantic refs: `{scale.step}`, `{key.name}`, optional alpha `{accent.9/24}`;
+  a string value applies to both modes. Contrast checks composite translucent
+  backgrounds onto `bg.base`.
 - Icons: Lucide only, pinned by `lucideVersion`. Both platforms are emitted from
   the same path data (`scripts/lib/svg.mjs`), so geometry matches exactly. Icon
   stroke width (`stroke.icon`) is baked into the generated assets.
@@ -31,7 +35,7 @@ Principles and integration steps: [README.md](README.md).
 - `examples/{ios,android}`: native preview apps; screens are kept 1:1 across
   platforms (see `examples/README.md`).
 - `scripts/lib/tokens.mjs`: loads and validates tokens, derives Inter tracking and spring physics.
-- `scripts/lib/color.mjs`: OKLCH conversion and palette ramp generation.
+- `scripts/lib/color.mjs`: OKLCH conversion and per-mode scale generation.
 - `scripts/lib/emit-{swift,kotlin,preview}.mjs`: platform emitters.
 - `scripts/lib/outputs.mjs`: in-memory `generated/` tree shared by build/check.
 - `runtime/ios/LodyText.swift`: `LodyTextStyle`, line-height modifier, font

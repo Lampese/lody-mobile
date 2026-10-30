@@ -163,9 +163,9 @@ struct LodyButton: View {
 
     private var colors: (bg: Color, fg: Color) {
         switch kind {
-        case .primary: (LodyColor.accentDefault, LodyColor.textOnAccent)
+        case .primary: (LodyColor.inkDefault, LodyColor.inkOn)
         case .secondary: (LodyColor.fillSecondary, LodyColor.textPrimary)
-        case .destructive: (LodyColor.dangerSolid, LodyColor.textOnAccent)
+        case .destructive: (LodyColor.dangerSolid, LodyColor.textOnDanger)
         case .ghost: (Color.clear, LodyColor.textLink)
         }
     }
@@ -244,9 +244,9 @@ struct Composer: View {
                 .foregroundStyle(LodyColor.textPrimary)
                 .tint(LodyColor.accentDefault)
             Button {} label: {
-                Glyph(icon: .send, size: LodyIconSize.md, color: LodyColor.textOnAccent)
+                Glyph(icon: .send, size: LodyIconSize.md, color: LodyColor.inkOn)
                     .frame(width: LodySize.controlSm, height: LodySize.controlSm)
-                    .background(LodyColor.accentDefault, in: Circle())
+                    .background(LodyColor.inkDefault, in: Circle())
             }
             .buttonStyle(.plain)
         }
