@@ -1,5 +1,6 @@
 import { verifySnapshot } from './snapshot.mjs';
 import { adaptCatalogBudget } from './src/catalog-budget.mjs';
+import { buildMarkdownRepair } from './src/markdown-repair.mjs';
 await verifySnapshot();
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile, readdir, copyFile, rm } from 'node:fs/promises';
@@ -38,6 +39,9 @@ for (const [location, info] of Object.entries(lock.packages)) {
  inventory.push({name,version,licenseSha256:createHash('sha256').update(text).digest('hex')});
 }
 await writeFile(path.join(licenses,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n');
+// Streaming-Markdown repair for the chat renderer (QuickJS). Its remend license is in the inventory above.
+const markdown=path.join(output,'main/markdown');await mkdir(markdown,{recursive:true});
+await writeFile(path.join(markdown,'MarkdownRepair.js'),await buildMarkdownRepair());
 console.log('Generated release and debug runtime assets with dependency licenses.');
 
 await writeFile(path.join(output,'debug/runtime/MismatchRuntime.html'),`<!doctype html><script>LodyHost.postMessage(JSON.stringify({type:'hostReady',protocol:2,capabilities:['ping']}))</script>`);

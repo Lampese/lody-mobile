@@ -7,7 +7,7 @@
 - Keep watchdog deadlines outside JavaScript, fence callbacks by runtime generation, bound automatic restarts, suspend deadlines in background, and never replay writes after recovery. Long-lived credentials stay native; only short-lived grants may enter the runtime. A machine ACK is delivery, not completion.
 - Phase 2 adds independent Device Flow and a read-only workspace catalog probe. Offline diagnostics remain separate. No sends, writes or Machine RPC are exposed; diagnostics and fault injection belong only in the debug source set.
 - The vendored cloud-runtime source is an unchanged, provenance-tracked snapshot. Apply Android bridge adaptation outside that source; retain dependency licenses and reproducible asset generation.
-- Use stable dependency versions, pinned in `gradle/libs.versions.toml`; AGP owns built-in Kotlin support.
+- Use stable dependency versions, pinned in `gradle/libs.versions.toml`; AGP owns built-in Kotlin support. AGP 9 ships Kotlin 2.2, so the root `buildscript` puts the catalog's newer Kotlin Gradle plugin (2.4) on the classpath; the Compose compiler plugin follows the same `kotlin` version.
 - Preserve user edits. Never copy tokens or signing keys into the repository. Keep local SDK paths in ignored `local.properties`.
 - Follow native Android navigation, lifecycle, accessibility, and background execution rules.
 - Verify scaffold changes with `./gradlew :app:assembleDebug :app:lintDebug`. Add behavioral tests when implementing behavior; do not report NO-SOURCE tasks as passing tests.
@@ -43,3 +43,10 @@
 - `home/ChatListModel` mirrors iOS `InboxSections.projects`: pinned first, projects by name, unassigned chats last, archived hidden, 5 chats per group before "Show N more"; status strings map to running / waiting / failed attention. Keep it pure and covered by `ChatListModelTest`.
 - The list stays read-only in this phase: no new-chat button, row menus or writes until sends and Machine RPC exist.
 
+
+## Chat transcript (spike)
+
+- `chat/` holds the transcript pipeline, mirroring iOS `ChatMarkdownRepair` / `ChatMarkdownStore`: coalesce chunks per frame (`renderMarkdown`), repair while streaming only, split into top-level blocks with the JetBrains GFM parser, render each block as its own lazy item (`ChatTranscript`, `MarkdownBlock`). The original text stays the source of truth; repaired text is display-only.
+- Repair runs the shared `../shared/markdown-repair/entry.js` (remend, pinned in `runtime/package.json` to the iOS version) as the `markdown/MarkdownRepair.js` asset in QuickJS (`QuickJsMarkdownRepair`, quickjs-kt, which serializes evaluations itself). Every failure returns the input unchanged. Do not route repair through the WebView runtime. Unit tests run the real engine via `quickjs-kt-jvm` against the built asset (`markdown.repair` system property).
+- Renderer: mikepenz multiplatform-markdown-renderer. Its append-only streaming state does not fit remend output (closing markers move), so blocks re-render with `retainState = true` instead; without it a growing block flashes back to loading.
+- `diagnostics/ChatStreamProbeActivity` (debug) replays `assets/chat/fixture.md` as a token stream and reports repair / split cost and long frames, with repair and coalescing toggles.

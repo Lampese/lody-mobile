@@ -14,13 +14,9 @@ const result = await build({
 const output = root + '.generated/Resources';
 await mkdir(output, { recursive: true });
 const markdownRepair = await build({
+  // Shared with Android; see shared/markdown-repair/README.md.
   stdin: {
-    contents: `import remend from 'remend';
-      globalThis.repairMarkdown = text => remend(text, {
-        linkMode: 'text-only', katex: false, inlineKatex: false,
-        htmlTags: false, comparisonOperators: false, singleTilde: false,
-        setextHeadings: false,
-      });`,
+    contents: await readFile(root + '../../../shared/markdown-repair/entry.js', 'utf8'),
     resolveDir: root,
   },
   bundle: true,

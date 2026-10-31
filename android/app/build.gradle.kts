@@ -59,6 +59,12 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.compose.material3)
     implementation(libs.compose.foundation)
+    // Chat transcript: QuickJS runs the shared remend repair; Markdown renders per block.
+    implementation(libs.quickjs)
+    testImplementation(libs.quickjs.jvm)
+    implementation(libs.markdown.parser)
+    implementation(libs.markdown.renderer.m3)
+    implementation(libs.markdown.renderer.code)
     testImplementation(libs.junit)
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.test.junit)
@@ -74,6 +80,7 @@ val generateRuntimeAssets = tasks.register<RuntimeAssets>("generateRuntimeAssets
     inputs.dir(rootProject.file("runtime/vendor"))
     inputs.dir(rootProject.file("runtime/src"))
     inputs.file(rootProject.file("runtime/build.mjs"))
+    inputs.file(rootProject.file("../shared/markdown-repair/entry.js"))
     inputs.file(rootProject.file("runtime/snapshot.mjs"))
     inputs.file(rootProject.file("runtime/package-lock.json"))
     mainAssets.set(layout.buildDirectory.dir("generated/runtime/main"))
@@ -87,6 +94,11 @@ androidComponents.onVariants { variant ->
 }
 
 tasks.withType<Test>().configureEach {
+    // Unit tests run the shipped remend bundle in the JVM QuickJS engine.
+    dependsOn(generateRuntimeAssets)
+    val markdownRepair = layout.buildDirectory.file("generated/runtime/main/markdown/MarkdownRepair.js")
+    inputs.file(markdownRepair)
+    systemProperty("markdown.repair", markdownRepair.get().asFile.absolutePath)
     inputs.file(rootProject.file("runtime/contract/fixtures.json"))
     systemProperty("runtime.fixtures", rootProject.file("runtime/contract/fixtures.json").absolutePath)
 }
