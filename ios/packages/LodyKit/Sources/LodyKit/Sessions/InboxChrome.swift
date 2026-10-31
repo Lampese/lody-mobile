@@ -45,6 +45,8 @@ final class InboxChrome {
   private var toolbar: [UIBarButtonItem] = []
   private var naturalWidth: CGFloat = 44
   private var waitingForTransition = false
+  /// While the expanded search field is active, the workspace capsule steps aside for it.
+  private var searching = false
 
   init() {
     workspace.accessibilityIdentifier = "workspace-menu"
@@ -58,11 +60,19 @@ final class InboxChrome {
     settings.setLongPress(true)
     settings.pressed = { [weak self] in self?.openSettings?() }
     settings.held = { [weak self] in self?.openDebug?() }
+    // iPhone: a search button that expands into the field (iOS 26 integratedButton); iPad uses padBar.
     search.configure(LodyNavigationSearch.Config(
-      placeholder: String(localized: "search.field.placeholder", bundle: .lody), placement: "integrated", hideWhenScrolling: false
+      placeholder: String(localized: "search.field.placeholder", bundle: .lody), placement: "integratedButton", hideWhenScrolling: false
     ))
     search.emit = { [weak self] event, text in
-      if event == "change" { self?.searchChanged?(text) }
+      guard let self else { return }
+      switch event {
+      case "change": self.searchChanged?(text)
+      case "focus": self.setSearching(true)
+      case "cancel": self.setSearching(false)
+      case "blur" where text.isEmpty: self.setSearching(false)
+      default: break
+      }
     }
     padBar.searchChanged = { [weak self] text in self?.searchChanged?(text) }
     padBar.create = { [weak self] in self?.newSession?() }
@@ -96,17 +106,20 @@ final class InboxChrome {
     workspace.setDetail([model.devices.summary, running].filter { !$0.isEmpty }.joined(separator: " · "))
     workspace.setItems(menuItems(model))
     layout()
+    let regular = host.traitCollection.horizontalSizeClass == .regular
     let left = [workspaceItem ?? UIBarButtonItem(customView: workspaceSlot)]
     let filter = filterItem ?? UIBarButtonItem(image: UIImage(systemName: "line.3.horizontal.decrease"), menu: nil)
     filter.tintColor = .label
     filter.accessibilityLabel = String(localized: "inbox.settings.section.view", bundle: .lody)
-    filter.menu = filterMenu(mode: model.mode, sort: model.sort)
-    let right = [settingsItem ?? UIBarButtonItem(customView: settingsSlot), filter]
-    (workspaceItem, settingsItem, filterItem) = (left[0], right[0], filter)
-    if header.leftItems != left { header.leftItems = left }
+    filter.menu = regular ? filterMenu(mode: model.mode, sort: model.sort) : compactViewMenu()
+    let settingsItem = self.settingsItem ?? UIBarButtonItem(customView: settingsSlot)
+    // iPhone reaches Settings from the bottom tabs; iPad keeps the gear beside the view menu.
+    let right = regular ? [settingsItem, filter] : [filter]
+    (workspaceItem, self.settingsItem, filterItem) = (left[0], settingsItem, filter)
+    let shownLeft = searching && !regular ? [] : left
+    if header.leftItems ?? [] != shownLeft { header.leftItems = shownLeft.isEmpty ? nil : shownLeft }
     if header.rightItems != right { header.rightItems = right }
     // iPad keeps integrated search in the navigation bar, so the sidebar hosts its own bottom field.
-    let regular = host.traitCollection.horizontalSizeClass == .regular
     if regular, header.search === search { header.search = nil }
     if !regular, header.search !== search { header.search = search }
     showToolbar()
@@ -121,7 +134,7 @@ final class InboxChrome {
   private func clear() {
     guard let header else { return }
     if let item = workspaceItem, header.leftItems == [item] { header.leftItems = nil }
-    if let settingsItem, let filterItem, header.rightItems == [settingsItem, filterItem] { header.rightItems = nil }
+    if let filterItem, let right = header.rightItems, right.contains(filterItem) { header.rightItems = nil }
     if header.search === search { header.search = nil }
     showPadBar(false)
     if let host, !toolbar.isEmpty, host.toolbarItems ?? [] == toolbar {
@@ -146,26 +159,11 @@ final class InboxChrome {
     }
     let regular = host.traitCollection.horizontalSizeClass == .regular
     showPadBar(regular)
-    if regular {
-      if !toolbar.isEmpty, host.toolbarItems ?? [] == toolbar { host.setToolbarItems(nil, animated: false) }
-      toolbar = []
-      if let navigation = host.navigationController, navigation.topViewController === host {
-        navigation.setToolbarHidden(true, animated: false)
-      }
-      return
-    }
-    if toolbar.isEmpty {
-      let create = UIBarButtonItem(primaryAction: UIAction(image: UIImage(systemName: "plus")) { [weak self] _ in
-        self?.newSession?()
-      })
-      create.sharesBackground = false
-      create.tintColor = .lodyAccent
-      create.accessibilityLabel = String(localized: "tabs.newSession", bundle: .lody)
-      toolbar = [host.navigationItem.searchBarPlacementBarButtonItem, .fixedSpace(6), create]
-    }
-    if host.toolbarItems ?? [] != toolbar { host.setToolbarItems(toolbar, animated: false) }
+    // iPhone's search lives in the navigation bar and new chat in HomeTabBar, so no bottom toolbar on either layout.
+    if !toolbar.isEmpty, host.toolbarItems ?? [] == toolbar { host.setToolbarItems(nil, animated: false) }
+    toolbar = []
     if let navigation = host.navigationController, navigation.topViewController === host {
-      navigation.setToolbarHidden(false, animated: false)
+      navigation.setToolbarHidden(true, animated: false)
     }
   }
 
@@ -218,6 +216,19 @@ final class InboxChrome {
     } else if !id.hasPrefix("__device") {
       selectWorkspace?(id)
     }
+  }
+
+  private func setSearching(_ value: Bool) {
+    guard searching != value, let host, let header else { return }
+    searching = value
+    guard host.traitCollection.horizontalSizeClass != .regular, let workspaceItem else { return }
+    header.leftItems = value ? nil : [workspaceItem]
+  }
+
+  /// iPhone view menu: grouping by time is the only view for now; by project and by status come later.
+  private func compactViewMenu() -> UIMenu {
+    let time = UIAction(title: String(localized: "home.view.time", bundle: .lody), image: UIImage(systemName: "clock"), state: .on) { _ in }
+    return UIMenu(title: String(localized: "inbox.settings.section.view", bundle: .lody), children: [time])
   }
 
   private func filterMenu(mode: Int, sort: InboxSort) -> UIMenu {

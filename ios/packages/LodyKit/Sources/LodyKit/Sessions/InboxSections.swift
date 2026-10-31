@@ -86,6 +86,43 @@ enum InboxSections {
     return [pinnedSection(rows, expanded: expanded)] + sections
   }
 
+  /// iPhone Home "by time": activity buckets only (no pinned / status groups); archived chats are hidden.
+  static func timeline(_ catalog: SessionCatalog, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
+    let names = projectNames(catalog)
+    let visible = catalog.sessions.filter { !$0.archived }.sorted { $0.activityAt > $1.activityAt }
+    var buckets: [String: [SessionItem]] = [:]
+    for session in visible { buckets[activityBucket(session.activityAt, now: now), default: []].append(session) }
+    return ["today", "yesterday", "week", "month", "older"].compactMap { id in
+      guard let sessions = buckets[id], !sessions.isEmpty else { return nil }
+      let rows = SessionRows.treeRows(sessions, all: catalog.sessions) { session in
+        SessionRows.row(session, projectName: place(session, names), now: now)
+      }
+      return section(id, header: String(localized: String.LocalizationValue("inbox.section." + id), bundle: .lody), rows: rows)
+    }
+  }
+
+  /// iPhone Projects tab: one row per project with its open chat count and most urgent state.
+  static func projectIndex(_ catalog: SessionCatalog) -> [LodyListSection] {
+    let live = catalog.sessions.filter { !$0.archived }
+    let rows = sortProjects(catalog.projects, sessions: live, sort: .name).map { project -> LodyListRow in
+      let sessions = live.filter { $0.projectId == project.id }
+      let states = sessions.map(SessionState.init)
+      var row = LodyListRow()
+      row.id = "project:\(project.id)"
+      row.title = project.name
+      row.subtitle = project.rootPath
+      row.image = "folder"
+      row.action = true
+      row.navigates = true
+      row.disclosure = true
+      row.menuActions = SessionRows.projectMenu(project)
+      row.badge = sessions.isEmpty ? "" : String(sessions.count)
+      row.imageTint = [SessionState.attention, .failed, .live].first(where: states.contains)?.tint ?? ""
+      return row
+    }
+    return rows.isEmpty ? [] : [section("projects", rows: rows)]
+  }
+
   static func search(
     _ catalog: SessionCatalog, hits: InboxSearchHits, query: String = "", now: Double = LodyRelativeTime.now()
   ) -> [LodyListSection] {

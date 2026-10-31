@@ -38,11 +38,12 @@
 
 ## Home UI
 
-- `home/HomeActivity` is the launcher: sign-in (Device Flow) without an account, otherwise `home/ChatListScreen`. It reads `AccountController` / `CatalogRepository` state only and picks the first workspace when none is restored.
-- UI uses the shared mobile design system in `../design-system` (Gradle adds `generated/android`, `runtime/android` and `fonts` as source / res dirs): `LodyTheme`, semantic tokens, Inter, Lucide `LodyIcons`. Do not hard-code colors, sizes or fonts in screens. Reference design: `design-system/examples/android/.../SessionListScreen.kt`; iOS counterpart: LodyKit `ChatListView`.
-- `home/ChatListModel` mirrors iOS `InboxSections.projects`: pinned first, projects by name, unassigned chats last, archived hidden, 5 chats per group before "Show N more"; status strings map to running / waiting / failed attention. Keep it pure and covered by `ChatListModelTest`.
-- The list opens a read-only `chat/ChatScreen` through HomeActivity. `ChatRepository` borrows the existing RuntimeOwner lease, reopens after recovery, and closes its subscription on exit. Text and proposed-plan Markdown are projected from session events; tools and attachments are not rendered yet. No new-chat button, row menus or writes until sends and Machine RPC exist.
-
+- `home/HomeActivity` is the launcher: sign-in (Device Flow) without an account, otherwise `home/ChatListScreen`, which opens `chat/ChatScreen` for a row. It reads `AccountController` / `CatalogRepository` state only and picks the first workspace when none is restored.
+- Layout matches iOS Home: Chats tab has the workspace capsule (logo + name, connection state as a second line) leading, search and the view menu trailing; search takes over the bar and hides the capsule. A floating bar holds labelled Chats / Projects / Settings tabs plus a separate new-chat button. Projects opens a project's chats in place; Settings shows account, workspace switching and sign-out.
+- Chats are grouped by time (`ChatListModel.timeline`: today / yesterday / week / month / older by `createdAt`, the catalog has no activity time yet), with the project name trailing. The view menu only offers "By time" until by project / by status land. `ChatListModel.groups` (pinned, projects by name, unassigned last) feeds the Projects tab. Keep the model pure and covered by `ChatListModelTest`.
+- UI uses the shared mobile design system in `../design-system` (Gradle adds `generated/android`, `runtime/android` and `fonts` as source / res dirs): `LodyTheme`, semantic tokens, Inter, Lucide `LodyIcons`. Do not hard-code colors, sizes or fonts in screens.
+- Every user-visible string lives in `res/values/strings.xml` with a matching `res/values-b+zh+Hans/strings.xml` entry; keep both key sets identical.
+- Read-only phase: new chat explains it is unavailable; no row menus or writes until sends and Machine RPC exist.
 
 ## Chat transcript (spike)
 

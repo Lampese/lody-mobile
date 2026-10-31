@@ -26,6 +26,8 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     /// nil when the group cannot collapse.
     let expanded: Bool?
     let canToggle: Bool
+    /// Rows outside a group header (time buckets, search) name their project, since nothing above them does.
+    var showsPlace = false
   }
 
   var forwarded: ((String, [String: Any]) -> Void)?
@@ -118,7 +120,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
         } else if row.id.hasPrefix("project:") || row.id.hasPrefix("view:") {
           entry = Entry(kind: .more, row: row, expanded: nil, canToggle: false)
         } else {
-          entry = Entry(kind: .session, row: row, expanded: nil, canToggle: false)
+          entry = Entry(kind: .session, row: row, expanded: nil, canToggle: false, showsPlace: section.rows.first?.parent != true)
         }
         guard next[item] == nil else { continue }
         next[item] = entry
@@ -154,7 +156,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       switch entry.kind {
       case .header: GroupHeader(row: entry.row, expanded: entry.expanded, canToggle: entry.canToggle, onAction: emit)
       case .link: GroupHeader(row: entry.row, expanded: nil, canToggle: false, onAction: emit)
-      case .session: ChatRowContent(row: entry.row)
+      case .session: ChatRowContent(row: entry.row, showsPlace: entry.showsPlace)
       case .more: MoreRowContent(title: entry.row.title)
       }
     }
@@ -327,6 +329,13 @@ private struct GroupHeader: View {
 
 private struct ChatRowContent: View {
   let row: LodyListRow
+  var showsPlace = false
+
+  /// The project part of "project · branch"; empty when the row already sits under its project.
+  private var place: String {
+    guard showsPlace, !row.wrapSubtitle else { return "" }
+    return row.subtitle.components(separatedBy: " · ").first ?? ""
+  }
 
   /// Search results keep their match snippet; everything else is one line.
   private var detail: String? {
@@ -353,7 +362,16 @@ private struct ChatRowContent: View {
             .lineLimit(2)
         }
       }
-      Spacer(minLength: 0)
+      Spacer(minLength: LodySpacing.sm)
+      if !place.isEmpty {
+        Text(place)
+          .lodyTextStyle(.footnote)
+          .foregroundStyle(LodyColor.textTertiary)
+          .lineLimit(1)
+          // Ideal width clamped to the token, then fixed: short names take only their width, long ones truncate.
+          .frame(maxWidth: LodyLayout.trailingMetaMaxWidth, alignment: .trailing)
+          .fixedSize(horizontal: true, vertical: false)
+      }
     }
     .padding(.leading, LodyLayout.screenPaddingX)
     .padding(.trailing, LodyLayout.screenPaddingX)
@@ -361,7 +379,7 @@ private struct ChatRowContent: View {
     .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.title)
-    .accessibilityValue([row.badge, row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", "))
+    .accessibilityValue([row.badge, place, row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", "))
     .accessibilityAddTraits(.isButton)
   }
 }

@@ -2,11 +2,21 @@ package app.lody.android.home
 
 import app.lody.android.runtime.CatalogSession
 import app.lody.android.runtime.CatalogSnapshot
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /** What a chat (or a collapsed group) wants from the user, if anything. */
 enum class ChatAttention { Running, Waiting, Failed }
 
-data class ChatItem(val id: String, val title: String, val attention: ChatAttention?)
+/** [place] is the project name, empty for unassigned chats; time views show it beside the title. */
+data class ChatItem(val id: String, val title: String, val attention: ChatAttention?, val place: String = "")
+
+/** Activity buckets, matching iOS `InboxSections.activityBucket`. */
+enum class TimeBucket { Today, Yesterday, Week, Month, Older }
+
+data class TimeSection(val bucket: TimeBucket, val chats: List<ChatItem>)
 
 data class ChatGroup(val id: String, val name: String, val kind: Kind, val chats: List<ChatItem>) {
     enum class Kind { Pinned, Chats, Project }
@@ -58,6 +68,42 @@ object ChatListModel {
         return groups
     }
 
+    /**
+     * Home "by time": non-archived chats in activity buckets, newest first. The catalog has no
+     * activity time yet, so creation time stands in for it.
+     */
+    fun timeline(snapshot: CatalogSnapshot, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<TimeSection> {
+        val names = snapshot.projects.associate { it.id to it.name }
+        return snapshot.sessions
+            .filter { !it.archived }
+            .sortedByDescending { it.createdAt }
+            .groupBy { bucket(it.createdAt, today, zone) }
+            .toSortedMap()
+            .map { (bucket, sessions) -> TimeSection(bucket, sessions.map { item(it, if (isChat(it.projectId)) "" else names[it.projectId].orEmpty()) }) }
+    }
+
+    fun bucket(createdAt: String, today: LocalDate, zone: ZoneId): TimeBucket {
+        val date = runCatching { Instant.parse(createdAt).atZone(zone).toLocalDate() }.getOrNull() ?: return TimeBucket.Older
+        val days = ChronoUnit.DAYS.between(date, today)
+        return when {
+            days <= 0 -> TimeBucket.Today
+            days == 1L -> TimeBucket.Yesterday
+            days <= 7 -> TimeBucket.Week
+            days <= 30 -> TimeBucket.Month
+            else -> TimeBucket.Older
+        }
+    }
+
+    fun searchTimeline(sections: List<TimeSection>, query: String): List<TimeSection> {
+        val term = query.trim()
+        if (term.isEmpty()) return sections
+        return sections.mapNotNull { section ->
+            section.chats.filter { it.title.contains(term, ignoreCase = true) || it.place.contains(term, ignoreCase = true) }
+                .takeIf { it.isNotEmpty() }
+                ?.let { section.copy(chats = it) }
+        }
+    }
+
     /** Keeps only matching chats; groups without matches drop out. */
     fun search(groups: List<ChatGroup>, query: String): List<ChatGroup> {
         val term = query.trim()
@@ -69,5 +115,5 @@ object ChatListModel {
         }
     }
 
-    private fun item(session: CatalogSession) = ChatItem(session.id, session.title, attention(session.status))
+    private fun item(session: CatalogSession, place: String = "") = ChatItem(session.id, session.title, attention(session.status), place)
 }

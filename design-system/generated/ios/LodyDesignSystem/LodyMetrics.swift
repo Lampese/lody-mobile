@@ -158,6 +158,8 @@ public enum LodyLayout {
     public static let childIndent: CGFloat = 48
     /// Between grouped sections / cards.
     public static let sectionGap: CGFloat = 24
+    /// Max width of trailing metadata in a row (e.g. a chat's project name); the title keeps the rest.
+    public static let trailingMetaMaxWidth: CGFloat = 128
     /// Between controls inside a card.
     public static let stackGap: CGFloat = 12
     /// Max text column width on tablets / foldables.
@@ -170,6 +172,7 @@ public enum LodyLayout {
         ("listRowGap", listRowGap),
         ("childIndent", childIndent),
         ("sectionGap", sectionGap),
+        ("trailingMetaMaxWidth", trailingMetaMaxWidth),
         ("stackGap", stackGap),
         ("readableMaxWidth", readableMaxWidth),
     ]

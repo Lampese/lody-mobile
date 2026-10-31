@@ -6,6 +6,8 @@ import app.lody.android.runtime.CatalogSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 class ChatListModelTest {
     private fun session(id: String, project: String, status: String = "idle", archived: Boolean = false, pinned: Boolean = false, at: String) =
@@ -56,5 +58,37 @@ class ChatListModelTest {
         val result = ChatListModel.search(groups, " chat 3 ")
         assertEquals(listOf("p-alpha"), result.map { it.id })
         assertEquals(groups, ChatListModel.search(groups, "  "))
+    }
+
+    @Test
+    fun timelineBucketsByDayNewestFirstWithProjectNames() {
+        val today = LocalDate.parse("2026-10-06")
+        val sections = ChatListModel.timeline(snapshot, today, ZoneOffset.UTC)
+        assertEquals(listOf(TimeBucket.Today, TimeBucket.Yesterday, TimeBucket.Week), sections.map { it.bucket })
+        assertEquals(listOf("6"), sections[0].chats.map { it.id })
+        assertEquals("", sections[0].chats.single().place)
+        assertEquals(listOf("5"), sections[1].chats.map { it.id })
+        // Archived #4 is hidden; the rest are newest first and carry their project.
+        assertEquals(listOf("2", "3", "1"), sections[2].chats.map { it.id })
+        assertEquals(listOf("zed", "Alpha", "zed"), sections[2].chats.map { it.place })
+    }
+
+    @Test
+    fun bucketBoundariesAndUnparseableDates() {
+        val today = LocalDate.parse("2026-10-31")
+        fun bucket(at: String) = ChatListModel.bucket(at, today, ZoneOffset.UTC)
+        assertEquals(TimeBucket.Today, bucket("2026-10-31T23:59:00Z"))
+        assertEquals(TimeBucket.Yesterday, bucket("2026-10-30T00:00:00Z"))
+        assertEquals(TimeBucket.Week, bucket("2026-10-24T12:00:00Z"))
+        assertEquals(TimeBucket.Month, bucket("2026-10-01T12:00:00Z"))
+        assertEquals(TimeBucket.Older, bucket("2026-09-01T12:00:00Z"))
+        assertEquals(TimeBucket.Older, bucket("not a date"))
+    }
+
+    @Test
+    fun timelineSearchMatchesTitleOrProject() {
+        val sections = ChatListModel.timeline(snapshot, LocalDate.parse("2026-10-06"), ZoneOffset.UTC)
+        assertEquals(listOf("3"), ChatListModel.searchTimeline(sections, "alpha").flatMap { section -> section.chats.map { it.id } })
+        assertEquals(listOf("6"), ChatListModel.searchTimeline(sections, "chat 6").flatMap { section -> section.chats.map { it.id } })
     }
 }

@@ -100,12 +100,12 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
     val user = auth.account
     val workspace = catalog.workspace
     val snapshot = catalog.snapshot
-    // Only actionable connection state reaches the title area; a healthy list shows who is signed in.
-    val subtitle = when (catalog.phase) {
+    // Only actionable connection state reaches the workspace capsule; a live list shows none.
+    val status = when (catalog.phase) {
         ConnectionPhase.CONNECTING, ConnectionPhase.SYNCING -> stringResource(R.string.home_syncing)
         ConnectionPhase.UNAVAILABLE, ConnectionPhase.PAUSED ->
             stringResource(if (catalog.cached) R.string.home_offline_cached else R.string.home_offline)
-        else -> user?.name.orEmpty()
+        else -> ""
     }
     val placeholder = when {
         snapshot == null && catalog.phase in setOf(ConnectionPhase.UNAVAILABLE, ConnectionPhase.PAUSED) -> stringResource(R.string.home_offline)
@@ -113,12 +113,14 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
         snapshot == null -> stringResource(R.string.home_loading)
         else -> stringResource(R.string.home_empty)
     }
-    val title = workspace?.name ?: stringResource(R.string.app_name)
+    val name = workspace?.name ?: stringResource(R.string.app_name)
     return ChatListUiState(
-        title = title,
-        subtitle = subtitle,
-        initial = (user?.name ?: title).take(1).uppercase(),
-        groups = snapshot?.let(ChatListModel::groups).orEmpty(),
+        workspaceName = name,
+        initial = name.take(1).uppercase(),
+        status = status,
+        accountName = user?.name.orEmpty(),
+        timeline = snapshot?.let { ChatListModel.timeline(it) }.orEmpty(),
+        projects = snapshot?.let(ChatListModel::groups).orEmpty(),
         placeholder = placeholder,
         workspaces = user?.workspaces.orEmpty(),
         workspaceId = workspace?.id,

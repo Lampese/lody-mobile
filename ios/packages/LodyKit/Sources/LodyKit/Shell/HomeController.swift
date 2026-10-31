@@ -10,6 +10,10 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
   private let secondary = UINavigationController()
   private let inspector = UINavigationController()
   private let inbox: InboxController
+  /// iPhone tabs: each root page is built on first use and kept, so lists keep their scroll and state.
+  private var tab: HomeTab = .chats
+  private var tabPages: [HomeTab: LodyPageController] = [:]
+  private var tabBars: [HomeTab: HomeTabBar] = [:]
   private var session: SessionController?
   private var scope = ""
   private var observers: [NSObjectProtocol] = []
@@ -63,7 +67,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     split.preferredPrimaryColumnWidth = 320
     split.preferredInspectorColumnWidthFraction = 0.45
     split.maximumInspectorColumnWidth = .greatestFiniteMagnitude
-    primary.setViewControllers([page(inbox, title: "")], animated: false)
+    primary.setViewControllers([tabPage(.chats)], animated: false)
     secondary.setViewControllers([placeholder()], animated: false)
     primary.view.accessibilityIdentifier = "ipad-panel"
     secondary.view.accessibilityIdentifier = "ipad-detail"
@@ -98,6 +102,8 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     primary.traitOverrides.horizontalSizeClass = traitCollection.horizontalSizeClass
     (folded ? foldHost?.controller : split)?.view.frame = view.bounds
     view.accessibilityIdentifier = traitCollection.horizontalSizeClass == .regular ? "ipad-home" : "home"
+    // Tabs exist only on compact width; a wide layout lists chats in its sidebar.
+    if traitCollection.horizontalSizeClass == .regular, tab != .chats { selectTab(.chats) }
     layoutColumns()
   }
   private func scopeChanged() {
@@ -219,6 +225,36 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     controller.contentUnavailableConfiguration = configuration
     return controller
   }
+  func selectTab(_ next: HomeTab) {
+    guard next != tab else {
+      // Re-selecting the current tab returns to its root, like a system tab bar.
+      primary.popToRootViewController(animated: true)
+      return
+    }
+    tab = next
+    primary.setViewControllers([tabPage(next)], animated: false)
+  }
+
+  private func tabPage(_ tab: HomeTab) -> LodyPageController {
+    if let page = tabPages[tab] { return page }
+    let (content, title): (UIViewController, String) = switch tab {
+    case .chats: (inbox, "")
+    case .projects: (ProjectsListController(source: source), tab.title)
+    case .settings: (SettingsController(), tab.title)
+    }
+    let next = page(content, title: title)
+    tabBars[tab] = HomeTabBar(page: next, content: content, selected: tab, actions: HomeTabBar.Actions(
+      select: { [weak self] in self?.selectTab($0) },
+      create: { [weak self] in self?.inbox.newSession() },
+      openDebug: { [weak self] in
+        guard let self else { return }
+        LodyShell.shared.openPage("debug", from: self.tabPages[.settings])
+      }
+    ))
+    tabPages[tab] = next
+    return next
+  }
+
   private func page(_ content: UIViewController, title: String) -> LodyPageController {
     LodyPageController(spec: .init(title: title, style: "push", animation: "slide", dismissible: true,
       headerShown: true, headerVariant: "transparent"), inSheet: false, content: content)

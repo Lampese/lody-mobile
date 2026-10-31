@@ -165,6 +165,8 @@ object LodyLayout {
     val childIndent = 48.dp
     /** Between grouped sections / cards. */
     val sectionGap = 24.dp
+    /** Max width of trailing metadata in a row (e.g. a chat's project name); the title keeps the rest. */
+    val trailingMetaMaxWidth = 128.dp
     /** Between controls inside a card. */
     val stackGap = 12.dp
     /** Max text column width on tablets / foldables. */
@@ -177,6 +179,7 @@ object LodyLayout {
         "listRowGap" to listRowGap,
         "childIndent" to childIndent,
         "sectionGap" to sectionGap,
+        "trailingMetaMaxWidth" to trailingMetaMaxWidth,
         "stackGap" to stackGap,
         "readableMaxWidth" to readableMaxWidth,
     )

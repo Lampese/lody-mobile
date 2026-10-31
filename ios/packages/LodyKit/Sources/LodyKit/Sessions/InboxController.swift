@@ -93,6 +93,11 @@ final class InboxController: UIViewController {
       return
     }
     list.setPlaceholder(listPlaceholder(state))
+    // iPhone Home groups by time; other views arrive later through the chrome's view menu.
+    if traitCollection.horizontalSizeClass != .regular {
+      list.setSections(InboxSections.timeline(catalog))
+      return
+    }
     let pinOrder = pinOrder(state, catalog: catalog)
     if mode == 0 {
       list.setSections(InboxSections.projects(catalog, expanded: expanded, sort: sort, pinOrder: pinOrder))
@@ -256,7 +261,7 @@ final class InboxController: UIViewController {
       title: String(localized: "workspace.edit.title", bundle: .lody), detents: [0.5])
   }
 
-  private func newSession() {
+  func newSession() {
     let state = source.state
     guard state.workspace != nil else {
       LodyToastOverlay.shared.show(message: String(localized: "tabs.toast.signInFirst", bundle: .lody), kind: "error")
