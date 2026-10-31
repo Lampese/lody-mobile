@@ -15,21 +15,17 @@ settings:
     INFOPLIST_KEY_UILaunchScreen_Generation: 'YES'
     INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
     SUPPORTS_MACCATALYST: 'NO'
+packages:
+  LodyDesignSystem:
+    path: ../..
 targets:
   LodyDesignPreview:
     type: application
     platform: iOS
     sources:
       - path: App
-      - path: ../../generated/ios/LodyDesignSystem
-        group: DesignSystem/Generated
-      - path: ../../runtime/ios
-        group: DesignSystem/Runtime
-      - path: ../../generated/ios/LodyIcons.xcassets
-        group: DesignSystem/Generated
-      - path: ../../fonts/font
-        group: DesignSystem/Fonts
-        buildPhase: resources
+    dependencies:
+      - package: LodyDesignSystem
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.lody.designpreview

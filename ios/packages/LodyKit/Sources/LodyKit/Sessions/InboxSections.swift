@@ -243,11 +243,13 @@ enum InboxSections {
       row.navigates = true
       return
     }
+    let states = sessions.map(SessionState.init)
     guard open else {
       row.badge = String(sessions.count)
+      // Collapsed groups keep their most urgent state visible beside the count.
+      row.imageTint = [SessionState.attention, .failed, .live].first(where: states.contains)?.tint ?? ""
       return
     }
-    let states = sessions.map(SessionState.init)
     for state in [SessionState.failed, .attention, .live] {
       let count = states.filter { $0 == state }.count
       guard count > 0 else { continue }

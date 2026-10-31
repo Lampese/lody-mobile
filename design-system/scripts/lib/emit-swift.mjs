@@ -177,8 +177,8 @@ import UIKit
 public enum LodyIcon: String, CaseIterable, Sendable {
 ${cases}
 
-    public var image: Image { Image(rawValue) }
-    public var uiImage: UIImage? { UIImage(named: rawValue) }
+    public var image: Image { Image(rawValue, bundle: .module) }
+    public var uiImage: UIImage? { UIImage(named: rawValue, in: .module, with: nil) }
 }
 `
 }

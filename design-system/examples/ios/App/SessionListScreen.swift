@@ -6,6 +6,7 @@
 // waiting, failed, unread); collapsed groups surface a count and their most
 // urgent state; search filters every group; swipe and long-press act in place.
 
+import LodyDesignSystem
 import SwiftUI
 
 enum PreviewDestination: Hashable {
@@ -226,7 +227,8 @@ struct ChatRow: View {
                 ZStack {
                     if let attention = ChatAttention(chat) { AttentionGlyph(attention: attention) }
                 }
-                .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .center)
+                .frame(width: LodyIconSize.md)
+                .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
                 Text(chat.title)
                     .lodyTextStyle(chat.unread ? .bodyEmphasis : .body)
                     .foregroundStyle(LodyColor.textPrimary)

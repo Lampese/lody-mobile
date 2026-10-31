@@ -1,3 +1,4 @@
+import LodyDesignSystem
 import SwiftUI
 
 @main

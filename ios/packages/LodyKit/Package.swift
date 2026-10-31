@@ -10,6 +10,8 @@ let package = Package(
     .package(path: "../lody-core"),
     .package(path: "../chat-kit"),
     .package(path: "../lexical-swift"),
+    // Shared mobile design system (tokens, Lucide icons, Inter); see design-system/README.md.
+    .package(path: "../../../design-system"),
     .package(path: "../../node_modules/@rien7/anchored-overlay-kit"),
     .package(url: "https://github.com/Lakr233/MarkdownView.git", exact: "4.6.5"),
     .package(url: "https://github.com/lukilabs/beautiful-mermaid-swift.git", exact: "1.0.4"),
@@ -25,6 +27,7 @@ let package = Package(
         .product(name: "LodyCore", package: "lody-core"),
         .product(name: "LodyRuntime", package: "lody-core"),
         .product(name: "ChatKit", package: "chat-kit"),
+        .product(name: "LodyDesignSystem", package: "design-system"),
         .product(name: "Lexical", package: "lexical-swift"),
         .product(name: "LexicalListPlugin", package: "lexical-swift"),
         .product(name: "LexicalLinkPlugin", package: "lexical-swift"),

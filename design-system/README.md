@@ -133,42 +133,31 @@ node design-system/scripts/fetch-fonts.mjs  # 重新拉取字体（联网）
 
 ## 接入
 
+两个 App 都直接引用本目录，修改 token 后跑 `build.mjs` 即对两端生效。
+
 ### iOS（`ios/`）
 
-1. 将 `generated/ios/LodyDesignSystem/*.swift`、`runtime/ios/*.swift`、`generated/ios/LodyIcons.xcassets`、`fonts/font/*.ttf` 加入 App target（XcodeGen 中以目录引用的方式添加，保持与本目录同步）。
-2. 启动时调用：
+本目录是 SwiftPM 包 `LodyDesignSystem`（根目录 `Package.swift`）；图标和字体从包自己的 `Bundle.module` 加载。
+
+- LodyKit 在 `ios/packages/LodyKit/Package.swift` 中依赖 `../../../design-system`；`LodyApplication.launch` 调用 `LodyFonts.register()`。
+- 已接入：iPhone 首页与项目页的对话列表 `Sessions/ChatListView.swift`。iPad 侧边栏和其他页面仍为旧样式，逐步迁移。
+- 示例工程 `examples/ios/project.yml` 以同样方式引用本包。
 
 ```swift
-LodyFonts.register()
-LodyAppearance.apply()
+import LodyDesignSystem
+Text("…").lodyTextStyle(.body).foregroundStyle(LodyColor.textPrimary)
+LodyIcon.inbox.image.resizable().frame(width: LodyIconSize.md, height: LodyIconSize.md)
 ```
-
-3. 文本使用 `Text("…").lodyTextStyle(.body).foregroundStyle(LodyColor.textPrimary)`；图标使用 `LodyIcon.inbox.image.resizable().frame(width: LodyIconSize.md, height: LodyIconSize.md)`。
 
 ### Android（`android/`）
 
-1. `app/build.gradle.kts` 中把本目录接入源码与资源（路径相对于 `android/app`；AGP 9 下请确认 source set API）：
+`android/app/build.gradle.kts` 把 `generated/android`、`runtime/android` 加入源码目录，把 `fonts/` 加入资源目录；生成代码使用 `app.lody.android.R`（`namespace = "app.lody.android"`），包名 `app.lody.android.designsystem`。
 
-```kotlin
-val lodyDesignSystem = file("../../design-system")
-android {
-    sourceSets["main"].java.srcDirs(
-        lodyDesignSystem.resolve("generated/android"),
-        lodyDesignSystem.resolve("runtime/android"),
-    )
-    sourceSets["main"].res.srcDir(lodyDesignSystem.resolve("fonts"))
-}
-dependencies {
-    implementation(libs.compose.material3)   // 目前只有 debugImplementation
-    implementation(libs.compose.foundation)
-}
-```
-
-2. 生成代码使用 `app.lody.android.R`（`namespace = "app.lody.android"`），包名为 `app.lody.android.designsystem`；修改方式见 `scripts/lib/emit-kotlin.mjs` 顶部常量。
-3. 根部包一层 `LodyTheme { … }`；图标用 `Icon(LodyIcons.Inbox, null, Modifier.size(LodyIconSize.md), tint = LodyTheme.colors.iconSecondary)`。
+- 已接入：启动页 `home/HomeActivity`（登录 + 对话列表 `home/ChatListScreen`）。
+- 根部包一层 `LodyTheme { … }`；图标用 `Icon(LodyIcons.Inbox, null, Modifier.size(LodyIconSize.md), tint = LodyTheme.colors.iconSecondary)`。
 
 ## 已知限制 / 下一步
 
-- 当前环境没有 Xcode 与 Android SDK，生成的 Swift / Kotlin 尚未在两端编译过，首次接入时需要验证。
-- 尚未包含代码语法高亮配色：计划从桌面端 `--syntax-*` 派生。
-- 下一步：在两端各做一个组件 gallery 页面（`ListRow`、`SectionHeader`、`StatusIcon`、`Chip`、`Composer`、`EmptyState`），并用截图并排对比两端。
+- 两端接入代码尚未编译和运行验证，首次构建时需要检查。
+- iOS 只有 iPhone 对话列表使用设计系统；iPad 侧边栏、会话页等仍是旧样式，需要逐页迁移。
+- Android 当前阶段只读：对话列表不提供新建、行内菜单等写操作，点击会话暂无会话页。

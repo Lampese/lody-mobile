@@ -35,3 +35,11 @@
 - Only a matching catalog + synced event pair may persist. Stamp `RuntimeEmission.generation` at native receipt before buffering; never infer the origin generation at collection time. Revisions restart per generation.
 - Persist with a scope-owned conflated worker; disk latency must not backpressure cloud event delivery. Cancel and join the worker before clearing/switching its scope.
 - RuntimeLifecycle owns one process-lifetime network subscription. Network validation is a recovery hint for an unavailable read lease, not proof of cloud liveness; backgrounding never registers another callback or starts recovery work.
+
+## Home UI
+
+- `home/HomeActivity` is the launcher: sign-in (Device Flow) without an account, otherwise `home/ChatListScreen`. It reads `AccountController` / `CatalogRepository` state only and picks the first workspace when none is restored.
+- UI uses the shared mobile design system in `../design-system` (Gradle adds `generated/android`, `runtime/android` and `fonts` as source / res dirs): `LodyTheme`, semantic tokens, Inter, Lucide `LodyIcons`. Do not hard-code colors, sizes or fonts in screens. Reference design: `design-system/examples/android/.../SessionListScreen.kt`; iOS counterpart: LodyKit `ChatListView`.
+- `home/ChatListModel` mirrors iOS `InboxSections.projects`: pinned first, projects by name, unassigned chats last, archived hidden, 5 chats per group before "Show N more"; status strings map to running / waiting / failed attention. Keep it pure and covered by `ChatListModelTest`.
+- The list stays read-only in this phase: no new-chat button, row menus or writes until sends and Machine RPC exist.
+

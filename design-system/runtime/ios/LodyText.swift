@@ -92,7 +92,10 @@ private struct LodyTextStyleModifier: ViewModifier {
 public enum LodyFonts {
     private static let registration: Void = {
         for name in LodyFontFiles.all {
-            guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else {
+            // SwiftPM may keep or flatten the fonts/font directory when processing resources.
+            let url = Bundle.module.url(forResource: name, withExtension: "ttf")
+                ?? Bundle.module.url(forResource: name, withExtension: "ttf", subdirectory: "font")
+            guard let url else {
                 assertionFailure("Missing bundled font \(name).ttf")
                 continue
             }

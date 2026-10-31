@@ -334,8 +334,10 @@ private fun ChatRow(chat: SampleChat) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // The gutter under the group icon: empty unless the chat needs attention.
-            Box(Modifier.width(LodyLayout.childIndent - LodyLayout.screenPaddingX), contentAlignment = Alignment.Center) {
-                ChatAttention.of(chat)?.let { AttentionGlyph(it) }
+            Box(Modifier.width(LodyLayout.childIndent - LodyLayout.screenPaddingX), contentAlignment = Alignment.CenterStart) {
+                Box(Modifier.size(LodyIconSize.md), contentAlignment = Alignment.Center) {
+                    ChatAttention.of(chat)?.let { AttentionGlyph(it) }
+                }
             }
             Text(
                 chat.title,

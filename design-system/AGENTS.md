@@ -1,7 +1,9 @@
 # Mobile Design System
 
 Shared tokens, icons and fonts for the native iOS (`../ios`) and Android
-(`../android`) apps.
+(`../android`) apps. iOS consumes it as the SwiftPM package `LodyDesignSystem`
+(`Package.swift`, assets via `Bundle.module`); Android adds its generated/runtime
+sources and `fonts/` res dir in Gradle.
 Principles and integration steps: [README.md](README.md).
 
 ## Invariants

@@ -1,6 +1,7 @@
 // Content-layer building blocks. Each mirrors a composable in android/.../Components.kt
 // with the same tokens, so the two previews can be compared side by side.
 
+import LodyDesignSystem
 import SwiftUI
 
 struct Glyph: View {

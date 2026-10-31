@@ -25,6 +25,14 @@ android {
         }
     }
 
+    // Shared mobile design system (tokens, Lucide icons, Inter); see ../design-system/README.md.
+    val designSystem = rootDir.resolve("../design-system")
+    sourceSets["main"].java.srcDirs(
+        designSystem.resolve("generated/android"),
+        designSystem.resolve("runtime/android"),
+    )
+    sourceSets["main"].res.srcDir(designSystem.resolve("fonts"))
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -48,9 +56,9 @@ dependencies {
     androidTestImplementation(libs.test.core)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.runtime)
-    debugImplementation(libs.activity.compose)
-    debugImplementation(libs.compose.material3)
-    debugImplementation(libs.compose.foundation)
+    implementation(libs.activity.compose)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.foundation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.test.junit)

@@ -234,7 +234,9 @@ svg { width: 20px; height: 20px; display: block; flex: none; }
 .ghead { display: flex; align-items: center; gap: ${L('listRowGap')}px; min-height: ${S('listRow')}px; padding-left: ${L('screenPaddingX')}px; padding-right: 4px; }
 .ghead .act { width: 44px; height: 44px; display: grid; place-items: center; }
 .chat { display: flex; align-items: center; min-height: ${S('listRow')}px; padding-right: ${L('screenPaddingX')}px; }
-.chat .gutter { width: ${L('childIndent')}px; flex: none; display: grid; place-items: center; padding-left: ${L('screenPaddingX')}px; box-sizing: border-box; }
+.chat .gutter { width: ${L('childIndent')}px; flex: none; display: flex; align-items: center; padding-left: ${L('screenPaddingX')}px; box-sizing: border-box; }
+.chat .gutter > * { margin-left: calc((20px - 16px) / 2); }
+.chat .gutter > .dot { margin-left: calc((20px - ${S('dot')}px) / 2); }
 .chat.more { color: ${v('text.tertiary')}; }
 .sm svg { width: 16px; height: 16px; }
 .dot { width: ${S('dot')}px; height: ${S('dot')}px; border-radius: 99px; background: ${v('accent.default')}; display: block; }

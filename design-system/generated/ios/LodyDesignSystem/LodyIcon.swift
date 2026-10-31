@@ -40,6 +40,7 @@ public enum LodyIcon: String, CaseIterable, Sendable {
     case externalLink = "lody.icon.externalLink"
     case refresh = "lody.icon.refresh"
     case star = "lody.icon.star"
+    case pin = "lody.icon.pin"
     case bell = "lody.icon.bell"
     case eye = "lody.icon.eye"
     case lock = "lody.icon.lock"
@@ -65,6 +66,6 @@ public enum LodyIcon: String, CaseIterable, Sendable {
     case moon = "lody.icon.moon"
     case logOut = "lody.icon.logOut"
 
-    public var image: Image { Image(rawValue) }
-    public var uiImage: UIImage? { UIImage(named: rawValue) }
+    public var image: Image { Image(rawValue, bundle: .module) }
+    public var uiImage: UIImage? { UIImage(named: rawValue, in: .module, with: nil) }
 }

@@ -1,5 +1,6 @@
 // Keep in sync with android/.../SampleData.kt so both previews show the same screen.
 
+import LodyDesignSystem
 import SwiftUI
 
 enum SessionState: CaseIterable {

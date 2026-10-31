@@ -1,9 +1,10 @@
 import UIKit
 
 // Both layouts render the same catalog projection and keep one owner for actions.
+// iPhone uses `ChatListView` (the mobile design-system list); the iPad sidebar keeps `LodySidebar`.
 @MainActor
 final class SessionListView: UIView {
-  private let grouped = LodyGroupedList(frame: .zero)
+  private let grouped = ChatListView(frame: .zero)
   private let sidebar = LodySidebar(frame: .zero)
   var forwarded: ((String, [String: Any]) -> Void)?
   var selectedSessionId = "" { didSet { sidebar.setSelectedRowId(selectedSessionId) } }
@@ -29,9 +30,9 @@ final class SessionListView: UIView {
     render()
   }
   var sidebarScrollView: UIScrollView { sidebar.scrollView }
-  func setContentStyle(_ value: Bool) { grouped.setContentStyle(value) }
-  func setPreviewUserId(_ value: String) { grouped.setPreviewUserId(value); sidebar.previewUserId = value }
-  func setPreviewWorkspaceId(_ value: String) { grouped.setPreviewWorkspaceId(value); sidebar.previewWorkspaceId = value }
+  func setContentStyle(_ value: Bool) {}
+  func setPreviewUserId(_ value: String) { sidebar.previewUserId = value }
+  func setPreviewWorkspaceId(_ value: String) { sidebar.previewWorkspaceId = value }
   func setPlaceholder(_ value: String) { grouped.setPlaceholder(value); sidebar.setPlaceholder(value) }
   func setSections(_ value: [LodyListSection]) { sections = value; render() }
   private func render() {
