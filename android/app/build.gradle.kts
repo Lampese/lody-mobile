@@ -27,7 +27,7 @@ android {
 
     // Shared mobile design system (tokens, Lucide icons, Inter); see ../design-system/README.md.
     val designSystem = rootDir.resolve("../design-system")
-    sourceSets["main"].java.srcDirs(
+    sourceSets["main"].kotlin.srcDirs(
         designSystem.resolve("generated/android"),
         designSystem.resolve("runtime/android"),
     )

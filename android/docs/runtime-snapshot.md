@@ -14,3 +14,12 @@ The production lockfile remains pinned. Phase 1 reported Zod advisory **GHSA-mrh
 References: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5 and https://zod.dev/v4/changelog. Audit evidence is retained separately for each phase.
 
 Bridge protocol 2 adds an explicit command capability handshake, `$cancel`, native command deadlines, and ordered message chunks. It wraps the original JS runtime; it does not change the upstream cloud protocol. Fixtures use synthetic catalog data matching the vendored event shapes, not captured user data. The offline document exposes `ping`, `setActive`, and `probeSchema`. The network document additionally advertises `connect` and `grant`, used only by the native scoped runtime. No write capability is advertised.
+
+Android applies `src/catalog-budget.mjs` at bundle time to raise the three catalog
+input guards from 8 MiB to 16 MiB per replica. A real machine catalog with about
+9.2 MiB of bootstrap input exceeded the original limit and prevented workspace
+publication. The pinned source and its hashes remain unchanged; the adapter fails
+the build if the expected upstream guards change. Snapshot, bootstrap updates,
+and live updates share the bounded budget; the existing 100-page limit remains.
+The network adapter separately caps each response at 16 MiB. Synthetic watcher
+tests verify large-catalog publication and rejection beyond the new budget.

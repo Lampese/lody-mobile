@@ -1,4 +1,5 @@
 import { verifySnapshot } from './snapshot.mjs';
+import { adaptCatalogBudget } from './src/catalog-budget.mjs';
 await verifySnapshot();
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile, readdir, copyFile, rm } from 'node:fs/promises';
@@ -12,7 +13,9 @@ const prelude = preludeBuild.outputFiles[0].text;
 const documents={main:'DataRuntime.html',debug:'DebugRuntime.html',network:'NetworkRuntime.html'};
 for (const variant of Object.keys(documents)) {
   const result = await build({entryPoints:[path.join(root,`src/${variant}.mjs`)], bundle:true,format:'esm',platform:'browser',target:'chrome100',write:false,
-    plugins:[{name:'inline-loro-wasm',setup(b){b.onResolve({filter:/^loro-crdt$/},()=>b.resolve('loro-crdt/base64',{resolveDir:root,kind:'import-statement'}));}}]});
+    plugins:[{name:'android-catalog-budget',setup(b){
+      b.onLoad({filter:/vendor\/cloud-runtime\/src\/runtime\/index\.ts$/},async(args)=>({contents:adaptCatalogBudget(await readFile(args.path,'utf8')),loader:'ts'}));
+    }},{name:'inline-loro-wasm',setup(b){b.onResolve({filter:/^loro-crdt$/},()=>b.resolve('loro-crdt/base64',{resolveDir:root,kind:'import-statement'}));}}]});
   const dir=path.join(output,variant==='network'?'main':variant,'runtime');await mkdir(dir,{recursive:true});
   const script=result.outputFiles[0].text.replaceAll('</script','<\\/script');
   // Offline probe: no network access, external scripts, frames or persistent web storage.

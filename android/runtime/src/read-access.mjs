@@ -38,6 +38,13 @@ export function createReadAccess(fetch, emit=()=>{}) {
   try {
    const response=await fetch(request);
    if(response.status===401 || response.status===403)emit({type:'networkStatus',status:'authorization_required'});
+   // WebView may expose an empty stream for a null-body HTTP status.
+   // Re-wrapping it with a ReadableStream makes Response throw a TypeError.
+   if([204,205,304].includes(response.status)) {
+    requests.delete(controller);
+    await response.body?.cancel();
+    return new Response(null,{status:response.status,statusText:response.statusText,headers:response.headers});
+   }
    if(!response.body){requests.delete(controller);return response;}
    const reader=response.body.getReader();let bytes=0;
    const body=new ReadableStream({
