@@ -105,6 +105,7 @@ class CatalogRepository(private val account: AccountController, private val owne
        if (event.reason == "grant_endpoint_changed") mutable.value.workspace?.let { select(it) }
        else mutable.value = mutable.value.copy(phase = ConnectionPhase.UNAVAILABLE, failure = event.reason)
       }
+      is RuntimeEvent.SessionUpdated -> Unit
       RuntimeEvent.GrantRequested -> Unit
      }
     }

@@ -21,6 +21,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import app.lody.android.chat.ChatRepository
+import app.lody.android.chat.ChatScreen
+import app.lody.android.runtime.RuntimeScope
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +60,10 @@ class HomeActivity : ComponentActivity() {
                 val account by app.account.state.collectAsState()
                 val catalog by app.cloud.state.collectAsState()
                 val user = account.account
+                var selectedId by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf<String?>(null) }
+                var selectedTitle by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf("") }
+                val repository = remember { ChatRepository(app.runtimeOwner) }
+                val screens = rememberSaveableStateHolder()
                 // The repository restores the cached workspace; a first sign-in picks the first one.
                 LaunchedEffect(user, catalog.workspace) {
                     val first = user?.workspaces?.firstOrNull()
@@ -65,11 +77,18 @@ class HomeActivity : ComponentActivity() {
                         onCancel = { app.account.cancel() },
                     )
                 } else {
-                    ChatListScreen(
-                        state = uiState(account, catalog),
-                        onSelectWorkspace = { app.cloud.select(it) },
-                        onSignOut = { app.account.logout() },
-                    )
+                    val workspace = catalog.workspace
+                    val id = selectedId
+                    if (id != null && workspace != null) {
+                        ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, selectedTitle, onBack = { selectedId = null })
+                    } else screens.SaveableStateProvider("list/${user.id}/${workspace?.id}") {
+                        ChatListScreen(
+                            state = uiState(account, catalog),
+                            onSelectWorkspace = { app.cloud.select(it) },
+                            onSignOut = { app.account.logout() },
+                            onOpenChat = { selectedTitle = it.title; selectedId = it.id },
+                        )
+                    }
                 }
             }
         }

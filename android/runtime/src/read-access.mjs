@@ -14,7 +14,7 @@ export function createReadAccess(fetch, emit=()=>{}) {
   const parts=url.pathname.slice(config.prefix.length).split('/');
   if(parts.length>2 || (parts.length===2 && parts[1]!=='bootstrap')) return false;
   let stream;try{stream=decodeURIComponent(parts[0])}catch{return false}
-  return stream===config.workspace+':meta' || new RegExp('^'+config.workspace+':mf:[a-zA-Z0-9_-]{1,128}$').test(stream);
+  return stream===config.workspace+':meta' || new RegExp('^'+config.workspace+':(?:mf|s):[a-zA-Z0-9_-]{1,128}$').test(stream);
  }
  function setActive(value) {
   active=value;

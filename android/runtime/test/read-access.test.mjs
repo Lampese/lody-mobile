@@ -44,3 +44,10 @@ test('background aborts active response bodies and defers new requests until for
  access.setActive(true);await (await next).text();assert.equal(calls,2);
  await response.body.cancel();
 });
+
+test('workspace session reads are allowed while other workspaces and session writes are denied',async()=>{
+ const access=createReadAccess(async()=>new Response('session'));access.configure(config);
+ assert.equal(await (await access.fetch('https://streams.example.org/ds/lody/workspace%3As%3Asession-1/bootstrap')).text(),'session');
+ await assert.rejects(access.fetch('https://streams.example.org/ds/lody/other%3As%3Asession-1'),/network_denied/);
+ await assert.rejects(access.fetch('https://streams.example.org/ds/lody/workspace%3As%3Asession-1',{method:'POST',body:'write'}),/network_denied/);
+});

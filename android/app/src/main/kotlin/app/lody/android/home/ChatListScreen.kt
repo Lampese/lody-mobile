@@ -87,7 +87,7 @@ data class ChatListUiState(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatListScreen(state: ChatListUiState, onSelectWorkspace: (Workspace) -> Unit, onSignOut: () -> Unit) {
+fun ChatListScreen(state: ChatListUiState, onSelectWorkspace: (Workspace) -> Unit, onSignOut: () -> Unit, onOpenChat: (ChatItem) -> Unit) {
     val colors = LodyTheme.colors
     var collapsed by rememberSaveable { mutableStateOf(emptySet<String>()) }
     var showingAll by rememberSaveable { mutableStateOf(emptySet<String>()) }
@@ -140,7 +140,7 @@ fun ChatListScreen(state: ChatListUiState, onSelectWorkspace: (Workspace) -> Uni
                     }
                 }
                 if (!isCollapsed) {
-                    items(visible, key = { "${group.id}/${it.id}" }) { chat -> ChatRow(chat) }
+                    items(visible, key = { "${group.id}/${it.id}" }) { chat -> ChatRow(chat) { onOpenChat(chat) } }
                     val hidden = group.chats.size - visible.size
                     if (hidden > 0) {
                         item(key = "more-${group.id}") { ShowMoreRow(hidden) { showingAll = showingAll + group.id } }
@@ -314,11 +314,12 @@ private fun GroupHeaderRow(group: ChatGroup, collapsed: Boolean, modifier: Modif
 }
 
 @Composable
-private fun ChatRow(chat: ChatItem) {
+private fun ChatRow(chat: ChatItem, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LodySize.listRow)
+            .clickable(onClick = onClick)
             .padding(horizontal = LodyLayout.screenPaddingX),
         verticalAlignment = Alignment.CenterVertically,
     ) {

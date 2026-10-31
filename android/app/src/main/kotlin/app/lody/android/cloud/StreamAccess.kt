@@ -18,7 +18,7 @@ internal class StreamAccess(val workspaceId: String, gateway: String) {
         val uri = URI(url)
         val parts = uri.rawPath.split('/')
         val stream = if (parts.size >= 4) URLDecoder.decode(parts[3], "UTF-8") else ""
-        val scoped = stream == "$workspaceId:meta" || stream.matches(Regex("${Regex.escape(workspaceId)}:mf:[a-zA-Z0-9_-]{1,128}"))
+        val scoped = stream == "$workspaceId:meta" || stream.matches(Regex("${Regex.escape(workspaceId)}:(?:mf|s):[a-zA-Z0-9_-]{1,128}"))
         method in setOf("GET", "HEAD", "OPTIONS") && uri.scheme == "https" && "https://${uri.host}" == origin && uri.port == -1 && uri.userInfo == null && uri.fragment == null &&
             parts.size in 4..5 && parts[1] == "ds" && parts[2] == "lody" && (parts.size == 4 || parts[4] == "bootstrap") && scoped
     } catch (_: Exception) { false }

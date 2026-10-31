@@ -33,6 +33,14 @@ open class WebViewRuntime internal constructor(
         mutableState.value = backend.status
     }
     override suspend fun execute(command: RuntimeCommand): RuntimeResult = when (command) {
+        is RuntimeCommand.WatchSession -> {
+            call("watchSession", JSONArray().put(command.id), CommandDeadline.QUERY)
+            RuntimeResult.Accepted
+        }
+        is RuntimeCommand.CloseSession -> {
+            call("closeSession", JSONArray().put(command.id))
+            RuntimeResult.Accepted
+        }
         RuntimeCommand.Ping -> RuntimeResult.Pong(call("ping") as? Boolean ?: throw RuntimeException(runtimeFault("invalid_ping_reply")))
         RuntimeCommand.InspectSchema -> {
             val value = call("probeSchema", deadline = CommandDeadline.QUERY)

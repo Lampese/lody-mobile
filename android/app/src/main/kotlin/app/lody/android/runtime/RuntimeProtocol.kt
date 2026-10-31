@@ -13,6 +13,23 @@ internal object RuntimeProtocol {
         return result
     }
     fun event(message: JSONObject): RuntimeEvent? = when (message.getString("type")) {
+        "session" -> {
+            val envelope = JSONObject(message.getString("session"))
+            require(envelope.getInt("v") == 1)
+            val entries = envelope.getJSONArray("entries").objects().mapNotNull { entry ->
+                val role = entry.text("role")
+                if (role !in setOf("user", "assistant")) return@mapNotNull null
+                val text = entry.getJSONArray("items").objects().mapNotNull { item ->
+                    when (item.optString("type")) {
+                        "text" -> item.optString("text")
+                        "proposed_plan" -> item.optString("markdown").takeUnless { item.optString("status") == "cleared" }
+                        else -> null
+                    }
+                }.joinToString("\n\n")
+                if (text.isBlank()) null else SessionMessage(entry.text("id"), role, text, role == "assistant" && !entry.optBoolean("finished", true))
+            }
+            RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries))
+        }
         "catalog" -> {
             val catalog = JSONObject(message.get("catalog") as String)
             val projects = catalog.getJSONArray("projects").objects().map {

@@ -23,7 +23,7 @@
 
 - AccountController owns native credentials and serializes login/restore/cancel/logout. Public UI state contains no device_code or bearer token. Use the official registered lody-cli Device Flow client until the server provisions a dedicated Android client.
 - Keystore stores the AES-GCM key; only ciphertext goes to noBackupFilesDir. Invalidated keys or tampered ciphertext require fresh login. Never import desktop credentials or log tokens/server bodies.
-- Native HTTP uses fixed official endpoints, bounded bodies, cancellation and no redirects/cookies/logging. NetworkRuntime is a local bundled asset whose CSP permits only the validated grant origin. Fetch and native interception both restrict requests to the selected workspace's read-only catalog streams; reject redirects, remote scripts and writes.
+- Native HTTP uses fixed official endpoints, bounded bodies, cancellation and no redirects/cookies/logging. NetworkRuntime is a local bundled asset whose CSP permits only the validated grant origin. Fetch and native interception both restrict requests to the selected workspace's read-only catalog and session streams; reject redirects, remote scripts and writes.
 - The read probe starts the shared runtime without user identity or presence, avoiding implicit git-state Machine RPC. Network readiness and catalog synchronization are separate states; a WebView heartbeat never means cloud LIVE.
 - Keep one app module and manual construction while these boundaries remain small. JSON belongs in adapters; do not introduce a second Streams client in native code or a dependency-injection framework for this probe.
 
@@ -41,7 +41,7 @@
 - `home/HomeActivity` is the launcher: sign-in (Device Flow) without an account, otherwise `home/ChatListScreen`. It reads `AccountController` / `CatalogRepository` state only and picks the first workspace when none is restored.
 - UI uses the shared mobile design system in `../design-system` (Gradle adds `generated/android`, `runtime/android` and `fonts` as source / res dirs): `LodyTheme`, semantic tokens, Inter, Lucide `LodyIcons`. Do not hard-code colors, sizes or fonts in screens. Reference design: `design-system/examples/android/.../SessionListScreen.kt`; iOS counterpart: LodyKit `ChatListView`.
 - `home/ChatListModel` mirrors iOS `InboxSections.projects`: pinned first, projects by name, unassigned chats last, archived hidden, 5 chats per group before "Show N more"; status strings map to running / waiting / failed attention. Keep it pure and covered by `ChatListModelTest`.
-- The list stays read-only in this phase: no new-chat button, row menus or writes until sends and Machine RPC exist.
+- The list opens a read-only `chat/ChatScreen` through HomeActivity. `ChatRepository` borrows the existing RuntimeOwner lease, reopens after recovery, and closes its subscription on exit. Text and proposed-plan Markdown are projected from session events; tools and attachments are not rendered yet. No new-chat button, row menus or writes until sends and Machine RPC exist.
 
 
 ## Chat transcript (spike)

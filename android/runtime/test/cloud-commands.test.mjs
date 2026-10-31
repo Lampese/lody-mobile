@@ -10,3 +10,15 @@ test('read probe never enables presence or supplies identity for implicit Machin
  assert.throws(()=>commands.connect('other','https://streams.example.org'),/already_connected/);
  assert.equal(commands.sendTurn,undefined);
 });
+test('session subscription validates ids and closes only the matching selection',async()=>{
+ const calls=[];
+ const commands=cloudCommands({start(){},session:id=>{calls.push(id);return 'watching';}}, {configure(){}},()=>calls.push('stop'));
+ assert.throws(()=>commands.watchSession('s'),/not_connected/);
+ commands.connect('workspace','https://streams.example.org');
+ assert.throws(()=>commands.watchSession('../other'),/invalid_session/);
+ await commands.watchSession('s1');await commands.watchSession('s2');
+ commands.closeSession('s1');
+ assert.deepEqual(calls,['stop','s1','stop','s2']);
+ commands.closeSession('s2');assert.equal(calls.at(-1),'stop');
+ assert.equal(commands.sendTurn,undefined);
+});

@@ -29,4 +29,10 @@
     <string name="sign_in_code_hint">Confirm this code in your browser. It expires in %1$d minutes.</string>
     <string name="sign_in_open">Open authorization page</string>
     <string name="sign_in_cancel">Cancel</string>
+    <string name="chat_back">Back</string>
+    <string name="chat_loading">Loading messages…</string>
+    <string name="chat_empty">No text messages yet</string>
+    <string name="chat_offline">Messages unavailable</string>
+    <string name="chat_retry">Retry</string>
+    <string name="chat_read_only">Read only</string>
 </resources>

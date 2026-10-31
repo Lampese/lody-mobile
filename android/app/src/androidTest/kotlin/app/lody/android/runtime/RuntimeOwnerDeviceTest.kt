@@ -45,6 +45,14 @@ class RuntimeOwnerDeviceTest {
         runtime.call("event", JSONArray().put(JSONObject().put("type", "catalog").put("revision", 7).put("catalog", catalog)))
         assertEquals(RuntimeEvent.CatalogUpdated(CatalogSnapshot(7, emptyList(), emptyList(), listOf("machine-fixture"))), event.await().event)
     }
+    @Test fun sessionProjectionCrossesTheActualWebViewBridge() = runtimeTest { runtime ->
+        val event = CoroutineScope(currentCoroutineContext()).async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(5000) { runtime.events.first { it.event is RuntimeEvent.SessionUpdated } }
+        }
+        val body = """{"v":1,"status":"live","entries":[{"id":"u","role":"user","finished":true,"items":[{"type":"text","text":"中文 😀"}]}]}"""
+        runtime.call("event", JSONArray().put(JSONObject().put("type","session").put("sessionId","s").put("session",body)))
+        assertEquals(RuntimeEvent.SessionUpdated(SessionSnapshot("s","live",listOf(SessionMessage("u","user","中文 😀",false)))), event.await().event)
+    }
     @Test fun saturatedQueriesCannotStarveTheHeartbeat() = runtimeTest { runtime ->
         val generation = runtime.state.value.generation
         val results = List(32) { CoroutineScope(currentCoroutineContext()).async {
