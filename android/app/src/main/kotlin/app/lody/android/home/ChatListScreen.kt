@@ -16,6 +16,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.background
+import app.lody.android.designsystem.LodyRadius
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,8 +47,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -325,8 +328,8 @@ private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Un
 }
 
 /**
- * Chats are grouped by time (by project / by status come later). The menu is a multi-select of what
- * the second row line shows; toggles keep the menu open so several can change at once.
+ * The view menu: scope (my / team tasks) and grouping (time / project / status) as segmented
+ * controls, then a multi-select of what the second row line shows.
  */
 @Composable
 private fun ViewMenu(
@@ -340,48 +343,88 @@ private fun ViewMenu(
     val colors = LodyTheme.colors
     var open by remember { mutableStateOf(false) }
     val label = stringResource(R.string.home_view)
+    val shape = RoundedCornerShape(LodyRadius.lg)
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.semantics { contentDescription = label }) {
             Glyph(LodyIcons.Filter, colors.iconPrimary)
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bgOverlay) {
+        // Every choice applies in place and the menu stays open, so the list behind it updates
+        // live; tapping outside closes it.
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = shape,
+            containerColor = colors.bgOverlay,
+            tonalElevation = 0.dp,
+            // Material elevation casts roughly twice its value as blur; match the md shadow.
+            shadowElevation = LodyElevations.md.blur / 2,
+            border = BorderStroke(0.5.dp, colors.borderSubtle),
+            modifier = Modifier.width(MenuWidth),
+        ) {
             MenuHeading(stringResource(R.string.home_view_scope))
-            HomeScope.entries.forEach { option ->
-                val chosen = option == scope
-                DropdownMenuItem(
-                    text = { Text(stringResource(option.label), style = LodyTheme.typography.body, color = colors.textPrimary) },
-                    trailingIcon = { if (chosen) Glyph(LodyIcons.Check, colors.accentFg, LodyIconSize.sm) },
-                    onClick = { open = false; onSelectScope(option) },
-                    modifier = Modifier.semantics { this.selected = chosen },
-                )
-            }
-            HorizontalDivider(color = colors.borderSubtle)
+            Segmented(HomeScope.entries, scope, { stringResource(it.label) }, onSelectScope)
             MenuHeading(stringResource(R.string.home_view_grouping))
-            HomeGrouping.entries.forEach { option ->
-                val chosen = option == grouping
-                DropdownMenuItem(
-                    text = { Text(stringResource(option.label), style = LodyTheme.typography.body, color = colors.textPrimary) },
-                    trailingIcon = { if (chosen) Glyph(LodyIcons.Check, colors.accentFg, LodyIconSize.sm) },
-                    onClick = { open = false; onSelectGrouping(option) },
-                    modifier = Modifier.semantics { this.selected = chosen },
-                )
-            }
-            HorizontalDivider(color = colors.borderSubtle)
+            Segmented(HomeGrouping.entries, grouping, { stringResource(it.label) }, onSelectGrouping)
+            HorizontalDivider(Modifier.padding(top = LodySpacing.md), thickness = 0.5.dp, color = colors.borderSubtle)
             MenuHeading(stringResource(R.string.home_view_details))
             ChatRowDetail.entries.forEach { detail ->
                 val checked = detail in details
-                DropdownMenuItem(
-                    text = { Text(stringResource(detail.label), style = LodyTheme.typography.body, color = colors.textPrimary) },
-                    leadingIcon = { Glyph(detail.icon, colors.iconSecondary, LodyIconSize.sm) },
-                    trailingIcon = {
-                        Checkbox(
-                            checked = checked,
-                            onCheckedChange = null,
-                            colors = CheckboxDefaults.colors(checkedColor = colors.accentDefault, uncheckedColor = colors.iconTertiary, checkmarkColor = colors.textOnAccent),
-                        )
-                    },
-                    onClick = { onToggle(detail) },
-                    modifier = Modifier.semantics { this.selected = checked },
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = LodySize.controlLg)
+                        .toggleable(value = checked, role = Role.Checkbox) { onToggle(detail) }
+                        .padding(horizontal = LodySpacing.lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+                ) {
+                    Glyph(detail.icon, colors.iconSecondary, LodyIconSize.sm)
+                    Text(stringResource(detail.label), style = LodyTheme.typography.body, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    Glyph(LodyIcons.Check, if (checked) colors.accentFg else Color.Transparent, LodyIconSize.sm)
+                }
+            }
+            Spacer(Modifier.height(LodySpacing.xs))
+        }
+    }
+}
+
+private val MenuWidth = 280.dp
+
+/**
+ * A single choice as a segmented control (the iOS one's shape on design tokens): a sunken
+ * track with the chosen segment raised on the overlay colour.
+ */
+@Composable
+private fun <T> Segmented(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
+    val colors = LodyTheme.colors
+    val track = RoundedCornerShape(LodyRadius.md)
+    val thumb = RoundedCornerShape(LodyRadius.sm)
+    Row(
+        modifier = Modifier
+            .padding(horizontal = LodySpacing.lg)
+            .fillMaxWidth()
+            .height(LodySize.controlMd)
+            .background(colors.fillSecondary, track)
+            .padding(LodySpacing.xxs)
+            .selectableGroup(),
+    ) {
+        options.forEach { option ->
+            val chosen = option == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .then(if (chosen) Modifier.dropShadow(thumb, LodyElevations.sm.shadow()).background(colors.bgOverlay, thumb) else Modifier)
+                    .clip(thumb)
+                    .selectable(selected = chosen, role = Role.RadioButton) { onSelect(option) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label(option),
+                    style = LodyTheme.typography.label,
+                    color = if (chosen) colors.textPrimary else colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -394,7 +437,9 @@ private fun MenuHeading(text: String) {
         text,
         style = LodyTheme.typography.footnote,
         color = LodyTheme.colors.textTertiary,
-        modifier = Modifier.semantics { heading() }.padding(horizontal = LodySpacing.lg, vertical = LodySpacing.sm),
+        modifier = Modifier
+            .semantics { heading() }
+            .padding(start = LodySpacing.lg, end = LodySpacing.lg, top = LodySpacing.md, bottom = LodySpacing.xs),
     )
 }
 
