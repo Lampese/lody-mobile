@@ -40,14 +40,17 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
 
   static let height = LodySize.controlLg + LodySpacing.sm
 
-  private let bar = UITabBar()
+  private let bar = HomeSystemTabBar()
   private let create = UIButton(type: .system)
+  private var createCenter: NSLayoutConstraint!
+  private var createSize: NSLayoutConstraint!
   private let actions: Actions
   private weak var page: UIViewController?
   private weak var content: UIViewController?
 
   /// - Parameters:
-  ///   - page: the hosting `LodyPageController`; the bar is pinned to its safe area.
+  ///   - page: the hosting `LodyPageController`; the bar is pinned to its bottom edge, as a
+  ///     system tab bar is, and lays its capsule out above the home indicator itself.
   ///   - content: the page's content; its bottom safe area grows so lists scroll clear of the bar.
   init(page: UIViewController, content: UIViewController, selected: HomeTab, actions: Actions) {
     self.page = page
@@ -82,15 +85,19 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
       page.view.addSubview(view)
     }
     let guide = page.view.safeAreaLayoutGuide
+    // The bar's frame is taller than its glass capsule (it reaches the screen edge), so the
+    // button follows the capsule the bar reports after layout rather than the bar's frame.
+    createCenter = create.centerYAnchor.constraint(equalTo: bar.topAnchor, constant: Self.height / 2)
+    createSize = create.heightAnchor.constraint(equalToConstant: Self.height)
     NSLayoutConstraint.activate([
       bar.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: LodyLayout.screenPaddingX),
       bar.trailingAnchor.constraint(equalTo: create.leadingAnchor, constant: -LodySpacing.md),
-      bar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -LodySpacing.xs),
+      bar.bottomAnchor.constraint(equalTo: page.view.bottomAnchor),
       create.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -LodyLayout.screenPaddingX),
-      create.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-      create.widthAnchor.constraint(equalToConstant: Self.height),
-      create.heightAnchor.constraint(equalToConstant: Self.height),
+      create.widthAnchor.constraint(equalTo: create.heightAnchor),
+      createCenter, createSize,
     ])
+    bar.capsuleChanged = { [weak self] capsule in self?.follow(capsule) }
     page.registerForTraitChanges([UITraitHorizontalSizeClass.self]) { [weak self] (_: UIViewController, _: UITraitCollection) in
       self?.updateVisibility()
     }
@@ -110,12 +117,42 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     if index == settings { actions.openDebug() }
   }
 
+  /// Centres and sizes the new-chat circle on the tab capsule, and keeps lists clear of it.
+  private func follow(_ capsule: CGRect) {
+    if createCenter.constant != capsule.midY { createCenter.constant = capsule.midY }
+    if createSize.constant != capsule.height { createSize.constant = capsule.height }
+    updateVisibility()
+  }
+
   private func updateVisibility() {
     guard let page else { return }
     let shown = page.traitCollection.horizontalSizeClass != .regular
     bar.isHidden = !shown
     create.isHidden = !shown
-    let height = max(Self.height, bar.sizeThatFits(page.view.bounds.size).height)
-    content?.additionalSafeAreaInsets.bottom = shown ? height + LodySpacing.xs : 0
+    // The content's bottom safe area already covers the home indicator; add what the capsule
+    // rises above it, plus a gap.
+    let covered = bar.capsule.map { bar.bounds.height - $0.minY - page.view.safeAreaInsets.bottom } ?? Self.height
+    let inset = shown ? max(0, covered) + LodySpacing.xs : 0
+    if content?.additionalSafeAreaInsets.bottom != inset { content?.additionalSafeAreaInsets.bottom = inset }
+  }
+}
+
+/// Reports where iOS 26 draws the tab bar's glass capsule: its frame spans to the screen edge,
+/// while the capsule is the widest visible subview inside it.
+private final class HomeSystemTabBar: UITabBar {
+  var capsuleChanged: ((CGRect) -> Void)?
+  private(set) var capsule: CGRect?
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    let candidates = subviews.filter { view in
+      !view.isHidden && view.alpha > 0 && view.frame.height > 0 && view.frame.height < bounds.height && view.frame.width > bounds.width / 2
+    }
+    // Without a recognisable capsule, fall back to the bar's area above the home indicator.
+    let next = candidates.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }?.frame
+      ?? CGRect(x: 0, y: 0, width: bounds.width, height: max(0, bounds.height - safeAreaInsets.bottom))
+    guard next != capsule else { return }
+    capsule = next
+    capsuleChanged?(next)
   }
 }
