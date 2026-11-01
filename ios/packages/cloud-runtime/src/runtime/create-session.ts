@@ -100,8 +100,15 @@ export function creationOptions(
         const cliType = String(value.cliType);
         const agentType = String(value.agentType);
         if (!agentType || !cliType) continue;
-        const key = `${machineId}:${cliType}:${agentType}`;
-        // The same agent can publish more than one capability row; the most
+        // Rows are keyed by agent config (`['acpCapability', configId]`, web's
+        // `machineFlockKeys.acpCapability`): two ACP providers of one agent type
+        // offer different models, so never merge them by type. Legacy rows
+        // without a config id still fall back to the type key.
+        const configId = typeof row.key[1] === 'string' ? row.key[1] : '';
+        const key = configId
+          ? `${machineId}:config:${configId}`
+          : `${machineId}:${cliType}:${agentType}`;
+        // The same config can publish more than one capability row; the most
         // recently fetched one describes what the machine will actually accept.
         const fetchedAt = Number(value.fetchedAt) || 0;
         if ((capabilities.get(key)?.fetchedAt ?? -1) >= fetchedAt) continue;
@@ -148,6 +155,7 @@ export function creationOptions(
         );
         capabilities.set(key, {
           machineId,
+          ...(configId ? { agentConfigId: configId } : {}),
           cliType,
           agentType,
           models: modelOption?.options ?? choices(value.models, 'modelId'),

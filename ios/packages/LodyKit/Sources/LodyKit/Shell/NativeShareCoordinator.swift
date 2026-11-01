@@ -100,10 +100,10 @@ final class NativeShareCoordinator {
         let options = try await CreateSessionService.live.options(draft.workspaceId, draft.projectId)
         available = options.agents.contains { $0.id == draft.agent.id && $0.machineId == draft.agent.machineId }
         if let model = draft.choice.modelId, !model.isEmpty {
-          available = available && options.capabilities.contains { capability in
-            capability.machineId == draft.agent.machineId && capability.cliType == draft.agent.cliType
-              && capability.agentType == draft.agent.agentType && capability.models.contains { $0.id == model }
-          }
+          let capability = CreateLogic.capability(
+            in: options.capabilities, machineId: draft.agent.machineId, configId: draft.agent.id,
+            cliType: draft.agent.cliType, agentType: draft.agent.agentType)
+          available = available && capability?.models.contains { $0.id == model } == true
         }
       } catch {
         // An unavailable network does not invalidate a cached selection: the ordinary outbox owns its failure and draft restoration.

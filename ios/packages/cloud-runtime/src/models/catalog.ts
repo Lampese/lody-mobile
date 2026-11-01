@@ -21,6 +21,8 @@ export type Session = {
   pinned: boolean;
   /** The Lody user who owns the session (session meta `userId`). */
   userId?: string;
+  /** The agent config (ACP provider) the session runs; picks its model capability. */
+  agentConfigId?: string;
   projectId: string;
   createdAt: string;
   latestUserMsgId?: string;

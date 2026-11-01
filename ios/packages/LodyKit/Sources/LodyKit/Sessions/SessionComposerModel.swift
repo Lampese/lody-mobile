@@ -65,7 +65,7 @@ final class SessionComposerModel {
   }
 
   func load(workspaceId: String, projectId: String?, session: SessionItem) {
-    let key = [workspaceId, projectId ?? "", session.machineId, session.cliType, session.agentType].joined(separator: "\n")
+    let key = [workspaceId, projectId ?? "", session.machineId, session.agentConfigId ?? "", session.cliType, session.agentType].joined(separator: "\n")
     guard key != capabilityKey else { return }
     capabilityKey = key
     capabilityTask?.cancel()
@@ -77,8 +77,10 @@ final class SessionComposerModel {
     capabilityTask = Task { [weak self] in
       let options = try? await service.options(workspaceId, projectId)
       guard let self, !Task.isCancelled, self.capabilityKey == key else { return }
-      self.capability = options?.capabilities.first {
-        $0.machineId == session.machineId && $0.cliType == session.cliType && $0.agentType == session.agentType
+      self.capability = options.flatMap {
+        CreateLogic.capability(
+          in: $0.capabilities, machineId: session.machineId, configId: session.agentConfigId,
+          cliType: session.cliType, agentType: session.agentType)
       }
       self.changed?()
     }

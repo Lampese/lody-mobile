@@ -44,6 +44,8 @@ export const ConfigOption = z
 export const Capability = z
   .object({
     machineId: z.string(),
+    /** The agent config (ACP provider) this was probed for; capabilities are per config, as web. */
+    agentConfigId: z.string().optional(),
     cliType: z.string(),
     agentType: z.string(),
     models: z.array(CapabilityChoice),

@@ -360,6 +360,7 @@ extension RuntimeContract {
 
   public struct Capability: Codable, Sendable, Equatable {
     public var machineId: String
+    public var agentConfigId: String?
     public var cliType: String
     public var agentType: String
     public var models: [CapabilityChoice]
@@ -369,8 +370,9 @@ extension RuntimeContract {
     public var reasoningEffortConfigId: String?
     public var configOptions: [ConfigOption]?
     public var steer: Bool
-    public init(machineId: String, cliType: String, agentType: String, models: [CapabilityChoice], modes: [CapabilityChoice], legacyModes: [CapabilityChoice]? = nil, reasoningEfforts: [String: [String]], reasoningEffortConfigId: String? = nil, configOptions: [ConfigOption]? = nil, steer: Bool) {
+    public init(machineId: String, agentConfigId: String? = nil, cliType: String, agentType: String, models: [CapabilityChoice], modes: [CapabilityChoice], legacyModes: [CapabilityChoice]? = nil, reasoningEfforts: [String: [String]], reasoningEffortConfigId: String? = nil, configOptions: [ConfigOption]? = nil, steer: Bool) {
       self.machineId = machineId
+      self.agentConfigId = agentConfigId
       self.cliType = cliType
       self.agentType = agentType
       self.models = models
@@ -384,6 +386,7 @@ extension RuntimeContract {
     public init(from decoder: any Decoder) throws {
       let c = try decoder.container(keyedBy: Key.self)
       self.machineId = try c.decode(String.self, forKey: Key("machineId"))
+      self.agentConfigId = try c.decodeIfPresent(String.self, forKey: Key("agentConfigId"))
       self.cliType = try c.decode(String.self, forKey: Key("cliType"))
       self.agentType = try c.decode(String.self, forKey: Key("agentType"))
       self.models = try c.decode([CapabilityChoice].self, forKey: Key("models"))
@@ -397,6 +400,7 @@ extension RuntimeContract {
     public func encode(to encoder: any Encoder) throws {
       var c = encoder.container(keyedBy: Key.self)
       try c.encode(self.machineId, forKey: Key("machineId"))
+      try c.encodeIfPresent(self.agentConfigId, forKey: Key("agentConfigId"))
       try c.encode(self.cliType, forKey: Key("cliType"))
       try c.encode(self.agentType, forKey: Key("agentType"))
       try c.encode(self.models, forKey: Key("models"))

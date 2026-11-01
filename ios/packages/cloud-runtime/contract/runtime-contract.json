@@ -455,6 +455,7 @@
       "type": "object",
       "properties": {
         "machineId": { "type": "string" },
+        "agentConfigId": { "type": "string" },
         "cliType": { "type": "string" },
         "agentType": { "type": "string" },
         "models": { "type": "array", "items": { "$ref": "CapabilityChoice" } },

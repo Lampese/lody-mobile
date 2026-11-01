@@ -15,6 +15,8 @@ struct SessionItem: Equatable, Sendable {
   var pinned = false
   /// The owning Lody user; nil from runtimes older than the field.
   var userId: String?
+  /// The agent config (ACP provider) the session runs; picks its model capability.
+  var agentConfigId: String?
   var projectId = ""
   var createdAt = ""
   var openedBySessionId: String?
@@ -48,7 +50,7 @@ extension SessionItem: Decodable {
   private enum CodingKeys: String, CodingKey {
     case id, title, status, archived, pinned, projectId, createdAt, openedBySessionId, openedByRootSessionId
     case parentSessionId, lastMessageAt, lastReadAt, awaitingUserSince, branchName, lastModel, diff, machineId
-    case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId, userId
+    case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId, userId, agentConfigId
   }
 
   private struct Model: Decodable {
@@ -71,6 +73,7 @@ extension SessionItem: Decodable {
     archived = value(.archived) ?? false
     pinned = value(.pinned) ?? false
     userId = present(value(.userId))
+    agentConfigId = present(value(.agentConfigId))
     projectId = value(.projectId) ?? ""
     createdAt = value(.createdAt) ?? ""
     openedBySessionId = present(value(.openedBySessionId))

@@ -96,6 +96,9 @@ public struct ConfigOption: Codable, Equatable, Sendable {
 
 public struct Capability: Codable, Equatable, Sendable {
   public var machineId: String
+  /// The agent config (ACP provider) this was probed for. Capabilities are per config, as web:
+  /// two providers of one agent type offer different models. Nil from older runtimes.
+  public var agentConfigId: String?
   public var cliType: String
   public var agentType: String
   public var models: [CapabilityChoice] = []
@@ -106,8 +109,9 @@ public struct Capability: Codable, Equatable, Sendable {
   public var configOptions: [ConfigOption]?
   public var steer: Bool?
 
-  public init(machineId: String, cliType: String, agentType: String, models: [CapabilityChoice] = [], modes: [CapabilityChoice] = [], legacyModes: [CapabilityChoice]? = nil, reasoningEfforts: [String: [String]] = [:], reasoningEffortConfigId: String? = nil, configOptions: [ConfigOption]? = nil, steer: Bool? = nil) {
+  public init(machineId: String, agentConfigId: String? = nil, cliType: String, agentType: String, models: [CapabilityChoice] = [], modes: [CapabilityChoice] = [], legacyModes: [CapabilityChoice]? = nil, reasoningEfforts: [String: [String]] = [:], reasoningEffortConfigId: String? = nil, configOptions: [ConfigOption]? = nil, steer: Bool? = nil) {
     self.machineId = machineId
+    self.agentConfigId = agentConfigId
     self.cliType = cliType
     self.agentType = agentType
     self.models = models

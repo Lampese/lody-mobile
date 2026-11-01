@@ -33,8 +33,20 @@ public enum CreateLogic {
 
   public static func capabilityFor(_ options: CreationOptions?, _ agent: CreationAgent?) -> Capability? {
     guard let options, let agent else { return nil }
-    return options.capabilities.first {
-      $0.machineId == agent.machineId && $0.cliType == agent.cliType && $0.agentType == agent.agentType
+    return capability(in: options.capabilities, machineId: agent.machineId, configId: agent.id, cliType: agent.cliType, agentType: agent.agentType)
+  }
+
+  /// The capability probed for this agent config (ACP provider); runtimes that predate per-config
+  /// capabilities only key them by agent type, so fall back to that.
+  public static func capability(
+    in capabilities: [Capability], machineId: String, configId: String?, cliType: String, agentType: String
+  ) -> Capability? {
+    if let configId, !configId.isEmpty,
+      let exact = capabilities.first(where: { $0.machineId == machineId && $0.agentConfigId == configId }) {
+      return exact
+    }
+    return capabilities.first {
+      $0.machineId == machineId && $0.agentConfigId == nil && $0.cliType == cliType && $0.agentType == agentType
     }
   }
 

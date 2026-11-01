@@ -172,6 +172,7 @@ export function projectRows(
       archived: value.isArchived === true,
       pinned: value.isPinned === true,
       userId: text(value.userId) || undefined,
+      agentConfigId: text(value.agentConfigId) || undefined,
       projectId,
       createdAt: text(value.createdAt),
       latestUserMsgId: text(value.latestUserMsgId) || undefined,
