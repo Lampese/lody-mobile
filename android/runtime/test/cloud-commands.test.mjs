@@ -22,3 +22,8 @@ test('session subscription validates ids and closes only the matching selection'
  commands.closeSession('s2');assert.equal(calls.at(-1),'stop');
  assert.equal(commands.sendTurn,undefined);
 });
+test('native verified identity enables presence and rejects malformed identities',()=>{
+ const calls=[];const c=cloudCommands({start:(...args)=>calls.push(args)}, {configure(){}});
+ assert.throws(()=>c.connect('workspace','https://streams.example.org',{}),/invalid_identity/);
+ c.connect('workspace','https://streams.example.org','user');assert.deepEqual(calls,[['workspace','user',true]]);
+});

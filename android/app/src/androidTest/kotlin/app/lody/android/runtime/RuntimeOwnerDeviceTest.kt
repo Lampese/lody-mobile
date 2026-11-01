@@ -24,6 +24,16 @@ class RuntimeOwnerDeviceTest {
         val runtime = withContext(Dispatchers.Main) { WebViewRuntime(scope, WebViewCloudRuntime(instrumentation.targetContext, "DebugRuntime.html")) }
         try { runtime.start(); ready(runtime); block(runtime) } finally { runtime.stop() }
     }
+    @Test fun creationUsesTypedCommandsAcrossTheWebViewBridge() = runtimeTest { runtime ->
+        val options = (runtime.execute(RuntimeCommand.GetCreationOptions(null)) as RuntimeResult.Options).value
+        assertEquals("fixture-agent", options.agents.single().id)
+        val request = CreateRequest(java.util.UUID.randomUUID().toString(), java.util.UUID.randomUUID().toString(), null, "fixture-machine", "fixture-agent", "中文 😀", null, false, null, null, null)
+        val receipt = (runtime.execute(RuntimeCommand.CreateAndSend(request)) as RuntimeResult.Created).value
+        assertEquals(request.sessionId, receipt.sessionId)
+        assertEquals("accepted", receipt.state)
+        try { runtime.execute(RuntimeCommand.CreateAndSend(request)); fail("Creation must not replay") }
+        catch (_: RuntimeException) { }
+    }
     @Test fun cancellationReleasesPendingCapacityAndDoesNotStopRuntime() = runtimeTest { runtime ->
         val calls = List(30) { CoroutineScope(currentCoroutineContext()).launch { runtime.call("delay", JSONArray().put(20_000), CommandDeadline.QUERY) } }
         delay(250)

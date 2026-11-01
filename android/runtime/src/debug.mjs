@@ -1,4 +1,5 @@
 import '../vendor/cloud-runtime/src/runtime/index.ts';
+import {createCommands} from './create-commands.mjs';
 import { createDispatcher, HOST_PROTOCOL, CORE_CAPABILITIES } from './dispatch.mjs';
 import { Flock } from '@loro-dev/flock-wasm/base64';
 import { LoroDoc } from 'loro-crdt';
@@ -47,7 +48,12 @@ async function compatibility() {
   });
   return checks;
 }
+const creationFixture=createCommands({
+ creationOptions:()=>({agents:[{id:'fixture-agent',name:'Fixture assistant',machineId:'fixture-machine',cliType:'builtin',agentType:'codex'}],capabilities:[]}),
+ createSession:async()=>({state:'created'}),ensureSession:async()=>true,
+},async args=>({state:args.text==='中文 😀'?'accepted':'not_sent'}),()=>({workspaceId:'fixture',userId:'fixture-user'}));
 globalThis.androidDispatch = createDispatcher(globalThis.dataRuntime, emit, {
+  ...creationFixture,
   compatibility,
   echo: value => value,
   delay: (ms, signal) => new Promise((resolve,reject)=>{const timer=setTimeout(()=>resolve(true),Math.min(ms,20000));signal.addEventListener('abort',()=>{clearTimeout(timer);reject(Error('cancelled'));},{once:true});}),
@@ -57,4 +63,4 @@ globalThis.androidDispatch = createDispatcher(globalThis.dataRuntime, emit, {
   // Verifies the native navigation boundary without network credentials.
   navigate: () => { location.href='https://example.invalid/escape'; return true; },
 });
-emit({type:'hostReady', protocol:HOST_PROTOCOL, capabilities:[...CORE_CAPABILITIES,"compatibility","echo","delay","large","event","stall","navigate"]});
+emit({type:'hostReady', protocol:HOST_PROTOCOL, capabilities:[...CORE_CAPABILITIES,"creationOptions","createAndSend","compatibility","echo","delay","large","event","stall","navigate"]});

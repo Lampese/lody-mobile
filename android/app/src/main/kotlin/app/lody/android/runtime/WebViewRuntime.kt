@@ -33,6 +33,11 @@ open class WebViewRuntime internal constructor(
         mutableState.value = backend.status
     }
     override suspend fun execute(command: RuntimeCommand): RuntimeResult = when (command) {
+        is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
+        is RuntimeCommand.CreateAndSend -> {
+            val value = call("createAndSend", JSONArray().put(CreationJson.request(command.request)), CommandDeadline.WRITE) as JSONObject
+            RuntimeResult.Created(CreationReceipt(value.getString("sessionId"), value.getString("state")))
+        }
         is RuntimeCommand.WatchSession -> {
             call("watchSession", JSONArray().put(command.id), CommandDeadline.QUERY)
             RuntimeResult.Accepted

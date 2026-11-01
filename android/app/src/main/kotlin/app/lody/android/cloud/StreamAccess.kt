@@ -18,8 +18,19 @@ internal class StreamAccess(val workspaceId: String, gateway: String) {
         val uri = URI(url)
         val parts = uri.rawPath.split('/')
         val stream = if (parts.size >= 4) URLDecoder.decode(parts[3], "UTF-8") else ""
-        val scoped = stream == "$workspaceId:meta" || stream.matches(Regex("${Regex.escape(workspaceId)}:(?:mf|s):[a-zA-Z0-9_-]{1,128}"))
-        method in setOf("GET", "HEAD", "OPTIONS") && uri.scheme == "https" && "https://${uri.host}" == origin && uri.port == -1 && uri.userInfo == null && uri.fragment == null &&
-            parts.size in 4..5 && parts[1] == "ds" && parts[2] == "lody" && (parts.size == 4 || parts[4] == "bootstrap") && scoped
+        val read = method in setOf("GET", "HEAD", "OPTIONS")
+        val id = "[a-zA-Z0-9_-]{1,128}"
+        val workspace = Regex.escape(workspaceId)
+        val permitted = when {
+            stream == "$workspaceId:meta" -> read || method == "POST"
+            stream.matches(Regex("$workspace:mf:$id")) -> read
+            stream.matches(Regex("$workspace:s:$id")) -> read || method in setOf("PUT", "POST")
+            stream.matches(Regex("$workspace:rpc:req:$id")) -> method in setOf("POST", "OPTIONS")
+            stream.matches(Regex("$workspace:rpc:res:$id:$id")) -> read || method == "PUT"
+            else -> false
+        }
+        permitted && uri.scheme == "https" && "https://${uri.host}" == origin && uri.port == -1 && uri.userInfo == null && uri.fragment == null &&
+            parts.size in 4..5 && parts[1] == "ds" && parts[2] == "lody" && (parts.size == 4 || (parts[4] == "bootstrap" && read))
+
     } catch (_: Exception) { false }
 }

@@ -18,12 +18,16 @@ data class RuntimeScope(val accountId: String, val workspaceId: String) {
     init { require(accountId.isNotBlank() && workspaceId.isNotBlank()); require(accountId.length <= 128 && workspaceId.length <= 128) }
 }
 sealed interface RuntimeCommand {
+    data class GetCreationOptions(val projectId: String?) : RuntimeCommand
+    data class CreateAndSend(val request: CreateRequest) : RuntimeCommand
     data class WatchSession(val id: String) : RuntimeCommand
     data class CloseSession(val id: String) : RuntimeCommand
     data object Ping : RuntimeCommand
     data object InspectSchema : RuntimeCommand
 }
 sealed interface RuntimeResult {
+    data class Options(val value: CreationOptions) : RuntimeResult
+    data class Created(val value: CreationReceipt) : RuntimeResult
     data object Accepted : RuntimeResult
     data class Pong(val healthy: Boolean) : RuntimeResult
     data class Schema(val machineIds: Set<String>, val creationTrials: Map<String, String>) : RuntimeResult

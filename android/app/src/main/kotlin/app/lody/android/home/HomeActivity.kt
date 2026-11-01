@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import app.lody.android.chat.ChatRepository
 import app.lody.android.chat.ChatScreen
+import app.lody.android.create.CreateSessionRepository
 import app.lody.android.create.CreateSessionScreen
 import androidx.activity.compose.BackHandler
 import app.lody.android.runtime.RuntimeScope
@@ -66,6 +67,7 @@ class HomeActivity : ComponentActivity() {
                 var selectedTitle by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf("") }
                 var creating by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf(false) }
                 val repository = remember { ChatRepository(app.runtimeOwner) }
+                val creator = remember { CreateSessionRepository(app.runtimeOwner) }
                 val screens = rememberSaveableStateHolder()
                 // The repository restores the cached workspace; a first sign-in picks the first one.
                 LaunchedEffect(user, catalog.workspace) {
@@ -84,10 +86,10 @@ class HomeActivity : ComponentActivity() {
                     val id = selectedId
                     if (id != null && workspace != null) {
                         ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, selectedTitle, onBack = { selectedId = null })
-                    } else if (creating) {
+                    } else if (creating && workspace != null) {
                         // Like web, new session is its own full screen over Home; back returns.
                         BackHandler { creating = false }
-                        CreateSessionScreen(catalog.snapshot, onBack = { creating = false })
+                        CreateSessionScreen(catalog.snapshot, creator, RuntimeScope(user.id, workspace.id), onCreated = { sessionId, title -> selectedId = sessionId; selectedTitle = title; creating = false }, onBack = { creating = false })
                     } else screens.SaveableStateProvider("list/${user.id}/${workspace?.id}") {
                         ChatListScreen(
                             state = uiState(account, catalog),

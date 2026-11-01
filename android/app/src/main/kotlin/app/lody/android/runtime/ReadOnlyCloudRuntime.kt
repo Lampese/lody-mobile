@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.*
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Owns read startup and grant refresh for exactly one scope and backend generation. */
+/** Owns cloud startup and grant refresh for exactly one scope and backend generation. */
 internal class ReadOnlyCloudRuntime(
     context: Context,
     override val scope: RuntimeScope,
@@ -59,7 +59,7 @@ internal class ReadOnlyCloudRuntime(
                     val payload = JSONObject().put("token", grant.token).put("gatewayBaseUrl", access.origin).put("expiresIn", grant.remainingSeconds().also { if (it <= 0) throw RuntimeException(RuntimeFault("grant_expired", RuntimeErrorCategory.AUTH)) })
                     runtime.call("grant", JSONArray().put(payload))
                     if (connectedGeneration != generation) {
-                        runtime.call("connect", JSONArray().put(scope.workspaceId).put(access.origin))
+                        runtime.call("connect", JSONArray().put(scope.workspaceId).put(access.origin).put(scope.accountId))
                         connectedGeneration = generation
                     }
                     return@launch

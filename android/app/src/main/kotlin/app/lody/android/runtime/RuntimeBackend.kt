@@ -36,4 +36,4 @@ internal fun runtimeFault(code: String): RuntimeFault {
     }
     return RuntimeFault(code, category)
 }
-internal enum class CommandDeadline(val milliseconds: Long) { CONTROL(5_000), QUERY(30_000), DIAGNOSTIC(15_000) }
+internal enum class CommandDeadline(val milliseconds: Long) { WRITE(120_000), CONTROL(5_000), QUERY(30_000), DIAGNOSTIC(15_000) }

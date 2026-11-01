@@ -13,7 +13,7 @@ The production lockfile remains pinned. Phase 1 reported Zod advisory **GHSA-mrh
 
 References: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5 and https://zod.dev/v4/changelog. Audit evidence is retained separately for each phase.
 
-Bridge protocol 2 adds an explicit command capability handshake, `$cancel`, native command deadlines, and ordered message chunks. It wraps the original JS runtime; it does not change the upstream cloud protocol. Fixtures use synthetic catalog data matching the vendored event shapes, not captured user data. The offline document exposes `ping`, `setActive`, and `probeSchema`. The network document additionally advertises `connect`, `grant`, `watchSession`, and `closeSession`, used through the native scoped runtime. Session reads reuse the upstream Loro projection and emit typed text messages to Compose. Both network gates allow only same-workspace catalog/session GETs (plus HEAD and native CORS preflight); returning to the list stops the session subscription. No write capability is advertised.
+Bridge protocol 2 adds an explicit command capability handshake, `$cancel`, native command deadlines, and ordered message chunks. It wraps the original JS runtime; it does not change the upstream cloud protocol. Fixtures use synthetic catalog data matching the vendored event shapes, not captured user data. The offline document exposes `ping`, `setActive`, and `probeSchema`. The network document additionally advertises `connect`, `grant`, `watchSession`, `closeSession`, `creationOptions`, and `createAndSend`, used through the native scoped runtime. Session reads reuse the upstream Loro projection and emit typed text messages to Compose. Both network gates restrict reads and the creation/dispatch writes described below to the current workspace; returning to the list stops the session subscription.
 
 Android also applies `src/catalog-owner.mjs` at bundle time: it adds the session owner
 (`userId`, from session meta) to the catalog projection, the same line upstream
@@ -28,3 +28,7 @@ the build if the expected upstream guards change. Snapshot, bootstrap updates,
 and live updates share the bounded budget; the existing 100-page limit remains.
 The network adapter separately caps each response at 16 MiB. Synthetic watcher
 tests verify large-catalog publication and rejection beyond the new budget.
+
+## Android text creation
+
+`create-commands.mjs` exposes creation options and create-and-send using native scope identity. Presence is read through the grant origin; the UI only offers currently online agents. The adapter calls upstream creation, session bootstrap and text send in order, retaining IDs and never retrying writes. It deliberately uses plain text (no shortcut, attachment or mention expansion). `creation-adapter.mjs` adds the current public `useWorktree` project field at bundle time, without modifying the provenance-tracked snapshot. Native and JavaScript network gates permit only the exact workspace stream kinds needed for persistence and dispatch. An accepted Machine RPC is not task completion. GitHub branches are entered by name in this first integration.

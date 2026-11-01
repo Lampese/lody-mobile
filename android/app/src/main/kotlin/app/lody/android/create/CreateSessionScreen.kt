@@ -1,4 +1,4 @@
-// New session, full screen like web; iOS counterpart: CreateSessionController + CreateSessionContext.
+// New session using the existing scoped cloud runtime.
 //
 // Follows web's mobile new-chat page (`mobile-new-chat-sheet.tsx`, `mobile-inline-picker.tsx`,
 // `mobile-run-config-sheet.tsx`), checked by driving its Storybook stories: computer and project
@@ -7,10 +7,18 @@
 // GitHub projects; then the composer card (+, @, the run-config chip, send). The assistant lives
 // in the run-config chip's sheet, not on the page.
 //
-// Android is still read-only: assistants, models and branches need Machine RPC / GitHub reads,
-// and sending needs writes, so those say they are not available yet instead of pretending.
+// Text creation and dispatch use the same workspace lease as the catalog.
 
 package app.lody.android.create
+
+import app.lody.android.runtime.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import java.util.UUID
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -85,7 +93,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateSessionScreen(snapshot: CatalogSnapshot?, onBack: () -> Unit) {
+fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService, runtimeScope: RuntimeScope, onCreated: (String, String) -> Unit, onBack: () -> Unit) {
     val colors = LodyTheme.colors
     val catalog = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
     var target by remember(catalog.revision == 0L) { mutableStateOf(CreateSessionModel.initial(catalog)) }
@@ -93,8 +101,55 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, onBack: () -> Unit) {
     var runConfig by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val unavailable = stringResource(R.string.home_new_chat_unavailable)
+    val unavailable = stringResource(R.string.create_extras_unavailable)
     val notice = { scope.launch { snackbar.showSnackbar(unavailable) }; Unit }
+    var options by remember { mutableStateOf<CreationOptions?>(null) }
+    var agentId by rememberSaveable { mutableStateOf<String?>(null) }
+    var modelId by rememberSaveable { mutableStateOf<String?>(null) }
+    var modeId by rememberSaveable { mutableStateOf<String?>(null) }
+    var effort by rememberSaveable { mutableStateOf<String?>(null) }
+    var branch by rememberSaveable { mutableStateOf("") }
+    val sessionId = rememberSaveable { UUID.randomUUID().toString() }
+    val turnId = rememberSaveable { UUID.randomUUID().toString() }
+    var attempted by rememberSaveable { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var outcome by rememberSaveable { mutableStateOf<String?>(null) }
+    val agents = options?.agents.orEmpty().filter { it.machineId == target.machineId }
+    val agent = agents.firstOrNull { it.id == agentId } ?: agents.firstOrNull()
+    val capability = options?.capability(agent)
+    val github = CreateSessionModel.isGithub(target.projectId) && !target.chat
+    val canSend = agent != null && !attempted && !busy && (!github || branch.isNotBlank())
+    val waitingText = stringResource(if (options == null) R.string.create_waiting_agents else R.string.create_no_online_agents)
+    val unknownText = stringResource(R.string.create_result_unknown)
+    val rejectedText = stringResource(R.string.create_result_rejected)
+    LaunchedEffect(runtimeScope, target.projectId, target.chat, target.machineId) {
+        options = null; agentId = null; modelId = null; modeId = null; effort = null; branch = ""
+        while (true) {
+            try { options = repository.options(runtimeScope, target.projectId.takeUnless { target.chat }) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { options = null }
+            delay(5000)
+        }
+    }
+    BackHandler(enabled = busy) { }
+    val send = {
+        val chosen = agent
+        if (canSend && !attempted && !busy && prompt.isNotBlank()) {
+            attempted = true; busy = true
+            val request = CreateRequest(sessionId, turnId, target.projectId.takeUnless { target.chat }, chosen.machineId, chosen.id, prompt, branch.takeIf { github }, target.worktree, modelId, modeId, effort)
+            scope.launch {
+                try {
+                    val receipt = repository.create(runtimeScope, request)
+                    if (receipt.state == "accepted" || receipt.state == "queued") onCreated(receipt.sessionId, prompt.take(200))
+                    else outcome = if (receipt.state == "rejected") rejectedText else unknownText
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { outcome = unknownText }
+                finally { busy = false }
+            }
+        }
+        Unit
+    }
+
 
     Scaffold(
         containerColor = colors.bgBase,
@@ -104,7 +159,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, onBack: () -> Unit) {
                 title = { Text(stringResource(R.string.create_title), style = LodyTheme.typography.headline, color = colors.textPrimary) },
                 navigationIcon = {
                     val back = stringResource(R.string.chat_back)
-                    IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = back }) {
+                    IconButton(onClick = onBack, enabled = !busy, modifier = Modifier.semantics { contentDescription = back }) {
                         Icon(LodyIcons.Back, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
                     }
                 },
@@ -129,15 +184,27 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, onBack: () -> Unit) {
                         .padding(horizontal = LodyLayout.screenPaddingX),
                     verticalArrangement = Arrangement.spacedBy(LodySpacing.sm),
                 ) {
-                    ContextPanel(catalog, target, onChange = { target = it })
+                    ContextPanel(catalog, target, onChange = { if (!attempted) target = it })
+                    if (github) OutlinedTextField(value = branch, onValueChange = { branch = it }, enabled = !attempted, label = { Text(stringResource(R.string.create_branch_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    if (agent == null && !attempted) Text(waitingText, style = LodyTheme.typography.footnote, color = colors.textSecondary)
+                    if (attempted) {
+                        Text(if (busy) stringResource(R.string.create_sending) else outcome ?: unknownText, style = LodyTheme.typography.footnote, color = colors.textSecondary)
+                        if (!busy && outcome != rejectedText) TextButton(onClick = { onCreated(sessionId, prompt.take(200)) }) { Text(stringResource(R.string.create_open_result)) }
+                    }
                 }
             }
-            Composer(prompt, onPromptChange = { prompt = it }, onAttach = notice, onMention = notice, onRunConfig = { runConfig = true }, onSend = notice)
+            Composer(prompt, onPromptChange = { if (!attempted && it.length <= 32000) prompt = it }, onAttach = notice, onMention = notice, onRunConfig = { if (!attempted) runConfig = true }, onSend = send, enabled = canSend, configLabel = listOfNotNull(agent?.name, modelId, effort, modeId).joinToString(" · ").ifBlank { waitingText })
         }
     }
     if (runConfig) {
         ModalBottomSheet(onDismissRequest = { runConfig = false }, containerColor = colors.bgBase) {
-            RunConfigSheet()
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LodyLayout.screenPaddingX)) {
+                Text(stringResource(R.string.create_run_config), style = LodyTheme.typography.headline)
+                ConfigChoices(stringResource(R.string.create_agent), agents.map { CreationChoice(it.id, it.name) }, agent?.id) { agentId = it; modelId = null; modeId = null; effort = null }
+                ConfigChoices(stringResource(R.string.create_model), capability?.models.orEmpty(), modelId) { modelId = it; effort = null }
+                ConfigChoices(stringResource(R.string.create_effort), capability?.efforts?.get(modelId).orEmpty().map { CreationChoice(it, it) }, effort) { effort = it }
+                ConfigChoices(stringResource(R.string.create_mode), capability?.modes.orEmpty(), modeId) { modeId = it }
+            }
         }
     }
 }
@@ -194,25 +261,8 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChang
     )
 
     val local = !target.chat && project != null && !CreateSessionModel.isGithub(project.id)
-    val github = !target.chat && CreateSessionModel.isGithub(target.projectId)
-    if (local || github) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
-            if (local) WorktreeChip(target.worktree) { onChange(target.copy(worktree = it)) }
-            // Branches come from GitHub / local git reads Android does not make yet.
-            if (github) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
-                    Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
-                    Text(stringResource(R.string.create_branch_unavailable), style = LodyTheme.typography.body, color = colors.textTertiary)
-                }
-            }
-        }
-    }
-    Text(
-        stringResource(R.string.create_readonly_note),
-        style = LodyTheme.typography.footnote,
-        color = colors.textTertiary,
-        modifier = Modifier.padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
-    )
+    if (local) WorktreeChip(target.worktree) { onChange(target.copy(worktree = it)) }
+
 }
 
 private const val MACHINE = "machine"
@@ -397,18 +447,15 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
-/** Web's run-config sheet; assistants and models need Machine RPC, so it explains that for now. */
 @Composable
-private fun RunConfigSheet() {
-    val colors = LodyTheme.colors
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.md),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(LodySpacing.md),
-    ) {
-        Text(stringResource(R.string.create_run_config), style = LodyTheme.typography.headline, color = colors.textPrimary)
-        Text(stringResource(R.string.create_agent_unavailable), style = LodyTheme.typography.body, color = colors.textSecondary)
-        Spacer(Modifier.heightIn(min = LodySpacing.xl))
+private fun ConfigChoices(label: String, choices: List<CreationChoice>, selected: String?, onSelect: (String) -> Unit) {
+    if (choices.isEmpty()) return
+    Text(label, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textSecondary)
+    choices.forEach { choice ->
+        TextButton(onClick = { onSelect(choice.id) }, modifier = Modifier.fillMaxWidth()) {
+            Text(choice.name, modifier = Modifier.weight(1f), color = LodyTheme.colors.textPrimary)
+            if (choice.id == selected) Icon(LodyIcons.Check, contentDescription = null, tint = LodyTheme.colors.accentFg)
+        }
     }
 }
 
@@ -421,6 +468,8 @@ private fun Composer(
     onMention: () -> Unit,
     onRunConfig: () -> Unit,
     onSend: () -> Unit,
+    enabled: Boolean,
+    configLabel: String,
 ) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
@@ -456,8 +505,7 @@ private fun Composer(
         Row(verticalAlignment = Alignment.CenterVertically) {
             ComposerButton(LodyIcons.Plus, stringResource(R.string.create_attach), onAttach)
             ComposerButton(LodyIcons.AtSign, stringResource(R.string.create_mention), onMention)
-            // The run-config chip: assistant mark + model · reasoning · mode on web; Android has
-            // no assistant data yet, so it reads as unavailable and opens the explaining sheet.
+            // The run-config chip reflects the selected assistant and capability choices.
             Row(
                 Modifier
                     .weight(1f, fill = false)
@@ -469,10 +517,10 @@ private fun Composer(
                 horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
             ) {
                 Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                Text(stringResource(R.string.create_run_config_unavailable), style = type.subhead, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(configLabel, style = type.subhead, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.weight(1f))
-            val ready = prompt.isNotBlank()
+            val ready = enabled && prompt.isNotBlank()
             val send = stringResource(R.string.create_send)
             Box(
                 Modifier

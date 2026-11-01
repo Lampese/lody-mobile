@@ -1,12 +1,13 @@
 export function cloudCommands(runtime, access, stopSessions) {
  let connected=false, selected;
  return {
-  connect(workspaceId,gatewayBaseUrl) {
+  connect(workspaceId,gatewayBaseUrl,userId) {
    if(connected)throw Error('already_connected');
+   if(userId!==undefined && (typeof userId!=='string' || !userId.trim() || userId.length>128))throw Error('invalid_identity');
    access.configure({workspaceId,gatewayBaseUrl});
    connected=true;
-   // Empty user identity suppresses implicit git-state Machine RPC; no presence connection.
-   runtime.start(workspaceId,undefined,false);
+   // The verified native identity enables presence for creation; offline probes omit it.
+   runtime.start(workspaceId,userId,Boolean(userId));
    return true;
   },
   watchSession(id) {

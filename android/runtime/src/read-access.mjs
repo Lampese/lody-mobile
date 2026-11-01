@@ -10,11 +10,17 @@ export function createReadAccess(fetch, emit=()=>{}) {
  }
  function allowed(request) {
   const url=new URL(request.url);
-  if(!config || !['GET','HEAD'].includes(request.method) || url.origin!==config.origin || url.username || url.password || url.hash || !url.pathname.startsWith(config.prefix)) return false;
+  if(!config || !['GET','HEAD','POST','PUT'].includes(request.method) || url.origin!==config.origin || url.username || url.password || url.hash || !url.pathname.startsWith(config.prefix)) return false;
   const parts=url.pathname.slice(config.prefix.length).split('/');
   if(parts.length>2 || (parts.length===2 && parts[1]!=='bootstrap')) return false;
   let stream;try{stream=decodeURIComponent(parts[0])}catch{return false}
-  return stream===config.workspace+':meta' || new RegExp('^'+config.workspace+':(?:mf|s):[a-zA-Z0-9_-]{1,128}$').test(stream);
+  const read=['GET','HEAD'].includes(request.method);
+  if(parts.length===2 && !read)return false;
+  if(stream===config.workspace+':meta')return read || request.method==='POST';
+  if(new RegExp('^'+config.workspace+':mf:[a-zA-Z0-9_-]{1,128}$').test(stream))return read;
+  if(new RegExp('^'+config.workspace+':s:[a-zA-Z0-9_-]{1,128}$').test(stream))return true;
+  if(new RegExp('^'+config.workspace+':rpc:req:[a-zA-Z0-9_-]{1,128}$').test(stream))return request.method==='POST';
+  return new RegExp('^'+config.workspace+':rpc:res:[a-zA-Z0-9_-]{1,128}:[a-zA-Z0-9_-]{1,128}$').test(stream) && (read || request.method==='PUT');
  }
  function setActive(value) {
   active=value;
@@ -24,6 +30,7 @@ export function createReadAccess(fetch, emit=()=>{}) {
  async function guardedFetch(input, init) {
   const original=new Request(input,init);
   if(!allowed(original)) throw Error('network_denied');
+  if(!active && !['GET','HEAD'].includes(original.method))throw Error('inactive_write');
   if(!active) await new Promise((resolve,reject)=>{
    const cleanup=()=>{waiters.delete(wake);original.signal.removeEventListener('abort',abort)};
    const wake=()=>{cleanup();resolve()};const abort=()=>{cleanup();reject(Error('cancelled'))};
