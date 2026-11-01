@@ -131,14 +131,9 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     if index == settings { actions.openDebug() }
   }
 
-  /// Centres and sizes the new-chat circle on the tab capsule, and keeps lists clear of it. The
-  /// capsule is inset inside the bar's frame, so the bar is shifted by that inset: the capsule's
-  /// outer edge then sits `screenPaddingX` from the screen, mirroring the button's.
+  /// Follow vertical geometry only. UIKit centres a width-capped capsule inside the bar;
+  /// feeding its horizontal insets back into the bar constraints creates a layout loop.
   private func follow(_ capsule: CGRect) {
-    let leading = LodyLayout.screenPaddingX - capsule.minX
-    let trailing = -LodySpacing.md + (bar.bounds.width - capsule.maxX)
-    if barLeading.constant != leading { barLeading.constant = leading }
-    if barTrailing.constant != trailing { barTrailing.constant = trailing }
     if createCenter.constant != capsule.midY { createCenter.constant = capsule.midY }
     if createSize.constant != capsule.height { createSize.constant = capsule.height }
     updateVisibility()
