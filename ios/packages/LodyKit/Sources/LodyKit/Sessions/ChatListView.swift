@@ -378,7 +378,9 @@ private struct ChatRowContent: View {
   private var project: String { details.contains(.project) ? row.place : "" }
   private var branch: String { details.contains(.branch) ? row.branch : "" }
   private var pullRequest: PullRequestMark? { details.contains(.pullRequest) ? PullRequestMark(row.prStatus) : nil }
-  private var hasDetailLine: Bool { !project.isEmpty || !branch.isEmpty || pullRequest != nil }
+  /// The detail line needs a project or branch; a PR mark alone stays on the title line, before the age.
+  private var hasDetailLine: Bool { !project.isEmpty || !branch.isEmpty }
+  private var inlinePullRequest: PullRequestMark? { snippet != nil || !hasDetailLine ? pullRequest : nil }
 
   /// Search results keep their match snippet in place of the detail line.
   private var snippet: String? {
@@ -386,12 +388,12 @@ private struct ChatRowContent: View {
   }
 
   var body: some View {
-    HStack(alignment: .top, spacing: 0) {
-      // The status slot under the group icon, one title line tall so the mark centres on it.
+    HStack(alignment: .center, spacing: 0) {
+      // The status slot under the group icon, centred on the whole row.
       ZStack {
         if let attention = Attention(tint: row.imageTint, unread: row.unread) { AttentionGlyph(attention: attention) }
       }
-      .frame(width: LodyIconSize.md, height: LodyTextStyle.body.lineHeight)
+      .frame(width: LodyIconSize.md, height: LodyIconSize.md)
       .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (row.parentId.isEmpty ? 0 : LodySpacing.lg), alignment: .leading)
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
@@ -400,12 +402,18 @@ private struct ChatRowContent: View {
             .foregroundStyle(LodyColor.textPrimary)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
-          if !row.value.isEmpty {
-            Text(row.value)
-              .lodyTextStyle(.footnote)
-              .foregroundStyle(LodyColor.textTertiary)
-              .monospacedDigit()
-              .fixedSize()
+          // The text inside sets the stack's baseline, so the PR mark centres on the age.
+          if inlinePullRequest != nil || !row.value.isEmpty {
+            HStack(spacing: LodySpacing.xs) {
+              inlinePullRequest?.glyph
+              if !row.value.isEmpty {
+                Text(row.value)
+                  .lodyTextStyle(.footnote)
+                  .foregroundStyle(LodyColor.textTertiary)
+                  .monospacedDigit()
+              }
+            }
+            .fixedSize()
           }
         }
         if let snippet {
@@ -438,10 +446,9 @@ private struct ChatRowContent: View {
         Text(branch).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textTertiary).lineLimit(1).truncationMode(.middle)
       }
       Spacer(minLength: LodySpacing.sm)
-      if let pullRequest {
-        Glyph(icon: pullRequest.icon, size: LodyIconSize.sm, color: pullRequest.color)
-      }
+      pullRequest?.glyph
     }
+    .frame(maxWidth: .infinity)
   }
 }
 
@@ -450,6 +457,9 @@ private struct PullRequestMark {
   let icon: LodyIcon
   let color: Color
   let label: String
+
+  /// Always the trailing mark of the line that carries it.
+  var glyph: some View { Glyph(icon: icon, size: LodyIconSize.sm, color: color).fixedSize() }
 
   init?(_ status: String) {
     switch status {

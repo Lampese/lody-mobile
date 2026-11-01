@@ -67,7 +67,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.Role
@@ -521,8 +520,8 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
     val place = chat.place.takeIf { ChatRowDetail.Project in details && it.isNotEmpty() }
     val branch = chat.branch.takeIf { ChatRowDetail.Branch in details && it.isNotEmpty() }
     val pr = chat.prStatus.takeIf { ChatRowDetail.PullRequest in details && it in PrStatuses }
-    val twoLine = place != null || branch != null || pr != null
-    val titleLine = with(LocalDensity.current) { type.body.lineHeight.toDp() }
+    // A PR mark alone stays on the title line, before the age; it is always the trailing mark of its line.
+    val twoLine = place != null || branch != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -530,10 +529,10 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
             .clickable(onClick = onClick)
             .padding(end = LodyLayout.screenPaddingX)
             .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
-        verticalAlignment = if (twoLine) Alignment.Top else Alignment.CenterVertically,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The status slot spans the gutter and centres on the title line; empty when idle.
-        Box(Modifier.width(LodyLayout.childIndent).height(titleLine), contentAlignment = Alignment.Center) {
+        // The status slot spans the gutter and centres on the whole row; empty when idle.
+        Box(Modifier.width(LodyLayout.childIndent), contentAlignment = Alignment.Center) {
             chat.attention?.let { AttentionGlyph(it) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
@@ -546,6 +545,7 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                if (pr != null && !twoLine) PullRequestMark(pr, Modifier.padding(start = LodySpacing.sm))
                 chat.activityAt?.let { at ->
                     Text(
                         ageText(at, now),
@@ -553,22 +553,24 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
                         color = colors.textTertiary,
                         maxLines = 1,
                         textAlign = TextAlign.End,
-                        modifier = Modifier.padding(start = LodySpacing.sm),
+                        modifier = Modifier.padding(start = if (pr != null && !twoLine) LodySpacing.xs else LodySpacing.sm),
                     )
                 }
             }
             if (twoLine) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
-                    if (place != null) {
-                        Glyph(if (chat.placeIsRepo) LodyIcons.Github else LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
-                        Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Project and branch share the leading space so the PR mark stays pinned trailing.
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                        if (place != null) {
+                            Glyph(if (chat.placeIsRepo) LodyIcons.Github else LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
+                            Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        }
+                        if (branch != null) {
+                            Glyph(LodyIcons.Branch, colors.iconTertiary, LodyIconSize.sm, Modifier.padding(start = if (place != null) LodySpacing.xs else 0.dp))
+                            Text(branch, style = type.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
+                        }
                     }
-                    if (branch != null) {
-                        Glyph(LodyIcons.Branch, colors.iconTertiary, LodyIconSize.sm, Modifier.padding(start = if (place != null) LodySpacing.xs else 0.dp))
-                        Text(branch, style = type.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if (pr != null) PullRequestMark(pr)
+                    if (pr != null) PullRequestMark(pr, Modifier.padding(start = LodySpacing.sm))
                 }
             }
         }
@@ -579,7 +581,7 @@ private val PrStatuses = setOf("open", "merged", "closed", "draft")
 
 /** Web `SessionPrIcon`: open, merged, closed and draft each have their own Lucide mark and colour. */
 @Composable
-private fun PullRequestMark(status: String) {
+private fun PullRequestMark(status: String, modifier: Modifier = Modifier) {
     val colors = LodyTheme.colors
     val (icon, tint, label) = when (status) {
         "merged" -> Triple(LodyIcons.Merge, colors.prMerged, R.string.home_pr_merged)
@@ -588,7 +590,7 @@ private fun PullRequestMark(status: String) {
         else -> Triple(LodyIcons.PullRequest, colors.prOpen, R.string.home_pr_open)
     }
     val description = stringResource(label)
-    Glyph(icon, tint, LodyIconSize.sm, Modifier.semantics { contentDescription = description })
+    Glyph(icon, tint, LodyIconSize.sm, modifier.semantics { contentDescription = description })
 }
 
 /** Wall clock for row ages, refreshed each minute while the list is on screen. */
