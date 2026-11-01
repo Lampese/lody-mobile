@@ -42,6 +42,11 @@ enum SessionNavigation {
       params.initialText = draft?["text"] as? String
       params.initialAttachmentsJSON = draft?["attachmentsJSON"] as? String
       params.relay = true
+      let regular = HomeController.current?.traitCollection.horizontalSizeClass == .regular
+      // iPhone: like web, new session is its own full screen, pushed over Home (back returns).
+      // The form brings its own navigation bar for its pickers, so the shell page hides its own.
+      // Shared content keeps the sheet it is handed off in.
+      params.pushed = !regular && fields["sheet"] as? Bool != true
       let content = CreateSessionHostController(params: params)
       content.onCreated = { created in
         guard source.state.key == state.key else { throw OutboxError.scopeExpired }
@@ -50,7 +55,10 @@ enum SessionNavigation {
         let choice = ModelChoice(modelId: created["modelId"] as? String, effort: created["effort"] as? String, modeId: created["modeId"] as? String)
         open(session["id"] as! String, choice: choice, source: source)
       }
-      let regular = HomeController.current?.traitCollection.horizontalSizeClass == .regular
+      if params.pushed == true,
+        let page = LodyShell.shared.pushRootNative(content, title: String(localized: "create.title", bundle: .lody), headerShown: false) {
+        return page
+      }
       if !regular, let label = fields["zoomSourceLabel"] as? String { LodySheetZoom.prepare(sourceLabel: label) }
       return LodyShell.shared.presentNative(content, title: String(localized: "create.title", bundle: .lody),
         detents: regular ? [1] : [0.62, 1], grabber: !regular, headerShown: false)

@@ -12,6 +12,8 @@ struct CreateSessionHostParams: Decodable {
   var initialAttachmentsJSON: String?
   var sendHandoff: Bool?
   var relay: Bool?
+  /// Pushed full screen (iPhone Home) rather than presented: the form leads with a back button.
+  var pushed: Bool?
 
   init() {}
 
@@ -27,10 +29,11 @@ struct CreateSessionHostParams: Decodable {
     initialAttachmentsJSON = try values.decodeIfPresent(String.self, forKey: .initialAttachmentsJSON)
     sendHandoff = try values.decodeIfPresent(Bool.self, forKey: .sendHandoff)
     relay = try values.decodeIfPresent(Bool.self, forKey: .relay)
+    pushed = try values.decodeIfPresent(Bool.self, forKey: .pushed)
   }
 
   private enum CodingKeys: String, CodingKey {
-    case userId, workspaceId, projects, machineNames, projectId, context, initialText, initialAttachmentsJSON, sendHandoff, relay
+    case userId, workspaceId, projects, machineNames, projectId, context, initialText, initialAttachmentsJSON, sendHandoff, relay, pushed
   }
 }
 
@@ -53,6 +56,7 @@ class CreateSessionHostController: UIViewController {
     self.service = service
     controller = CreateSessionController(composer: input.composer, host: input)
     navigation = UINavigationController(rootViewController: controller)
+    controller.pushed = params.pushed == true
     super.init(nibName: nil, bundle: nil)
     title = String(localized: "create.title", bundle: .lody)
   }

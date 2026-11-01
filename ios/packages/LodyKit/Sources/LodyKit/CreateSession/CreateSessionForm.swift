@@ -12,11 +12,15 @@ struct CreateSessionPage: Equatable {
   var branches: CreateBranches?
   var branchesLoading = false
   var branchesFailed = false
+  /// Local projects only: start the session in a new git worktree (web's workdir mode). GitHub
+  /// sessions always run in a worktree.
+  var worktree = false
   var loading = true
   var failed = false
 
   var target: String { chat ? CreateLogic.chatTarget : projectId }
   var github: Bool { !chat && projectId.hasPrefix("github:") }
+  var local: Bool { !chat && !projectId.isEmpty && !github }
 
   // Local projects expose only their owning machine; GitHub projects and chats
   // can choose among the machines returned by the runtime.
@@ -59,6 +63,8 @@ struct CreateSessionDraft: Codable, Equatable {
   var agent: CreationAgent
   var choice: ModelChoice
   var reasoningEffortConfigId: String?
+  /// Local project in a new git worktree; nil keeps drafts saved before the field decodable.
+  var useWorktree: Bool?
 }
 
 struct CreateSessionForm {
@@ -204,7 +210,8 @@ struct CreateSessionForm {
       branch: page.github ? page.branch.trimmingCharacters(in: .whitespaces) : nil,
       agent: agent,
       choice: page.choice,
-      reasoningEffortConfigId: page.capability?.reasoningEffortConfigId
+      reasoningEffortConfigId: page.capability?.reasoningEffortConfigId,
+      useWorktree: page.local && page.worktree ? true : nil
     )
   }
 }

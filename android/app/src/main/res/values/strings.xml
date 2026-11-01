@@ -92,4 +92,18 @@
     <string name="chat_offline">Messages unavailable</string>
     <string name="chat_retry">Retry</string>
     <string name="chat_read_only">Read only</string>
+
+    <!-- New session -->
+    <string name="create_title">New session</string>
+    <string name="create_pick_machine">Choose computer</string>
+    <string name="create_pick_project">Choose project</string>
+    <string name="create_chat_only">Chat only (no project)</string>
+    <string name="create_branch_unavailable">Branches aren’t available on Android yet</string>
+    <string name="create_worktree">Run in a worktree</string>
+    <string name="create_agent_unavailable">Assistants aren’t available on Android yet</string>
+    <string name="create_readonly_note">Android can’t create sessions yet; this page shows the layout.</string>
+    <string name="create_composer_placeholder">Describe what you want to do…</string>
+    <string name="create_attach">Add attachment</string>
+    <string name="create_mention">Mention</string>
+    <string name="create_send">Send</string>
 </resources>

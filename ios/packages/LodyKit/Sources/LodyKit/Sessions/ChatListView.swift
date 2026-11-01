@@ -205,9 +205,12 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   /// Keep UIKit's original supplementary label, including its native push-off.
   private func updateBackdrop() {
     let top = collection.contentOffset.y + collection.adjustedContentInset.top
+    // At rest the first label already sits at the top edge; it only counts as pinned (and
+    // brings the blur) once content has actually scrolled under it.
+    let scrolled = top > 0.5
     let paths = collection.indexPathsForVisibleSupplementaryElements(ofKind: UICollectionView.elementKindSectionHeader)
     let active = paths.compactMap { path -> UICollectionViewLayoutAttributes? in
-      guard pinsGroupLabels,
+      guard pinsGroupLabels, scrolled,
             let id = dataSource.sectionIdentifier(for: path.section), !(titles[id] ?? "").isEmpty,
             let attributes = collection.layoutAttributesForSupplementaryElement(ofKind: UICollectionView.elementKindSectionHeader, at: path)
       else { return nil }

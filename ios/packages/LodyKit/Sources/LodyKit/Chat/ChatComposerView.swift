@@ -1577,6 +1577,13 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       prefix.append(NSAttributedString(string: " "))
       title.insert(prefix, at: 0)
     }
+    if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: nil) {
+      let attachment = NSTextAttachment(image: mark.withRenderingMode(.alwaysOriginal))
+      attachment.bounds = CGRect(x: 0, y: font.descender, width: font.lineHeight, height: font.lineHeight)
+      let prefix = NSMutableAttributedString(attachment: attachment)
+      prefix.append(NSAttributedString(string: " "))
+      title.insert(prefix, at: 0)
+    }
     title.addAttribute(.font, value: font, range: NSRange(location: 0, length: title.length))
     var configuration = UIButton.Configuration.plain()
     configuration.attributedTitle = AttributedString(title)
