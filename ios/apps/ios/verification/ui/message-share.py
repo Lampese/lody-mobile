@@ -8,7 +8,7 @@ from driver import UI
 import catalog
 
 ui = UI(*sys.argv[1:])
-container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'app.innei.lody', 'data'], text=True).strip())
+container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip())
 
 def menu():
     ui.axe('tap', '--id', 'paper-reply:meta:actions')

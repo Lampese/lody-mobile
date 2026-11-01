@@ -35,7 +35,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>lody</string>
-				<string>app.innei.lody</string>
+				<string>ai.lody.mobile</string>
 			</array>
 		</dict>
 	</array>
@@ -65,7 +65,7 @@
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<false/>
 	<key>OneSignal_app_groups_key</key>
-	<string>group.app.innei.lody</string>
+	<string>group.ai.lody.mobile</string>
 	<key>OneSignal_suppress_launch_urls</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

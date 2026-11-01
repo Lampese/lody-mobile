@@ -8,7 +8,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.lody.android"
+        applicationId = "ai.lody.android"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

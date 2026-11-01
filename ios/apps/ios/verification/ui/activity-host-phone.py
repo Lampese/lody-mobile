@@ -23,7 +23,7 @@ def sim(*args):
 
 
 def select(name):
-    sim('launch', '--terminate-running-process', udid, 'app.innei.lody', '-fixture', name, '-AppleLanguages', '(en)', '-AppleLocale', 'en_US')
+    sim('launch', '--terminate-running-process', udid, 'ai.lody.mobile', '-fixture', name, '-AppleLanguages', '(en)', '-AppleLocale', 'en_US')
     ui.invalidate_axe()
     expected = 'Ended' if name == 'end' else f'Showing {name}'
     ui.wait(lambda items: any(i.get('AXLabel') == expected for i in items), f'ActivityKit did not accept {name}')

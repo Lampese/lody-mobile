@@ -68,7 +68,7 @@ final class SessionFeed {
   private var received = false
   private var unwatch: (@MainActor () -> Void)?
   private var token = 0
-  private static let parsing = DispatchQueue(label: "app.innei.lody.session-feed", qos: .userInitiated)
+  private static let parsing = DispatchQueue(label: "ai.lody.mobile.session-feed", qos: .userInitiated)
 
   init(sessionId: String, userId: String, workspaceId: String, service: SessionFeedService = .live) {
     self.sessionId = sessionId

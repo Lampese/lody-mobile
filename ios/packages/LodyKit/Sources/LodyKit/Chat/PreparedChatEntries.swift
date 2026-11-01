@@ -2,7 +2,7 @@ import Foundation
 
 /// Navigation owns this decoded value; no process-wide history cache or cursor.
 final class PreparedChatEntries {
-  static let queue = DispatchQueue(label: "app.innei.lody.chat-prepare", qos: .userInitiated)
+  static let queue = DispatchQueue(label: "ai.lody.mobile.chat-prepare", qos: .userInitiated)
   let json: String
   let entries: [ChatEntry]
 

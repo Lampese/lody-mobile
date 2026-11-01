@@ -180,9 +180,9 @@ assert chips()[0]['AXUniqueId'] == 'quick-reply:' + custom_id
 ui.capture('custom-chip')
 
 # Relaunch the real app to verify UserDefaults hydration, across process launches.
-subprocess.run(['xcrun', 'simctl', 'terminate', ui.udid, 'app.innei.lody'], check=True, timeout=30)
+subprocess.run(['xcrun', 'simctl', 'terminate', ui.udid, 'ai.lody.mobile'], check=True, timeout=30)
 ui.invalidate_axe()
-launch = ['xcrun', 'simctl', 'launch', ui.udid, 'app.innei.lody', '--ui-verify', '-AppleLanguages', '(en)', '-AppleLocale', 'en_US']
+launch = ['xcrun', 'simctl', 'launch', ui.udid, 'ai.lody.mobile', '--ui-verify', '-AppleLanguages', '(en)', '-AppleLocale', 'en_US']
 subprocess.run(launch, check=True, timeout=30)
 ui.element('ui-verify-ready', timeout=90)
 ui.open_case('quick-replies-preview')

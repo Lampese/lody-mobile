@@ -1,6 +1,6 @@
 # Native OneSignal integration
 
-The iOS-only app keeps bundle ID `app.innei.lody` and uses the public OneSignal App
+The iOS-only app keeps bundle ID `ai.lody.mobile` and uses the public OneSignal App
 ID `e383bf31-7c8e-4641-b3f6-3486e77b9a82`. `LODY_ONESIGNAL_APP_ID` can override it at
 prebuild time (an empty value disables initialization). No REST API key or APNs
 private key is shipped in the app.
@@ -8,15 +8,15 @@ private key is shipped in the app.
 OneSignal iOS **5.5.1 Stable**, selected from the official
 https://onesignal.github.io/sdk-releases/releases.json, is pinned in `project.yml` and resolved by Swift Package Manager. LodyKit owns initialization, identity, subscription observation, click
 buffering and foreground policy. The Notification Service Extension uses the same
-SDK version and App Group `group.app.innei.lody`.
+SDK version and App Group `group.ai.lody.mobile`.
 
 ## Build and configure
 
-1. Configure this OneSignal App's iOS platform for `app.innei.lody` and its APNs key.
+1. Configure this OneSignal App's iOS platform for `ai.lody.mobile` and its APNs key.
 2. Keep automatic signing and choose your Apple team. Register Push Notifications
    and the App Group for the app, and the same group for the NSE identifier
-   `app.innei.lody.notification-service` and the widget extension identifier
-   `app.innei.lody.live-activity`.
+   `ai.lody.mobile.notification-service` and the widget extension identifier
+   `ai.lody.mobile.live-activity`.
 3. Run `pnpm prebuild`. XcodeGen creates the app, LodyKit, NSE, Share and Live Activity targets.
 4. Open the project with `pnpm ios` and Run in Xcode, or use `xcodebuild` with normal signing.
    The app embeds `LodyNotificationService.appex` and `LodyLiveActivity.appex`. Changing the OneSignal App ID or
@@ -140,17 +140,17 @@ JSON array (keep all existing app entries):
 Set `ONE_SIGNAL_IOS_API_KEY` to this OneSignal app's REST API key in Convex's
 environment variables. This is distinct from the APNs `.p8` signing key: configure
 that key, its Key ID and Apple Team ID in the OneSignal iOS platform dashboard for
-bundle `app.innei.lody`. Live Activities require `.p8` authentication; an existing
+bundle `ai.lody.mobile`. Live Activities require `.p8` authentication; an existing
 `.p12` ordinary-push configuration is insufficient. Neither secret belongs in build environment variables,
 the repository, or the widget. An explicit inventory replaces legacy environment
 fallback; do not overwrite it with only the new iOS entry.
 
 Apple Developer / signing checklist:
 
-- Main App ID `app.innei.lody`: Push Notifications and App Group
-  `group.app.innei.lody`.
-- NSE ID `app.innei.lody.notification-service` and Widget ID
-  `app.innei.lody.live-activity`: same App Group and Apple team. Keep automatic
+- Main App ID `ai.lody.mobile`: Push Notifications and App Group
+  `group.ai.lody.mobile`.
+- NSE ID `ai.lody.mobile.notification-service` and Widget ID
+  `ai.lody.mobile.live-activity`: same App Group and Apple team. Keep automatic
   signing; regenerate profiles if their capabilities changed.
 - Prebuild owns `NSSupportsLiveActivities`, the remote-notification background
   mode and entitlements. Pod install embeds both extensions. There is no extra
@@ -209,12 +209,12 @@ failure recovery, clear cancellation and the signed-out Settings entry. The
 fixture never initializes OneSignal or uses user/cloud credentials.
 
 LodyKit writes persistent `notice` events to Apple's unified log under subsystem
-`app.innei.lody`, category `live-activity`. In macOS Console, select the attached
+`ai.lody.mobile`, category `live-activity`. In macOS Console, select the attached
 iPhone, start streaming, and filter by that subsystem/category before reproducing.
 Keep the phone locked/backgrounded through the failure; record the wall-clock time
 before reopening Lody (foreground catalog updates can replace the stalled state).
 For a Simulator, use `xcrun simctl spawn <udid> log stream --level info --style json
---predicate 'subsystem == "app.innei.lody" AND category == "live-activity"'`.
+--predicate 'subsystem == "ai.lody.mobile" AND category == "live-activity"'`.
 Normal verification fixtures do not register with OneSignal and cannot prove APNs delivery.
 
 All activity correlation keys are the first 16 lowercase hex characters of SHA-256

@@ -45,7 +45,7 @@ for name, title in [
 ]:
     fixture = name.removesuffix('-aod')
     start = time.monotonic()
-    sim('launch', '--terminate-running-process', args.udid, 'app.innei.lody.small-activity-verify',
+    sim('launch', '--terminate-running-process', args.udid, 'ai.lody.mobile.small-activity-verify',
         '-fixture', fixture, '-reduced', 'YES' if name.endswith('-aod') else 'NO',
         '-AppleLanguages', '(en)', '-AppleLocale', 'en_US')
     deadline = time.monotonic() + 45

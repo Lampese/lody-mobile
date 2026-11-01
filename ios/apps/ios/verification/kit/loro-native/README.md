@@ -32,13 +32,13 @@ xcodegen generate
 PROBE_SIMULATOR=30639638-6CAE-43D5-BC8F-8B022D3C534F
 xcodebuild -project LodyNativeProbe.xcodeproj -scheme LodyNativeProbe -configuration Debug -destination "platform=iOS Simulator,id=$PROBE_SIMULATOR" -derivedDataPath build build
 xcrun simctl install "$PROBE_SIMULATOR" build/Build/Products/Debug-iphonesimulator/LodyNativeProbe.app
-xcrun simctl launch "$PROBE_SIMULATOR" app.innei.lody-native-probe
+xcrun simctl launch "$PROBE_SIMULATOR" ai.lody.mobile-native-probe
 ```
 
 After the app shows PASS, check the native update in WASM:
 
 ```sh
-probe_data=$(xcrun simctl get_app_container "$PROBE_SIMULATOR" app.innei.lody-native-probe data)
+probe_data=$(xcrun simctl get_app_container "$PROBE_SIMULATOR" ai.lody.mobile-native-probe data)
 node fixtures.mjs "$probe_data/Documents/result.json"
 ```
 

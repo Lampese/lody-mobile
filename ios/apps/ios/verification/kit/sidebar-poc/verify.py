@@ -23,7 +23,7 @@ for appearance in ('light', 'dark'):
     directory.mkdir(exist_ok=True)
     ui = UI(udid, directory)
     sim('ui', udid, 'appearance', appearance)
-    sim('launch', '--terminate-running-process', udid, 'app.innei.lody.sidebar-poc', '-AppleLanguages', '(en)')
+    sim('launch', '--terminate-running-process', udid, 'ai.lody.mobile.sidebar-poc', '-AppleLanguages', '(en)')
     ui.element('mode-0')
     (directory / 'flow.mp4').unlink(missing_ok=True)
     with (directory / 'recording.log').open('w') as log:

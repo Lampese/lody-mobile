@@ -10,8 +10,8 @@ const filter = path.join(
   '.github/scripts/verify-signing-settings.jq',
 );
 const profiles = {
-  'app.innei.lody': 'APP-UUID',
-  'app.innei.lody.notification-service': 'EXTENSION-UUID',
+  'ai.lody.mobile': 'APP-UUID',
+  'ai.lody.mobile.notification-service': 'EXTENSION-UUID',
 };
 
 function settings(bundle, profile) {
@@ -46,13 +46,13 @@ function verify(buildSettings) {
 }
 
 test('signing verification accepts duplicate rows for the same target', () => {
-  const app = settings('app.innei.lody', 'APP-UUID');
+  const app = settings('ai.lody.mobile', 'APP-UUID');
   const result = verify([
     { target: 'Lody', buildSettings: app },
     {
       target: 'LodyNotificationService',
       buildSettings: settings(
-        'app.innei.lody.notification-service',
+        'ai.lody.mobile.notification-service',
         'EXTENSION-UUID',
       ),
     },
@@ -67,16 +67,16 @@ test('signing verification checks every duplicate target row', () => {
   const result = verify([
     {
       target: 'Lody',
-      buildSettings: settings('app.innei.lody', 'APP-UUID'),
+      buildSettings: settings('ai.lody.mobile', 'APP-UUID'),
     },
     {
       target: 'Lody',
-      buildSettings: settings('app.innei.lody', 'WRONG-UUID'),
+      buildSettings: settings('ai.lody.mobile', 'WRONG-UUID'),
     },
     {
       target: 'LodyNotificationService',
       buildSettings: settings(
-        'app.innei.lody.notification-service',
+        'ai.lody.mobile.notification-service',
         'EXTENSION-UUID',
       ),
     },
@@ -88,11 +88,11 @@ test('signing verification checks every duplicate target row', () => {
 
 test('signing verification excludes non-archived app hosts while checking extensions', () => {
   const result = verify([
-    { target: 'Lody', buildSettings: settings('app.innei.lody', 'APP-UUID') },
+    { target: 'Lody', buildSettings: settings('ai.lody.mobile', 'APP-UUID') },
     {
       target: 'LodyNotificationService',
       buildSettings: {
-        ...settings('app.innei.lody.notification-service', 'EXTENSION-UUID'),
+        ...settings('ai.lody.mobile.notification-service', 'EXTENSION-UUID'),
         PRODUCT_TYPE: 'com.apple.product-type.app-extension',
         SKIP_INSTALL: 'YES',
       },
@@ -100,7 +100,7 @@ test('signing verification excludes non-archived app hosts while checking extens
     {
       target: 'LodyActivityVerify',
       buildSettings: {
-        PRODUCT_BUNDLE_IDENTIFIER: 'app.innei.lody',
+        PRODUCT_BUNDLE_IDENTIFIER: 'ai.lody.mobile',
         PRODUCT_TYPE: 'com.apple.product-type.application',
         CODE_SIGN_STYLE: 'Automatic',
         SKIP_INSTALL: 'YES',

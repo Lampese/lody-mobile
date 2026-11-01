@@ -37,6 +37,6 @@ def restore_portrait(ui):
 
 
 def set_width(ui, width):
-    subprocess.run(['xcrun', 'simctl', 'spawn', ui.udid, 'notifyutil', '-p', f'app.innei.lody.verify.width.{width}'],
+    subprocess.run(['xcrun', 'simctl', 'spawn', ui.udid, 'notifyutil', '-p', f'ai.lody.mobile.verify.width.{width}'],
                    check=True, capture_output=True, timeout=20)
     time.sleep(1.5)

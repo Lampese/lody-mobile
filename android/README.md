@@ -4,7 +4,7 @@ Independent Kotlin Android client. Current milestone: native Device Flow, a read
 
 ## Run
 
-Use Android Studio Rabbit 1 / AGP 9.4.1, Gradle 9.6.0 and JDK 17+ (validated with the IDE's embedded JDK 21). The Kotlin Compose compiler matches AGP's built-in Kotlin 2.2.10. Compile SDK 37, target SDK 36, minimum SDK 26. Application ID is provisional: `app.lody.android`.
+Use Android Studio Rabbit 1 / AGP 9.4.1, Gradle 9.6.0 and JDK 17+ (validated with the IDE's embedded JDK 21). The Kotlin Compose compiler matches AGP's built-in Kotlin 2.2.10. Compile SDK 37, target SDK 36, minimum SDK 26. Application ID: `ai.lody.android`.
 
 The local installed IDE was 2025.3 at bootstrap; upgrade it before IDE sync with this AGP. Local SDK paths stay in ignored `local.properties`.
 
@@ -17,7 +17,7 @@ npm test
 cd ..
 ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
 ./gradlew :app:installDebug
-adb shell am start -n app.lody.android/.diagnostics.RuntimeProbeActivity
+adb shell am start -n ai.lody.android/app.lody.android.diagnostics.RuntimeProbeActivity
 ```
 
 Gradle generates runtime assets from the vendored snapshot, pinned npm dependencies and Android adapter before packaging. Dependency licenses are bundled alongside the HTML. No dependency on an iOS checkout, login or connected machine is required.

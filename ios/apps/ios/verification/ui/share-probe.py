@@ -47,7 +47,7 @@ def sim(*command, **kwargs):
 host = output / 'ShareProbeHost.app'
 host.mkdir(exist_ok=True)
 (host / 'Info.plist').write_bytes(plistlib.dumps({
-    'CFBundleIdentifier': 'app.innei.lody.share-probe-host',
+    'CFBundleIdentifier': 'ai.lody.mobile.share-probe-host',
     'CFBundleExecutable': 'ShareProbeHost',
     'CFBundleName': 'ShareProbeHost',
     'CFBundlePackageType': 'APPL',
@@ -76,11 +76,11 @@ subprocess.run(['codesign', '--force', '--sign', '-', str(host)], check=True, ti
 sim('install', args.udid, str(app))
 sim('install', args.udid, str(host))
 sim('ui', args.udid, 'appearance', args.appearance)
-for bundle in ['app.innei.lody.share', 'app.innei.lody.share-probe-host']:
+for bundle in ['ai.lody.mobile.share', 'ai.lody.mobile.share-probe-host']:
     sim('spawn', args.udid, 'defaults', 'write', bundle, 'AppleLanguages', '-array', 'en')
     sim('spawn', args.udid, 'defaults', 'write', bundle, 'AppleLocale', 'en_US')
 group = Path(subprocess.check_output(
-    ['xcrun', 'simctl', 'get_app_container', args.udid, 'app.innei.lody', 'group.app.innei.lody'], text=True).strip())
+    ['xcrun', 'simctl', 'get_app_container', args.udid, 'ai.lody.mobile', 'group.ai.lody.mobile'], text=True).strip())
 store = group / 'Library/LodyShare'
 ui = UI(args.udid, output)
 
@@ -93,9 +93,9 @@ def flatten(node):
 
 def open_extension(name):
     # The containing app stays stopped; the system hosts only its extension.
-    subprocess.run(['xcrun', 'simctl', 'terminate', args.udid, 'app.innei.lody'], capture_output=True, timeout=30)
-    subprocess.run(['xcrun', 'simctl', 'terminate', args.udid, 'app.innei.lody.share-probe-host'], capture_output=True, timeout=30)
-    sim('launch', args.udid, 'app.innei.lody.share-probe-host', '-AppleLanguages', '(en)', '-AppleLocale', 'en_US')
+    subprocess.run(['xcrun', 'simctl', 'terminate', args.udid, 'ai.lody.mobile'], capture_output=True, timeout=30)
+    subprocess.run(['xcrun', 'simctl', 'terminate', args.udid, 'ai.lody.mobile.share-probe-host'], capture_output=True, timeout=30)
+    sim('launch', args.udid, 'ai.lody.mobile.share-probe-host', '-AppleLanguages', '(en)', '-AppleLocale', 'en_US')
     ui.element('share-probe-host.open')
     ui.axe('tap', '--id', 'share-probe-host.open', '--tap-style', 'physical', '--post-delay', '1')
     ui.capture(f'{name}-tray')

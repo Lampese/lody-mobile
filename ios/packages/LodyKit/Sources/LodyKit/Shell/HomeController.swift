@@ -11,7 +11,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
   private let inspector = UINavigationController()
   private let inbox: InboxController
   /// iPhone tabs: each root page is built on first use and kept, so lists keep their scroll and state.
-  private var tab: HomeTab = .chats
+  private var selectedTab: HomeTab = .chats
   private var tabPages: [HomeTab: LodyPageController] = [:]
   private var tabBars: [HomeTab: HomeTabBar] = [:]
   private var session: SessionController?
@@ -103,7 +103,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     (folded ? foldHost?.controller : split)?.view.frame = view.bounds
     view.accessibilityIdentifier = traitCollection.horizontalSizeClass == .regular ? "ipad-home" : "home"
     // Tabs exist only on compact width; a wide layout lists chats in its sidebar.
-    if traitCollection.horizontalSizeClass == .regular, tab != .chats { selectTab(.chats) }
+    if traitCollection.horizontalSizeClass == .regular, selectedTab != .chats { selectTab(.chats) }
     layoutColumns()
   }
   private func scopeChanged() {
@@ -226,12 +226,12 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     return controller
   }
   func selectTab(_ next: HomeTab) {
-    guard next != tab else {
+    guard next != selectedTab else {
       // Re-selecting the current tab returns to its root, like a system tab bar.
       primary.popToRootViewController(animated: true)
       return
     }
-    tab = next
+    selectedTab = next
     primary.setViewControllers([tabPage(next)], animated: false)
   }
 

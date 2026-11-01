@@ -15,7 +15,7 @@ targets:
     sources: [App.swift, fixtures.json]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.innei.lody-native-probe
+        PRODUCT_BUNDLE_IDENTIFIER: ai.lody.mobile-native-probe
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         CODE_SIGN_STYLE: Automatic

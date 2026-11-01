@@ -37,7 +37,7 @@ Official Lody Device Flow and simulator Keychain only. Inspect the simulator UI 
 
 Use AXe with explicit simulator UDID and simctl screenshots. `pnpm verify:build`
 builds project apps/ios/Lody.xcodeproj, scheme Lody, Debug, with normal
-signing and one shared DerivedData; the app bundle identifier is app.innei.lody.
+signing and one shared DerivedData; the app bundle identifier is ai.lody.mobile.
 Run pnpm check, pnpm test and pnpm bundle as supporting gates.
 
 UI evidence for a visual or interaction requirement alignment comes from a finished

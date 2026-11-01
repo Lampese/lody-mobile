@@ -6,7 +6,7 @@ import sys
 from driver import UI
 
 ui = UI(*sys.argv[1:])
-container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'app.innei.lody', 'data'], text=True).strip())
+container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip())
 for delayed in [False, True]:
     if delayed:
         ui.axe('tap', '--label', 'Try again', '--post-delay', '.6')

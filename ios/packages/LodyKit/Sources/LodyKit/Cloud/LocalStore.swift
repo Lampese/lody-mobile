@@ -3,7 +3,7 @@ import SQLite3
 
 /// Access only on queue. Display projections, never credentials or CRDT state.
 final class LocalStore: @unchecked Sendable {
-  static let queue = DispatchQueue(label: "app.innei.lody.local-store", qos: .userInitiated)
+  static let queue = DispatchQueue(label: "ai.lody.mobile.local-store", qos: .userInitiated)
   static let shared = LocalStore()
   private var db: OpaquePointer?
   private let url: URL

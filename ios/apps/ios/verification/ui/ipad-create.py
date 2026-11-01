@@ -10,7 +10,7 @@ import rotation
 
 ui = UI(*sys.argv[1:])
 container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid,
-                                        'app.innei.lody', 'data'], text=True).strip())
+                                        'ai.lody.mobile', 'data'], text=True).strip())
 report = container / 'tmp/lody-production-composer-relay.json'
 for orientation in ['landscape', 'portrait']:
     if ui.visible_keyboard(ui.state()):

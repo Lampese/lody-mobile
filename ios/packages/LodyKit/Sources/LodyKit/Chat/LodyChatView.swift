@@ -157,7 +157,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var pendingEntries: String?
   var preparedEntries: PreparedChatEntries?
   var workDurationTimer: Timer?
-  let preparation = DispatchQueue(label: "app.innei.lody.chat", qos: .userInitiated)
+  let preparation = DispatchQueue(label: "ai.lody.mobile.chat", qos: .userInitiated)
   var decoding = false
   var displayError: String? { didSet { composer.displayError = displayError } }
   var applying = false

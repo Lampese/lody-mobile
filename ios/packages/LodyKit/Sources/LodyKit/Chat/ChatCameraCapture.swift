@@ -8,7 +8,7 @@ final class ChatCameraCapture: NSObject, AVCapturePhotoCaptureDelegate, @uncheck
   var onReady: ((AVCaptureDevice?, Bool) -> Void)?
   var onPhoto: ((ChatAttachment) -> Void)?
   var onError: ((String) -> Void)?
-  private let queue = DispatchQueue(label: "app.innei.lody.attachment-camera")
+  private let queue = DispatchQueue(label: "ai.lody.mobile.attachment-camera")
   private let output = AVCapturePhotoOutput()
   private var input: AVCaptureDeviceInput?
   private var wantsActive = false

@@ -47,7 +47,7 @@ enum LodyAccentChoice: Equatable, RawRepresentable {
   }
 
   // The Share Extension has its own standard defaults; the app mirrors the accent here.
-  static var shared: UserDefaults? { UserDefaults(suiteName: "group.app.innei.lody") }
+  static var shared: UserDefaults? { UserDefaults(suiteName: "group.ai.lody.mobile") }
 
   static var current: Self {
     #if LODY_SHARE_EXTENSION

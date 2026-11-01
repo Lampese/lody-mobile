@@ -78,7 +78,7 @@ if (command === 'certificates list') {
         id: 'bundle-app',
         attributes: {
           name: 'Lody',
-          identifier: 'app.innei.lody',
+          identifier: 'ai.lody.mobile',
           platform: 'UNIVERSAL',
           seedId: 'TEAM123',
         },
@@ -90,7 +90,7 @@ if (command === 'certificates list') {
         id: 'bundle-extension',
         attributes: {
           name: 'Lody Notification Service',
-          identifier: 'app.innei.lody.notification-service',
+          identifier: 'ai.lody.mobile.notification-service',
           platform: 'UNIVERSAL',
           seedId: 'TEAM123',
         },
@@ -106,7 +106,7 @@ if (command === 'certificates list') {
     type: 'profiles',
     id: 'profile-app',
     attributes: {
-      name: 'app.innei.lody CI App Store 40',
+      name: 'ai.lody.mobile CI App Store 40',
       platform: 'IOS',
       profileType: 'IOS_APP_STORE',
       profileState: 'ACTIVE',
@@ -150,7 +150,7 @@ if (command === 'certificates list') {
       type: 'profiles',
       id: 'profile-app',
       attributes: {
-        name: 'app.innei.lody CI App Store 40',
+        name: 'ai.lody.mobile CI App Store 40',
         platform: 'IOS',
         profileType: 'IOS_APP_STORE',
         profileState: 'ACTIVE',
@@ -175,7 +175,7 @@ if (command === 'certificates list') {
         type: 'bundleIds',
         id: 'bundle-app',
         attributes: {
-          identifier: 'app.innei.lody',
+          identifier: 'ai.lody.mobile',
         },
       },
     ],
@@ -213,7 +213,7 @@ if (command === 'certificates list') {
         type: 'bundleIds',
         id: 'bundle-extension',
         attributes: {
-          identifier: 'app.innei.lody.notification-service',
+          identifier: 'ai.lody.mobile.notification-service',
         },
       },
     ],
@@ -244,14 +244,14 @@ if (command === 'certificates list') {
   const profileId = readFileSync(option('--path'), 'utf8');
   const extension = profileId === 'profile-extension';
   const bundleId = extension
-    ? 'app.innei.lody.notification-service'
-    : 'app.innei.lody';
+    ? 'ai.lody.mobile.notification-service'
+    : 'ai.lody.mobile';
   print({
     path: option('--path'),
     uuid: extension ? 'EXTENSION-UUID' : 'APP-UUID',
     name: extension
-      ? 'app.innei.lody.notification-service CI App Store 41'
-      : 'app.innei.lody CI App Store 40',
+      ? 'ai.lody.mobile.notification-service CI App Store 41'
+      : 'ai.lody.mobile CI App Store 40',
     appIdName: extension ? 'Lody Notification Service' : 'Lody',
     teamId: 'TEAM123',
     teamName: 'Example',
@@ -293,7 +293,7 @@ if (command === 'certificates list') {
       IOS_DIST_CERT_SERIAL: 'a1:b2:c3',
       PATH: `${bin}:${process.env.PATH}`,
       RUNNER_TEMP: runnerTemp,
-      TARGET_BUNDLE_IDS: 'app.innei.lody\napp.innei.lody.notification-service',
+      TARGET_BUNDLE_IDS: 'ai.lody.mobile\nai.lody.mobile.notification-service',
     },
   });
 
@@ -301,7 +301,7 @@ if (command === 'certificates list') {
   const environment = await readFile(githubEnv, 'utf8');
   assert.equal(
     environment.trim(),
-    'IOS_PROFILE_MAP={"app.innei.lody":"APP-UUID","app.innei.lody.notification-service":"EXTENSION-UUID"}',
+    'IOS_PROFILE_MAP={"ai.lody.mobile":"APP-UUID","ai.lody.mobile.notification-service":"EXTENSION-UUID"}',
   );
 
   const calls = (await readFile(log, 'utf8'))
@@ -316,7 +316,7 @@ if (command === 'certificates list') {
       'profiles',
       'create',
       '--name',
-      'app.innei.lody.notification-service CI App Store 41',
+      'ai.lody.mobile.notification-service CI App Store 41',
       '--profile-type',
       'IOS_APP_STORE',
       '--bundle',

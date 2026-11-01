@@ -10,7 +10,7 @@ enum LodyVerifyWidth {
     guard LodyUIVerify.enabled else { return }
     for width in ["compact", "regular", "system"] {
       var token: Int32 = 0
-      notify_register_dispatch("app.innei.lody.verify.width.\(width)", &token, .main) { _ in
+      notify_register_dispatch("ai.lody.mobile.verify.width.\(width)", &token, .main) { _ in
         MainActor.assumeIsolated { apply(width) }
       }
       tokens.append(token)

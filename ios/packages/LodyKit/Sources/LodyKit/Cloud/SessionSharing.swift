@@ -72,7 +72,7 @@ import Security
       guard let version = args["version"] as? Int, version > 0 else { throw failure() }
       let key = String(data: try JSONSerialization.data(withJSONObject: [userId, workspace, share, String(version)]), encoding: .utf8)!
       let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: "app.innei.lody.session-shares", kSecAttrAccount as String: key]
+        kSecAttrService as String: "ai.lody.mobile.session-shares", kSecAttrAccount as String: key]
       if operation == "saveSecret" {
         guard let secret = args["secret"] as? String,
           secret.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw failure() }

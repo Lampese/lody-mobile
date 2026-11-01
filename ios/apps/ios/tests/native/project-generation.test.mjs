@@ -110,13 +110,13 @@ test(
     const root = await fixture();
     try {
       const profiles = {
-        'app.innei.lody': 'app-profile',
-        'app.innei.lody.share': 'share-profile',
-        'app.innei.lody.notification-service': 'push-profile',
-        'app.innei.lody.live-activity': 'activity-profile',
+        'ai.lody.mobile': 'app-profile',
+        'ai.lody.mobile.share': 'share-profile',
+        'ai.lody.mobile.notification-service': 'push-profile',
+        'ai.lody.mobile.live-activity': 'activity-profile',
       };
       let result = generate(root, {
-        IOS_PROFILE_MAP: JSON.stringify({ 'app.innei.lody': 'app-profile' }),
+        IOS_PROFILE_MAP: JSON.stringify({ 'ai.lody.mobile': 'app-profile' }),
         APPLE_TEAM_ID: 'TEAM',
       });
       assert.notEqual(result.status, 0);

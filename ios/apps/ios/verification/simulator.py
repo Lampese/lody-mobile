@@ -55,7 +55,7 @@ class SimulatorPool:
         self.simctl = simctl
         self.device_type = device_type
         self.lock_directory = lock_directory or (
-            Path.home() / 'Library/Caches/app.innei.lody/verify-simulators'
+            Path.home() / 'Library/Caches/ai.lody.mobile/verify-simulators'
         )
 
     def acquire_lock(self, name, blocking):

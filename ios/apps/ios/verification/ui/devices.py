@@ -11,7 +11,7 @@ from driver import UI
 import pad
 
 ui = UI(*sys.argv[1:])
-container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'app.innei.lody', 'data'], text=True).strip())
+container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip())
 database = container / 'Library/Application Support/Lody/catalog.sqlite'
 events = []
 started = time.monotonic()

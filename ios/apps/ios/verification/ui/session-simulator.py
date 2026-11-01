@@ -9,7 +9,7 @@ import catalog
 
 ui = UI(*sys.argv[1:])
 container = Path(subprocess.check_output(
-    ['xcrun', 'simctl', 'get_app_container', ui.udid, 'app.innei.lody', 'data'], text=True).strip())
+    ['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip())
 traces = container / 'tmp'
 
 

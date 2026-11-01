@@ -29,7 +29,7 @@ def foreground():
     # Let the Home/Island dismissal finish before requesting activation; launching
     # during that transition can return the existing pid and still land on Home.
     time.sleep(1)
-    subprocess.run(['xcrun', 'simctl', 'launch', udid, 'app.innei.lody'], check=True, timeout=30)
+    subprocess.run(['xcrun', 'simctl', 'launch', udid, 'ai.lody.mobile'], check=True, timeout=30)
     ui.element('live-activity-status')
 
 

@@ -282,7 +282,7 @@ import os
     return "URLError \(error.code.rawValue) status \(error.userInfo["status"] as? Int ?? 0)"
   }
 
-  private static let log = Logger(subsystem: "app.innei.lody", category: "simulator-transport")
+  private static let log = Logger(subsystem: "ai.lody.mobile", category: "simulator-transport")
 
   /// Local/remote candidate types only, such as "host/relay"; never addresses.
   private static func candidateTypes(_ peer: Int32) -> String {

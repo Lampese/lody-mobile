@@ -24,9 +24,9 @@ def generate(root, environment):
     profiles = json.loads(environment.get('IOS_PROFILE_MAP', '{}'))
     if profiles:
         # Release signing is another XcodeGen input, never a post-generation project edit.
-        targets = {'app.innei.lody': 'Lody', 'app.innei.lody.share': 'LodyShare',
-                   'app.innei.lody.notification-service': 'LodyNotificationService',
-                   'app.innei.lody.live-activity': 'LodyLiveActivity'}
+        targets = {'ai.lody.mobile': 'Lody', 'ai.lody.mobile.share': 'LodyShare',
+                   'ai.lody.mobile.notification-service': 'LodyNotificationService',
+                   'ai.lody.mobile.live-activity': 'LodyLiveActivity'}
         if set(profiles) != set(targets):
             raise ValueError('Provisioning profiles must cover exactly the app and its three extensions')
         spec['targets'] = {targets[bundle]: {'settings': {'configs': {'Release': {

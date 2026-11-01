@@ -4,7 +4,7 @@ import os
 /// WebRTC-first transport. A single switch to WebSocket discards partial media
 /// and pending inputs. Codec recovery remains owned by SimulatorStreamView.
 @MainActor final class SimulatorTransport {
-  private nonisolated static let log = Logger(subsystem: "app.innei.lody", category: "simulator-transport")
+  private nonisolated static let log = Logger(subsystem: "ai.lody.mobile", category: "simulator-transport")
   enum Mode { case connecting, webRTC, webSocket, closed }
   private(set) var mode: Mode = .connecting
   var onOpen: (() -> Void)?

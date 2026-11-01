@@ -15,7 +15,7 @@ final class DiagnosticsStore: @unchecked Sendable {
 
   private static var storageRoot: URL {
     #if os(iOS)
-    let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.app.innei.lody")
+    let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.ai.lody.mobile")
     let root = group ?? URL.applicationSupportDirectory
     #else
     let root = URL.applicationSupportDirectory
@@ -29,7 +29,7 @@ final class DiagnosticsStore: @unchecked Sendable {
   private let maxBytes: Int
   private let retention: TimeInterval = 7 * 86400
   private let now: @Sendable () -> Date
-  private let queue = DispatchQueue(label: "app.innei.lody.diagnostics", qos: .utility)
+  private let queue = DispatchQueue(label: "ai.lody.mobile.diagnostics", qos: .utility)
   private var lastPruned: Date?
   private var dropped = 0
 
@@ -211,7 +211,7 @@ final class DiagnosticsStore: @unchecked Sendable {
     let cutoff = now().addingTimeInterval(-retention)
     for file in files(source) {
       let records = try read(file)
-      let kept = records.filter { $0.at >= cutoff }
+      let kept = records.filter { $0.at.timeIntervalSinceReferenceDate >= cutoff.timeIntervalSinceReferenceDate }
       guard kept.count != records.count else { continue }
       var data = Data()
       for entry in kept { data.append(try Self.encoder().encode(entry)); data.append(10) }
@@ -227,7 +227,7 @@ final class DiagnosticsStore: @unchecked Sendable {
     var records: [Entry] = []
     for source in Process.allCases {
       try prune(source)
-      for file in files(source) { records += try read(file).filter { $0.at >= cutoff } }
+      for file in files(source) { records += try read(file).filter { $0.at.timeIntervalSinceReferenceDate >= cutoff.timeIntervalSinceReferenceDate } }
     }
     return records.sorted { $0.at < $1.at }
   }

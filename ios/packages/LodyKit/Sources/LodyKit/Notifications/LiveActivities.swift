@@ -8,7 +8,7 @@ import UIKit
 @MainActor
 final class LiveActivities {
   static let shared = LiveActivities()
-  private let defaults = UserDefaults(suiteName: "group.app.innei.lody")
+  private let defaults = UserDefaults(suiteName: "group.ai.lody.mobile")
   private var tokenTasks: [String: (stamp: UUID, nativeId: String, task: Task<Void, Never>, lifecycle: Task<Void, Never>, content: Task<Void, Never>)] = [:]
   private var lastContentLog: [String: (signature: String, time: Date)] = [:]
   private var pushToStartTask: Task<Void, Never>?
@@ -256,7 +256,7 @@ final class LiveActivities {
     return ended
   }
 
-  private nonisolated static let log = Logger(subsystem: "app.innei.lody", category: "live-activity")
+  private nonisolated static let log = Logger(subsystem: "ai.lody.mobile", category: "live-activity")
 
   // Correlates with Convex's SHA-256 prefix; never hash or log an APNs token.
   private nonisolated static func correlation(_ value: String) -> String {

@@ -50,12 +50,12 @@ def screenshot(name):
     (OUT / name).write_bytes(adb('exec-out','screencap','-p'))
 
 def launch():
-    adb('shell','am','start','-n','app.lody.android/.diagnostics.RuntimeProbeActivity')
+    adb('shell','am','start','-n','ai.lody.android/app.lody.android.diagnostics.RuntimeProbeActivity')
 
-adb('shell','am','force-stop','app.lody.android')
+adb('shell','am','force-stop','ai.lody.android')
 launch()
 wait_text('7/7 checks passed')
-initial_pid=adb('shell','pidof','app.lody.android').decode().strip()
+initial_pid=adb('shell','pidof','ai.lody.android').decode().strip()
 screenshot('checks.png')
 initial_generation = re.search(r'Generation (\d+)', texts(dump())).group(1)
 adb('shell','input','keyevent','KEYCODE_HOME')
@@ -63,7 +63,7 @@ time.sleep(9)  # Intentionally cross the native eight-second heartbeat deadline.
 launch()
 resumed = wait_text('7/7 checks passed')
 assert re.search(r'Generation (\d+)',texts(resumed)).group(1) == initial_generation
-assert adb('shell','pidof','app.lody.android').decode().strip() == initial_pid
+assert adb('shell','pidof','ai.lody.android').decode().strip() == initial_pid
 recording=subprocess.Popen(BASE+['shell','screenrecord','--bit-rate','1000000','--time-limit','40','/sdcard/lody-phase1.mp4'],stdout=subprocess.DEVNULL)
 click('Open runtime details')
 wait_text('This page shares the application-owned runtime.')
@@ -76,11 +76,11 @@ wait_text('Scope: workspace-b')
 wait_text('7/7 checks passed')
 screenshot('workspace-b.png')
 # A process restart discards the debug scope; the new process only activates its fixed offline fixture.
-adb('shell','am','force-stop','app.lody.android')
+adb('shell','am','force-stop','ai.lody.android')
 launch()
 wait_text('Scope: workspace-a')
 wait_text('7/7 checks passed')
-new_pid=adb('shell','pidof','app.lody.android').decode().strip()
+new_pid=adb('shell','pidof','ai.lody.android').decode().strip()
 assert initial_pid != new_pid
 screenshot('fresh-process.png')
 recording.wait(timeout=50)

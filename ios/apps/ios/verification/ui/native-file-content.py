@@ -7,7 +7,7 @@ from driver import UI
 import catalog
 
 ui = UI(*sys.argv[1:])
-container = subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'app.innei.lody', 'data'], text=True).strip()
+container = subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip()
 source_probe = Path(container) / 'tmp/lody-file-source.json'
 html_probe = Path(container) / 'tmp/lody-html-preview.json'
 

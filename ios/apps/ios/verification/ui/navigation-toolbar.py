@@ -15,7 +15,7 @@ import catalog
 from driver import UI
 
 ui = UI(sys.argv[1], sys.argv[2])
-container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'app.innei.lody', 'data'], text=True).strip())
+container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip())
 existing = set((container / 'tmp').glob('lody-scroll-*.json'))
 search_label = catalog.text('search.field.placeholder')
 

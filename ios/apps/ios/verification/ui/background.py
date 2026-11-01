@@ -23,7 +23,7 @@ def tap(name):
     ui.axe('tap', '--id', 'background-' + name, '--tap-style', 'physical')
 
 def foreground():
-    subprocess.run(['xcrun', 'simctl', 'launch', udid, 'app.innei.lody'], check=True, timeout=30)
+    subprocess.run(['xcrun', 'simctl', 'launch', udid, 'ai.lody.mobile'], check=True, timeout=30)
 
 try:
     tap('start')
