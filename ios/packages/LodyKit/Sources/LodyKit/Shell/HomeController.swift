@@ -232,7 +232,9 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
       return
     }
     selectedTab = next
-    primary.setViewControllers([tabPage(next)], animated: false)
+    let page = tabPage(next)
+    tabBars[next]?.show(next)
+    primary.setViewControllers([page], animated: false)
   }
 
   private func tabPage(_ tab: HomeTab) -> LodyPageController {
