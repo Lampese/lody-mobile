@@ -94,7 +94,7 @@ enum InboxSections {
   ) -> [LodyListSection] {
     var catalog = catalog
     if let owner { catalog.sessions = owned(catalog.sessions, by: owner) }
-    switch grouping {
+    return switch grouping {
     case .time: timeline(catalog, now: now)
     case .project: byProject(catalog, now: now)
     case .status: byStatus(catalog, idleExpanded: idleExpanded, now: now)
