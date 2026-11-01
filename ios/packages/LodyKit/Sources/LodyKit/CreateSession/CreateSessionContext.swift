@@ -82,13 +82,14 @@ enum CreateSessionContext {
         let offline = online.map { !$0.contains(machine.id) } ?? false
         return CreateOption(
           id: machine.id, title: machine.name, subtitle: offline ? text("create.context.offline") : "",
-          selected: machine.id == selectedMachine, disabled: offline)
+          glyph: machineGlyph(form, machine.id, name: machine.name), selected: machine.id == selectedMachine, disabled: offline)
       }
     }
     panel.cards.append(CreatePicker(
-      id: "machine", glyph: .lody(.machine),
+      id: "machine", glyph: selectedMachine.map { machineGlyph(form, $0, name: machineName ?? "") } ?? .lody(.machine),
       title: machineName ?? text(page.loading ? "common.reading" : "create.row.selectMachine"),
-      placeholder: machineName == nil, loading: page.loading && machineName == nil, options: machineOptions
+      placeholder: machineName == nil, loading: page.loading && machineName == nil, options: machineOptions,
+      searchPlaceholder: text("create.context.searchMachines")
     ))
 
     // Project, or chat only.
@@ -139,6 +140,26 @@ enum CreateSessionContext {
       id: "branch", glyph: .lody(.branch), title: title, placeholder: placeholder,
       loading: page.branchesLoading && page.branch.isEmpty, options: options, searchOptions: names,
       searchPlaceholder: text("create.context.searchBranches"))
+  }
+
+  /// The SF Symbol for a computer, like the system draws Apple devices: a Mac laptop or desktop
+  /// by its name, a PC for Windows, a server for Linux; the generic computer when unknown.
+  static func machineGlyph(_ form: CreateSessionForm, _ id: String, name: String) -> CreateGlyph {
+    let lower = name.lowercased()
+    switch form.machineOs[id] {
+    case "darwin":
+      if lower.contains("macbook") || lower.contains("powerbook") { return .symbol("laptopcomputer") }
+      if lower.contains("mini") { return .symbol("macmini") }
+      if lower.contains("studio") { return .symbol("macstudio") }
+      if lower.contains("mac pro") { return .symbol("macpro.gen3") }
+      return lower.contains("imac") ? .symbol("desktopcomputer") : .symbol("laptopcomputer")
+    case "win32":
+      return .symbol("pc")
+    case "linux":
+      return .symbol("server.rack")
+    default:
+      return .symbol("desktopcomputer")
+    }
   }
 
   private static func projectGlyph(_ id: String) -> CreateGlyph {
@@ -384,7 +405,7 @@ struct OptionList: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
         }
-        .padding(.horizontal, LodySpacing.lg)
+        .padding(.horizontal, LodySpacing.xs)
         .frame(minHeight: LodySize.controlMd)
       }
       ScrollView {
@@ -399,8 +420,6 @@ struct OptionList: View {
       .frame(maxHeight: 280)
       .fixedSize(horizontal: false, vertical: shown.count < 6)
     }
-    // No surface of its own: options sit indented under the line that opened them.
-    .padding(.leading, LodyIconSize.md + LodySpacing.md)
   }
 
   private func row(_ option: CreateOption) -> some View {
@@ -421,7 +440,7 @@ struct OptionList: View {
           .foregroundStyle(LodyColor.accentFg)
       }
     }
-    .padding(.horizontal, LodySpacing.lg)
+    .padding(.horizontal, LodySpacing.xs)
     .frame(minHeight: LodySize.listRow)
     .contentShape(Rectangle())
     .accessibilityAddTraits(option.selected ? [.isButton, .isSelected] : .isButton)

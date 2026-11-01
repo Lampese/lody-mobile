@@ -23731,6 +23731,23 @@
           }
         }
       }
+    },
+    "create.context.searchMachines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search computers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索电脑"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

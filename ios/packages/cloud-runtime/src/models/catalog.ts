@@ -41,6 +41,8 @@ export type Catalog = {
   sessions: Session[];
   machineIds: string[];
   machineNames?: Record<string, string>;
+  /** Each computer's OS (`darwin` / `win32` / `linux`), for its icon. */
+  machineOs?: Record<string, string>;
   machineSimulators?: Record<string, 'available' | 'upgrade-required'>;
 };
 export type SavedCatalog = { catalog: Catalog; syncedAt: number };

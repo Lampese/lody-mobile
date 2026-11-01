@@ -77,6 +77,7 @@ export function projectRows(
     sessions: Session[] = [],
     machineIds = new Set<string>(),
     machineNames: Record<string, string> = {},
+    machineOs: Record<string, string> = {},
     machineSimulators: NonNullable<Catalog['machineSimulators']> = {};
   if (mode !== 'meta') {
     for (const row of rows) {
@@ -125,6 +126,8 @@ export function projectRows(
       machineIds.add(machineId);
       const name = text(value.name);
       if (name) machineNames[machineId] = name;
+      const os = text(value.os);
+      if (os) machineOs[machineId] = os;
       if (value.os === 'darwin')
         machineSimulators[machineId] =
           Number(object(value.protocolCapabilities).iosSimulator) >= 1
@@ -212,6 +215,7 @@ export function projectRows(
     sessions,
     machineIds: [...machineIds],
     machineNames,
+    machineOs,
     machineSimulators,
     agentUsage,
   };

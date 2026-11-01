@@ -72,6 +72,8 @@ struct CreateSessionForm {
   var workspaceId = ""
   var projects: [CreateProject] = []
   var machineNames: [String: String] = [:]
+  /// Computer id to OS, for the computer's icon.
+  var machineOs: [String: String] = [:]
   var prefs: CreatePrefs?
   var locked = false
   // Share Extension: a selection without cached options is sent and finished in the app.

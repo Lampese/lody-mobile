@@ -128,6 +128,8 @@ struct SessionCatalog: Equatable, Sendable {
   var sessions: [SessionItem] = []
   var machineIds: [String] = []
   var machineNames: [String: String] = [:]
+  /// Computer id to OS (`darwin` / `win32` / `linux`), for its icon.
+  var machineOs: [String: String] = [:]
   var machineSimulators: [String: String] = [:]
 
   func session(_ id: String) -> SessionItem? { sessions.first { $0.id == id } }
@@ -149,13 +151,14 @@ struct SessionCatalog: Equatable, Sendable {
       var sessions: [Lossy<SessionItem>]
       var machineIds: [Lossy<String>]
       var machineNames: Lossy<[String: String]>?
+      var machineOs: Lossy<[String: String]>?
       var machineSimulators: Lossy<[String: String]>?
     }
     struct Saved: Decodable { var catalog: Shape }
     guard let shape = try? JSONDecoder().decode(Saved.self, from: saved).catalog else { return nil }
     return SessionCatalog(
       projects: shape.projects.compactMap(\.value), sessions: shape.sessions.compactMap(\.value) + pending,
-      machineIds: shape.machineIds.compactMap(\.value), machineNames: shape.machineNames?.value ?? [:], machineSimulators: shape.machineSimulators?.value ?? [:]
+      machineIds: shape.machineIds.compactMap(\.value), machineNames: shape.machineNames?.value ?? [:], machineOs: shape.machineOs?.value ?? [:], machineSimulators: shape.machineSimulators?.value ?? [:]
     )
   }
 }

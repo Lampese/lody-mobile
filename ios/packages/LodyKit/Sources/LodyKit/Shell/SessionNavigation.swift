@@ -36,6 +36,7 @@ enum SessionNavigation {
         CreateProject(id: $0.id, machineId: $0.machineId, name: $0.name, rootPath: $0.rootPath)
       }
       params.machineNames = state.catalog.machineNames
+      params.machineOs = state.catalog.machineOs
       params.projectId = fields["projectId"] as? String; params.context = fields["context"] as? String
       let draft = fields["draft"] as? [String: Any]
       params.initialText = draft?["text"] as? String

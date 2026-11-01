@@ -6,6 +6,7 @@ struct CreateSessionHostParams: Decodable {
   var workspaceId = ""
   var projects: [CreateProject] = []
   var machineNames: [String: String] = [:]
+  var machineOs: [String: String] = [:]
   var projectId: String?
   var context: String?
   var initialText: String?
@@ -23,6 +24,7 @@ struct CreateSessionHostParams: Decodable {
     workspaceId = try values.decodeIfPresent(String.self, forKey: .workspaceId) ?? ""
     projects = try values.decodeIfPresent([CreateProject].self, forKey: .projects) ?? []
     machineNames = try values.decodeIfPresent([String: String].self, forKey: .machineNames) ?? [:]
+    machineOs = try values.decodeIfPresent([String: String].self, forKey: .machineOs) ?? [:]
     projectId = try values.decodeIfPresent(String.self, forKey: .projectId)
     context = try values.decodeIfPresent(String.self, forKey: .context)
     initialText = try values.decodeIfPresent(String.self, forKey: .initialText)
@@ -33,7 +35,7 @@ struct CreateSessionHostParams: Decodable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case userId, workspaceId, projects, machineNames, projectId, context, initialText, initialAttachmentsJSON, sendHandoff, relay, pushed
+    case userId, workspaceId, projects, machineNames, machineOs, projectId, context, initialText, initialAttachmentsJSON, sendHandoff, relay, pushed
   }
 }
 
@@ -154,7 +156,7 @@ class CreateSessionHostController: UIViewController {
     let prefs = await service.readPrefs(CreateSessionService.prefsKey(userId: params.userId, workspaceId: params.workspaceId))
     controller.form = CreateSessionForm(
       userId: params.userId, workspaceId: params.workspaceId, projects: params.projects,
-      machineNames: params.machineNames, prefs: prefs)
+      machineNames: params.machineNames, machineOs: params.machineOs, prefs: prefs)
     controller.form.open(projectId: params.projectId, context: params.context)
     if let text = params.initialText, !text.isEmpty { input.composer.setInitialDraft(text) }
     if let attachments = params.initialAttachmentsJSON, !attachments.isEmpty { input.composer.setInitialAttachments(attachments) }
