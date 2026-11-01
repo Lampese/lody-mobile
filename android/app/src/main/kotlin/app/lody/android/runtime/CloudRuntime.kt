@@ -39,6 +39,8 @@ data class CatalogSession(
     val id: String, val machineId: String, val projectId: String, val title: String, val status: String, val archived: Boolean, val pinned: Boolean, val createdAt: String,
     val branchName: String? = null, val lastMessageAt: Long? = null, val lastReadAt: Long? = null, val awaitingUserSince: Long? = null,
     val pullRequests: List<CatalogPullRequest> = emptyList(),
+    /** The owning Lody user (session meta `userId`); null from caches written before the field. */
+    val userId: String? = null,
 )
 /** Read projection, never a CRDT replica. Optional feature-specific fields come later. */
 data class CatalogSnapshot(val revision: Long, val projects: List<CatalogProject>, val sessions: List<CatalogSession>, val machineIds: List<String>)

@@ -13,6 +13,8 @@ struct SessionItem: Equatable, Sendable {
   var status = "idle"
   var archived = false
   var pinned = false
+  /// The owning Lody user; nil from runtimes older than the field.
+  var userId: String?
   var projectId = ""
   var createdAt = ""
   var openedBySessionId: String?
@@ -46,7 +48,7 @@ extension SessionItem: Decodable {
   private enum CodingKeys: String, CodingKey {
     case id, title, status, archived, pinned, projectId, createdAt, openedBySessionId, openedByRootSessionId
     case parentSessionId, lastMessageAt, lastReadAt, awaitingUserSince, branchName, lastModel, diff, machineId
-    case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId
+    case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId, userId
   }
 
   private struct Model: Decodable {
@@ -68,6 +70,7 @@ extension SessionItem: Decodable {
     status = value(.status) ?? "idle"
     archived = value(.archived) ?? false
     pinned = value(.pinned) ?? false
+    userId = present(value(.userId))
     projectId = value(.projectId) ?? ""
     createdAt = value(.createdAt) ?? ""
     openedBySessionId = present(value(.openedBySessionId))

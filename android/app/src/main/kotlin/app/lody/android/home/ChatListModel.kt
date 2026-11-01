@@ -38,6 +38,9 @@ enum class TimeBucket { Today, Yesterday, Week, Month, Older }
 
 data class TimeSection(val bucket: TimeBucket, val chats: List<ChatItem>)
 
+/** Whose chats Home lists: only the signed-in user's, or the workspace's. iOS: `HomeScope`. */
+enum class HomeScope(val key: String) { Mine("mine"), Team("team") }
+
 /** How Home groups chats; within a group chats are always newest activity first. iOS: `HomeGrouping`. */
 enum class HomeGrouping(val key: String) { Time("time"), Project("project"), Status("status") }
 
@@ -134,8 +137,22 @@ object ChatListModel {
         }
     }
 
-    /** Home in the view menu's grouping; archived chats are hidden. */
-    fun home(snapshot: CatalogSnapshot, grouping: HomeGrouping, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<HomeSection> =
+    /**
+     * Home in the view menu's grouping; archived chats are hidden. With [owner] ("My tasks"),
+     * only chats whose session meta `userId` is that user are listed.
+     */
+    fun home(
+        snapshot: CatalogSnapshot,
+        grouping: HomeGrouping,
+        owner: String? = null,
+        today: LocalDate = LocalDate.now(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): List<HomeSection> {
+        val scoped = owner?.let { id -> snapshot.copy(sessions = snapshot.sessions.filter { it.userId == id }) } ?: snapshot
+        return grouped(scoped, grouping, today, zone)
+    }
+
+    private fun grouped(snapshot: CatalogSnapshot, grouping: HomeGrouping, today: LocalDate, zone: ZoneId): List<HomeSection> =
         when (grouping) {
             HomeGrouping.Time -> timeline(snapshot, today, zone).map { HomeSection("bucket-${it.bucket}", HomeSection.Header.Bucket(it.bucket), it.chats) }
             HomeGrouping.Project -> byProject(snapshot)

@@ -24,6 +24,17 @@ enum class ChatRowDetail(val key: String, @StringRes val label: Int) {
 object HomeGroupings {
     private const val FILE = "home"
     private const val KEY = "chatGrouping"
+    private const val SCOPE = "chatScope"
+
+    /** Defaults to the team so nothing disappears unasked. */
+    fun loadScope(context: Context): HomeScope {
+        val stored = context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(SCOPE, null)
+        return HomeScope.entries.firstOrNull { it.key == stored } ?: HomeScope.Team
+    }
+
+    fun saveScope(context: Context, scope: HomeScope) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(SCOPE, scope.key).apply()
+    }
 
     fun load(context: Context): HomeGrouping {
         val stored = context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY, null)

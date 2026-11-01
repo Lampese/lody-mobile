@@ -87,14 +87,24 @@ enum InboxSections {
   }
 
   /// iPhone Home in the view menu's grouping; archived chats are hidden.
+  /// - Parameter owner: when set ("My tasks"), only chats owned by this user id are listed.
   static func home(
-    _ catalog: SessionCatalog, grouping: HomeGrouping, idleExpanded: Bool = false, now: Double = LodyRelativeTime.now()
+    _ catalog: SessionCatalog, grouping: HomeGrouping, owner: String? = nil, idleExpanded: Bool = false,
+    now: Double = LodyRelativeTime.now()
   ) -> [LodyListSection] {
+    var catalog = catalog
+    if let owner { catalog.sessions = owned(catalog.sessions, by: owner) }
     switch grouping {
     case .time: timeline(catalog, now: now)
     case .project: byProject(catalog, now: now)
     case .status: byStatus(catalog, idleExpanded: idleExpanded, now: now)
     }
+  }
+
+  /// The owner's chats, plus any child tab whose parent is theirs so trees stay whole.
+  static func owned(_ sessions: [SessionItem], by owner: String) -> [SessionItem] {
+    let mine = Set(sessions.filter { $0.userId == owner }.map(\.id))
+    return sessions.filter { mine.contains($0.id) || $0.parentSessionId.map(mine.contains) == true }
   }
 
   /// Quiet chats beyond this many top-level rows fold behind "Show all" in the status view.

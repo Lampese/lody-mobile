@@ -190,4 +190,14 @@ class ChatListModelTest {
     fun ciLettersMatchWeb() {
         assertEquals(listOf("pass", "fail", "fail", "pending", "pending", ""), listOf("s", "f", "e", "p", "x", null).map(ChatListModel::ci))
     }
+
+    @Test
+    fun myTasksKeepOnlyTheOwnersChats() {
+        val owned = snapshot.copy(sessions = snapshot.sessions.map { if (it.id in setOf("2", "6")) it.copy(userId = "me") else it.copy(userId = "teammate") })
+        fun ids(owner: String?) = ChatListModel.home(owned, HomeGrouping.Time, owner, LocalDate.parse("2026-10-06"), ZoneOffset.UTC).flatMap { section -> section.chats.map { it.id } }
+        assertEquals(listOf("6", "2"), ids("me"))
+        assertEquals(listOf("6", "5", "2", "3", "1"), ids(null))
+        // Chats without an owner (older caches) are not anyone's.
+        assertEquals(emptyList<String>(), ids("nobody"))
+    }
 }

@@ -117,6 +117,8 @@ data class ChatListUiState(
     /** Search results are by time; the Chats list follows the view menu's grouping of [snapshot]. */
     val timeline: List<TimeSection>,
     val snapshot: CatalogSnapshot?,
+    /** The signed-in user, for "My tasks". */
+    val userId: String?,
     val projects: List<ChatGroup>,
     val placeholder: String,
     val workspaces: List<Workspace>,
@@ -163,8 +165,11 @@ fun ChatListScreen(
     }
     var grouping by remember { mutableStateOf(HomeGroupings.load(context)) }
     val selectGrouping = { next: HomeGrouping -> grouping = next; HomeGroupings.save(context, next) }
+    var scope by remember { mutableStateOf(HomeGroupings.loadScope(context)) }
+    val selectScope = { next: HomeScope -> scope = next; HomeGroupings.saveScope(context, next) }
     var idleExpanded by rememberSaveable { mutableStateOf(false) }
-    val sections = remember(state.snapshot, grouping) { state.snapshot?.let { ChatListModel.home(it, grouping) }.orEmpty() }
+    val owner = state.userId.takeIf { scope == HomeScope.Mine }
+    val sections = remember(state.snapshot, grouping, owner) { state.snapshot?.let { ChatListModel.home(it, grouping, owner) }.orEmpty() }
 
     BackHandler(enabled = searching || project != null) {
         if (searching) closeSearch() else projectId = null
@@ -179,7 +184,7 @@ fun ChatListScreen(
                 searching -> SearchTopBar(query, onQueryChange = { query = it }, onClose = closeSearch)
                 project != null -> TitleTopBar(project.name, onBack = { projectId = null })
                 tab == HomeTab.Chats -> Box {
-                    ChatsTopBar(state, grouping, selectGrouping, details, onToggleDetail = toggleDetail, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace)
+                    ChatsTopBar(state, scope, selectScope, grouping, selectGrouping, details, onToggleDetail = toggleDetail, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace)
                     HomeSyncPill(state.sync, Modifier.align(Alignment.Center).statusBarsPadding())
                 }
                 else -> TitleTopBar(stringResource(tab.label), onBack = null)
@@ -224,6 +229,8 @@ fun ChatListScreen(
 @Composable
 private fun ChatsTopBar(
     state: ChatListUiState,
+    scope: HomeScope,
+    onSelectScope: (HomeScope) -> Unit,
     grouping: HomeGrouping,
     onSelectGrouping: (HomeGrouping) -> Unit,
     details: Set<ChatRowDetail>,
@@ -239,7 +246,7 @@ private fun ChatsTopBar(
             IconButton(onClick = onSearch, modifier = Modifier.semantics { contentDescription = search }) {
                 Glyph(LodyIcons.Search, colors.iconPrimary)
             }
-            ViewMenu(grouping, onSelectGrouping, details, onToggleDetail)
+            ViewMenu(scope, onSelectScope, grouping, onSelectGrouping, details, onToggleDetail)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.bgBase, scrolledContainerColor = colors.bgBase),
     )
@@ -316,7 +323,14 @@ private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Un
  * the second row line shows; toggles keep the menu open so several can change at once.
  */
 @Composable
-private fun ViewMenu(grouping: HomeGrouping, onSelectGrouping: (HomeGrouping) -> Unit, details: Set<ChatRowDetail>, onToggle: (ChatRowDetail) -> Unit) {
+private fun ViewMenu(
+    scope: HomeScope,
+    onSelectScope: (HomeScope) -> Unit,
+    grouping: HomeGrouping,
+    onSelectGrouping: (HomeGrouping) -> Unit,
+    details: Set<ChatRowDetail>,
+    onToggle: (ChatRowDetail) -> Unit,
+) {
     val colors = LodyTheme.colors
     var open by remember { mutableStateOf(false) }
     val label = stringResource(R.string.home_view)
@@ -325,6 +339,17 @@ private fun ViewMenu(grouping: HomeGrouping, onSelectGrouping: (HomeGrouping) ->
             Glyph(LodyIcons.Filter, colors.iconPrimary)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bgOverlay) {
+            MenuHeading(stringResource(R.string.home_view_scope))
+            HomeScope.entries.forEach { option ->
+                val chosen = option == scope
+                DropdownMenuItem(
+                    text = { Text(stringResource(option.label), style = LodyTheme.typography.body, color = colors.textPrimary) },
+                    trailingIcon = { if (chosen) Glyph(LodyIcons.Check, colors.accentFg, LodyIconSize.sm) },
+                    onClick = { open = false; onSelectScope(option) },
+                    modifier = Modifier.semantics { this.selected = chosen },
+                )
+            }
+            HorizontalDivider(color = colors.borderSubtle)
             MenuHeading(stringResource(R.string.home_view_grouping))
             HomeGrouping.entries.forEach { option ->
                 val chosen = option == grouping
@@ -366,6 +391,12 @@ private fun MenuHeading(text: String) {
         modifier = Modifier.semantics { heading() }.padding(horizontal = LodySpacing.lg, vertical = LodySpacing.sm),
     )
 }
+
+private val HomeScope.label: Int
+    get() = when (this) {
+        HomeScope.Mine -> R.string.home_scope_mine
+        HomeScope.Team -> R.string.home_scope_team
+    }
 
 private val HomeGrouping.label: Int
     get() = when (this) {

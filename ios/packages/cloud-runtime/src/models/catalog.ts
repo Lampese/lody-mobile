@@ -19,6 +19,8 @@ export type Session = {
   status: string;
   archived: boolean;
   pinned: boolean;
+  /** The Lody user who owns the session (session meta `userId`). */
+  userId?: string;
   projectId: string;
   createdAt: string;
   latestUserMsgId?: string;

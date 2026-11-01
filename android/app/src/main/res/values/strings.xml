@@ -27,6 +27,9 @@
     <string name="home_bucket_older">Older</string>
 
     <!-- Home: grouping -->
+    <string name="home_view_scope">Show</string>
+    <string name="home_scope_mine">My tasks</string>
+    <string name="home_scope_team">Team tasks</string>
     <string name="home_view_grouping">Group by</string>
     <string name="home_grouping_time">Time</string>
     <string name="home_grouping_project">Project</string>

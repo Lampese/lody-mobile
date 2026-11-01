@@ -120,6 +120,7 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
         accountName = user?.name.orEmpty(),
         timeline = snapshot?.let { ChatListModel.timeline(it) }.orEmpty(),
         snapshot = snapshot,
+        userId = user?.id,
         projects = snapshot?.let(ChatListModel::groups).orEmpty(),
         placeholder = placeholder,
         workspaces = user?.workspaces.orEmpty(),

@@ -17,6 +17,23 @@ enum HomeGrouping: String, CaseIterable, Sendable {
   }
 }
 
+/// Whose chats Home lists: only the signed-in user's, or the whole workspace's. Chosen in the
+/// view menu, stored per device; defaults to the team so nothing disappears unasked.
+enum HomeScope: String, CaseIterable, Sendable {
+  case mine, team
+
+  private static let key = "homeChatScope"
+
+  static var stored: HomeScope {
+    UserDefaults.standard.string(forKey: key).flatMap(HomeScope.init(rawValue:)) ?? .team
+  }
+
+  static func store(_ value: HomeScope) {
+    UserDefaults.standard.set(value.rawValue, forKey: key)
+    NotificationCenter.default.post(name: .lodyHomeGroupingChanged, object: nil)
+  }
+}
+
 /// "By status" groups, most pressing first. Mirrors web `lib/home-now.ts`: every chat lands in
 /// exactly one group, under the first reason that applies.
 enum HomeStatusGroup: String, CaseIterable, Sendable {

@@ -98,7 +98,8 @@ final class InboxController: UIViewController {
     list.setPlaceholder(listPlaceholder(state))
     // iPhone Home groups by the view menu's choice (time / project / status).
     if traitCollection.horizontalSizeClass != .regular {
-      list.setSections(InboxSections.home(catalog, grouping: HomeGrouping.stored, idleExpanded: idleExpanded))
+      let owner = HomeScope.stored == .mine ? state.userId : nil
+      list.setSections(InboxSections.home(catalog, grouping: HomeGrouping.stored, owner: owner, idleExpanded: idleExpanded))
       return
     }
     let pinOrder = pinOrder(state, catalog: catalog)

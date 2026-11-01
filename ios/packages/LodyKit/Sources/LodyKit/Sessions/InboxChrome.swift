@@ -275,9 +275,19 @@ final class InboxChrome {
         ) { _ in HomeGrouping.store(grouping) }
       })
     }
+    let scopes = UIDeferredMenuElement.uncached { completion in
+      let current = HomeScope.stored
+      completion([(HomeScope.mine, "person"), (.team, "person.2")].map { scope, symbol in
+        UIAction(
+          title: String(localized: String.LocalizationValue("home.scope." + scope.rawValue), bundle: .lody),
+          image: UIImage(systemName: symbol), state: current == scope ? .on : .off
+        ) { _ in HomeScope.store(scope) }
+      })
+    }
     return UIMenu(
       title: String(localized: "inbox.settings.section.view", bundle: .lody),
       children: [
+        UIMenu(title: String(localized: "home.view.scope", bundle: .lody), options: [.displayInline, .singleSelection], children: [scopes]),
         UIMenu(title: String(localized: "home.view.grouping", bundle: .lody), options: [.displayInline, .singleSelection], children: [groupings]),
         UIMenu(title: String(localized: "home.view.details", bundle: .lody), options: .displayInline, children: [toggles]),
       ]

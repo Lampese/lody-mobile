@@ -27,6 +27,9 @@
     <string name="home_bucket_older">更早</string>
 
     <!-- Home: grouping -->
+    <string name="home_view_scope">范围</string>
+    <string name="home_scope_mine">我的任务</string>
+    <string name="home_scope_team">团队任务</string>
     <string name="home_view_grouping">分组</string>
     <string name="home_grouping_time">按时间</string>
     <string name="home_grouping_project">按项目</string>

@@ -171,6 +171,7 @@ export function projectRows(
         text(value.status) || text(object(value.status).type) || labels.unknown,
       archived: value.isArchived === true,
       pinned: value.isPinned === true,
+      userId: text(value.userId) || undefined,
       projectId,
       createdAt: text(value.createdAt),
       latestUserMsgId: text(value.latestUserMsgId) || undefined,

@@ -15,6 +15,11 @@ References: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5 and https://zod.de
 
 Bridge protocol 2 adds an explicit command capability handshake, `$cancel`, native command deadlines, and ordered message chunks. It wraps the original JS runtime; it does not change the upstream cloud protocol. Fixtures use synthetic catalog data matching the vendored event shapes, not captured user data. The offline document exposes `ping`, `setActive`, and `probeSchema`. The network document additionally advertises `connect`, `grant`, `watchSession`, and `closeSession`, used through the native scoped runtime. Session reads reuse the upstream Loro projection and emit typed text messages to Compose. Both network gates allow only same-workspace catalog/session GETs (plus HEAD and native CORS preflight); returning to the list stops the session subscription. No write capability is advertised.
 
+Android also applies `src/catalog-owner.mjs` at bundle time: it adds the session owner
+(`userId`, from session meta) to the catalog projection, the same line upstream
+`packages/cloud-runtime` now carries, for Home's "My tasks". It fails the build if
+the anchor moves; drop it at the next re-snapshot.
+
 Android applies `src/catalog-budget.mjs` at bundle time to raise the three catalog
 input guards from 8 MiB to 16 MiB per replica. A real machine catalog with about
 9.2 MiB of bootstrap input exceeded the original limit and prevented workspace

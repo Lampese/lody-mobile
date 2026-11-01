@@ -13,6 +13,7 @@ object CatalogJson {
 
     fun session(base: CatalogSession, json: JSONObject) = base.copy(
         branchName = json.optText("branchName"),
+        userId = json.optText("userId"),
         lastMessageAt = json.optMillis("lastMessageAt"),
         lastReadAt = json.optMillis("lastReadAt"),
         awaitingUserSince = json.optMillis("awaitingUserSince"),
@@ -27,6 +28,7 @@ object CatalogJson {
 
     fun putSession(json: JSONObject, session: CatalogSession): JSONObject = json.apply {
         session.branchName?.let { put("branchName", it) }
+        session.userId?.let { put("userId", it) }
         session.lastMessageAt?.let { put("lastMessageAt", it) }
         session.lastReadAt?.let { put("lastReadAt", it) }
         session.awaitingUserSince?.let { put("awaitingUserSince", it) }
