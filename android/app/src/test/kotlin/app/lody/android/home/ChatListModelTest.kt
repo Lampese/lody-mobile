@@ -200,4 +200,27 @@ class ChatListModelTest {
         // Chats without an owner (older caches) are not anyone's.
         assertEquals(emptyList<String>(), ids("nobody"))
     }
+
+    @Test
+    fun nestsOpenedChatsUnderTheirRootOpenerInTheSameGroup() {
+        val opened = snapshot.copy(
+            sessions = snapshot.sessions.map {
+                when (it.id) {
+                    // #2 opened #1 and #5; #5's opener is a Tab of #2, which resolves to #2.
+                    "1" -> it.copy(openedBySessionId = "2")
+                    "5" -> it.copy(openedBySessionId = "t", openedByRootSessionId = "t")
+                    else -> it
+                }
+            } + CatalogSession("t", "m", "p-zed", "Tab", "idle", false, false, "2026-09-01T00:00:00Z", parentSessionId = "2"),
+        )
+        val zed = ChatListModel.byProject(opened).first { it.header == HomeSection.Header.Project("zed") }.chats
+        // The family takes its freshest member's (#5) place; the contained Tab keeps its own row.
+        assertEquals(listOf("2", "5", "1", "t"), zed.map { it.id })
+        assertEquals(listOf(null, "2", "2", null), zed.map { it.nestedUnder })
+        assertEquals(listOf(false, false, true, false), zed.map { it.lastChild })
+        assertTrue(zed[0].treeParent)
+        // An opener in another group (#3 opened by #2, different project) stays top-level.
+        val other = opened.copy(sessions = opened.sessions.map { if (it.id == "3") it.copy(openedBySessionId = "2") else it })
+        assertNull(ChatListModel.byProject(other).first { it.header == HomeSection.Header.Project("Alpha") }.chats.single().nestedUnder)
+    }
 }

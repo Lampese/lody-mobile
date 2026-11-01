@@ -41,6 +41,10 @@ data class CatalogSession(
     val pullRequests: List<CatalogPullRequest> = emptyList(),
     /** The owning Lody user (session meta `userId`); null from caches written before the field. */
     val userId: String? = null,
+    /** Opened-by relations (Home nests a chat under the one that opened it) and Tab containment. */
+    val openedBySessionId: String? = null,
+    val openedByRootSessionId: String? = null,
+    val parentSessionId: String? = null,
 )
 /** Read projection, never a CRDT replica. Optional feature-specific fields come later. */
 data class CatalogSnapshot(val revision: Long, val projects: List<CatalogProject>, val sessions: List<CatalogSession>, val machineIds: List<String>)

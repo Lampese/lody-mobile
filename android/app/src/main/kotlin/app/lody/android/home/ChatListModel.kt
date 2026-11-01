@@ -29,6 +29,13 @@ data class ChatItem(
     val projectId: String = "",
     /** The "by status" group, decided from the catalog session (see [StatusGroup]). */
     val statusGroup: StatusGroup = StatusGroup.Idle,
+    /** The chat that opened this one (resolved like iOS `SessionRows.tree`), if any. */
+    val openerId: String? = null,
+    /** Set by [ChatListModel.nest]: shown nested under this row id. */
+    val nestedUnder: String? = null,
+    val lastChild: Boolean = false,
+    /** Has nested rows right below it; the tree trunk starts here. */
+    val treeParent: Boolean = false,
 ) {
     val unread: Boolean get() = attention == ChatAttention.Unread
 }
@@ -148,7 +155,11 @@ object ChatListModel {
         today: LocalDate = LocalDate.now(),
         zone: ZoneId = ZoneId.systemDefault(),
     ): List<HomeSection> {
-        val scoped = owner?.let { id -> snapshot.copy(sessions = snapshot.sessions.filter { it.userId == id }) } ?: snapshot
+        // A contained Tab of the owner's chat stays with it, as on iOS (`InboxSections.owned`).
+        val scoped = owner?.let { id ->
+            val mine = snapshot.sessions.filter { it.userId == id }.mapTo(mutableSetOf()) { it.id }
+            snapshot.copy(sessions = snapshot.sessions.filter { it.id in mine || it.parentSessionId in mine })
+        } ?: snapshot
         return grouped(scoped, grouping, today, zone)
     }
 
@@ -166,7 +177,7 @@ object ChatListModel {
             .groupBy { if (isChat(it.projectId)) CHATS_ID else it.projectId }
             .map { (key, chats) ->
                 val header = if (key == CHATS_ID) HomeSection.Header.Chats else HomeSection.Header.Project(names[key].orEmpty())
-                HomeSection("project-$key", header, chats)
+                HomeSection("project-$key", header, nest(chats))
             }
     }
 
@@ -174,7 +185,7 @@ object ChatListModel {
     fun byStatus(snapshot: CatalogSnapshot): List<HomeSection> {
         val groups = homeItems(snapshot).groupBy { it.statusGroup }
         return StatusGroup.entries.mapNotNull { group ->
-            groups[group]?.let { HomeSection("status-$group", HomeSection.Header.Status(group), it) }
+            groups[group]?.let { HomeSection("status-$group", HomeSection.Header.Status(group), nest(it)) }
         }
     }
 
@@ -184,13 +195,60 @@ object ChatListModel {
     /** Non-archived rows, newest activity first, carrying their project for the detail line. */
     private fun homeItems(snapshot: CatalogSnapshot): List<ChatItem> {
         val projects = snapshot.projects.associateBy { it.id }
+        val all = snapshot.sessions.associateBy { it.id }
         return snapshot.sessions
             .filter { !it.archived }
             .map { session ->
                 val project = projects[session.projectId]?.takeUnless { isChat(it.id) }
-                item(session, project?.name.orEmpty(), project?.repoFullName != null)
+                item(session, project?.name.orEmpty(), project?.repoFullName != null).copy(openerId = opener(session, all))
             }
             .sortedByDescending { it.activityAt ?: Long.MIN_VALUE }
+    }
+
+    /**
+     * The session that opened [session], mirroring iOS `SessionRows.tree`: contained Tabs keep
+     * their own entry; an opener inside a Tab resolves to that Tab's root; the opener must share
+     * the project and archive state.
+     */
+    private fun opener(session: CatalogSession, all: Map<String, CatalogSession>): String? {
+        if (session.parentSessionId != null) return null
+        var id = session.openedByRootSessionId ?: session.openedBySessionId ?: return null
+        val seen = mutableSetOf<String>()
+        while (seen.add(id)) id = all[id]?.parentSessionId ?: break
+        val opener = all[id] ?: return null
+        return id.takeIf { it != session.id && opener.projectId == session.projectId && opener.archived == session.archived }
+    }
+
+    /**
+     * Nests each chat under its root opener when that opener is in the same group (one level, as
+     * on web and iOS). A family takes its freshest member's place; members keep their order.
+     */
+    fun nest(chats: List<ChatItem>): List<ChatItem> {
+        val byId = chats.associateBy { it.id }
+        fun root(chat: ChatItem): String {
+            val seen = mutableSetOf(chat.id)
+            var current = chat
+            while (true) {
+                val next = current.openerId?.let(byId::get) ?: return current.id
+                if (!seen.add(next.id)) return chat.id
+                current = next
+            }
+        }
+        val order = mutableListOf<String>()
+        val children = mutableMapOf<String, MutableList<ChatItem>>()
+        for (chat in chats) {
+            val id = root(chat)
+            if (id !in children) {
+                children[id] = mutableListOf()
+                order += id
+            }
+            if (id != chat.id) children.getValue(id) += chat
+        }
+        return order.flatMap { id ->
+            val kids = children.getValue(id)
+            listOf(byId.getValue(id).copy(treeParent = kids.isNotEmpty(), nestedUnder = null, lastChild = false)) +
+                kids.mapIndexed { index, kid -> kid.copy(nestedUnder = id, lastChild = index == kids.lastIndex, treeParent = false) }
+        }
     }
 
     fun isUnread(session: CatalogSession): Boolean {
@@ -225,7 +283,7 @@ object ChatListModel {
         return homeItems(snapshot)
             .groupBy { bucket(it.activityAt, today, zone) }
             .toSortedMap()
-            .map { (bucket, chats) -> TimeSection(bucket, chats) }
+            .map { (bucket, chats) -> TimeSection(bucket, nest(chats)) }
     }
 
     fun bucket(createdAt: String, today: LocalDate, zone: ZoneId): TimeBucket =
@@ -274,7 +332,7 @@ object ChatListModel {
         return sections.mapNotNull { section ->
             section.chats.filter { it.title.contains(term, ignoreCase = true) || it.place.contains(term, ignoreCase = true) }
                 .takeIf { it.isNotEmpty() }
-                ?.let { section.copy(chats = it) }
+                ?.let { section.copy(chats = nest(it)) }
         }
     }
 

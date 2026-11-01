@@ -43,6 +43,8 @@ struct LodyListRow {
   var parent: Bool = false
   var parentId: String = ""
   var lastChild: Bool = false
+  /// Has nested rows right below it (`SessionRows.treeRows`); Home draws the tree trunk from it.
+  var treeParent: Bool = false
   var collapsedValue: String = ""
   var collapsedBadge: String = ""
   var collapsedImageTint: String = ""

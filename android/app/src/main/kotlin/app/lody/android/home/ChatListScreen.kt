@@ -68,6 +68,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -687,17 +689,21 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
     val pr = chat.prStatus.takeIf { ChatRowDetail.PullRequest in details && it in PrStatuses }
     // A PR mark alone stays on the title line, before the age; it is always the trailing mark of its line.
     val twoLine = place != null || branch != null
+    val nested = chat.nestedUnder != null
+    val treeColor = colors.borderDefault
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LodySize.listRow)
+            .drawBehind { if (nested || chat.treeParent) drawTree(treeColor, nested, chat.lastChild, chat.treeParent, chat.attention != null) }
             .clickable(onClick = onClick)
             .padding(end = LodyLayout.screenPaddingX)
             .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The status slot spans the gutter and centres on the whole row; empty when idle.
-        Box(Modifier.width(LodyLayout.childIndent), contentAlignment = Alignment.Center) {
+        // The status slot spans the gutter and centres on the whole row; empty when idle. A nested
+        // row's slot (and so its title) steps in one level.
+        Box(Modifier.padding(start = if (nested) TreeLevel else 0.dp).width(LodyLayout.childIndent), contentAlignment = Alignment.Center) {
             chat.attention?.let { AttentionGlyph(it) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
@@ -739,6 +745,30 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
                 }
             }
         }
+    }
+}
+
+/** One nesting level: how far a nested row's mark and title step in (iOS `TreeLines.level`). */
+private val TreeLevel = LodySpacing.lg
+
+/**
+ * Web's opened-by tree connectors (`session-row-leading-slot.tsx`) in the mobile gutter: a trunk
+ * down the parent's status-mark column, from below its mark through each nested row (stopping at
+ * the last one's centre), and an elbow into the nested row's own mark, or toward its title when
+ * it has none. Rows sit edge to edge, so each draws only its own height and the pieces join.
+ */
+private fun DrawScope.drawTree(color: Color, nested: Boolean, lastChild: Boolean, parent: Boolean, marked: Boolean) {
+    val x = (LodyLayout.childIndent / 2).toPx()
+    val mid = size.height / 2
+    val stroke = 1.dp.toPx()
+    if (parent) {
+        drawLine(color, Offset(x, mid + (LodyIconSize.md / 2 + LodySpacing.xxs).toPx()), Offset(x, size.height), stroke)
+    }
+    if (nested) {
+        drawLine(color, Offset(x, 0f), Offset(x, if (lastChild) mid else size.height), stroke)
+        val end = if (marked) TreeLevel + LodyLayout.childIndent / 2 - LodyIconSize.md / 2 + LodySpacing.xxs
+        else LodyLayout.childIndent + TreeLevel - LodySpacing.sm
+        drawLine(color, Offset(x, mid), Offset(end.toPx(), mid), stroke)
     }
 }
 

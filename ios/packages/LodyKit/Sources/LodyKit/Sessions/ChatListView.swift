@@ -221,7 +221,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
     a.title == b.title && a.subtitle == b.subtitle && a.unread == b.unread && a.imageTint == b.imageTint
       && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus && a.prCI == b.prCI
-      && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.highlight == b.highlight && ea == eb
+      && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.lastChild == b.lastChild && a.treeParent == b.treeParent && a.highlight == b.highlight && ea == eb
   }
 
   private func updatePlaceholder() {
@@ -527,6 +527,9 @@ private struct ChatRowContent: View {
   private var hasDetailLine: Bool { !project.isEmpty || !branch.isEmpty }
   private var inlinePullRequest: PullRequestMark? { snippet != nil || !hasDetailLine ? pullRequest : nil }
 
+  private var attention: Attention? { Attention(tint: row.imageTint, unread: row.unread) }
+  private var nested: Bool { !row.parentId.isEmpty }
+
   /// Search results keep their match snippet in place of the detail line.
   private var snippet: String? {
     row.wrapSubtitle && !row.subtitle.isEmpty ? row.subtitle : nil
@@ -534,12 +537,13 @@ private struct ChatRowContent: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: 0) {
-      // The status slot under the group icon, centred on the whole row.
+      // The status slot, centred on the whole row; a nested row's slot steps in one level.
       ZStack {
-        if let attention = Attention(tint: row.imageTint, unread: row.unread) { AttentionGlyph(attention: attention) }
+        if let attention { AttentionGlyph(attention: attention) }
       }
       .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-      .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (row.parentId.isEmpty ? 0 : LodySpacing.lg), alignment: .leading)
+      .padding(.leading, nested ? TreeLines.level : 0)
+      .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (nested ? TreeLines.level : 0), alignment: .leading)
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
           Text(row.title)
@@ -571,6 +575,11 @@ private struct ChatRowContent: View {
     .padding(.horizontal, LodyLayout.screenPaddingX)
     .padding(.vertical, snippet != nil || hasDetailLine ? LodySpacing.sm : 0)
     .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
+    .background {
+      if nested || row.treeParent {
+        TreeLines(nested: nested, lastChild: row.lastChild, parent: row.treeParent, marked: attention != nil)
+      }
+    }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.title)
     .accessibilityValue(
@@ -594,6 +603,44 @@ private struct ChatRowContent: View {
       pullRequest?.glyph
     }
     .frame(maxWidth: .infinity)
+  }
+}
+
+/// Web's opened-by tree connectors (`session-row-leading-slot.tsx`) in the mobile gutter: a
+/// trunk down the parent's status-mark column, from below its mark through each nested row
+/// (stopping at the last one's centre), and an elbow into the nested row's own mark, or toward
+/// its title when it has none. Rows sit edge to edge, so each draws only its own height and the
+/// pieces read as one line.
+private struct TreeLines: View {
+  /// One nesting level: how far a nested row's mark and title step in.
+  static let level = LodySpacing.lg
+
+  let nested: Bool
+  let lastChild: Bool
+  let parent: Bool
+  let marked: Bool
+
+  var body: some View {
+    Canvas { context, size in
+      let x = LodyLayout.screenPaddingX + LodyIconSize.md / 2
+      let mid = size.height / 2
+      var path = Path()
+      if parent {
+        path.move(to: CGPoint(x: x, y: mid + LodyIconSize.md / 2 + LodySpacing.xxs))
+        path.addLine(to: CGPoint(x: x, y: size.height))
+      }
+      if nested {
+        path.move(to: CGPoint(x: x, y: 0))
+        path.addLine(to: CGPoint(x: x, y: lastChild ? mid : size.height))
+        let end = marked
+          ? LodyLayout.screenPaddingX + Self.level + LodySpacing.xxs
+          : LodyLayout.childIndent + Self.level - LodySpacing.sm
+        path.move(to: CGPoint(x: x, y: mid))
+        path.addLine(to: CGPoint(x: end, y: mid))
+      }
+      context.stroke(path, with: .color(LodyColor.borderDefault), lineWidth: 1)
+    }
+    .accessibilityHidden(true)
   }
 }
 
