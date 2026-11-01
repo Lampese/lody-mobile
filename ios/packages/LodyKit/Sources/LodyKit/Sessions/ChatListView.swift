@@ -48,7 +48,14 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     config.headerTopPadding = 0
     config.trailingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipe(path, leading: false) }
     config.leadingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipe(path, leading: true) }
-    collection = UICollectionView(frame: bounds, collectionViewLayout: UICollectionViewCompositionalLayout.list(using: config))
+    // Group labels scroll with their rows (as on web and Android): a plain list pins headers by
+    // default, and a pinned label on a clear background overlaps the rows passing beneath it.
+    let layout = UICollectionViewCompositionalLayout { _, environment in
+      let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+      section.boundarySupplementaryItems.forEach { $0.pinToVisibleBounds = false }
+      return section
+    }
+    collection = UICollectionView(frame: bounds, collectionViewLayout: layout)
     collection.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     collection.backgroundColor = .clear
     collection.delegate = self
