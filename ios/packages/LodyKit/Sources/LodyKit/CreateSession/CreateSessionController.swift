@@ -1,4 +1,5 @@
 import LodyCore
+import LodyDesignSystem
 import UIKit
 
 @MainActor
@@ -22,8 +23,8 @@ final class CreateSessionController: UIViewController {
 
   let composer: ChatComposerView
   private let host: UIView
-  private let paged = LodyPagedList(frame: .zero)
-  private let single = LodyGroupedList(frame: .zero)
+  private let context = CreateSessionContextView()
+  private let signedOutLabel = UILabel()
   private lazy var hostHeight = host.heightAnchor.constraint(equalToConstant: 64)
   private var loads: [Bool: Task<Void, Never>] = [:]
   private var retryTimer: Timer?
@@ -49,25 +50,19 @@ final class CreateSessionController: UIViewController {
     close.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
     navigationItem.rightBarButtonItem = UIBarButtonItem(customView: close)
 
-    for list in [paged, single] as [UIView] {
-      list.translatesAutoresizingMaskIntoConstraints = false
-      view.addSubview(list)
-      NSLayoutConstraint.activate([
-        list.topAnchor.constraint(equalTo: view.topAnchor),
-        list.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-        list.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        list.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-      ])
-    }
-    paged.setTransparent(true)
-    single.setTransparent(true)
-    paged.setGrouped(true)
-    single.setGrouped(true)
-    paged.forwardedRowPress = { [weak self] in self?.rowPressed($0["id"] as? String ?? "") }
-    paged.forwardedPageChange = { [weak self] in self?.pageChanged($0) }
-    single.forwarded = { [weak self] name, body in
-      if name == "rowPress" { self?.rowPressed(body["id"] as? String ?? "") }
-    }
+    view.backgroundColor = LodyUIColor.bgBase
+    context.onPress = { [weak self] id in self?.rowPressed(id) }
+    context.onPick = { [weak self] id, option in self?.optionPicked(id, option) }
+    context.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(context)
+    signedOutLabel.text = String(localized: "native.share.signIn", bundle: .lody)
+    signedOutLabel.font = LodyTextStyle.body.uiFont
+    signedOutLabel.adjustsFontForContentSizeCategory = true
+    signedOutLabel.textColor = LodyUIColor.textSecondary
+    signedOutLabel.textAlignment = .center
+    signedOutLabel.numberOfLines = 0
+    signedOutLabel.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(signedOutLabel)
 
     host.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(host)
@@ -78,6 +73,14 @@ final class CreateSessionController: UIViewController {
       host.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       host.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -16),
       keyboard, hostHeight,
+      // The context sits right above the composer, within thumb reach, and rides up with it.
+      context.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: LodyLayout.screenPaddingX * 2),
+      context.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -LodyLayout.screenPaddingX),
+      context.bottomAnchor.constraint(equalTo: host.topAnchor, constant: -LodySpacing.md),
+      context.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: LodySpacing.md),
+      signedOutLabel.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
+      signedOutLabel.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: LodyLayout.screenPaddingX * 2),
+      signedOutLabel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -LodyLayout.screenPaddingX * 2),
     ])
     composer.setInputIdentifier("create-session-input")
     composer.setComposerState(CreateJSON.encode(["placeholder": String(localized: "create.composer.placeholder", bundle: .lody)]))
@@ -98,13 +101,6 @@ final class CreateSessionController: UIViewController {
     }
   }
 
-  override func viewDidLayoutSubviews() {
-    super.viewDidLayoutSubviews()
-    let inset = max(0, view.bounds.height - host.frame.minY)
-    paged.setBottomInset(inset)
-    single.setBottomInset(inset)
-  }
-
   func setComposerHeight(_ height: CGFloat) {
     guard hostHeight.constant != height else { return }
     hostHeight.constant = height
@@ -114,29 +110,35 @@ final class CreateSessionController: UIViewController {
   func render() {
     guard isViewLoaded else { return }
     let signedOut = form.signedOut
-    paged.isHidden = form.locked || signedOut
-    single.isHidden = !paged.isHidden
-    if signedOut {
-      single.setPlaceholder(String(localized: "native.share.signIn", bundle: .lody))
-      single.setSections([])
-    } else if form.locked {
-      single.setSections(CreateSessionSections.root(form, page: form.project))
-    } else {
-      paged.setPages([
-        page("project", "create.type.project", form.project),
-        page("chat", "create.type.chat", form.chatPage),
-      ])
-      paged.setSelectedPage(form.chat ? 1 : 0)
-    }
+    signedOutLabel.isHidden = !signedOut
+    context.isHidden = signedOut
+    if !signedOut { context.update(rows: CreateSessionContext.rows(form), note: CreateSessionContext.note(form)) }
     renderComposer()
   }
 
-  private func page(_ id: String, _ title: String, _ state: CreateSessionPage) -> LodyPagedPage {
-    var page = LodyPagedPage()
-    page.id = id
-    page.title = String(localized: String.LocalizationValue(title), bundle: .lody)
-    page.sections = CreateSessionSections.root(form, page: state)
-    return page
+  /// A menu choice in the context block: computer, assistant, or project vs plain chat.
+  private func optionPicked(_ id: String, _ option: String) {
+    guard !sending else { return render() }
+    switch (id, option) {
+    case ("project", CreateSessionContext.chatOption):
+      guard !form.chat else { return }
+      form.switchPage(chat: true)
+      changed()
+    case ("project", _):
+      if form.chat {
+        form.switchPage(chat: false)
+        changed()
+      }
+      pickProject()
+    case ("machine", _):
+      form.selectMachine(option)
+      changed()
+    case ("agent", _):
+      form.selectAgent(option)
+      changed()
+    default:
+      break
+    }
   }
 
   private func renderComposer() {
@@ -200,15 +202,6 @@ final class CreateSessionController: UIViewController {
     guard isViewLoaded, !sending, !form.deferUnresolved else { return }
     load(chat: false)
     if !form.locked { load(chat: true) }
-  }
-
-  private func pageChanged(_ index: Int) {
-    guard !sending else {
-      paged.setSelectedPage(form.chat ? 1 : 0)
-      return
-    }
-    form.switchPage(chat: index == 1)
-    changed()
   }
 
   private func rowPressed(_ id: String) {
