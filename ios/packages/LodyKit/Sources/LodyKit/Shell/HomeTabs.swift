@@ -104,6 +104,17 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     updateVisibility()
   }
 
+  /// Each tab page owns a bar, and a tap or drag moves only the bar it happened on. A cached page
+  /// coming back would still show whatever its bar last selected, so the shell re-selects its
+  /// own tab before the page is shown.
+  func show(_ tab: HomeTab) {
+    guard let index = HomeTab.allCases.firstIndex(of: tab), let item = bar.items?[index], bar.selectedItem !== item else { return }
+    UIView.performWithoutAnimation {
+      bar.selectedItem = item
+      bar.layoutIfNeeded()
+    }
+  }
+
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
     guard HomeTab.allCases.indices.contains(item.tag) else { return }
     actions.select(HomeTab.allCases[item.tag])
