@@ -31,9 +31,8 @@ enum SessionNavigation {
     case "create":
       var params = CreateSessionHostParams()
       params.userId = state.userId; params.workspaceId = state.workspaceId
-      let index = UserDefaults.standard.integer(forKey: "inboxProjectSort")
-      let sort = InboxSort.allCases.indices.contains(index) ? InboxSort.allCases[index] : .name
-      params.projects = InboxSections.sortProjects(state.catalog.projects, sessions: state.catalog.sessions, sort: sort).filter { !SessionRows.isChat($0.id) }.map {
+      // Most recently active first: the new-session project menu offers the first five.
+      params.projects = InboxSections.sortProjects(state.catalog.projects, sessions: state.catalog.sessions, sort: .activity).filter { !SessionRows.isChat($0.id) }.map {
         CreateProject(id: $0.id, machineId: $0.machineId, name: $0.name, rootPath: $0.rootPath)
       }
       params.machineNames = state.catalog.machineNames

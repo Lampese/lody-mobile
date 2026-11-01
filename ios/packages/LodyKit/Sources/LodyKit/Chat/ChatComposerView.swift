@@ -10,6 +10,7 @@ import LexicalHTML
 import LexicalLinkPlugin
 import LexicalListPlugin
 import LexicalMarkdown
+import LodyDesignSystem
 import UIKit
 import UniformTypeIdentifiers
 
@@ -602,8 +603,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   }
   private let mentionButton = UIButton(type: .system)
   private let permissionButton = UIButton(type: .system)
-  private var modelLeading: NSLayoutConstraint?
-  private var permissionLeading: NSLayoutConstraint?
+  /// Web's mobile composer order after +: @, the run-config chip (assistant mark, model ·
+  /// effort, fast), the permission shield. A stack, so hidden controls close their gap.
+  private let controls = UIStackView()
   private var mentionHeight: NSLayoutConstraint!
   private let queueView = ChatQueueView()
   private var queueHeight: NSLayoutConstraint!
@@ -659,6 +661,15 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   var onHeightChange: ((CGFloat) -> Void)?
   var displayError: String? { didSet { updateComposer() } }
   private var measuredWidth: CGFloat = 0
+  /// Web's mobile composer card instead of the glass pill / keyboard sheet: always shows its
+  /// controls row and keeps @ visible. Set by the new-session page.
+  var cardStyle = false {
+    didSet {
+      guard cardStyle != oldValue else { return }
+      (surfaceLayout as? ChatComposerLiquidGlassSurfaceLayout)?.setCard(cardStyle)
+      updateComposer()
+    }
+  }
   private lazy var surfaceLayout: any ChatComposerSurfaceLayout = ChatComposerLiquidGlassSurfaceLayout(
     container: composer,
     inputSurface: inputSurface
@@ -851,10 +862,14 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       sheetContent.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor),
       sheetContentBottom,
     ])
-    for view in [mentionPanel, mentionSeparator, attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, modelButton, mentionButton, permissionButton, send, grabber] {
+    controls.axis = .horizontal
+    controls.alignment = .center
+    controls.spacing = 0
+    for view in [mentionButton, modelButton, permissionButton] { controls.addArrangedSubview(view) }
+    for view in [mentionPanel, mentionSeparator, attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, controls, send, grabber] {
       inputSurface.contentView.addSubview(view)
     }
-    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, quickRepliesView, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, grabber] {
+    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, quickRepliesView, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, grabber] {
       view.translatesAutoresizingMaskIntoConstraints = false
     }
     inputHeight = editorView.heightAnchor.constraint(equalToConstant: 48)
@@ -921,21 +936,15 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       send.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor, constant: -2),
       send.bottomAnchor.constraint(equalTo: sheetContent.bottomAnchor, constant: -2),
       send.widthAnchor.constraint(equalToConstant: 44), send.heightAnchor.constraint(equalToConstant: 44),
-      mentionButton.leadingAnchor.constraint(equalTo: inputSurface.leadingAnchor, constant: 52),
-      mentionButton.centerYAnchor.constraint(equalTo: send.centerYAnchor),
+      controls.leadingAnchor.constraint(equalTo: attach.trailingAnchor),
+      controls.centerYAnchor.constraint(equalTo: send.centerYAnchor),
+      controls.trailingAnchor.constraint(lessThanOrEqualTo: send.leadingAnchor, constant: -2),
       mentionButton.widthAnchor.constraint(equalToConstant: 44), mentionButton.heightAnchor.constraint(equalToConstant: 44),
-      permissionButton.centerYAnchor.constraint(equalTo: send.centerYAnchor),
       permissionButton.widthAnchor.constraint(equalToConstant: 44), permissionButton.heightAnchor.constraint(equalToConstant: 44),
-      modelButton.centerYAnchor.constraint(equalTo: send.centerYAnchor),
       modelButton.heightAnchor.constraint(equalToConstant: 44),
-      modelButton.trailingAnchor.constraint(equalTo: send.leadingAnchor, constant: -2),
     ])
     attachLeading = attach.leadingAnchor.constraint(equalTo: inputSurface.contentView.leadingAnchor, constant: 2)
     attachLeading.isActive = true
-    permissionLeading = permissionButton.leadingAnchor.constraint(equalTo: mentionButton.trailingAnchor)
-    permissionLeading?.isActive = true
-    modelLeading = modelButton.leadingAnchor.constraint(greaterThanOrEqualTo: inputSurface.contentView.leadingAnchor, constant: 2)
-    modelLeading?.isActive = true
     updateComposer()
   }
 
@@ -1404,11 +1413,11 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     mentionPanel.update(input: input, items: activeMentionItems ?? [], enabled: activeMentionItems != nil)
     mentionHeight.constant = mentionPanel.panelHeight
     mentionSeparator.alpha = mentionPanel.panelHeight > 0 ? 1 : 0
-    mentionButton.isHidden = activeMentionItems == nil || !input.isFirstResponder
+    mentionButton.isHidden = activeMentionItems == nil || (!input.isFirstResponder && !cardStyle)
     mentionButton.isEnabled = state.editable && !state.sending && pendingDraft == nil
     let sending = state.sending || pendingDraft != nil
     if !state.editable && input.isFirstResponder { input.resignFirstResponder() }
-    let expanded = input.isFirstResponder
+    let expanded = input.isFirstResponder || cardStyle
     let expansionChanged = composerExpanded != expanded
     // The bottom anchor belongs to the host; animate its layout with the contents.
     let layoutRoot = window ?? superview ?? self
@@ -1490,7 +1499,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let fullProgress = dragProgress ?? (fullScreen ? 1 : 0)
     accessoryHeight.constant = expanded ? 48 : 0
     attachLeading.constant = expanded ? 8 : 2
-    sheetContentBottom.constant = expanded ? -ChatComposerLiquidGlassSurfaceLayout.sheetBleed : 0
+    sheetContentBottom.constant = expanded && !cardStyle ? -ChatComposerLiquidGlassSurfaceLayout.sheetBleed : 0
     formatHeight.constant = 44 * fullProgress
     formatBar.alpha = fullProgress
     formatBar.isHidden = fullProgress == 0
@@ -1555,44 +1564,36 @@ final class ChatComposerView: UIView, UITextViewDelegate {
         self.onComposerOptionChange?(["modelId": self.composerOptions.modelId, "effort": self.composerOptions.effort, "permissionId": option.id])
       }
     })
-    permissionLeading?.constant = mentionButton.isHidden ? -44 : 0
-    if !permissionButton.isHidden {
-      modelLeading?.constant = mentionButton.isHidden ? 96 : 140
-    } else {
-      modelLeading?.constant = mentionButton.isHidden ? 2 : 96
-    }
     modelButton.isHidden = !composerExpanded || composerOptions.models.isEmpty
     modelButton.isEnabled = state.editable && !state.sending && pendingDraft == nil
+    // Web's run-config chip: assistant mark, model · effort, and a fast bolt, in one line.
+    let font = LodyTextStyle.subhead.uiFont
+    let dot = NSAttributedString(string: "  ·  ", attributes: [.foregroundColor: UIColor.tertiaryLabel])
     let title = NSMutableAttributedString(string: composerOptions.modelTitle, attributes: [.foregroundColor: UIColor.label])
     if !composerOptions.efforts.isEmpty || !composerOptions.effort.isEmpty {
-      title.append(NSAttributedString(string: " " + composerOptions.effortTitle, attributes: [.foregroundColor: UIColor.secondaryLabel]))
+      title.append(dot)
+      title.append(NSAttributedString(string: composerOptions.effortTitle, attributes: [.foregroundColor: UIColor.label]))
     }
     let summary = title.string
-    let font = UIFont.preferredFont(forTextStyle: .caption1)
     if composerOptions.fast == true {
       let symbol = NSTextAttachment()
-      symbol.image = UIImage(systemName: "bolt.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: font.pointSize - 2, weight: .regular))?
+      symbol.image = UIImage(systemName: "bolt", withConfiguration: UIImage.SymbolConfiguration(pointSize: font.pointSize, weight: .medium))?
         .withTintColor(.lodyAccent, renderingMode: .alwaysOriginal)
-      let prefix = NSMutableAttributedString(attachment: symbol)
-      prefix.append(NSAttributedString(string: " "))
-      title.insert(prefix, at: 0)
+      title.append(dot)
+      title.append(NSAttributedString(attachment: symbol))
     }
     if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: nil) {
       let attachment = NSTextAttachment(image: mark.withRenderingMode(.alwaysOriginal))
       attachment.bounds = CGRect(x: 0, y: font.descender, width: font.lineHeight, height: font.lineHeight)
       let prefix = NSMutableAttributedString(attachment: attachment)
-      prefix.append(NSAttributedString(string: " "))
+      prefix.append(NSAttributedString(string: "  "))
       title.insert(prefix, at: 0)
     }
     title.addAttribute(.font, value: font, range: NSRange(location: 0, length: title.length))
     var configuration = UIButton.Configuration.plain()
     configuration.attributedTitle = AttributedString(title)
-    configuration.image = UIImage(systemName: "chevron.down")
-    configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 5, weight: .medium)
-    configuration.imagePlacement = .trailing
-    configuration.imagePadding = 5
-    configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 6)
-    configuration.baseForegroundColor = .secondaryLabel
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
+    configuration.baseForegroundColor = .label
     configuration.titleLineBreakMode = .byTruncatingTail
     modelButton.configuration = configuration
     modelButton.accessibilityLabel = String.localizedStringWithFormat(String(localized: "native.chat.composer.modelButton", bundle: .lody), String(describing: summary))

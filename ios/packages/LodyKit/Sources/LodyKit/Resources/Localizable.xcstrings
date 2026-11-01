@@ -23477,23 +23477,6 @@
         }
       }
     },
-    "create.context.pickProject": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose project…"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择项目…"
-          }
-        }
-      }
-    },
     "create.context.branchLoading": {
       "extractionState": "manual",
       "localizations": {
@@ -23541,6 +23524,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "在 Worktree 中运行"
+          }
+        }
+      }
+    },
+    "create.context.moreProjects": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More projects…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多项目…"
+          }
+        }
+      }
+    },
+    "create.composer.placeholderAgent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work with %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "和 %@ 一起工作"
           }
         }
       }
