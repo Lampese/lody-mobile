@@ -280,7 +280,7 @@ struct CreateContextPanel: View {
         .padding(.horizontal, LodyLayout.screenPaddingX)
         .padding(.bottom, LodySpacing.md)
         .frame(minHeight: geometry.size.height, alignment: .bottom)
-        .animation(LodySpring.snappy, value: state.open)
+        .animation(.smooth(duration: 0.3), value: state.open)
       }
       .scrollBounceBehavior(.basedOnSize)
       .defaultScrollAnchor(.bottom)
@@ -299,9 +299,8 @@ struct CreateContextPanel: View {
                 .lodyTextStyle(.subhead)
                 .foregroundStyle(LodyColor.textSecondary)
             }
-            .padding(.horizontal, LodySpacing.md)
+            .padding(.horizontal, LodySpacing.xs)
             .frame(minHeight: LodySize.controlMd)
-            .background(LodyColor.fillTertiary, in: RoundedRectangle(cornerRadius: LodyRadius.md, style: .continuous))
             .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
@@ -321,7 +320,7 @@ struct CreateContextPanel: View {
       if id != CreateSessionContext.loadMoreOption { state.open = nil }
       state.onPick(picker.id, id)
     }
-    .transition(.opacity.combined(with: .move(edge: .top)))
+    .transition(.blurReplace)
   }
 
   private func toggle(_ id: String) { state.open = state.open == id ? nil : id }
@@ -349,11 +348,8 @@ private struct PickerFace: View {
             .foregroundStyle(LodyColor.iconTertiary)
         }
       }
-      .padding(.horizontal, prominent ? LodySpacing.lg : LodySpacing.xs)
+      .padding(.horizontal, LodySpacing.xs)
       .frame(minHeight: prominent ? LodySize.controlLg : LodySize.controlMd)
-      .background {
-        if prominent { RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous).fill(LodyColor.fillTertiary) }
-      }
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
@@ -390,7 +386,6 @@ struct OptionList: View {
         }
         .padding(.horizontal, LodySpacing.lg)
         .frame(minHeight: LodySize.controlMd)
-        Divider()
       }
       ScrollView {
         LazyVStack(spacing: 0) {
@@ -404,9 +399,8 @@ struct OptionList: View {
       .frame(maxHeight: 280)
       .fixedSize(horizontal: false, vertical: shown.count < 6)
     }
-    .background(LodyColor.bgRaised, in: RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous).stroke(LodyColor.borderSubtle, lineWidth: 0.5))
-    .clipShape(RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous))
+    // No surface of its own: options sit indented under the line that opened them.
+    .padding(.leading, LodyIconSize.md + LodySpacing.md)
   }
 
   private func row(_ option: CreateOption) -> some View {
@@ -429,7 +423,6 @@ struct OptionList: View {
     }
     .padding(.horizontal, LodySpacing.lg)
     .frame(minHeight: LodySize.listRow)
-    .background(option.selected ? LodyColor.fillTertiary : .clear)
     .contentShape(Rectangle())
     .accessibilityAddTraits(option.selected ? [.isButton, .isSelected] : .isButton)
   }
@@ -473,14 +466,14 @@ struct CreateRunConfigSheet: View {
                   state.openInSheet = nil
                   state.onPick(row.id, id)
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.blurReplace)
               }
             }
           }
         }
         .padding(.horizontal, LodyLayout.screenPaddingX)
         .padding(.bottom, LodySpacing.lg)
-        .animation(LodySpring.snappy, value: state.openInSheet)
+        .animation(.smooth(duration: 0.3), value: state.openInSheet)
       }
     }
     .background(LodyColor.bgBase)
@@ -499,9 +492,7 @@ struct CreateRunConfigSheet: View {
             .foregroundStyle(row.placeholder ? LodyColor.textTertiary : LodyColor.textPrimary)
           Spacer(minLength: 0)
         }
-        .padding(.horizontal, LodySpacing.md)
         .frame(minHeight: LodySize.controlMd)
-        .background(LodyColor.fillTertiary, in: RoundedRectangle(cornerRadius: LodyRadius.md, style: .continuous))
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -509,9 +500,6 @@ struct CreateRunConfigSheet: View {
       .accessibilityLabel(CreateSessionContext.runConfigLabel(row.id))
       .accessibilityValue(row.title)
     }
-    .padding(LodySpacing.sm)
-    .padding(.leading, LodySpacing.sm)
-    .background(LodyColor.bgRaised, in: RoundedRectangle(cornerRadius: LodyRadius.lg, style: .continuous))
-    .overlay(RoundedRectangle(cornerRadius: LodyRadius.lg, style: .continuous).stroke(LodyColor.borderSubtle, lineWidth: 0.5))
+    .padding(.vertical, LodySpacing.xs)
   }
 }
