@@ -665,6 +665,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   /// controls row and keeps @ visible. Set by the new-session page.
   /// Card style: the run-config chip opens the host's sheet instead of the model popover.
   var onRunConfig: (() -> Void)?
+  private var cardFocused = false
   var cardStyle = false {
     didSet {
       guard cardStyle != oldValue else { return }
@@ -1415,7 +1416,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     mentionPanel.update(input: input, items: activeMentionItems ?? [], enabled: activeMentionItems != nil)
     mentionHeight.constant = mentionPanel.panelHeight
     mentionSeparator.alpha = mentionPanel.panelHeight > 0 ? 1 : 0
-    mentionButton.isHidden = activeMentionItems == nil || (!input.isFirstResponder && !cardStyle)
+    // Card style (new session) has no @ button, like web: typing @ still opens mentions.
+    mentionButton.isHidden = cardStyle || activeMentionItems == nil || !input.isFirstResponder
     mentionButton.isEnabled = state.editable && !state.sending && pendingDraft == nil
     let sending = state.sending || pendingDraft != nil
     if !state.editable && input.isFirstResponder { input.resignFirstResponder() }
@@ -1522,7 +1524,16 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let height = input.sizeThatFits(CGSize(width: max(1, input.bounds.width), height: .greatestFiniteMagnitude)).height
     let overflows = height > ChatMessageContent.maximumCollapsedHeight
     let chrome = mentionHeight.constant + queueHeight.constant + queueGap.constant + quickRepliesHeight.constant + noticeHeight.constant + attachmentTop.constant + attachmentHeight.constant + quotaNoticeHeight.constant + accessoryHeight.constant + formatHeight.constant + grabberHeight.constant + (expanded ? 8 : 16)
-    let inlineHeight = expanded ? min(ChatMessageContent.maximumCollapsedHeight, max(132, height)) : 48
+    // Card style rests at one line above its controls and opens to two while editing; the
+    // glass sheet keeps its taller writing area.
+    var minimumHeight: CGFloat = 132
+    if cardStyle {
+      let lines: CGFloat = input.isFirstResponder ? 2 : 1
+      minimumHeight = topInset + verticalInset + lines * input.font!.lineHeight
+    }
+    let inlineHeight = expanded ? min(ChatMessageContent.maximumCollapsedHeight, max(minimumHeight, height)) : 48
+    let cardFocusChanged = cardStyle && cardFocused != input.isFirstResponder
+    cardFocused = input.isFirstResponder
     if fullProgress > 0 {
       let fullHeight = fullScreenInputHeight(chrome: chrome - formatHeight.constant + 44)
       dragDistance = max(1, fullHeight + 44 - inlineHeight)
@@ -1536,6 +1547,13 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     updateComposerOptions()
     onHeightChange?(chrome + inputHeight.constant)
     setNeedsLayout()
+    // The card is always "expanded", so its focus change grows the input here: ride along with
+    // the keyboard on the same spring rather than jumping.
+    if cardFocusChanged && window != nil && !UIAccessibility.isReduceMotionEnabled {
+      UIView.animate(springDuration: 0.35, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+        (self.window ?? self.superview ?? self).layoutIfNeeded()
+      }
+    }
     if expansionChanged {
       if window != nil && !UIAccessibility.isReduceMotionEnabled {
         UIView.animate(withDuration: 0.24, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
