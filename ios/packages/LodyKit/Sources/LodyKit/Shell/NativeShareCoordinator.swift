@@ -114,7 +114,7 @@ final class NativeShareCoordinator {
     guard available, let draft = adopted.draft else {
       do {
         var fields: [String: Any] = ["workspaceId": adopted.workspaceId, "context": adopted.context,
-          "draft": ["text": adopted.text, "attachmentsJSON": CreateJSON.encode(adopted.attachments)]]
+          "draft": ["text": adopted.text, "attachmentsJSON": CreateJSON.encode(adopted.attachments)], "sheet": true]
         if let project = adopted.projectId { fields["projectId"] = project }
         let page = try SessionNavigation.handle("create", fields)!
         form = page

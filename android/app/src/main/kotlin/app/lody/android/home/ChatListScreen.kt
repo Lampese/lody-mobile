@@ -64,7 +64,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -113,7 +112,6 @@ import app.lody.android.designsystem.LodyTheme
 import app.lody.android.designsystem.LodyWorkingGrid
 import app.lody.android.designsystem.shadow
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 /** Everything Home renders; HomeActivity derives it from account and catalog state. */
@@ -155,6 +153,7 @@ fun ChatListScreen(
     onSelectWorkspace: (Workspace) -> Unit,
     onSignOut: () -> Unit,
     onOpenChat: (ChatItem) -> Unit,
+    onNewChat: () -> Unit,
 ) {
     val colors = LodyTheme.colors
     var tab by rememberSaveable { mutableStateOf(HomeTab.Chats) }
@@ -163,8 +162,6 @@ fun ChatListScreen(
     var projectId by rememberSaveable { mutableStateOf<String?>(null) }
     val project = state.projects.firstOrNull { it.id == projectId }
     val snackbar = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val unavailable = stringResource(R.string.home_new_chat_unavailable)
     val closeSearch = { searching = false; query = "" }
     val context = LocalContext.current
     var details by remember { mutableStateOf(ChatRowDetails.load(context)) }
@@ -204,7 +201,7 @@ fun ChatListScreen(
                 HomeBottomBar(
                     selected = tab,
                     onSelect = { tab = it },
-                    onCreate = { scope.launch { snackbar.showSnackbar(unavailable) } },
+                    onCreate = onNewChat,
                 )
             }
         },

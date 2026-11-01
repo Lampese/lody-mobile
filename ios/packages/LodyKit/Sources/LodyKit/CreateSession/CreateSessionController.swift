@@ -19,6 +19,8 @@ final class CreateSessionController: UIViewController {
   var showMessage: ((String) -> Void)?
   var restoreDraft: ((Int) -> Void)?
   private(set) var sending = false
+  /// Pushed full screen: lead with a back button instead of the sheet's close button.
+  var pushed = false
   private var restoreToken = 0
 
   let composer: ChatComposerView
@@ -48,11 +50,22 @@ final class CreateSessionController: UIViewController {
     close.accessibilityLabel = String.localizedStringWithFormat(String(localized: "accessibility.closeSheet", bundle: .lody), String(describing: String(localized: "create.title", bundle: .lody)))
     close.addAction(UIAction { [weak self] _ in self?.onCancel?() }, for: .primaryActionTriggered)
     close.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
-    navigationItem.rightBarButtonItem = UIBarButtonItem(customView: close)
+    if pushed {
+      let back = UIBarButtonItem(image: UIImage(systemName: "chevron.backward"), primaryAction: UIAction { [weak self] _ in self?.onCancel?() })
+      back.accessibilityLabel = String(localized: "common.back", bundle: .lody)
+      navigationItem.leftBarButtonItem = back
+    } else {
+      navigationItem.rightBarButtonItem = UIBarButtonItem(customView: close)
+    }
 
     view.backgroundColor = LodyUIColor.bgBase
     context.onPress = { [weak self] id in self?.rowPressed(id) }
     context.onPick = { [weak self] id, option in self?.optionPicked(id, option) }
+    context.onToggle = { [weak self] id, on in
+      guard let self, id == "worktree", !self.sending else { return }
+      self.form.project.worktree = on
+      self.changed(prefs: false)
+    }
     context.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(context)
     signedOutLabel.text = String(localized: "native.share.signIn", bundle: .lody)
@@ -155,6 +168,7 @@ final class CreateSessionController: UIViewController {
       options["permissions"] = permission.options.map { ["id": $0.id, "title": $0.name, "description": $0.description ?? ""] }
     }
     if let fast { options["fast"] = fast.enabled }
+    if let asset = LodyAgentIcon.asset(modelId: page.agent?.agentType, name: nil) { options["agentAsset"] = asset }
     composer.setComposerOptions(Self.json(options))
     composer.setComposerState(Self.json([
       "editable": true, "canSend": form.canSend, "sending": sending, "notice": form.notice,

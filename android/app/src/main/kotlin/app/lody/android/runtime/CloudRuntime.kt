@@ -47,7 +47,14 @@ data class CatalogSession(
     val parentSessionId: String? = null,
 )
 /** Read projection, never a CRDT replica. Optional feature-specific fields come later. */
-data class CatalogSnapshot(val revision: Long, val projects: List<CatalogProject>, val sessions: List<CatalogSession>, val machineIds: List<String>)
+/** [machineNames] is optional display data (computer id to name); empty from older caches. */
+data class CatalogSnapshot(
+    val revision: Long,
+    val projects: List<CatalogProject>,
+    val sessions: List<CatalogSession>,
+    val machineIds: List<String>,
+    val machineNames: Map<String, String> = emptyMap(),
+)
 data class SessionMessage(val id: String, val role: String, val text: String, val streaming: Boolean)
 data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>)
 sealed interface RuntimeEvent {

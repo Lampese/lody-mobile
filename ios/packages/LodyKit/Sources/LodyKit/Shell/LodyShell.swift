@@ -26,13 +26,16 @@ final class LodyShell {
     pushNative(content, title: title, from: source)
   }
 
-  func pushNative(_ content: UIViewController, title: String, from source: UIViewController) {
-    guard let target = (source as? UINavigationController) ?? source.navigationController else { return }
+  @discardableResult
+  func pushNative(_ content: UIViewController, title: String, from source: UIViewController, headerShown: Bool = true) -> LodyPageController? {
+    guard let target = (source as? UINavigationController) ?? source.navigationController else { return nil }
     let spec = ShellPageSpec(
-      title: title, style: "push", animation: "slide", dismissible: true, headerShown: true,
+      title: title, style: "push", animation: "slide", dismissible: true, headerShown: headerShown,
       headerVariant: "transparent"
     )
-    push(LodyPageController(spec: spec, inSheet: target !== navigation, content: content), on: target)
+    let page = LodyPageController(spec: spec, inSheet: target !== navigation, content: content)
+    push(page, on: target)
+    return page
   }
 
   @discardableResult
@@ -59,9 +62,10 @@ final class LodyShell {
 
   func configureNavigation(_ controller: UINavigationController) { controller.delegate = delegate }
 
-  func pushRootNative(_ content: UIViewController, title: String) {
-    guard let navigation else { return }
-    pushNative(content, title: title, from: navigation)
+  @discardableResult
+  func pushRootNative(_ content: UIViewController, title: String, headerShown: Bool = true) -> LodyPageController? {
+    guard let navigation else { return nil }
+    return pushNative(content, title: title, from: navigation, headerShown: headerShown)
   }
 
   func presentDetail(_ content: UIViewController, title: String, from source: UIViewController, push: Bool = false, detents: [Double] = [0.6, 1]) {

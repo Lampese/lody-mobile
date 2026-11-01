@@ -27,6 +27,8 @@ export type CreateSessionArgs = {
   userId: string;
   title: string;
   branch?: string;
+  /** Local projects: start in a new git worktree (web `project.useWorktree`). */
+  useWorktree?: boolean;
   billingEntitlement?: BillingEntitlement | null;
 };
 
@@ -258,7 +260,7 @@ export async function createSession(
     workspaceSessionCount(replica.flock.scan()),
   );
   if (reason) return { state: 'rejected', reason } as const;
-  let project: Record<string, string> | undefined;
+  let project: Record<string, string | boolean> | undefined;
   if (!chat && github) {
     project = {
       kind: 'github',
@@ -271,6 +273,7 @@ export async function createSession(
       localProjectId: options.project!.id.slice(
         `${agent.machineId}:local:`.length,
       ),
+      ...(args.useWorktree === true ? { useWorktree: true } : {}),
     };
   }
   const meta = {

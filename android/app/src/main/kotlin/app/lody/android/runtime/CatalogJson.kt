@@ -25,6 +25,12 @@ object CatalogJson {
         }.orEmpty(),
     )
 
+    /** Optional `machineNames` object; non-string or empty names are skipped. */
+    fun machineNames(json: JSONObject): Map<String, String> {
+        val names = json.optJSONObject("machineNames") ?: return emptyMap()
+        return names.keys().asSequence().mapNotNull { id -> names.optText(id)?.let { id to it } }.toMap()
+    }
+
     fun putProject(json: JSONObject, project: CatalogProject): JSONObject = json.apply {
         project.repoFullName?.let { put("repoFullName", it) }
     }
