@@ -47,7 +47,33 @@ object CreateSessionModel {
     fun chat(snapshot: CatalogSnapshot, target: CreateTarget): CreateTarget =
         CreateTarget(chat = true, machineId = target.machineId ?: machines(snapshot).firstOrNull()?.first)
 
-    /** The computer is a choice only for chats and GitHub projects with more than one computer. */
-    fun machineChoosable(snapshot: CatalogSnapshot, target: CreateTarget): Boolean =
-        (target.chat || isGithub(target.projectId)) && machines(snapshot).size > 1
+    /** Every known computer is offered whenever there is more than one (web's machine menu). */
+    fun machineChoosable(snapshot: CatalogSnapshot): Boolean = machines(snapshot).size > 1
+
+    /**
+     * A local project belongs to one computer: picking another moves to that computer's most
+     * recent local project, or to a chat there when it has none. Chats and GitHub projects switch.
+     */
+    fun pickMachine(snapshot: CatalogSnapshot, target: CreateTarget, machineId: String): CreateTarget {
+        val local = !target.chat && target.projectId != null && !isGithub(target.projectId)
+        if (!local) return target.copy(machineId = machineId)
+        val current = snapshot.projects.firstOrNull { it.id == target.projectId }
+        if (current?.machineId == machineId) return target
+        val next = projects(snapshot).firstOrNull { it.machineId == machineId && !isGithub(it.id) }
+        return if (next != null) select(snapshot, target, next.id) else CreateTarget(chat = true, machineId = machineId)
+    }
+
+    const val RECENT_LIMIT = 5
+
+    /**
+     * The project menu's recent part: the five most recent projects usable on the chosen
+     * computer (its local projects and any GitHub project); a selected project outside them
+     * still shows so the check matches the line.
+     */
+    fun recent(snapshot: CatalogSnapshot, target: CreateTarget): List<CatalogProject> {
+        val usable = projects(snapshot).filter { isGithub(it.id) || target.machineId == null || it.machineId == target.machineId }
+        val recent = usable.take(RECENT_LIMIT)
+        val current = snapshot.projects.firstOrNull { it.id == target.projectId && !target.chat }
+        return if (current == null || recent.any { it.id == current.id }) recent else listOf(current) + recent
+    }
 }

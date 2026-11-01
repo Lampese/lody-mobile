@@ -137,15 +137,14 @@ final class CreateSessionController: UIViewController {
       guard !form.chat else { return }
       form.switchPage(chat: true)
       changed()
-    case ("project", _):
-      if form.chat {
-        form.switchPage(chat: false)
-        changed()
-      }
+    case ("project", CreateSessionContext.pickProjectOption):
       pickProject()
+    case ("project", _):
+      guard let project = form.projects.first(where: { $0.id == option }) else { return pickProject() }
+      if form.chat { form.switchPage(chat: false) }
+      apply(project)
     case ("machine", _):
-      form.selectMachine(option)
-      changed()
+      pickMachine(option)
     case ("agent", _):
       form.selectAgent(option)
       changed()
@@ -172,8 +171,14 @@ final class CreateSessionController: UIViewController {
     composer.setComposerOptions(Self.json(options))
     composer.setComposerState(Self.json([
       "editable": true, "canSend": form.canSend, "sending": sending, "notice": form.notice,
-      "reconnect": false, "placeholder": String(localized: "create.composer.placeholder", bundle: .lody),
+      "reconnect": false, "placeholder": placeholder,
     ]))
+  }
+
+  /// Web's landing prompt: "Work with <assistant>" once one is chosen.
+  private var placeholder: String {
+    guard let agent = form.current.agent else { return String(localized: "create.composer.placeholder", bundle: .lody) }
+    return String.localizedStringWithFormat(String(localized: "create.composer.placeholderAgent", bundle: .lody), agent.name)
   }
 
   private static func json(_ value: [String: Any]) -> String {
@@ -244,17 +249,39 @@ final class CreateSessionController: UIViewController {
     picker.onPick = { [weak self, weak picker] project in
       guard let self else { return }
       picker?.navigationController?.popViewController(animated: true)
-      let changedProject = project.id != self.form.project.projectId
-      self.form.selectProject(project)
-      if changedProject {
-        self.branchTask?.cancel()
-        self.branchPicker = nil
-        self.load(chat: false)
-        self.fetchBranches()
-      }
-      self.changed(prefs: false)
+      if self.form.chat { self.form.switchPage(chat: false) }
+      self.apply(project)
     }
     push(picker)
+  }
+
+  private func apply(_ project: CreateProject) {
+    let changedProject = project.id != form.project.projectId
+    form.selectProject(project)
+    if changedProject {
+      branchTask?.cancel()
+      branchPicker = nil
+      load(chat: false)
+      fetchBranches()
+    }
+    changed(prefs: false)
+  }
+
+  /// A local project belongs to one computer: picking another moves to that computer's most
+  /// recent project, or to a chat there when it has none. Chats and GitHub projects just switch.
+  private func pickMachine(_ id: String) {
+    let page = form.current
+    guard page.local, let current = form.projects.first(where: { $0.id == page.projectId }), current.machineId != id else {
+      form.selectMachine(id)
+      return changed()
+    }
+    if let next = form.projects.first(where: { $0.machineId == id && !CreateProjectPicker.isGithub($0.id) }) {
+      apply(next)
+    } else {
+      form.switchPage(chat: true)
+      form.selectMachine(id)
+      changed()
+    }
   }
 
   private func pickMachine() {

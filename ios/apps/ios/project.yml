@@ -57,6 +57,8 @@ packages:
     path: '../../packages/chat-kit'
   Lexical:
     path: '../../packages/lexical-swift'
+  LodyDesignSystem:
+    path: '../../../design-system'
   OneSignal:
     url: https://github.com/OneSignal/OneSignal-XCFramework.git
     exactVersion: 5.5.1
@@ -172,6 +174,7 @@ targets:
           - CreateSession/CreateSessionSections.swift
           - CreateSession/CreateModelOptions.swift
           - CreateSession/CreateSessionController.swift
+          - CreateSession/CreateSessionContext.swift
           - CreateSession/CreateSessionPickers.swift
           - CreateSession/ShareStore.swift
           - Resources/Localizable.xcstrings
@@ -211,6 +214,9 @@ targets:
     dependencies:
       - package: LodyCore
         product: LodyCore
+      # The shared composer and new-session form use the mobile design system.
+      - package: LodyDesignSystem
+        product: LodyDesignSystem
       - package: ChatKit
         product: ChatKit
       - package: Lexical

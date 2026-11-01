@@ -128,18 +128,22 @@ private fun ContextLines(catalog: CatalogSnapshot, target: CreateTarget, onChang
     val colors = LodyTheme.colors
     val machines = CreateSessionModel.machines(catalog)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
-    val machineChoosable = CreateSessionModel.machineChoosable(catalog, target)
+    val machineChoosable = CreateSessionModel.machineChoosable(catalog)
     MenuLine(
         icon = LodyIcons.Machine,
         title = machineName ?: stringResource(R.string.create_pick_machine),
         placeholder = machineName == null,
         options = if (machineChoosable) machines.map { (id, name) -> MenuOption(id, name, selected = id == target.machineId) } else emptyList(),
-        onPick = { onChange(target.copy(machineId = it)) },
+        onPick = { onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
     )
 
     val projects = CreateSessionModel.projects(catalog)
     val project = projects.firstOrNull { it.id == target.projectId }
     val chatLabel = stringResource(R.string.create_chat_only)
+    // Chat only, the five most recent projects, then "More projects…" opening the full list.
+    var allProjects by remember { mutableStateOf(false) }
+    val listed = if (allProjects) projects else CreateSessionModel.recent(catalog, target)
+    val more = if (!allProjects && projects.size > listed.size) listOf(MenuOption(MORE, stringResource(R.string.create_more_projects), selected = false, icon = LodyIcons.More)) else emptyList()
     MenuLine(
         icon = when {
             target.chat -> LodyIcons.Session
@@ -149,10 +153,18 @@ private fun ContextLines(catalog: CatalogSnapshot, target: CreateTarget, onChang
         title = if (target.chat) chatLabel else project?.name ?: stringResource(R.string.create_pick_project),
         placeholder = !target.chat && project == null,
         options = listOf(MenuOption(CHAT, chatLabel, selected = target.chat, icon = LodyIcons.Session)) +
-            projects.map {
-                MenuOption(it.id, it.name, selected = it.id == target.projectId, icon = if (CreateSessionModel.isGithub(it.id)) LodyIcons.Github else LodyIcons.Folder)
-            },
-        onPick = { id -> onChange(if (id == CHAT) CreateSessionModel.chat(catalog, target) else CreateSessionModel.select(catalog, target, id)) },
+            listed.map {
+                MenuOption(it.id, it.name, selected = !target.chat && it.id == target.projectId, icon = if (CreateSessionModel.isGithub(it.id)) LodyIcons.Github else LodyIcons.Folder)
+            } + more,
+        onPick = { id ->
+            when (id) {
+                MORE -> allProjects = true
+                CHAT -> onChange(CreateSessionModel.chat(catalog, target))
+                else -> { allProjects = false; onChange(CreateSessionModel.select(catalog, target, id)) }
+            }
+        },
+        keepOpen = { it == MORE },
+        onDismiss = { allProjects = false },
     )
 
     if (CreateSessionModel.isGithub(target.projectId) && !target.chat) {
@@ -179,19 +191,28 @@ private fun ContextLines(catalog: CatalogSnapshot, target: CreateTarget, onChang
 }
 
 private const val CHAT = "chat"
+private const val MORE = "more"
 
 private data class MenuOption(val id: String, val title: String, val selected: Boolean, val icon: ImageVector? = null)
 
 /** A context line that opens a menu in place; with no options it is plain text. */
 @Composable
-private fun MenuLine(icon: ImageVector, title: String, placeholder: Boolean, options: List<MenuOption>, onPick: (String) -> Unit) {
+private fun MenuLine(
+    icon: ImageVector,
+    title: String,
+    placeholder: Boolean,
+    options: List<MenuOption>,
+    onPick: (String) -> Unit,
+    keepOpen: (String) -> Boolean = { false },
+    onDismiss: () -> Unit = {},
+) {
     val colors = LodyTheme.colors
     var open by remember { mutableStateOf(false) }
     Box {
         Line(icon, title, placeholder, chooser = options.isNotEmpty(), onClick = if (options.isNotEmpty()) ({ open = true }) else null)
         DropdownMenu(
             expanded = open,
-            onDismissRequest = { open = false },
+            onDismissRequest = { open = false; onDismiss() },
             shape = RoundedCornerShape(LodyRadius.lg),
             containerColor = colors.bgOverlay,
             border = BorderStroke(0.5.dp, colors.borderSubtle),
@@ -201,7 +222,7 @@ private fun MenuLine(icon: ImageVector, title: String, placeholder: Boolean, opt
                     text = { Text(option.title, style = LodyTheme.typography.body, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = option.icon?.let { { Icon(it, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm)) } },
                     trailingIcon = { if (option.selected) Icon(LodyIcons.Check, contentDescription = null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm)) },
-                    onClick = { open = false; onPick(option.id) },
+                    onClick = { if (!keepOpen(option.id)) open = false; onPick(option.id) },
                 )
             }
         }

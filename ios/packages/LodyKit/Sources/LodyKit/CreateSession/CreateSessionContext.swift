@@ -51,28 +51,31 @@ enum CreateSessionContext {
     let page = form.current
     var rows: [CreateSessionContextRow] = []
 
-    let machines = page.machines
+    // Every known computer is offered, like web's machine menu. A local project belongs to one
+    // computer, so picking another moves to that computer's latest project (or a chat).
+    let machines = allMachines(form)
     let machineName = page.machine?.name ?? form.machineNames[page.machineId]
+    let selectedMachine = page.machine?.id ?? (page.machineId.isEmpty ? nil : page.machineId)
     rows.append(CreateSessionContextRow(
       id: "machine", icon: .lody(.machine),
       title: machineName ?? (page.loading ? text("common.reading") : text("create.row.selectMachine")),
       placeholder: machineName == nil, loading: page.loading && machineName == nil,
-      choice: machines.count > 1
-        ? .menu(machines.map { .init(id: $0.id, title: $0.name, selected: $0.id == page.machine?.id) })
+      choice: machines.count > 1 && !form.locked
+        ? .menu(machines.map { .init(id: $0.id, title: $0.name, selected: $0.id == selectedMachine) })
         : .none
     ))
 
     if page.chat {
       rows.append(CreateSessionContextRow(
         id: "project", icon: .lody(.session), title: text("create.context.chat"),
-        choice: form.locked ? .none : projectMenu(chat: true)
+        choice: form.locked ? .none : projectMenu(form, chat: true)
       ))
     } else {
       let project = form.projects.first { $0.id == page.projectId }
       rows.append(CreateSessionContextRow(
         id: "project", icon: .lody(page.github ? .github : .folder),
         title: project?.name ?? text("create.row.selectProject"), placeholder: project == nil,
-        choice: form.locked ? .none : projectMenu(chat: false)
+        choice: form.locked ? .none : projectMenu(form, chat: false)
       ))
       if page.github {
         var branch = page.branch
@@ -118,11 +121,42 @@ enum CreateSessionContext {
     return nil
   }
 
-  private static func projectMenu(chat: Bool) -> CreateSessionContextRow.Choice {
-    .menu([
-      .init(id: pickProjectOption, title: text("create.context.pickProject"), selected: !chat, symbol: "folder"),
-      .init(id: chatOption, title: text("create.context.chat"), selected: chat, symbol: "bubble.left"),
-    ])
+  static let recentLimit = 5
+
+  /// Chat only first, then the five most recent projects usable on the chosen computer (its
+  /// local projects and any GitHub project), then "More projects…" for the full picker.
+  private static func projectMenu(_ form: CreateSessionForm, chat: Bool) -> CreateSessionContextRow.Choice {
+    let selected = chat ? "" : form.project.projectId
+    let recent = recentProjects(form).map { project in
+      CreateSessionContextRow.Option(
+        id: project.id, title: project.name, selected: project.id == selected,
+        symbol: CreateProjectPicker.isGithub(project.id) ? "chevron.left.forwardslash.chevron.right" : "folder")
+    }
+    return .menu(
+      [.init(id: chatOption, title: text("create.context.chat"), selected: chat, symbol: "bubble.left")]
+        + recent
+        + [.init(id: pickProjectOption, title: text("create.context.moreProjects"), symbol: "ellipsis")]
+    )
+  }
+
+  /// `form.projects` is ordered by latest activity; a selected project outside the first five
+  /// still shows so the menu's check matches the line.
+  static func recentProjects(_ form: CreateSessionForm) -> [CreateProject] {
+    let machine = form.current.machine?.id ?? form.current.machineId
+    let usable = form.projects.filter { CreateProjectPicker.isGithub($0.id) || machine.isEmpty || $0.machineId == machine }
+    var recent = Array(usable.prefix(recentLimit))
+    if !form.chat, let current = form.projects.first(where: { $0.id == form.project.projectId }), !recent.contains(where: { $0.id == current.id }) {
+      recent.insert(current, at: 0)
+    }
+    return recent
+  }
+
+  /// Computers with assistants online (from the setup read) plus every computer the workspace knows.
+  static func allMachines(_ form: CreateSessionForm) -> [(id: String, name: String)] {
+    var seen = Set<String>()
+    let online = form.current.machines
+    let known = form.machineNames.sorted { $0.value.localizedCompare($1.value) == .orderedAscending }.map { (id: $0.key, name: $0.value) }
+    return (online + known).filter { seen.insert($0.id).inserted }
   }
 }
 

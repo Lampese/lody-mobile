@@ -34,10 +34,14 @@ class CreateSessionModelTest {
     fun localProjectsFixTheirComputerAndOnlyLocalOnesKeepWorktree() {
         val github = CreateSessionModel.initial(snapshot)
         assertEquals("github:lody/web", github.projectId)
-        assertTrue(CreateSessionModel.machineChoosable(snapshot, github))
+        assertTrue(CreateSessionModel.machineChoosable(snapshot))
         val local = CreateSessionModel.select(snapshot, github.copy(machineId = "m2"), "m1:local:a").copy(worktree = true)
         assertEquals("m1", local.machineId)
-        assertFalse(CreateSessionModel.machineChoosable(snapshot, local))
+        // Another computer has no local project here, so the target becomes a chat on it.
+        val moved = CreateSessionModel.pickMachine(snapshot, local, "m2")
+        assertTrue(moved.chat)
+        assertEquals("m2", moved.machineId)
+        assertEquals(listOf("github:lody/web"), CreateSessionModel.recent(snapshot, moved).map { it.id })
         assertFalse(CreateSessionModel.select(snapshot, local, "github:lody/web").worktree)
         val chat = CreateSessionModel.chat(snapshot, local)
         assertTrue(chat.chat)
