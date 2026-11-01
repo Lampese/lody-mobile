@@ -260,9 +260,22 @@ final class InboxChrome {
         return action
       })
     }
+    // Single choice; uncached so the check follows the stored value after each pick.
+    let groupings = UIDeferredMenuElement.uncached { completion in
+      let current = HomeGrouping.stored
+      completion([(HomeGrouping.time, "clock"), (.project, "folder"), (.status, "circle.dashed")].map { grouping, symbol in
+        UIAction(
+          title: String(localized: String.LocalizationValue("home.grouping." + grouping.rawValue), bundle: .lody),
+          image: UIImage(systemName: symbol), state: current == grouping ? .on : .off
+        ) { _ in HomeGrouping.store(grouping) }
+      })
+    }
     return UIMenu(
       title: String(localized: "inbox.settings.section.view", bundle: .lody),
-      children: [UIMenu(title: String(localized: "home.view.details", bundle: .lody), options: .displayInline, children: [toggles])]
+      children: [
+        UIMenu(title: String(localized: "home.view.grouping", bundle: .lody), options: [.displayInline, .singleSelection], children: [groupings]),
+        UIMenu(title: String(localized: "home.view.details", bundle: .lody), options: .displayInline, children: [toggles]),
+      ]
     )
   }
 

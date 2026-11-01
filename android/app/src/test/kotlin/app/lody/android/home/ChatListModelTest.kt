@@ -148,4 +148,46 @@ class ChatListModelTest {
         assertEquals(ChatListModel.Age.Days(6), age(6 * 86400))
         assertEquals(ChatListModel.Age.Date(LocalDate.parse("2026-10-24")), age(7 * 86400))
     }
+
+    @Test
+    fun statusGroupsFollowWebHomeNowOrder() {
+        val base = session("a", "p-zed", at = "2026-10-01T00:00:00Z")
+        fun pr(status: String, ci: String? = null) = listOf(CatalogPullRequest("lody/zed", 1, status, ci))
+        fun group(session: CatalogSession) = ChatListModel.statusGroup(session)
+        assertEquals(StatusGroup.Idle, group(base))
+        assertEquals(StatusGroup.Attention, group(base.copy(status = "error")))
+        assertEquals(StatusGroup.Attention, group(base.copy(awaitingUserSince = 1)))
+        // Running wins over unread and over red CI: it may be fixing exactly that.
+        assertEquals(StatusGroup.Running, group(base.copy(status = "running", lastMessageAt = 5, pullRequests = pr("open", "f"))))
+        // Red CI outranks unread; a draft only after unread.
+        assertEquals(StatusGroup.Attention, group(base.copy(lastMessageAt = 5, pullRequests = pr("open", "e"))))
+        assertEquals(StatusGroup.Finished, group(base.copy(lastMessageAt = 5, pullRequests = pr("draft"))))
+        assertEquals(StatusGroup.Attention, group(base.copy(pullRequests = pr("draft"))))
+        assertEquals(StatusGroup.PullRequest, group(base.copy(pullRequests = pr("open", "p"))))
+        // A merged or closed PR is done, so the chat is idle.
+        assertEquals(StatusGroup.Idle, group(base.copy(pullRequests = pr("merged", "f"))))
+    }
+
+    @Test
+    fun byStatusOrdersGroupsByUrgency() {
+        val sections = ChatListModel.byStatus(snapshot)
+        assertEquals(
+            listOf(HomeSection.Header.Status(StatusGroup.Attention), HomeSection.Header.Status(StatusGroup.Running), HomeSection.Header.Status(StatusGroup.Idle)),
+            sections.map { it.header },
+        )
+        assertEquals(listOf("6", "3"), sections[0].chats.map { it.id })
+        assertEquals(listOf("5", "1"), sections[2].chats.map { it.id })
+    }
+
+    @Test
+    fun byProjectOrdersByLatestActivityWithChatsAsAGroup() {
+        val sections = ChatListModel.byProject(snapshot)
+        assertEquals(listOf(HomeSection.Header.Chats, HomeSection.Header.Project("zed"), HomeSection.Header.Project("Alpha")), sections.map { it.header })
+        assertEquals(listOf("5", "2", "1"), sections[1].chats.map { it.id })
+    }
+
+    @Test
+    fun ciLettersMatchWeb() {
+        assertEquals(listOf("pass", "fail", "fail", "pending", "pending", ""), listOf("s", "f", "e", "p", "x", null).map(ChatListModel::ci))
+    }
 }

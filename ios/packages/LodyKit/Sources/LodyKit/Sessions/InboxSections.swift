@@ -86,22 +86,96 @@ enum InboxSections {
     return [pinnedSection(rows, expanded: expanded)] + sections
   }
 
-  /// iPhone Home "by time": activity buckets only (no pinned / status groups); archived chats are hidden.
+  /// iPhone Home in the view menu's grouping; archived chats are hidden.
+  static func home(
+    _ catalog: SessionCatalog, grouping: HomeGrouping, idleExpanded: Bool = false, now: Double = LodyRelativeTime.now()
+  ) -> [LodyListSection] {
+    switch grouping {
+    case .time: timeline(catalog, now: now)
+    case .project: byProject(catalog, now: now)
+    case .status: byStatus(catalog, idleExpanded: idleExpanded, now: now)
+    }
+  }
+
+  /// Quiet chats beyond this many top-level rows fold behind "Show all" in the status view.
+  static let idleLimit = 20
+  static let idleMoreId = "view:idle"
+
+  /// Activity buckets only (no pinned / status groups).
   static func timeline(_ catalog: SessionCatalog, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
-    let names = projectNames(catalog)
-    let repos = Set(catalog.projects.filter { !($0.repoFullName ?? "").isEmpty }.map(\.id))
-    let visible = catalog.sessions.filter { !$0.archived }.sorted { $0.activityAt > $1.activityAt }
+    let home = HomeRows(catalog, now: now)
     var buckets: [String: [SessionItem]] = [:]
-    for session in visible { buckets[activityBucket(session.activityAt, now: now), default: []].append(session) }
+    for session in home.visible { buckets[activityBucket(session.activityAt, now: now), default: []].append(session) }
     return ["today", "yesterday", "week", "month", "older"].compactMap { id in
       guard let sessions = buckets[id], !sessions.isEmpty else { return nil }
-      let rows = SessionRows.treeRows(sessions, all: catalog.sessions) { session in
-        var row = SessionRows.row(session, projectName: place(session, names), now: now)
-        row.place = SessionRows.isChat(session.projectId) ? "" : names[session.projectId] ?? ""
+      return section(id, header: String(localized: String.LocalizationValue("inbox.section." + id), bundle: .lody), rows: home.rows(sessions))
+    }
+  }
+
+  /// One group per project, most recently active first; unassigned chats form the "Chat" group.
+  /// The header names the project, so rows drop it from their detail line.
+  static func byProject(_ catalog: SessionCatalog, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
+    let home = HomeRows(catalog, now: now)
+    var order: [String] = []
+    var groups: [String: [SessionItem]] = [:]
+    for session in home.visible {
+      let key = SessionRows.isChat(session.projectId) ? chatId : session.projectId
+      if groups[key] == nil { order.append(key) }
+      groups[key, default: []].append(session)
+    }
+    return order.map { key in
+      let header = key == chatId ? String(localized: "inbox.section.chat", bundle: .lody) : home.names[key] ?? ""
+      return section("group:\(key)", header: header, rows: home.rows(groups[key] ?? [], showsPlace: false))
+    }
+  }
+
+  /// `HomeStatusGroup` order; the idle group shows `idleLimit` chats until expanded.
+  static func byStatus(_ catalog: SessionCatalog, idleExpanded: Bool = false, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
+    let home = HomeRows(catalog, now: now)
+    var groups: [HomeStatusGroup: [SessionItem]] = [:]
+    for session in home.visible { groups[HomeStatusGroup(session), default: []].append(session) }
+    return HomeStatusGroup.allCases.compactMap { group in
+      guard let sessions = groups[group], !sessions.isEmpty else { return nil }
+      let header = String(localized: String.LocalizationValue("home.group." + group.rawValue), bundle: .lody)
+      guard group == .idle else { return section(group.rawValue, header: header, rows: home.rows(sessions)) }
+      let roots = SessionRows.tree(sessions, all: catalog.sessions).count
+      var rows = home.rows(sessions, maxRoots: idleExpanded ? .max : idleLimit)
+      if roots > idleLimit {
+        var toggle = LodyListRow()
+        toggle.id = idleMoreId
+        toggle.title = idleExpanded
+          ? String(localized: "home.group.showLess", bundle: .lody)
+          : String.localizedStringWithFormat(String(localized: "home.group.showAll", bundle: .lody), roots)
+        toggle.action = true
+        rows.append(toggle)
+      }
+      return section(group.rawValue, header: header, rows: rows)
+    }
+  }
+
+  /// Shared row building for the Home groupings.
+  private struct HomeRows {
+    let catalog: SessionCatalog
+    let now: Double
+    let names: [String: String]
+    let repos: Set<String>
+    let visible: [SessionItem]
+
+    init(_ catalog: SessionCatalog, now: Double) {
+      self.catalog = catalog
+      self.now = now
+      names = InboxSections.projectNames(catalog)
+      repos = Set(catalog.projects.filter { !($0.repoFullName ?? "").isEmpty }.map(\.id))
+      visible = catalog.sessions.filter { !$0.archived }.sorted { $0.activityAt > $1.activityAt }
+    }
+
+    func rows(_ sessions: [SessionItem], showsPlace: Bool = true, maxRoots: Int = .max) -> [LodyListRow] {
+      SessionRows.treeRows(sessions, all: catalog.sessions, maxRoots: maxRoots) { session in
+        var row = SessionRows.row(session, projectName: InboxSections.place(session, names), now: now)
+        row.place = showsPlace && !SessionRows.isChat(session.projectId) ? names[session.projectId] ?? "" : ""
         row.placeIsRepo = repos.contains(session.projectId)
         return row
       }
-      return section(id, header: String(localized: String.LocalizationValue("inbox.section." + id), bundle: .lody), rows: rows)
     }
   }
 
@@ -247,7 +321,7 @@ enum InboxSections {
     return activityBucket(session.activityAt, now: now)
   }
 
-  private static func projectNames(_ catalog: SessionCatalog) -> [String: String] {
+  fileprivate static func projectNames(_ catalog: SessionCatalog) -> [String: String] {
     Dictionary(catalog.projects.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
   }
 

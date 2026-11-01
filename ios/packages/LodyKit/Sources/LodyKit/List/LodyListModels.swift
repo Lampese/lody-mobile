@@ -63,6 +63,8 @@ struct LodyListRow {
   var placeIsRepo: Bool = false
   var branch: String = ""
   var prStatus: String = ""
+  /// CI on the PR head: pass / fail / pending, empty when unknown.
+  var prCI: String = ""
 }
 
 struct LodyListVisualItem {

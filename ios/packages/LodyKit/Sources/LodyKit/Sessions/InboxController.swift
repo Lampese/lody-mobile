@@ -10,6 +10,8 @@ final class InboxController: UIViewController {
   private var sort = InboxSort.allCases[InboxController.storedIndex("inboxProjectSort")]
   private var expanded = UserDefaults.standard.dictionary(forKey: "inboxExpansion") as? [String: Bool] ?? [:]
   private var query = ""
+  /// The status view's quiet group shows everything; not persisted, so it opens folded.
+  private var idleExpanded = false
   private var search: (key: String, catalog: SessionCatalog, hits: InboxSearchHits)?
   private var requested: (key: String, catalog: SessionCatalog)?
   private var searchTask: Task<Void, Never>?
@@ -41,7 +43,7 @@ final class InboxController: UIViewController {
     list.forwarded = { [weak self] name, body in self?.event(name, body) }
     view.addSubview(list)
     wireChrome()
-    observers = (source.changes + [UIApplication.didBecomeActiveNotification]).map { name in
+    observers = (source.changes + [UIApplication.didBecomeActiveNotification, .lodyHomeGroupingChanged]).map { name in
       NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
         MainActor.assumeIsolated { self?.render() }
       }
@@ -93,9 +95,9 @@ final class InboxController: UIViewController {
       return
     }
     list.setPlaceholder(listPlaceholder(state))
-    // iPhone Home groups by time; other views arrive later through the chrome's view menu.
+    // iPhone Home groups by the view menu's choice (time / project / status).
     if traitCollection.horizontalSizeClass != .regular {
-      list.setSections(InboxSections.timeline(catalog))
+      list.setSections(InboxSections.home(catalog, grouping: HomeGrouping.stored, idleExpanded: idleExpanded))
       return
     }
     let pinOrder = pinOrder(state, catalog: catalog)
@@ -225,6 +227,11 @@ final class InboxController: UIViewController {
   }
 
   private func consume(_ id: String, expanded open: Bool) -> Bool {
+    if id == InboxSections.idleMoreId {
+      idleExpanded.toggle()
+      render()
+      return true
+    }
     if id == "view:\(InboxSections.chatId)" {
       setView(2)
       return true

@@ -20,7 +20,21 @@ enum class ChatRowDetail(val key: String, @StringRes val label: Int) {
         }
 }
 
-/** A display preference, so it lives in plain SharedPreferences (no account data). */
+/** Display preferences, so they live in plain SharedPreferences (no account data). */
+object HomeGroupings {
+    private const val FILE = "home"
+    private const val KEY = "chatGrouping"
+
+    fun load(context: Context): HomeGrouping {
+        val stored = context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(KEY, null)
+        return HomeGrouping.entries.firstOrNull { it.key == stored } ?: HomeGrouping.Time
+    }
+
+    fun save(context: Context, grouping: HomeGrouping) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString(KEY, grouping.key).apply()
+    }
+}
+
 object ChatRowDetails {
     private const val FILE = "home"
     private const val KEY = "chatRowDetails"

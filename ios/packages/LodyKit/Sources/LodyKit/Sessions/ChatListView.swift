@@ -152,7 +152,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
 
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
     a.title == b.title && a.subtitle == b.subtitle && a.unread == b.unread && a.imageTint == b.imageTint
-      && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus
+      && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus && a.prCI == b.prCI
       && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.highlight == b.highlight && ea == eb
   }
 
@@ -377,7 +377,7 @@ private struct ChatRowContent: View {
 
   private var project: String { details.contains(.project) ? row.place : "" }
   private var branch: String { details.contains(.branch) ? row.branch : "" }
-  private var pullRequest: PullRequestMark? { details.contains(.pullRequest) ? PullRequestMark(row.prStatus) : nil }
+  private var pullRequest: PullRequestMark? { details.contains(.pullRequest) ? PullRequestMark(row.prStatus, ci: row.prCI) : nil }
   /// The detail line needs a project or branch; a PR mark alone stays on the title line, before the age.
   private var hasDetailLine: Bool { !project.isEmpty || !branch.isEmpty }
   private var inlinePullRequest: PullRequestMark? { snippet != nil || !hasDetailLine ? pullRequest : nil }
@@ -457,11 +457,13 @@ private struct PullRequestMark {
   let icon: LodyIcon
   let color: Color
   let label: String
+  /// Shown only while the PR is open or a draft, as in the web sidebar.
+  let ci: PullRequestCI?
 
   /// Always the trailing mark of the line that carries it.
-  var glyph: some View { Glyph(icon: icon, size: LodyIconSize.sm, color: color).fixedSize() }
+  var glyph: some View { PullRequestGlyph(icon: icon, color: color, ci: ci).fixedSize() }
 
-  init?(_ status: String) {
+  init?(_ status: String, ci: String = "") {
     switch status {
     case "open":
       icon = .pullRequest
@@ -478,7 +480,50 @@ private struct PullRequestMark {
     default:
       return nil
     }
-    label = String(localized: String.LocalizationValue("home.pr." + status), bundle: .lody)
+    self.ci = ["open", "draft"].contains(status) ? PullRequestCI(rawValue: ci) : nil
+    let pr = String(localized: String.LocalizationValue("home.pr." + status), bundle: .lody)
+    label = self.ci.map { pr + ", " + String(localized: String.LocalizationValue("home.ci." + $0.rawValue), bundle: .lody) } ?? pr
+  }
+}
+
+/// Web `MaskedPrCiIcon` geometry on a 16-unit box: the verdict sits in the bottom-trailing
+/// 10-unit slot and a circular cutout clears the PR stroke beneath it, so no backdrop is
+/// painted. Pending is a static dot with a tighter cutout.
+private struct PullRequestGlyph: View {
+  let icon: LodyIcon
+  let color: Color
+  let ci: PullRequestCI?
+  private let size = LodyIconSize.sm
+
+  var body: some View {
+    if let ci {
+      let unit = size / 16
+      ZStack(alignment: .bottomTrailing) {
+        Glyph(icon: icon, size: size, color: color)
+          .mask {
+            Rectangle()
+              .overlay(alignment: .topLeading) {
+                let radius = (ci == .pending ? 3.75 : 5) * unit
+                Circle().frame(width: radius * 2, height: radius * 2)
+                  .offset(x: 12 * unit - radius, y: 12 * unit - radius)
+                  .blendMode(.destinationOut)
+              }
+              .compositingGroup()
+          }
+        verdict(ci, unit: unit).frame(width: 10 * unit, height: 10 * unit).offset(x: unit, y: unit)
+      }
+      .frame(width: size, height: size)
+    } else {
+      Glyph(icon: icon, size: size, color: color)
+    }
+  }
+
+  @ViewBuilder private func verdict(_ ci: PullRequestCI, unit: CGFloat) -> some View {
+    switch ci {
+    case .pass: Glyph(icon: .check, size: 10 * unit, color: LodyColor.successDefault)
+    case .fail: Glyph(icon: .close, size: 10 * unit, color: LodyColor.dangerDefault)
+    case .pending: Circle().fill(LodyColor.warningDefault).frame(width: 5 * unit, height: 5 * unit)
+    }
   }
 }
 

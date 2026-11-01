@@ -26,6 +26,26 @@
     <string name="home_bucket_month">This month</string>
     <string name="home_bucket_older">Older</string>
 
+    <!-- Home: grouping -->
+    <string name="home_view_grouping">Group by</string>
+    <string name="home_grouping_time">Time</string>
+    <string name="home_grouping_project">Project</string>
+    <string name="home_grouping_status">Status</string>
+    <string name="home_group_chats">Chats</string>
+    <string name="home_group_attention">Needs you</string>
+    <string name="home_group_finished">Just finished</string>
+    <string name="home_group_running">Running</string>
+    <string name="home_group_pull_request">Open pull requests</string>
+    <string name="home_group_idle">Idle</string>
+    <string name="home_group_show_less">Show less</string>
+    <string name="home_ci_pass">CI passed</string>
+    <string name="home_ci_fail">CI failed</string>
+    <string name="home_ci_pending">CI running</string>
+    <plurals name="home_group_show_all">
+        <item quantity="one">Show all %1$d</item>
+        <item quantity="other">Show all %1$d</item>
+    </plurals>
+
     <!-- Home: chat rows -->
     <string name="home_age_now">now</string>
     <string name="home_age_minutes">%1$dm</string>

@@ -24,6 +24,11 @@ data class ChatItem(
     val branch: String = "",
     val prStatus: String = "",
     val activityAt: Long? = null,
+    /** CI on the latest PR's head: pass / fail / pending, empty when unknown. */
+    val prCi: String = "",
+    val projectId: String = "",
+    /** The "by status" group, decided from the catalog session (see [StatusGroup]). */
+    val statusGroup: StatusGroup = StatusGroup.Idle,
 ) {
     val unread: Boolean get() = attention == ChatAttention.Unread
 }
@@ -32,6 +37,36 @@ data class ChatItem(
 enum class TimeBucket { Today, Yesterday, Week, Month, Older }
 
 data class TimeSection(val bucket: TimeBucket, val chats: List<ChatItem>)
+
+/** How Home groups chats; within a group chats are always newest activity first. iOS: `HomeGrouping`. */
+enum class HomeGrouping(val key: String) { Time("time"), Project("project"), Status("status") }
+
+/**
+ * "By status" groups, most pressing first. Mirrors web `lib/home-now.ts` (iOS `HomeStatusGroup`):
+ * every chat lands in exactly one group, under the first reason that applies.
+ */
+enum class StatusGroup {
+    /** Failed, waiting on the person, CI failed on an idle chat's open PR, or a draft PR. */
+    Attention,
+    /** Finished since the person last looked. */
+    Finished,
+    /** Working, even when unread or its CI is red: it may be fixing exactly that. */
+    Running,
+    /** An open pull request with passing or pending CI. */
+    PullRequest,
+    /** Everything else, including chats whose PR is merged or closed. */
+    Idle,
+}
+
+/** One Home group; the screen localizes [header]. */
+data class HomeSection(val id: String, val header: Header, val chats: List<ChatItem>) {
+    sealed interface Header {
+        data class Bucket(val bucket: TimeBucket) : Header
+        data class Project(val name: String) : Header
+        data object Chats : Header
+        data class Status(val group: StatusGroup) : Header
+    }
+}
 
 data class ChatGroup(val id: String, val name: String, val kind: Kind, val chats: List<ChatItem>) {
     enum class Kind { Pinned, Chats, Project }
@@ -75,6 +110,72 @@ object ChatListModel {
         }
     }
 
+    /** The catalog's CI letters as web reads them: s pass; f / e fail; p / x pending. */
+    fun ci(letter: String?): String = when (letter) {
+        "s" -> "pass"
+        "f", "e" -> "fail"
+        "p", "x" -> "pending"
+        else -> ""
+    }
+
+    fun statusGroup(session: CatalogSession): StatusGroup {
+        val status = attention(session.status)
+        val waiting = status == ChatAttention.Waiting || status == ChatAttention.Failed ||
+            (session.awaitingUserSince != null && status != ChatAttention.Running)
+        val pr = session.pullRequests.lastOrNull()?.takeIf { it.status == "open" || it.status == "draft" }
+        return when {
+            waiting -> StatusGroup.Attention
+            status == ChatAttention.Running -> StatusGroup.Running
+            pr != null && ci(pr.ci) == "fail" -> StatusGroup.Attention
+            isUnread(session) -> StatusGroup.Finished
+            pr?.status == "draft" -> StatusGroup.Attention
+            pr != null -> StatusGroup.PullRequest
+            else -> StatusGroup.Idle
+        }
+    }
+
+    /** Home in the view menu's grouping; archived chats are hidden. */
+    fun home(snapshot: CatalogSnapshot, grouping: HomeGrouping, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<HomeSection> =
+        when (grouping) {
+            HomeGrouping.Time -> timeline(snapshot, today, zone).map { HomeSection("bucket-${it.bucket}", HomeSection.Header.Bucket(it.bucket), it.chats) }
+            HomeGrouping.Project -> byProject(snapshot)
+            HomeGrouping.Status -> byStatus(snapshot)
+        }
+
+    /** One group per project, most recently active first; unassigned chats form the "Chats" group. */
+    fun byProject(snapshot: CatalogSnapshot): List<HomeSection> {
+        val names = snapshot.projects.associate { it.id to it.name }
+        return homeItems(snapshot)
+            .groupBy { if (isChat(it.projectId)) CHATS_ID else it.projectId }
+            .map { (key, chats) ->
+                val header = if (key == CHATS_ID) HomeSection.Header.Chats else HomeSection.Header.Project(names[key].orEmpty())
+                HomeSection("project-$key", header, chats)
+            }
+    }
+
+    /** [StatusGroup] order; the screen folds a long idle group behind "Show all". */
+    fun byStatus(snapshot: CatalogSnapshot): List<HomeSection> {
+        val groups = homeItems(snapshot).groupBy { it.statusGroup }
+        return StatusGroup.entries.mapNotNull { group ->
+            groups[group]?.let { HomeSection("status-$group", HomeSection.Header.Status(group), it) }
+        }
+    }
+
+    /** Quiet chats beyond this many fold behind "Show all" in the status view (iOS shows the same 20). */
+    const val IDLE_LIMIT = 20
+
+    /** Non-archived rows, newest activity first, carrying their project for the detail line. */
+    private fun homeItems(snapshot: CatalogSnapshot): List<ChatItem> {
+        val projects = snapshot.projects.associateBy { it.id }
+        return snapshot.sessions
+            .filter { !it.archived }
+            .map { session ->
+                val project = projects[session.projectId]?.takeUnless { isChat(it.id) }
+                item(session, project?.name.orEmpty(), project?.repoFullName != null)
+            }
+            .sortedByDescending { it.activityAt ?: Long.MIN_VALUE }
+    }
+
     fun isUnread(session: CatalogSession): Boolean {
         val message = session.lastMessageAt ?: return false
         return session.lastReadAt?.let { message > it } ?: true
@@ -104,14 +205,7 @@ object ChatListModel {
 
     /** Home "by time": non-archived chats in activity buckets, newest first. */
     fun timeline(snapshot: CatalogSnapshot, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<TimeSection> {
-        val projects = snapshot.projects.associateBy { it.id }
-        return snapshot.sessions
-            .filter { !it.archived }
-            .map { session ->
-                val project = projects[session.projectId]?.takeUnless { isChat(it.id) }
-                item(session, project?.name.orEmpty(), project?.repoFullName != null)
-            }
-            .sortedByDescending { it.activityAt ?: Long.MIN_VALUE }
+        return homeItems(snapshot)
             .groupBy { bucket(it.activityAt, today, zone) }
             .toSortedMap()
             .map { (bucket, chats) -> TimeSection(bucket, chats) }
@@ -187,5 +281,8 @@ object ChatListModel {
         branch = session.branchName.orEmpty(),
         prStatus = session.pullRequests.lastOrNull()?.status.orEmpty(),
         activityAt = activityAt(session),
+        prCi = ci(session.pullRequests.lastOrNull()?.ci),
+        projectId = session.projectId,
+        statusGroup = statusGroup(session),
     )
 }

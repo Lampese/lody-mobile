@@ -119,6 +119,7 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
         sync = sync,
         accountName = user?.name.orEmpty(),
         timeline = snapshot?.let { ChatListModel.timeline(it) }.orEmpty(),
+        snapshot = snapshot,
         projects = snapshot?.let(ChatListModel::groups).orEmpty(),
         placeholder = placeholder,
         workspaces = user?.workspaces.orEmpty(),

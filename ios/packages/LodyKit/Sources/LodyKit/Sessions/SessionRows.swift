@@ -78,6 +78,7 @@ enum SessionRows {
     row.preview = "session"
     row.branch = session.branchName ?? ""
     row.prStatus = session.pullRequests.last?.status ?? ""
+    row.prCI = PullRequestCI(session.pullRequests.last?.ci)?.rawValue ?? ""
     return row
   }
 
