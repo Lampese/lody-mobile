@@ -23425,6 +23425,40 @@
           }
         }
       }
+    },
+    "home.tree.expand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show opened chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开子对话"
+          }
+        }
+      }
+    },
+    "home.tree.collapse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide opened chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起子对话"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

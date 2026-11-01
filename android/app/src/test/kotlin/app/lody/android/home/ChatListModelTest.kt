@@ -223,4 +223,18 @@ class ChatListModelTest {
         val other = opened.copy(sessions = opened.sessions.map { if (it.id == "3") it.copy(openedBySessionId = "2") else it })
         assertNull(ChatListModel.byProject(other).first { it.header == HomeSection.Header.Project("Alpha") }.chats.single().nestedUnder)
     }
+
+    @Test
+    fun foldingAnOpenerHidesItsFamilyAndCarriesTheirUrgency() {
+        val chats = listOf(
+            ChatItem("p", "p", null, treeParent = true),
+            ChatItem("a", "a", ChatAttention.Running, nestedUnder = "p"),
+            ChatItem("b", "b", ChatAttention.Waiting, nestedUnder = "p", lastChild = true),
+            ChatItem("q", "q", null),
+        )
+        assertEquals(chats, ChatListModel.fold(chats, emptySet()))
+        val folded = ChatListModel.fold(chats, setOf("p"))
+        assertEquals(listOf("p", "q"), folded.map { it.id })
+        assertEquals(ChatAttention.Waiting, folded[0].attention)
+    }
 }

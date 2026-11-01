@@ -336,6 +336,26 @@ object ChatListModel {
         }
     }
 
+    /**
+     * Hides the nested chats of [folded] openers. A folded opener stands for its family, so it
+     * takes the family's most urgent attention.
+     */
+    fun fold(chats: List<ChatItem>, folded: Set<String>): List<ChatItem> {
+        if (folded.isEmpty()) return chats
+        val family = chats.filter { it.nestedUnder in folded }.groupBy { it.nestedUnder }
+        return chats.mapNotNull { chat ->
+            when {
+                chat.nestedUnder in folded -> null
+                chat.treeParent && chat.id in folded -> chat.copy(attention = mostUrgent(listOf(chat) + family[chat.id].orEmpty()))
+                else -> chat
+            }
+        }
+    }
+
+    private fun mostUrgent(chats: List<ChatItem>): ChatAttention? =
+        listOf(ChatAttention.Failed, ChatAttention.Waiting, ChatAttention.Running, ChatAttention.Unread)
+            .firstOrNull { wanted -> chats.any { it.attention == wanted } }
+
     /** Keeps only matching chats; groups without matches drop out. */
     fun search(groups: List<ChatGroup>, query: String): List<ChatGroup> {
         val term = query.trim()

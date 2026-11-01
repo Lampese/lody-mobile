@@ -37,6 +37,11 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private let topBackdrop = ChatHeaderBackdrop()
   private var placeholderText = ""
   private var details = ChatRowDetails.stored
+  /// The last projection, re-applied when an opener folds or unfolds.
+  private var lastSections: [LodyListSection] = []
+  /// Openers whose nested chats are hidden; default unfolded, as on web. Stored per device.
+  private var foldedOpeners = Set(UserDefaults.standard.stringArray(forKey: ChatListView.foldedKey) ?? [])
+  private static let foldedKey = "homeFoldedOpeners"
   /// UIKit owns a single section header and its push-off at the next section.
   /// Search labels remain in the flow.
   var pinsGroupLabels = true {
@@ -143,6 +148,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   }
 
   func setSections(_ sections: [LodyListSection]) {
+    lastSections = sections
     var snapshot = NSDiffableDataSourceSnapshot<String, Item>()
     var next: [Item: Entry] = [:]
     var nextTitles: [String: String] = [:]
@@ -162,6 +168,12 @@ final class ChatListView: UIView, UICollectionViewDelegate {
           entry = Entry(kind: .link, row: row, expanded: nil, canToggle: false)
         } else if row.id.hasPrefix("project:") || row.id.hasPrefix("view:") {
           entry = Entry(kind: .more, row: row, expanded: nil, canToggle: false)
+        } else if !row.parentId.isEmpty, foldedOpeners.contains(row.parentId) {
+          continue
+        } else if row.treeParent {
+          // A folded opener stands for its family: it shows their most urgent state.
+          let open = !foldedOpeners.contains(row.id)
+          entry = Entry(kind: .session, row: row.displayingCollapsed(!open, keepingTime: true), expanded: open, canToggle: true)
         } else {
           entry = Entry(kind: .session, row: row, expanded: nil, canToggle: false)
         }
@@ -177,6 +189,12 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     dataSource.apply(snapshot, animatingDifferences: window != nil && !UIAccessibility.isReduceMotionEnabled)
     updateBackdrop()
     updatePlaceholder()
+  }
+
+  private func toggleOpener(_ id: String) {
+    if foldedOpeners.remove(id) == nil { foldedOpeners.insert(id) }
+    UserDefaults.standard.set(Array(foldedOpeners).sorted(), forKey: Self.foldedKey)
+    setSections(lastSections)
   }
 
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -240,7 +258,11 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       switch entry.kind {
       case .header: GroupHeader(row: entry.row, expanded: entry.expanded, canToggle: entry.canToggle, onAction: emit)
       case .link: GroupHeader(row: entry.row, expanded: nil, canToggle: false, onAction: emit)
-      case .session: ChatRowContent(row: entry.row, details: details)
+      case .session:
+        ChatRowContent(
+          row: entry.row, details: details, expanded: entry.canToggle ? entry.expanded : nil,
+          onToggle: { [weak self] in self?.toggleOpener(entry.row.id) }
+        )
       case .more: MoreRowContent(title: entry.row.title)
       }
     }
@@ -519,6 +541,10 @@ extension Notification.Name {
 private struct ChatRowContent: View {
   let row: LodyListRow
   let details: ChatRowDetails
+  /// Set on a row with nested chats: whether they are shown. Its status slot then holds the
+  /// disclosure (web's opener chevron) and its status mark moves inline, before the age.
+  var expanded: Bool?
+  var onToggle: () -> Void = {}
 
   private var project: String { details.contains(.project) ? row.place : "" }
   private var branch: String { details.contains(.branch) ? row.branch : "" }
@@ -529,6 +555,8 @@ private struct ChatRowContent: View {
 
   private var attention: Attention? { Attention(tint: row.imageTint, unread: row.unread) }
   private var nested: Bool { !row.parentId.isEmpty }
+  /// An opener's own mark (or, folded, its family's) sits before the age.
+  private var inlineAttention: Attention? { expanded != nil ? attention : nil }
 
   /// Search results keep their match snippet in place of the detail line.
   private var snippet: String? {
@@ -538,12 +566,25 @@ private struct ChatRowContent: View {
   var body: some View {
     HStack(alignment: .center, spacing: 0) {
       // The status slot, centred on the whole row; a nested row's slot steps in one level.
-      ZStack {
-        if let attention { AttentionGlyph(attention: attention) }
+      if let expanded {
+        Button(action: onToggle) {
+          Glyph(icon: .expand, size: LodyIconSize.sm, color: LodyColor.iconTertiary)
+            .rotationEffect(.degrees(expanded ? 0 : -90))
+            .animation(LodySpring.snappy, value: expanded)
+            .frame(width: LodyIconSize.md, height: LodyIconSize.md)
+            .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      } else {
+        ZStack {
+          if let attention { AttentionGlyph(attention: attention) }
+        }
+        .frame(width: LodyIconSize.md, height: LodyIconSize.md)
+        .padding(.leading, nested ? TreeLines.level : 0)
+        .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (nested ? TreeLines.level : 0), alignment: .leading)
       }
-      .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-      .padding(.leading, nested ? TreeLines.level : 0)
-      .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (nested ? TreeLines.level : 0), alignment: .leading)
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
           Text(row.title)
@@ -552,8 +593,9 @@ private struct ChatRowContent: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
           // The text inside sets the stack's baseline, so the PR mark centres on the age.
-          if inlinePullRequest != nil || !row.value.isEmpty {
+          if inlineAttention != nil || inlinePullRequest != nil || !row.value.isEmpty {
             HStack(spacing: LodySpacing.xs) {
+              if let inlineAttention { AttentionGlyph(attention: inlineAttention) }
               inlinePullRequest?.glyph
               if !row.value.isEmpty {
                 Text(row.value)
@@ -576,8 +618,8 @@ private struct ChatRowContent: View {
     .padding(.vertical, snippet != nil || hasDetailLine ? LodySpacing.sm : 0)
     .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
     .background {
-      if nested || row.treeParent {
-        TreeLines(nested: nested, lastChild: row.lastChild, parent: row.treeParent, marked: attention != nil)
+      if nested || expanded == true {
+        TreeLines(nested: nested, lastChild: row.lastChild, parent: expanded == true, marked: attention != nil)
       }
     }
     .accessibilityElement(children: .ignore)
@@ -586,6 +628,11 @@ private struct ChatRowContent: View {
       [row.badge, project, branch, pullRequest?.label ?? "", row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", ")
     )
     .accessibilityAddTraits(.isButton)
+    .accessibilityActions {
+      if let expanded {
+        Button(String(localized: String.LocalizationValue(expanded ? "home.tree.collapse" : "home.tree.expand"), bundle: .lody), action: onToggle)
+      }
+    }
   }
 
   private var detailLine: some View {
@@ -626,7 +673,8 @@ private struct TreeLines: View {
       let mid = size.height / 2
       var path = Path()
       if parent {
-        path.move(to: CGPoint(x: x, y: mid + LodyIconSize.md / 2 + LodySpacing.xxs))
+        // Below the opener's chevron.
+        path.move(to: CGPoint(x: x, y: mid + LodyIconSize.sm / 2 + LodySpacing.xxs))
         path.addLine(to: CGPoint(x: x, y: size.height))
       }
       if nested {

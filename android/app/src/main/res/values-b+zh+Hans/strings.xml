@@ -27,6 +27,8 @@
     <string name="home_bucket_older">更早</string>
 
     <!-- Home: grouping -->
+    <string name="home_tree_expand">展开子对话</string>
+    <string name="home_tree_collapse">收起子对话</string>
     <string name="home_view_scope">范围</string>
     <string name="home_scope_mine">我的任务</string>
     <string name="home_scope_team">团队任务</string>

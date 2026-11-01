@@ -68,6 +68,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import app.lody.android.designsystem.LodySpring
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.draw.rotate
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
@@ -543,6 +547,13 @@ internal fun HomeList(
     // Resolved here: LazyListScope builders are not composable.
     val titles = sections.associate { it.id to it.header.title() }
     val showLess = stringResource(R.string.home_group_show_less)
+    val context = LocalContext.current
+    var folded by remember { mutableStateOf(FoldedOpeners.load(context)) }
+    val toggleOpener = { id: String ->
+        folded = if (id in folded) folded - id else folded + id
+        FoldedOpeners.save(context, folded)
+    }
+    val shown = remember(sections, folded) { sections.map { it.copy(chats = ChatListModel.fold(it.chats, folded)) } }
     val direction = LocalLayoutDirection.current
     // Keep the sticky slot below the app bar; content padding alone scrolls away.
     LazyColumn(
@@ -553,14 +564,18 @@ internal fun HomeList(
             bottom = padding.calculateBottomPadding(),
         ),
     ) {
-        sections.forEach { section ->
+        shown.forEach { section ->
             if (pinsLabels) {
                 stickyHeader(key = section.id) { SectionTitle(titles.getValue(section.id)) }
             } else {
                 item(key = section.id) { SectionTitle(titles.getValue(section.id)) }
             }
             items(section.visibleChats(idleExpanded), key = { "${section.id}/${it.id}" }) { chat ->
-                ChatRow(chat, details, now) { onOpenChat(chat) }
+                ChatRow(
+                    chat, details, now,
+                    expanded = if (chat.treeParent) chat.id !in folded else null,
+                    onToggle = { toggleOpener(chat.id) },
+                ) { onOpenChat(chat) }
             }
             if (section.folds) {
                 item(key = "${section.id}/more") {
@@ -679,9 +694,19 @@ private fun SectionTitle(text: String) {
 /**
  * Line 1: status slot, title, age. Line 2 (only when an enabled detail has a value): repo or folder
  * mark + project, branch, and the PR mark trailing. iOS counterpart: `ChatRowContent`.
+ *
+ * [expanded] is set on a row with nested chats: whether they are shown. Its status slot then
+ * holds the disclosure (web's opener chevron) and its status mark moves inline, before the age.
  */
 @Composable
-private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onClick: () -> Unit) {
+private fun ChatRow(
+    chat: ChatItem,
+    details: Set<ChatRowDetail>,
+    now: Long,
+    expanded: Boolean? = null,
+    onToggle: () -> Unit = {},
+    onClick: () -> Unit,
+) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val place = chat.place.takeIf { ChatRowDetail.Project in details && it.isNotEmpty() }
@@ -695,7 +720,7 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LodySize.listRow)
-            .drawBehind { if (nested || chat.treeParent) drawTree(treeColor, nested, chat.lastChild, chat.treeParent, chat.attention != null) }
+            .drawBehind { if (nested || expanded == true) drawTree(treeColor, nested, chat.lastChild, expanded == true, chat.attention != null) }
             .clickable(onClick = onClick)
             .padding(end = LodyLayout.screenPaddingX)
             .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
@@ -703,8 +728,23 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
     ) {
         // The status slot spans the gutter and centres on the whole row; empty when idle. A nested
         // row's slot (and so its title) steps in one level.
-        Box(Modifier.padding(start = if (nested) TreeLevel else 0.dp).width(LodyLayout.childIndent), contentAlignment = Alignment.Center) {
-            chat.attention?.let { AttentionGlyph(it) }
+        if (expanded != null) {
+            val label = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
+            val angle by animateFloatAsState(if (expanded) 0f else -90f, LodySpring.snappy(), label = "disclosure")
+            Box(
+                Modifier
+                    .width(LodyLayout.childIndent)
+                    .heightIn(min = LodySize.listRow)
+                    .clickable(role = Role.Button, onClickLabel = label, onClick = onToggle)
+                    .semantics { stateDescription = label },
+                contentAlignment = Alignment.Center,
+            ) {
+                Glyph(LodyIcons.Expand, colors.iconTertiary, LodyIconSize.sm, Modifier.rotate(angle))
+            }
+        } else {
+            Box(Modifier.padding(start = if (nested) TreeLevel else 0.dp).width(LodyLayout.childIndent), contentAlignment = Alignment.Center) {
+                chat.attention?.let { AttentionGlyph(it) }
+            }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -716,6 +756,8 @@ private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onCl
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                // An opener's own mark (or, folded, its family's) sits before the age.
+                if (expanded != null) chat.attention?.let { Box(Modifier.padding(start = LodySpacing.sm)) { AttentionGlyph(it) } }
                 if (pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
                 chat.activityAt?.let { at ->
                     Text(
@@ -762,7 +804,8 @@ private fun DrawScope.drawTree(color: Color, nested: Boolean, lastChild: Boolean
     val mid = size.height / 2
     val stroke = 1.dp.toPx()
     if (parent) {
-        drawLine(color, Offset(x, mid + (LodyIconSize.md / 2 + LodySpacing.xxs).toPx()), Offset(x, size.height), stroke)
+        // Below the opener's chevron.
+        drawLine(color, Offset(x, mid + (LodyIconSize.sm / 2 + LodySpacing.xxs).toPx()), Offset(x, size.height), stroke)
     }
     if (nested) {
         drawLine(color, Offset(x, 0f), Offset(x, if (lastChild) mid else size.height), stroke)

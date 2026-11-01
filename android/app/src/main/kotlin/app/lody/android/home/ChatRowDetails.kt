@@ -46,6 +46,19 @@ object HomeGroupings {
     }
 }
 
+/** Openers whose nested chats are hidden; default unfolded, as on web. */
+object FoldedOpeners {
+    private const val FILE = "home"
+    private const val KEY = "foldedOpeners"
+
+    fun load(context: Context): Set<String> =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getStringSet(KEY, null)?.toSet().orEmpty()
+
+    fun save(context: Context, ids: Set<String>) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putStringSet(KEY, ids).apply()
+    }
+}
+
 object ChatRowDetails {
     private const val FILE = "home"
     private const val KEY = "chatRowDetails"
