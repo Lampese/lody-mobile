@@ -68,8 +68,11 @@ final class InboxChrome {
     settings.pressed = { [weak self] in self?.openSettings?() }
     settings.held = { [weak self] in self?.openDebug?() }
     // iPhone: a search button that expands into the field (iOS 26 integratedButton); iPad uses padBar.
+    // No toolbar integration: with a toolbar-less page UIKit otherwise drops the button to the
+    // bottom edge, under HomeTabBar. `update` places it in the trailing nav items instead.
     search.configure(LodyNavigationSearch.Config(
-      placeholder: String(localized: "search.field.placeholder", bundle: .lody), placement: "integratedButton", hideWhenScrolling: false
+      placeholder: String(localized: "search.field.placeholder", bundle: .lody), placement: "integratedButton", hideWhenScrolling: false,
+      allowToolbarIntegration: false
     ))
     search.emit = { [weak self] event, text in
       guard let self else { return }
@@ -123,15 +126,16 @@ final class InboxChrome {
     filter.accessibilityLabel = String(localized: "inbox.settings.section.view", bundle: .lody)
     filter.menu = regular ? filterMenu(mode: model.mode, sort: model.sort) : compactViewMenu()
     let settingsItem = self.settingsItem ?? UIBarButtonItem(customView: settingsSlot)
+    // iPad keeps integrated search in the navigation bar, so the sidebar hosts its own bottom field.
+    if regular, header.search === search { header.search = nil }
+    if !regular, header.search !== search { header.search = search }
     // iPhone reaches Settings from the bottom tabs; iPad keeps the gear beside the view menu.
-    let right = regular ? [settingsItem, filter] : [filter]
+    // Right items run from the trailing edge: iPhone shows search, then the view menu (design).
+    let right = regular ? [settingsItem, filter] : [filter, host.navigationItem.searchBarPlacementBarButtonItem]
     (workspaceItem, self.settingsItem, filterItem) = (left[0], settingsItem, filter)
     let shownLeft = searching && !regular ? [] : left
     if header.leftItems ?? [] != shownLeft { header.leftItems = shownLeft.isEmpty ? nil : shownLeft }
     if header.rightItems != right { header.rightItems = right }
-    // iPad keeps integrated search in the navigation bar, so the sidebar hosts its own bottom field.
-    if regular, header.search === search { header.search = nil }
-    if !regular, header.search !== search { header.search = search }
     showToolbar()
   }
 

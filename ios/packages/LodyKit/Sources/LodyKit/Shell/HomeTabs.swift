@@ -1,5 +1,4 @@
 import LodyDesignSystem
-import SwiftUI
 import UIKit
 
 /// iPhone Home's top-level destinations. iPad keeps the split view and does not show tabs.
@@ -23,14 +22,15 @@ enum HomeTab: CaseIterable, Sendable {
   }
 }
 
-/// The floating bottom bar from the mobile design: a capsule of labelled tabs plus a separate
-/// new-chat button, both on system Liquid Glass. The system tab bar cannot host a second
-/// control beside its capsule (that slot belongs to search), so this bar draws its own glass.
+/// The floating bottom bar from the mobile design: the system tab bar (iOS 26 Liquid Glass, with
+/// its draggable, refracting selection) holding labelled tabs, plus a separate glass new-chat
+/// button. The bar is a standalone `UITabBar` rather than a `UITabBarController`, because Home
+/// stays a split view and the slot beside a controller's capsule belongs to search.
 ///
 /// It is installed on each tab's root page, so pushing a session or project slides it away
 /// with the page and popping brings it back; no visibility bookkeeping is needed.
 @MainActor
-final class HomeTabBar {
+final class HomeTabBar: NSObject, UITabBarDelegate {
   struct Actions {
     var select: (HomeTab) -> Void
     var create: () -> Void
@@ -40,7 +40,9 @@ final class HomeTabBar {
 
   static let height = LodySize.controlLg + LodySpacing.sm
 
-  private let hosting: UIHostingController<HomeTabBarView>
+  private let bar = UITabBar()
+  private let create = UIButton(type: .system)
+  private let actions: Actions
   private weak var page: UIViewController?
   private weak var content: UIViewController?
 
@@ -50,98 +52,70 @@ final class HomeTabBar {
   init(page: UIViewController, content: UIViewController, selected: HomeTab, actions: Actions) {
     self.page = page
     self.content = content
-    hosting = UIHostingController(rootView: HomeTabBarView(selected: selected, actions: actions))
-    hosting.view.backgroundColor = .clear
-    hosting.sizingOptions = .intrinsicContentSize
+    self.actions = actions
+    super.init()
     page.loadViewIfNeeded()
-    page.addChild(hosting)
-    hosting.view.translatesAutoresizingMaskIntoConstraints = false
-    page.view.addSubview(hosting.view)
+
+    let items = HomeTab.allCases.enumerated().map { index, tab in
+      let item = UITabBarItem(title: tab.title, image: tab.icon.uiImage?.withRenderingMode(.alwaysTemplate), tag: index)
+      item.accessibilityIdentifier = "home-tab-\(String(describing: tab))"
+      return item
+    }
+    bar.items = items
+    bar.selectedItem = items[HomeTab.allCases.firstIndex(of: selected) ?? 0]
+    bar.delegate = self
+    bar.tintColor = LodyUIColor.accentFg
+    bar.unselectedItemTintColor = LodyUIColor.iconSecondary
+    bar.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(longPressed(_:))))
+
+    var config = UIButton.Configuration.glass()
+    config.image = LodyIcon.compose.uiImage?.withRenderingMode(.alwaysTemplate)
+    config.baseForegroundColor = LodyUIColor.iconPrimary
+    config.cornerStyle = .capsule
+    create.configuration = config
+    create.accessibilityLabel = String(localized: "tabs.newSession", bundle: .lody)
+    create.accessibilityIdentifier = "home-new-session"
+    create.addAction(UIAction { [weak self] _ in self?.actions.create() }, for: .primaryActionTriggered)
+
+    for view in [bar, create] as [UIView] {
+      view.translatesAutoresizingMaskIntoConstraints = false
+      page.view.addSubview(view)
+    }
+    let guide = page.view.safeAreaLayoutGuide
     NSLayoutConstraint.activate([
-      hosting.view.leadingAnchor.constraint(equalTo: page.view.safeAreaLayoutGuide.leadingAnchor),
-      hosting.view.trailingAnchor.constraint(equalTo: page.view.safeAreaLayoutGuide.trailingAnchor),
-      hosting.view.bottomAnchor.constraint(equalTo: page.view.safeAreaLayoutGuide.bottomAnchor, constant: -LodySpacing.xs),
-      hosting.view.heightAnchor.constraint(equalToConstant: Self.height),
+      bar.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: LodyLayout.screenPaddingX),
+      bar.trailingAnchor.constraint(equalTo: create.leadingAnchor, constant: -LodySpacing.md),
+      bar.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -LodySpacing.xs),
+      create.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -LodyLayout.screenPaddingX),
+      create.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+      create.widthAnchor.constraint(equalToConstant: Self.height),
+      create.heightAnchor.constraint(equalToConstant: Self.height),
     ])
-    hosting.didMove(toParent: page)
     page.registerForTraitChanges([UITraitHorizontalSizeClass.self]) { [weak self] (_: UIViewController, _: UITraitCollection) in
       self?.updateVisibility()
     }
     updateVisibility()
   }
 
+  func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+    guard HomeTab.allCases.indices.contains(item.tag) else { return }
+    actions.select(HomeTab.allCases[item.tag])
+  }
+
+  @objc private func longPressed(_ gesture: UILongPressGestureRecognizer) {
+    guard gesture.state == .began, let settings = HomeTab.allCases.firstIndex(of: .settings) else { return }
+    // Tabs share the bar's width equally, so the touch's column names the tab.
+    let column = Int(gesture.location(in: bar).x / max(1, bar.bounds.width) * CGFloat(HomeTab.allCases.count))
+    let index = bar.effectiveUserInterfaceLayoutDirection == .rightToLeft ? HomeTab.allCases.count - 1 - column : column
+    if index == settings { actions.openDebug() }
+  }
+
   private func updateVisibility() {
     guard let page else { return }
     let shown = page.traitCollection.horizontalSizeClass != .regular
-    hosting.view.isHidden = !shown
-    content?.additionalSafeAreaInsets.bottom = shown ? Self.height + LodySpacing.xs : 0
-  }
-}
-
-private struct HomeTabBarView: View {
-  let selected: HomeTab
-  let actions: HomeTabBar.Actions
-
-  var body: some View {
-    GlassEffectContainer(spacing: LodySpacing.md) {
-      HStack(spacing: LodySpacing.md) {
-        HStack(spacing: 0) {
-          ForEach(HomeTab.allCases, id: \.self) { tab in
-            TabButton(tab: tab, selected: tab == selected, actions: actions)
-          }
-        }
-        .padding(LodySpacing.xs)
-        .glassEffect(.regular.interactive(), in: .capsule)
-
-        Button(action: actions.create) {
-          LodyIcon.compose.image
-            .resizable()
-            .renderingMode(.template)
-            .foregroundStyle(LodyColor.iconPrimary)
-            .frame(width: LodyIconSize.lg, height: LodyIconSize.lg)
-            .frame(width: HomeTabBar.height, height: HomeTabBar.height)
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
-        .accessibilityLabel(String(localized: "tabs.newSession", bundle: .lody))
-        .accessibilityIdentifier("home-new-session")
-      }
-      .padding(.horizontal, LodyLayout.screenPaddingX)
-    }
-    .accessibilityElement(children: .contain)
-  }
-}
-
-private struct TabButton: View {
-  let tab: HomeTab
-  let selected: Bool
-  let actions: HomeTabBar.Actions
-
-  var body: some View {
-    Button { actions.select(tab) } label: {
-      VStack(spacing: LodySpacing.xxs) {
-        tab.icon.image
-          .resizable()
-          .renderingMode(.template)
-          .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-        Text(tab.title)
-          .font(LodyTextStyle.micro.font)
-          .tracking(LodyTextStyle.micro.tracking)
-          .lineLimit(1)
-          .minimumScaleFactor(0.8)
-      }
-      .foregroundStyle(selected ? LodyColor.accentFg : LodyColor.iconSecondary)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(selected ? LodyColor.fillSelected : .clear, in: Capsule())
-      .contentShape(Capsule())
-    }
-    .buttonStyle(.plain)
-    .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in
-      if tab == .settings { actions.openDebug() }
-    })
-    .accessibilityLabel(tab.title)
-    .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-    .accessibilityIdentifier("home-tab-\(String(describing: tab))")
+    bar.isHidden = !shown
+    create.isHidden = !shown
+    let height = max(Self.height, bar.sizeThatFits(page.view.bounds.size).height)
+    content?.additionalSafeAreaInsets.bottom = shown ? height + LodySpacing.xs : 0
   }
 }
