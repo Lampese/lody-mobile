@@ -34,23 +34,17 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private var entries: [Item: Entry] = [:]
   private var titles: [String: String] = [:]
   private let placeholder = UILabel()
+  private let topBackdrop = ChatHeaderBackdrop()
   private var placeholderText = ""
   private var details = ChatRowDetails.stored
-  /// The current group's label, pinned under the navigation bar while its rows scroll beneath.
-  /// It has no backdrop of its own: it joins the system top scroll edge effect, so the bar's
-  /// soft blur extends under it as one continuous band.
-  private lazy var pinned: UIView & UIContentView = Self.pinnedConfiguration("").makeContentView()
-  private var pinnedText = ""
-  private let pinnedEdge = UIScrollEdgeElementContainerInteraction()
-  /// Matches `SectionTitle`'s label line (scaled like `lodyTextStyle`) plus its bottom inset, twice.
-  private var pinnedHeight: CGFloat {
-    let style = LodyTextStyle.subhead
-    return UIFontMetrics(forTextStyle: style.dynamicType.uiTextStyle).scaledValue(for: style.lineHeight, compatibleWith: traitCollection)
-      + LodySpacing.xs * 2
-  }
-  /// Search results keep their labels in the flow.
+  /// UIKit owns a single section header and its push-off at the next section.
+  /// Search labels remain in the flow.
   var pinsGroupLabels = true {
-    didSet { if pinsGroupLabels != oldValue { updatePinned() } }
+    didSet {
+      guard pinsGroupLabels != oldValue else { return }
+      collection.collectionViewLayout.invalidateLayout()
+      updateBackdrop()
+    }
   }
   private var detailsObserver: NSObjectProtocol?
 
@@ -64,28 +58,29 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     config.headerTopPadding = 0
     config.trailingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipe(path, leading: false) }
     config.leadingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipe(path, leading: true) }
-    // Group labels scroll with their rows (as on web and Android): a plain list pins headers by
-    // default, and a pinned label on a clear background overlaps the rows passing beneath it.
-    let layout = UICollectionViewCompositionalLayout { _, environment in
+    let layout = UICollectionViewCompositionalLayout { [weak self] index, environment in
       let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
-      section.boundarySupplementaryItems.forEach { $0.pinToVisibleBounds = false }
+      let id = self?.dataSource?.sectionIdentifier(for: index)
+      let title = id.flatMap { self?.titles[$0] } ?? ""
+      section.boundarySupplementaryItems.forEach {
+        $0.pinToVisibleBounds = self?.pinsGroupLabels == true && !title.isEmpty
+        $0.zIndex = 2
+      }
       return section
     }
+    // Group spacing belongs between sections, not inside the pinned label.
+    let layoutConfiguration = UICollectionViewCompositionalLayoutConfiguration()
+    layoutConfiguration.interSectionSpacing = LodySpacing.md
+    layout.configuration = layoutConfiguration
     collection = UICollectionView(frame: bounds, collectionViewLayout: layout)
     collection.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     collection.backgroundColor = .clear
     collection.delegate = self
     collection.accessibilityIdentifier = "home-chat-list"
     addSubview(collection)
-    pinned.isUserInteractionEnabled = false
-    // The in-list header stays the accessible one; this is a visual duplicate.
-    pinned.accessibilityElementsHidden = true
-    pinned.alpha = 0
-    pinnedEdge.scrollView = collection
-    pinnedEdge.edge = .top
-    pinned.addInteraction(pinnedEdge)
-    addSubview(pinned)
-
+    topBackdrop.layer.zPosition = 1
+    topBackdrop.isHidden = true
+    collection.addSubview(topBackdrop)
     let cell = UICollectionView.CellRegistration<UICollectionViewListCell, Item> { [weak self] cell, _, item in
       self?.configure(cell, item)
     }
@@ -98,6 +93,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       }
       .margins(.all, 0)
       view.backgroundConfiguration = .clear()
+      view.layer.zPosition = 2
     }
     dataSource = UICollectionViewDiffableDataSource(collectionView: collection) { view, path, item in
       view.dequeueConfiguredReusableCell(using: cell, for: path, item: item)
@@ -136,7 +132,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   override func layoutSubviews() {
     super.layoutSubviews()
     collection.frame = bounds
-    updatePinned()
+    updateBackdrop()
     let inset = LodyLayout.screenPaddingX * 2
     placeholder.frame = CGRect(x: inset, y: bounds.midY - 60, width: max(0, bounds.width - inset * 2), height: 120)
   }
@@ -179,46 +175,39 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     titles = nextTitles
     snapshot.reconfigureItems(Array(changed))
     dataSource.apply(snapshot, animatingDifferences: window != nil && !UIAccessibility.isReduceMotionEnabled)
-    updatePinned()
+    updateBackdrop()
     updatePlaceholder()
   }
 
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
-    updatePinned()
+    updateBackdrop()
   }
 
-  /// Pins the last labelled group whose in-list label has reached the top; the next label
-  /// pushes it up as it arrives, like a pinned header, but over the system edge effect.
-  private func updatePinned() {
-    let height = pinnedHeight
+  /// One continuous backdrop runs from the pinned label to the window top.
+  /// Keep UIKit's original supplementary label, including its native push-off.
+  private func updateBackdrop() {
     let top = collection.contentOffset.y + collection.adjustedContentInset.top
-    var current: (title: String, push: CGFloat)?
-    if pinsGroupLabels {
-      let sections = dataSource.snapshot().sectionIdentifiers
-      for (index, id) in sections.enumerated() {
-        guard let title = titles[id], !title.isEmpty,
-          let header = collection.layoutAttributesForSupplementaryElement(
-            ofKind: UICollectionView.elementKindSectionHeader, at: IndexPath(item: 0, section: index))
-        else { continue }
-        // A header's label sits at its bottom, so it reaches the pinned slot when its maxY does.
-        let labelTop = header.frame.maxY - height
-        if labelTop <= top {
-          current = (title, 0)
-        } else {
-          if let pinnedNow = current { current = (pinnedNow.title, min(0, labelTop - top - height)) }
-          break
-        }
-      }
+    let paths = collection.indexPathsForVisibleSupplementaryElements(ofKind: UICollectionView.elementKindSectionHeader)
+    let active = paths.compactMap { path -> UICollectionViewLayoutAttributes? in
+      guard pinsGroupLabels,
+            let id = dataSource.sectionIdentifier(for: path.section), !(titles[id] ?? "").isEmpty,
+            let attributes = collection.layoutAttributesForSupplementaryElement(ofKind: UICollectionView.elementKindSectionHeader, at: path)
+      else { return nil }
+      return attributes.frame.minY <= top + 1 ? attributes : nil
+    }.max { $0.indexPath.section < $1.indexPath.section }
+    // A second system edge would introduce a seam in the middle of the gradient.
+    collection.topEdgeEffect.isHidden = active != nil
+    topBackdrop.isHidden = active == nil
+    if let attributes = active {
+      topBackdrop.frame = CGRect(x: collection.bounds.minX, y: collection.bounds.minY,
+                                width: collection.bounds.width,
+                                height: max(0, attributes.frame.maxY - collection.bounds.minY) + LodySpacing.xxl)
     }
-    pinned.frame = CGRect(x: 0, y: collection.adjustedContentInset.top + (current?.push ?? 0), width: bounds.width, height: height)
-    pinned.alpha = current == nil ? 0 : 1
-    guard let title = current?.title, title != pinnedText else { return }
-    pinnedText = title
-    pinned.configuration = Self.pinnedConfiguration(title)
   }
 
-  private static func pinnedConfiguration(_ text: String) -> UIHostingConfiguration<PinnedGroupLabel, EmptyView> {
-    UIHostingConfiguration { PinnedGroupLabel(text: text) }.margins(.all, 0)
+  func collectionView(_ collectionView: UICollectionView, willDisplaySupplementaryView view: UICollectionReusableView,
+                      forElementKind elementKind: String, at indexPath: IndexPath) {
+    updateBackdrop()
   }
 
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
@@ -307,6 +296,83 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       })
     }
   }
+}
+
+/// Keep a blurred base under the upper gradient: fading a single blur view mixes
+/// sharp source text back in. Only the tail below the label fades to clear.
+private final class ChatHeaderBackdrop: UIView {
+  private let base = ChatBlurLayer(intensity: 0.4)
+  private let upper = ChatBlurLayer(intensity: 1)
+
+  init() {
+    super.init(frame: .zero)
+    isUserInteractionEnabled = false
+    addSubview(base)
+    addSubview(upper)
+    updateTone()
+    registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: ChatHeaderBackdrop, _: UITraitCollection) in
+      view.updateTone()
+    }
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError() }
+
+  private func updateTone() {
+    let dark = traitCollection.userInterfaceStyle == .dark
+    base.contentView.backgroundColor = dark ? LodyUIColor.bgBase.withAlphaComponent(0.25) : .clear
+    upper.contentView.backgroundColor = dark ? LodyUIColor.bgBase.withAlphaComponent(0.6) : .clear
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    base.frame = bounds
+    upper.frame = bounds
+    let labelEnd = max(0, min(1, (bounds.height - LodySpacing.xxl) / max(1, bounds.height)))
+    base.setFade(colors: [1, 1, 0], locations: [0, labelEnd, 1])
+    upper.setFade(colors: [1, 0, 0], locations: [0, labelEnd, 1])
+  }
+}
+
+private final class ChatBlurLayer: UIVisualEffectView {
+  private let fadeView = ChatBlurMask()
+  private var animator: UIViewPropertyAnimator?
+  private var lastSize = CGSize.zero
+  private var lastLocations: [CGFloat] = []
+
+  init(intensity: CGFloat) {
+    super.init(effect: nil)
+    let animator = UIViewPropertyAnimator(duration: 1, curve: .linear) { [weak self] in
+      self?.effect = UIBlurEffect(style: .regular)
+    }
+    animator.pausesOnCompletion = true
+    animator.fractionComplete = intensity
+    self.animator = animator
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError() }
+
+  isolated deinit { animator?.stopAnimation(true) }
+
+  func setFade(colors: [CGFloat], locations: [CGFloat]) {
+    guard lastSize != bounds.size || lastLocations != locations else { return }
+    lastSize = bounds.size
+    lastLocations = locations
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    fadeView.frame = bounds
+    let gradient = fadeView.layer as! CAGradientLayer
+    gradient.colors = colors.map { UIColor.black.withAlphaComponent($0).cgColor }
+    gradient.locations = locations.map { NSNumber(value: Double($0)) }
+    mask = nil
+    mask = fadeView
+    CATransaction.commit()
+  }
+}
+
+private final class ChatBlurMask: UIView {
+  override class var layerClass: AnyClass { CAGradientLayer.self }
 }
 
 // MARK: - Content
@@ -611,21 +677,6 @@ private struct MoreRowContent: View {
   }
 }
 
-/// The pinned copy of `SectionTitle`'s label: same type and inset, without the top spacing.
-private struct PinnedGroupLabel: View {
-  let text: String
-
-  var body: some View {
-    Text(text)
-      .lodyTextStyle(.subhead)
-      .foregroundStyle(LodyColor.textTertiary)
-      .lineLimit(1)
-      .padding(.horizontal, LodyLayout.screenPaddingX)
-      .padding(.vertical, LodySpacing.xs)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-  }
-}
-
 private struct SectionTitle: View {
   let text: String
 
@@ -637,7 +688,7 @@ private struct SectionTitle: View {
         .lodyTextStyle(.subhead)
         .foregroundStyle(LodyColor.textTertiary)
         .padding(.horizontal, LodyLayout.screenPaddingX)
-        .padding(.top, LodySpacing.lg)
+        .padding(.top, LodySpacing.xs)
         .padding(.bottom, LodySpacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityAddTraits(.isHeader)

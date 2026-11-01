@@ -230,6 +230,20 @@ enum NativeHomeFixture {
     let url = Bundle.main.url(forResource: "DebugHome", withExtension: "json")!
     let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
     catalog = fixture["catalog"] as! [String: Any]
+    if LodyUIVerify.has("--ui-verify-sticky-groups") {
+      HomeGrouping.store(.project)
+      let names = ["Alpha project", "Beta project", "Gamma project"]
+      catalog["projects"] = names.enumerated().map { index, name in
+        ["id": "sticky-\(index)", "name": name, "machineId": "ui", "rootPath": "/tmp/sticky-\(index)"]
+      }
+      catalog["sessions"] = names.indices.flatMap { group in
+        (0..<18).map { row -> [String: Any] in
+          ["id": "sticky-\(group)-\(row)", "title": "Conversation \(group + 1).\(row + 1) — scrolling behind header",
+           "projectId": "sticky-\(group)", "machineId": "ui", "status": "completed",
+           "createdAt": "2026-09-0\(7 - group)T10:00:00Z", "archived": false, "pinned": false]
+        }
+      }
+    }
     statesCatalog = relative(fixture["statesCatalog"] as! [String: Any], now: Date().timeIntervalSince1970 * 1000)
     workspaces = fixture["workspaces"] as! [[String: Any]]
     for case let (photo, source as String) in fixture["photoCache"] as? [String: Any] ?? [:] {
