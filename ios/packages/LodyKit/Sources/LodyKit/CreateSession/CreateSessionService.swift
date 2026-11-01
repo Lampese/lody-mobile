@@ -10,6 +10,11 @@ struct CreateSessionService {
   var writePrefs: (_ key: String, _ prefs: CreatePrefs) -> Void
   var put: (_ userId: String, _ workspaceId: String, _ json: String) -> Task<Void, Error>
   var persistShare = true
+  var cachedOptions: (_ userId: String, _ workspaceId: String, _ projectId: String?) async -> CreationOptions? = { _, _, _ in nil }
+
+  static func optionsKey(userId: String, workspaceId: String, projectId: String?) -> String {
+    "creation-options:v1:" + CreateJSON.encode([userId, workspaceId, projectId ?? ""])
+  }
 
   static func prefsKey(userId: String, workspaceId: String) -> String { "create:\(userId):\(workspaceId)" }
 
@@ -26,10 +31,15 @@ struct CreateSessionService {
         guard let runtime = DataRuntime.current, runtime.workspace == workspaceId else {
           throw DataRuntime.failure("not_ready", String(localized: "native.runtime.sessionNotSynced", bundle: .lody))
         }
+        let cacheKey = optionsKey(userId: runtime.userId, workspaceId: workspaceId, projectId: projectId)
+        let generation = LocalStore.shared.generation
         let result = try await runtime.workspaceCall(RuntimeContract.Calls.CreationOptions.self) { workspace, _ in
           RuntimeContract.CreationOptionsParams(workspaceId: workspace, projectId: projectId)
         }
-        return try JSONDecoder().decode(CreationOptions.self, from: JSONEncoder().encode(result))
+        let options = try JSONDecoder().decode(CreationOptions.self, from: JSONEncoder().encode(result))
+        let value = CreateJSON.encode(options)
+        LocalStore.queue.async { try? LocalStore.shared.write(cacheKey, value, generation: generation) }
+        return options
       },
       repositories: { workspaceId in
         if workspaceId == "ui-home", LodyUIVerify.mentions { return ["LodyAI/FreshProject"] }
@@ -54,7 +64,14 @@ struct CreateSessionService {
         let value = CreateJSON.encode(prefs), generation = LocalStore.shared.generation
         LocalStore.queue.async { try? LocalStore.shared.write(key, value, generation: generation) }
       },
-      put: { OutboxSession.shared.put(user: $0, workspace: $1, json: $2) }
+      put: { OutboxSession.shared.put(user: $0, workspace: $1, json: $2) },
+      cachedOptions: { userId, workspaceId, projectId in
+        let key = optionsKey(userId: userId, workspaceId: workspaceId, projectId: projectId)
+        let raw: String? = await withCheckedContinuation { continuation in
+          LocalStore.queue.async { continuation.resume(returning: (try? LocalStore.shared.read(key)) ?? nil) }
+        }
+        return raw.flatMap { CreateJSON.decode(CreationOptions.self, $0) }
+      }
     )
   }
 

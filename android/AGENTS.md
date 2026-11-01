@@ -36,6 +36,8 @@
 - Persist with a scope-owned conflated worker; disk latency must not backpressure cloud event delivery. Cancel and join the worker before clearing/switching its scope.
 - RuntimeLifecycle owns one process-lifetime network subscription. Network validation is a recovery hint for an unavailable read lease, not proof of cloud liveness; backgrounding never registers another callback or starts recovery work.
 
+- Creation options share the atomic cache lifecycle: persist all providers and model/mode/effort choices by account + workspace + project target, restore before refresh, retain on read failure, and enable Send only after live validation. Options files are separately bounded to 16 snapshots and cleared with account cache on logout.
+
 ## Home UI
 
 - `home/HomeActivity` is the launcher: sign-in (Device Flow) without an account, otherwise `home/ChatListScreen`, which opens `chat/ChatScreen` for a row. It reads `AccountController` / `CatalogRepository` state only and picks the first workspace when none is restored.

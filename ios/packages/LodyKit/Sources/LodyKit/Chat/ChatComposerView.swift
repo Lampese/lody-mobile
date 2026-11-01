@@ -1567,12 +1567,17 @@ final class ChatComposerView: UIView, UITextViewDelegate {
         self.onComposerOptionChange?(["modelId": self.composerOptions.modelId, "effort": self.composerOptions.effort, "permissionId": option.id])
       }
     })
-    modelButton.isHidden = !composerExpanded || composerOptions.models.isEmpty
+    let hasRunConfig = cardStyle && onRunConfig != nil && composerOptions.agentName?.isEmpty == false
+    modelButton.isHidden = !composerExpanded || (composerOptions.models.isEmpty && !hasRunConfig)
     modelButton.isEnabled = state.editable && !state.sending && pendingDraft == nil
     // Web's run-config chip: assistant mark, model · effort, and a fast bolt, in one line.
     let font = LodyTextStyle.subhead.uiFont
     let dot = NSAttributedString(string: "  ·  ", attributes: [.foregroundColor: UIColor.tertiaryLabel])
-    let title = NSMutableAttributedString(string: composerOptions.modelTitle, attributes: [.foregroundColor: UIColor.label])
+    var triggerTitle = composerOptions.modelTitle
+    if hasRunConfig && composerOptions.models.isEmpty {
+      triggerTitle = composerOptions.agentName ?? triggerTitle
+    }
+    let title = NSMutableAttributedString(string: triggerTitle, attributes: [.foregroundColor: UIColor.label])
     if !composerOptions.efforts.isEmpty || !composerOptions.effort.isEmpty {
       title.append(dot)
       title.append(NSAttributedString(string: composerOptions.effortTitle, attributes: [.foregroundColor: UIColor.label]))

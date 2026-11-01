@@ -6,6 +6,7 @@ import UIKit
 @MainActor
 final class CreateSessionController: UIViewController {
   var form = CreateSessionForm()
+  var loadCachedOptions: ((_ projectId: String?) async -> CreationOptions?)?
   var loadOptions: ((_ projectId: String?) async throws -> CreationOptions)?
   var loadRepositories: (() async throws -> [CreateProject])?
   var loadBranches: ((_ repo: String, _ page: Int) async throws -> CreateBranches)?
@@ -207,6 +208,7 @@ final class CreateSessionController: UIViewController {
       options["permissions"] = permission.options.map { ["id": $0.id, "title": $0.name, "description": $0.description ?? ""] }
     }
     if let fast { options["fast"] = fast.enabled }
+    if let agent = page.agent { options["agentName"] = agent.name }
     if let asset = LodyAgentIcon.asset(modelId: page.agent?.agentType, name: nil) { options["agentAsset"] = asset }
     composer.setComposerOptions(Self.json(options))
     composer.setComposerState(Self.json([
@@ -243,6 +245,12 @@ final class CreateSessionController: UIViewController {
     loads[chat]?.cancel()
     loads[chat] = Task { [weak self] in
       do {
+        if let self, (chat ? self.form.chatPage : self.form.project).options == nil,
+          let cached = await self.loadCachedOptions?(projectId) {
+          guard !Task.isCancelled, (chat ? nil : self.form.project.projectId) == projectId else { return }
+          self.form.applyCachedOptions(cached, chat: chat)
+          self.changed(prefs: false)
+        }
         guard let options = try await self?.loadOptions?(projectId) else { return }
         guard let self, !Task.isCancelled, (chat ? nil : self.form.project.projectId) == projectId else { return }
         self.form.applyOptions(options, chat: chat)

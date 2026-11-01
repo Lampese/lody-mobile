@@ -229,3 +229,17 @@ do {
   form.deferUnresolved = true
   check(form.canSend && form.draft(sessionId: "s") == nil, "offline share defers unresolved branch to the app")
 }
+
+// Cached choices are displayable while live availability is still unverified.
+do {
+  var form = CreateSessionForm(userId: "u", workspaceId: "w", projects: [])
+  form.open(projectId: nil, context: "chat")
+  form.applyCachedOptions(options, chat: true)
+  check(form.chatPage.options == options, "complete cached options restored")
+  check(CreateJSON.decode(CreationOptions.self, CreateJSON.encode(options)) == options, "providers and complete capability lists survive persistence")
+  check(!form.canSend, "cached options cannot authorize sending")
+  form.failOptions(chat: true)
+  check(form.chatPage.options == options && !form.canSend, "failed refresh retains cached choices")
+  form.applyOptions(options, chat: true)
+  check(form.canSend, "live options unlock sending")
+}

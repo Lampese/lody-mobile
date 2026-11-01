@@ -17,6 +17,8 @@ open class LodyApplication : Application() {
         private set
     lateinit var cloud: CatalogRepository
         private set
+    lateinit var creation: app.lody.android.create.CreationService
+        private set
     private var prepared: Pair<RuntimeScope, ShortLivedGrant>? = null
     protected open fun createRuntime(scope: RuntimeScope): CloudRuntime {
         val ready = prepared?.takeIf { it.first == scope }
@@ -34,6 +36,7 @@ open class LodyApplication : Application() {
         super.onCreate()
         runtimeOwner = RuntimeOwner(::createRuntime, Dispatchers.Main.immediate)
         val cache = AtomicCatalogStore(this)
+        creation = app.lody.android.create.CreateSessionRepository(runtimeOwner, cache)
         account = AccountController(CloudAuthHttp(OkHttpAuthTransport()), KeystoreCredentialStore(this), applicationScope, cache) {
             prepared = null
             cloud.disconnect()

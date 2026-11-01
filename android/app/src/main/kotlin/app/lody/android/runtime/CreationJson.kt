@@ -15,6 +15,12 @@ internal object CreationJson {
             }, c.optString("agentConfigId").takeIf { it.isNotBlank() })
         },
     )
+    fun encodeOptions(value: CreationOptions) = JSONObject().apply {
+        fun choices(values: List<CreationChoice>) = JSONArray(values.map { JSONObject().put("id", it.id).put("name", it.name) })
+        put("agents", JSONArray(value.agents.map { JSONObject().put("id", it.id).put("name", it.name).put("machineId", it.machineId).put("cliType", it.cliType).put("agentType", it.agentType) }))
+        put("capabilities", JSONArray(value.capabilities.map { c -> JSONObject().put("machineId", c.machineId).put("cliType", c.cliType).put("agentType", c.agentType).put("agentConfigId", c.agentConfigId)
+            .put("models", choices(c.models)).put("modes", choices(c.modes)).put("reasoningEfforts", JSONObject().apply { c.efforts.forEach { (model, levels) -> put(model, JSONArray(levels)) } }) }))
+    }
     fun request(value: CreateRequest) = JSONObject().apply {
         put("sessionId", value.sessionId); put("turnId", value.turnId); put("projectId", value.projectId)
         put("machineId", value.machineId); put("agentConfigId", value.agentConfigId); put("text", value.text)

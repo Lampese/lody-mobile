@@ -103,7 +103,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val scope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.create_extras_unavailable)
     val notice = { scope.launch { snackbar.showSnackbar(unavailable) }; Unit }
-    var options by remember { mutableStateOf<CreationOptions?>(null) }
+    var options by remember(runtimeScope, target.projectId, target.chat, target.machineId) { mutableStateOf<CreationOptions?>(null) }
+    var optionsFresh by remember(runtimeScope, target.projectId, target.chat, target.machineId) { mutableStateOf(false) }
     var agentId by rememberSaveable { mutableStateOf<String?>(null) }
     var modelId by rememberSaveable { mutableStateOf<String?>(null) }
     var modeId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -118,16 +119,21 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val agent = agents.firstOrNull { it.id == agentId } ?: agents.firstOrNull()
     val capability = options?.capability(agent)
     val github = CreateSessionModel.isGithub(target.projectId) && !target.chat
-    val canSend = agent != null && !attempted && !busy && (!github || branch.isNotBlank())
+    val canSend = optionsFresh && agent != null && !attempted && !busy && (!github || branch.isNotBlank())
     val waitingText = stringResource(if (options == null) R.string.create_waiting_agents else R.string.create_no_online_agents)
     val unknownText = stringResource(R.string.create_result_unknown)
     val rejectedText = stringResource(R.string.create_result_rejected)
     LaunchedEffect(runtimeScope, target.projectId, target.chat, target.machineId) {
+        optionsFresh = false
         options = null; agentId = null; modelId = null; modeId = null; effort = null; branch = ""
+        val projectId = target.projectId.takeUnless { target.chat }
+        try { options = repository.cachedOptions(runtimeScope, projectId) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { /* A missing/corrupt cache is a normal cold start. */ }
         while (true) {
-            try { options = repository.options(runtimeScope, target.projectId.takeUnless { target.chat }) }
+            try { options = repository.options(runtimeScope, projectId); optionsFresh = true }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { options = null }
+            catch (_: Exception) { optionsFresh = false }
             delay(5000)
         }
     }

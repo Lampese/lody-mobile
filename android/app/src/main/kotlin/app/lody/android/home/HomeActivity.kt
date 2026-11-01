@@ -28,7 +28,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import app.lody.android.chat.ChatRepository
 import app.lody.android.chat.ChatScreen
-import app.lody.android.create.CreateSessionRepository
 import app.lody.android.create.CreateSessionScreen
 import androidx.activity.compose.BackHandler
 import app.lody.android.runtime.RuntimeScope
@@ -67,7 +66,7 @@ class HomeActivity : ComponentActivity() {
                 var selectedTitle by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf("") }
                 var creating by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf(false) }
                 val repository = remember { ChatRepository(app.runtimeOwner) }
-                val creator = remember { CreateSessionRepository(app.runtimeOwner) }
+                val creator = app.creation
                 val screens = rememberSaveableStateHolder()
                 // The repository restores the cached workspace; a first sign-in picks the first one.
                 LaunchedEffect(user, catalog.workspace) {

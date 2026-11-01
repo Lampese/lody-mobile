@@ -21,6 +21,22 @@ import UniformTypeIdentifiers
   body()
 }
 
+// An assistant may advertise no model choices; its configuration must still be reachable.
+let agentOnlyComposer = ChatComposerView(frame: CGRect(x: 0, y: 0, width: 390, height: 180))
+agentOnlyComposer.cardStyle = true
+var openedAgentConfig = false
+agentOnlyComposer.onRunConfig = { openedAgentConfig = true }
+agentOnlyComposer.setComposerState(#"{"editable":true,"canSend":false,"sending":false}"#)
+agentOnlyComposer.setComposerOptions(#"{"agentName":"Kimi Code","models":[],"efforts":[]}"#)
+let agentOnlyButton = descendants(agentOnlyComposer).compactMap { $0 as? UIButton }.first { $0.accessibilityIdentifier == "session-model" }!
+precondition(!agentOnlyButton.isHidden, "An assistant without model capabilities must retain its configuration trigger")
+precondition(agentOnlyButton.configuration?.attributedTitle?.description.contains("Kimi Code") == true, "The trigger must identify the assistant when no models are available")
+agentOnlyButton.sendActions(for: .touchUpInside)
+precondition(openedAgentConfig, "The assistant-only trigger must open run configuration")
+agentOnlyComposer.setComposerOptions(#"{"models":[],"efforts":[]}"#)
+precondition(agentOnlyButton.isHidden, "No assistant and no models must not show an empty trigger")
+print("Composer: assistant-only configuration remains visible and opens")
+
 // Width changes must keep three columns in the very first layout pass, so
 // visible photos retain their cells and do not restart thumbnail requests.
 @MainActor final class PhotoGridFixture: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {

@@ -5,6 +5,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CreationJsonTest {
+    @Test fun completeOptionsSurvivePersistenceRoundTrip() {
+        val a = CreationAgent("provider", "Provider", "machine", "acp", "codex")
+        val c = CreationCapability("machine", "acp", "codex", listOf(CreationChoice("m", "Model")), listOf(CreationChoice("auto", "Auto")), mapOf("m" to listOf("low", "high")), "provider")
+        val options = CreationOptions(listOf(a), listOf(c, c.copy(agentConfigId = "other")))
+        assertEquals(options, CreationJson.options(JSONObject(CreationJson.encodeOptions(options).toString())))
+    }
+
     @Test fun providerCapabilityNeverFallsBackToAnotherProviderOfTheSameType() {
         val agent = CreationAgent("a", "A", "m", "builtin", "codex")
         val other = CreationCapability("m", "builtin", "codex", emptyList(), emptyList(), emptyMap(), "b")

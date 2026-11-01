@@ -18,6 +18,7 @@ struct ChatComposerOptions: Decodable {
   /// Asset name of the running assistant's mark; the model chip leads with it, like web's
   /// mobile run-config chip. Absent in chats, which show the model alone.
   var agentAsset: String?
+  var agentName: String?
 }
 
 extension ChatComposerOptions {

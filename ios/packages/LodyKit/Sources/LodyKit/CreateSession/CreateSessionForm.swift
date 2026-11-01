@@ -99,6 +99,12 @@ struct CreateSessionForm {
     if project.projectId.isEmpty { project.loading = false }
   }
 
+  mutating func applyCachedOptions(_ options: CreationOptions, chat: Bool) {
+    applyOptions(options, chat: chat)
+    // Cache is for display only; live validation still controls Send.
+    if chat { chatPage.loading = true } else { project.loading = true }
+  }
+
   mutating func applyOptions(_ options: CreationOptions, chat: Bool) {
     var page = chat ? chatPage : project
     let previous = page

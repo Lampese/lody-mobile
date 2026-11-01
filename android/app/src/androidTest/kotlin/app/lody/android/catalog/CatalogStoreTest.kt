@@ -13,6 +13,26 @@ class CatalogStoreTest {
  private val account = Account("account", "Fixture", listOf(Workspace("w", "Work"), Workspace("other", "Other")))
  private val scope = RuntimeScope("account", "w")
  private val saved = SavedCatalog(CatalogSnapshot(99, listOf(CatalogProject("p", "m", "项目 🌙", "/fixture")), listOf(CatalogSession("s", "m", "p", "hello", "idle", false, true, "2026")), listOf("m")), 1234)
+ @Test fun creationOptionsPersistAcrossInstancesAndRespectScopeAndLogout() = runBlocking {
+  val store = AtomicCatalogStore(context, "options-test")
+  val agent = CreationAgent("provider", "Assistant", "m", "acp", "codex")
+  val capability = CreationCapability("m", "acp", "codex", listOf(CreationChoice("model", "Model")), listOf(CreationChoice("auto", "Auto")), mapOf("model" to listOf("high")), "provider")
+  val options = CreationOptions(listOf(agent), listOf(capability))
+  try {
+   store.clear(); store.saveAccount(account); store.writeOptions(scope, null, options)
+   val reopened = AtomicCatalogStore(context, "options-test")
+   assertEquals(options, reopened.readOptions(scope, null))
+   assertNull(reopened.readOptions(scope, "project"))
+   assertNull(reopened.readOptions(RuntimeScope("account", "other"), null))
+   assertNull(reopened.readOptions(RuntimeScope("other-account", "w"), null))
+   reopened.saveAccount(account.copy(workspaces = listOf(Workspace("other", "Other"))))
+   reopened.saveAccount(account)
+   assertNull(reopened.readOptions(scope, null))
+   reopened.writeOptions(scope, null, options)
+   reopened.clear()
+   assertNull(store.readOptions(scope, null))
+  } finally { store.clear() }
+ }
  @Test fun atomicSnapshotRestoresContextAndIsolatesScopeAcrossInstances() = runBlocking {
   val store = AtomicCatalogStore(context, "cache-test")
   try {

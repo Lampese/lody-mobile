@@ -1,5 +1,6 @@
 package app.lody.android.catalog
 
+import app.lody.android.create.CreationOptionsStore
 import android.content.Context
 import android.util.AtomicFile
 import app.lody.android.auth.*
@@ -14,7 +15,7 @@ import java.io.File
 import java.security.MessageDigest
 
 /** Whole display snapshots, serialized on IO. No tokens, CRDT replicas or cursors. */
-internal class AtomicCatalogStore(context: Context, name: String = "catalog") : CatalogStore {
+internal class AtomicCatalogStore(context: Context, name: String = "catalog") : CatalogStore, CreationOptionsStore {
     init { require(name.matches(Regex("[a-zA-Z0-9_-]+"))) }
     private val directory = File(context.noBackupFilesDir, name)
     private val mutex = Mutex()
@@ -57,12 +58,36 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
             .put("selected", context.workspaceId), 1024 * 1024)
     }
     private fun owns(scope: RuntimeScope): Boolean = context()?.account?.let { it.id == scope.accountId && it.workspaces.any { w -> w.id == scope.workspaceId } } == true
+    private fun optionsFile(scope: RuntimeScope, projectId: String?): File {
+        val key = JSONArray(listOf(scope.accountId, scope.workspaceId, projectId ?: "")).toString()
+        val digest = MessageDigest.getInstance("SHA-256").digest(key.toByteArray())
+        return File(directory, "options-" + digest.joinToString("") { "%02x".format(it) } + ".json")
+    }
+    override suspend fun readOptions(scope: RuntimeScope, projectId: String?): CreationOptions? = io {
+        if (!owns(scope)) return@io null
+        val data = load(optionsFile(scope, projectId)) ?: return@io null
+        try {
+            require(data.getString("account") == scope.accountId && data.getString("workspace") == scope.workspaceId && data.getString("project") == (projectId ?: ""))
+            CreationJson.options(data.getJSONObject("options"))
+        } catch (_: Exception) { null }
+    }
+    override suspend fun writeOptions(scope: RuntimeScope, projectId: String?, options: CreationOptions) = io {
+        require(owns(scope)) { "cache_scope_changed" }
+        save(optionsFile(scope, projectId), JSONObject().put("account", scope.accountId).put("workspace", scope.workspaceId).put("project", projectId ?: "").put("options", CreationJson.encodeOptions(options)))
+        directory.listFiles()?.filter { it.name.startsWith("options-") && it.name.endsWith(".json") }
+            ?.sortedByDescending { it.lastModified() }?.drop(16)?.forEach { AtomicFile(it).delete() }
+        Unit
+    }
     override suspend fun readContext(): AccountContext? = io { context() }
     override suspend fun saveAccount(account: Account) = io {
         val previous = context()
         if (previous != null && previous.account.id != account.id) directory.deleteRecursively()
         previous?.account?.workspaces?.filter { old -> account.id != previous.account.id || account.workspaces.none { it.id == old.id } }?.forEach {
             AtomicFile(catalogFile(RuntimeScope(previous.account.id, it.id))).delete()
+        }
+        directory.listFiles()?.filter { it.name.startsWith("options-") && it.name.endsWith(".json") }?.forEach { file ->
+            val cached = load(file)
+            if (cached == null || cached.optString("account") != account.id || account.workspaces.none { it.id == cached.optString("workspace") }) AtomicFile(file).delete()
         }
         saveContext(AccountContext(account, previous?.workspaceId?.takeIf { previous.account.id == account.id && account.workspaces.any { w -> w.id == it } }))
     }
@@ -94,7 +119,7 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
         val target = catalogFile(scope)
         save(target, data)
         // Bound disk use to eight recently updated workspace projections (<=64 MiB).
-        directory.listFiles()?.filter { it.name.endsWith(".json") && it != accountFile && it != target }
+        directory.listFiles()?.filter { it.name.endsWith(".json") && !it.name.startsWith("options-") && it != accountFile && it != target }
             ?.sortedByDescending { it.lastModified() }?.drop(7)?.forEach { AtomicFile(it).delete() }
         Unit
     }

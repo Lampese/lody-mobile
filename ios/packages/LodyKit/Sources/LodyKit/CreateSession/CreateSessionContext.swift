@@ -198,7 +198,7 @@ enum CreateSessionContext {
   static func runConfig(_ form: CreateSessionForm) -> [CreatePicker] {
     let page = form.current
     var rows: [CreatePicker] = []
-    if page.agents.count > 1 {
+    if !page.agents.isEmpty {
       rows.append(CreatePicker(
         id: "agent", glyph: agentGlyph(page.agent?.agentType), title: page.agent?.name ?? text("create.row.selectAgent"),
         placeholder: page.agent == nil,

@@ -125,6 +125,10 @@ class CreateSessionHostController: UIViewController {
       self?.submit(draft, payload)
     }
     let workspaceId = params.workspaceId
+    controller.loadCachedOptions = { [weak self] projectId in
+      guard let self else { return nil }
+      return await service.cachedOptions(params.userId, workspaceId, projectId)
+    }
     controller.loadOptions = { [weak self] projectId in
       guard let self else { throw CancellationError() }
       let options = try await service.options(workspaceId, projectId)
