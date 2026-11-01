@@ -663,6 +663,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private var measuredWidth: CGFloat = 0
   /// Web's mobile composer card instead of the glass pill / keyboard sheet: always shows its
   /// controls row and keeps @ visible. Set by the new-session page.
+  /// Card style: the run-config chip opens the host's sheet instead of the model popover.
+  var onRunConfig: (() -> Void)?
   var cardStyle = false {
     didSet {
       guard cardStyle != oldValue else { return }
@@ -1551,7 +1553,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   }
   private func updateComposerOptions() {
     let permissions = composerOptions.permissions ?? []
-    permissionButton.isHidden = !composerExpanded || permissions.isEmpty
+    // Card style shows the mode inside the run-config chip (web's face), not as a shield button.
+    permissionButton.isHidden = !composerExpanded || permissions.isEmpty || cardStyle
     permissionButton.isEnabled = state.editable && !state.sending && pendingDraft == nil
     permissionButton.accessibilityValue = permissions.first { $0.id == composerOptions.permissionId }?.title
       ?? String(localized: "model.useDefault", bundle: .lody)
@@ -1573,6 +1576,11 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     if !composerOptions.efforts.isEmpty || !composerOptions.effort.isEmpty {
       title.append(dot)
       title.append(NSAttributedString(string: composerOptions.effortTitle, attributes: [.foregroundColor: UIColor.label]))
+    }
+    if cardStyle, let mode = composerOptions.permissions?.first(where: { $0.id == composerOptions.permissionId }) {
+      // Web dims the mode: it is the least-changed part of the run configuration.
+      title.append(dot)
+      title.append(NSAttributedString(string: mode.title, attributes: [.foregroundColor: UIColor.secondaryLabel]))
     }
     let summary = title.string
     if composerOptions.fast == true {
@@ -1602,6 +1610,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     if !modelButton.isEnabled { optionsPopover?.dismiss(animated: true) }
   }
   @objc private func presentComposerOptions() {
+    if cardStyle, let onRunConfig {
+      guard modelButton.isEnabled else { return }
+      return onRunConfig()
+    }
     guard modelButton.isEnabled, let controller = presenter(), optionsPopover == nil else { return }
     let panel = ChatComposerModelPanel()
     panel.onModel = { [weak self] in self?.selectModel($0) }

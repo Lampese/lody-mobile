@@ -97,7 +97,7 @@
     <string name="create_pick_machine">选择电脑</string>
     <string name="create_pick_project">选择项目</string>
     <string name="create_more_projects">更多项目…</string>
-    <string name="create_chat_only">纯对话（不选项目）</string>
+    <string name="create_chat_only">不选项目</string>
     <string name="create_branch_unavailable">Android 暂不支持读取分支</string>
     <string name="create_worktree">在 Worktree 中运行</string>
     <string name="create_agent_unavailable">Android 暂不支持读取助手</string>
@@ -106,4 +106,7 @@
     <string name="create_attach">添加附件</string>
     <string name="create_mention">提及</string>
     <string name="create_send">发送</string>
+    <string name="create_search_projects">搜索项目</string>
+    <string name="create_run_config">运行配置</string>
+    <string name="create_run_config_unavailable">助手不可用</string>
 </resources>

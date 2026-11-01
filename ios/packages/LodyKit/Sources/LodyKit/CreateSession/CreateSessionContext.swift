@@ -1,311 +1,517 @@
 import LodyCore
 import LodyDesignSystem
-import UIKit
+import SwiftUI
 
-/// Where a new session runs, shown above the composer of the full-screen new-session page:
-/// computer, project (or a plain chat), branch for GitHub projects, the worktree switch for local
-/// projects, and assistant. The page has room, so the values use the title style. Each line is an
-/// icon and a value; one with a choice carries the system pop-up indicator. Short lists (computers,
-/// assistants, project vs chat) open as native menus in place; long, searchable ones (projects,
-/// branches) push their picker. The composer below stays the shared web-style one.
-struct CreateSessionContextRow: Equatable {
-  enum Icon: Equatable {
-    case lody(LodyIcon)
-    /// An agent mark from the app's asset catalog, drawn in its own colours.
-    case asset(String)
-  }
+// The new-session page's context and run configuration, after web's mobile new-chat page
+// (`components/mobile/mobile-new-chat-sheet.tsx`, `mobile-inline-picker.tsx`,
+// `mobile-run-config-sheet.tsx`), checked by driving its Storybook stories:
+//
+// - Computer and project are full-width cards with a pop-up indicator. Tapping one expands its
+//   options in place right below it (an accordion, not a menu); one list is open at a time.
+//   Computers without an online assistant are listed but disabled. The project list searches
+//   every project and leads with No project (chat only), then recent projects, then More projects….
+// - Below them: the worktree chip for local projects, or the branch picker for GitHub projects,
+//   expanding inline with search.
+// - The assistant is not on the page: it lives in the composer's run-config chip, whose sheet
+//   holds Agent / Model / Reasoning / Mode rows that expand the same way. New sessions have no
+//   Plan / Fast toggles.
 
-  enum Choice: Equatable {
-    /// Not changeable here (a locked project, a single computer).
-    case none
-    /// Tapping pushes a picker.
-    case push
-    /// Tapping opens a menu of these options.
-    case menu([Option])
-    /// A switch at the trailing edge.
-    case toggle(Bool)
-  }
+// MARK: - Model
 
-  struct Option: Equatable {
-    var id: String
-    var title: String
-    var subtitle = ""
-    var selected = false
-    var symbol = ""
-  }
+enum CreateGlyph: Equatable {
+  case lody(LodyIcon)
+  /// An agent mark from the app's asset catalog, drawn in its own colours.
+  case asset(String)
+  case symbol(String)
+}
 
+struct CreateOption: Identifiable, Equatable {
   var id: String
-  var icon: Icon
+  var title: String
+  var subtitle = ""
+  var glyph: CreateGlyph?
+  var selected = false
+  var disabled = false
+  /// Matched by search in addition to the title and subtitle.
+  var searchText = ""
+}
+
+struct CreatePicker: Identifiable, Equatable {
+  var id: String
+  var glyph: CreateGlyph
   var title: String
   var placeholder = false
   var loading = false
-  var choice: Choice = .none
+  /// Empty: the line is not a choice here.
+  var options: [CreateOption] = []
+  /// Search runs over these instead of `options` when present (every project, not just recent).
+  var searchOptions: [CreateOption]?
+  var searchPlaceholder = ""
+  var searchable: Bool { searchOptions != nil || options.count > 8 }
+}
+
+struct CreatePanel: Equatable {
+  var cards: [CreatePicker] = []
+  /// Local projects: the worktree chip's state; nil hides it.
+  var worktree: Bool?
+  var branch: CreatePicker?
+  var note = ""
+  var noteWarning = false
 }
 
 enum CreateSessionContext {
   static let chatOption = "chat"
-  static let pickProjectOption = "pick-project"
+  static let moreOption = "more"
+  static let loadMoreOption = "load-more"
+  static let recentLimit = 5
 
   private static func text(_ key: String) -> String { String(localized: String.LocalizationValue(key), bundle: .lody) }
 
-  static func rows(_ form: CreateSessionForm) -> [CreateSessionContextRow] {
+  static func panel(_ form: CreateSessionForm) -> CreatePanel {
     let page = form.current
-    var rows: [CreateSessionContextRow] = []
+    var panel = CreatePanel()
 
-    // Every known computer is offered, like web's machine menu. A local project belongs to one
-    // computer, so picking another moves to that computer's latest project (or a chat).
+    // Computer: every known computer; ones without an online assistant are disabled, as web.
     let machines = allMachines(form)
+    let online = onlineMachines(form)
     let machineName = page.machine?.name ?? form.machineNames[page.machineId]
     let selectedMachine = page.machine?.id ?? (page.machineId.isEmpty ? nil : page.machineId)
-    rows.append(CreateSessionContextRow(
-      id: "machine", icon: .lody(.machine),
-      title: machineName ?? (page.loading ? text("common.reading") : text("create.row.selectMachine")),
-      placeholder: machineName == nil, loading: page.loading && machineName == nil,
-      choice: machines.count > 1 && !form.locked
-        ? .menu(machines.map { .init(id: $0.id, title: $0.name, selected: $0.id == selectedMachine) })
-        : .none
-    ))
-
-    if page.chat {
-      rows.append(CreateSessionContextRow(
-        id: "project", icon: .lody(.session), title: text("create.context.chat"),
-        choice: form.locked ? .none : projectMenu(form, chat: true)
-      ))
-    } else {
-      let project = form.projects.first { $0.id == page.projectId }
-      rows.append(CreateSessionContextRow(
-        id: "project", icon: .lody(page.github ? .github : .folder),
-        title: project?.name ?? text("create.row.selectProject"), placeholder: project == nil,
-        choice: form.locked ? .none : projectMenu(form, chat: false)
-      ))
-      if page.github {
-        var branch = page.branch
-        var placeholder = false
-        if branch.isEmpty {
-          placeholder = true
-          branch = text(page.branchesLoading ? "create.context.branchLoading" : page.branchesFailed ? "create.branch.unavailable" : "create.branch.placeholder")
-        }
-        rows.append(CreateSessionContextRow(
-          id: "branch", icon: .lody(.branch), title: branch, placeholder: placeholder,
-          loading: page.branchesLoading && page.branch.isEmpty, choice: .push
-        ))
-      }
-      if page.local {
-        rows.append(CreateSessionContextRow(
-          id: "worktree", icon: .lody(.branch), title: text("create.context.worktree"),
-          placeholder: !page.worktree, choice: .toggle(page.worktree)
-        ))
+    var machineOptions: [CreateOption] = []
+    if !form.locked && machines.count > 1 {
+      machineOptions = machines.map { machine in
+        let offline = online.map { !$0.contains(machine.id) } ?? false
+        return CreateOption(
+          id: machine.id, title: machine.name, subtitle: offline ? text("create.context.offline") : "",
+          selected: machine.id == selectedMachine, disabled: offline)
       }
     }
-
-    let agent = page.agent
-    let agentIcon = LodyAgentIcon.asset(modelId: agent?.agentType, name: nil).map(CreateSessionContextRow.Icon.asset) ?? .lody(.agent)
-    rows.append(CreateSessionContextRow(
-      id: "agent", icon: agentIcon,
-      title: agent?.name ?? text(page.loading ? "common.reading" : "create.row.selectAgent"),
-      placeholder: agent == nil, loading: page.loading && agent == nil,
-      // A failed setup read retries on tap (the note says so).
-      choice: page.failed ? .push
-        : page.agents.count > 1 || (agent == nil && !page.agents.isEmpty)
-        ? .menu(page.agents.map { .init(id: $0.key, title: $0.name, selected: $0.key == page.agentKey) })
-        : .none
+    panel.cards.append(CreatePicker(
+      id: "machine", glyph: .lody(.machine),
+      title: machineName ?? text(page.loading ? "common.reading" : "create.row.selectMachine"),
+      placeholder: machineName == nil, loading: page.loading && machineName == nil, options: machineOptions
     ))
-    return rows
+
+    // Project, or chat only.
+    let project = form.projects.first { $0.id == page.projectId }
+    var projectTitle = text("create.context.chat")
+    if !page.chat { projectTitle = project?.name ?? text("create.row.selectProject") }
+    panel.cards.append(CreatePicker(
+      id: "project",
+      glyph: page.chat ? .symbol("circle.slash") : projectGlyph(page.projectId),
+      title: projectTitle,
+      placeholder: !page.chat && project == nil,
+      options: form.locked ? [] : projectOptions(form, recent: true),
+      searchOptions: form.locked ? nil : projectOptions(form, recent: false),
+      searchPlaceholder: text("create.context.searchProjects")
+    ))
+
+    if page.local { panel.worktree = page.worktree }
+    if page.github { panel.branch = branchPicker(form) }
+
+    if form.deferUnresolved && page.options == nil {
+      panel.note = text("native.share.deferred")
+    } else if !form.deferUnresolved, let message = page.unavailableMessage {
+      panel.note = message
+      panel.noteWarning = true
+    } else if page.failed {
+      panel.note = text("create.machineConfig.retry")
+    }
+    return panel
   }
 
-  /// Below the rows: why the session cannot start yet, or that the setup is still loading.
-  static func note(_ form: CreateSessionForm) -> (text: String, warning: Bool)? {
+  private static func branchPicker(_ form: CreateSessionForm) -> CreatePicker {
     let page = form.current
-    if form.deferUnresolved && page.options == nil { return (text("native.share.deferred"), false) }
-    if let message = form.deferUnresolved ? nil : page.unavailableMessage { return (message, true) }
-    if page.failed { return (text("create.machineConfig.retry"), false) }
-    return nil
-  }
-
-  static let recentLimit = 5
-
-  /// Chat only first, then the five most recent projects usable on the chosen computer (its
-  /// local projects and any GitHub project), then "More projects…" for the full picker.
-  private static func projectMenu(_ form: CreateSessionForm, chat: Bool) -> CreateSessionContextRow.Choice {
-    let selected = chat ? "" : form.project.projectId
-    let recent = recentProjects(form).map { project in
-      CreateSessionContextRow.Option(
-        id: project.id, title: project.name, selected: project.id == selected,
-        symbol: CreateProjectPicker.isGithub(project.id) ? "chevron.left.forwardslash.chevron.right" : "folder")
+    var title = page.branch
+    var placeholder = false
+    if title.isEmpty {
+      placeholder = true
+      if page.branchesLoading { title = text("create.context.branchLoading") }
+      else if page.branchesFailed { title = text("create.branch.unavailable") }
+      else { title = text("create.branch.placeholder") }
     }
-    return .menu(
-      [.init(id: chatOption, title: text("create.context.chat"), selected: chat, symbol: "bubble.left")]
-        + recent
-        + [.init(id: pickProjectOption, title: text("create.context.moreProjects"), symbol: "ellipsis")]
-    )
+    let names = (page.branches?.names ?? []).map { CreateOption(id: $0, title: $0, selected: $0 == page.branch) }
+    var options = names
+    if page.branches?.nextPage != nil && !form.deferUnresolved {
+      options.append(CreateOption(
+        id: loadMoreOption, title: text(page.branchesLoading ? "common.reading" : "create.context.loadMore"), glyph: .symbol("ellipsis")))
+    }
+    return CreatePicker(
+      id: "branch", glyph: .lody(.branch), title: title, placeholder: placeholder,
+      loading: page.branchesLoading && page.branch.isEmpty, options: options, searchOptions: names,
+      searchPlaceholder: text("create.context.searchBranches"))
   }
 
-  /// `form.projects` is ordered by latest activity; a selected project outside the first five
-  /// still shows so the menu's check matches the line.
-  static func recentProjects(_ form: CreateSessionForm) -> [CreateProject] {
+  private static func projectGlyph(_ id: String) -> CreateGlyph {
+    CreateProjectPicker.isGithub(id) ? .lody(.github) : .lody(.folder)
+  }
+
+  /// No project first; then recent projects usable on the chosen computer (its local projects
+  /// and any GitHub project) and More projects…, or for search every usable project.
+  private static func projectOptions(_ form: CreateSessionForm, recent: Bool) -> [CreateOption] {
+    let chat = CreateOption(id: chatOption, title: text("create.context.chat"), glyph: .symbol("circle.slash"), selected: form.chat)
+    let shown = recent ? recentProjects(form) : usableProjects(form)
+    var options = [chat] + shown.map { project in
+      CreateOption(
+        id: project.id, title: project.name,
+        subtitle: CreateProjectPicker.isGithub(project.id) ? "GitHub" : abbreviated(project.rootPath),
+        glyph: projectGlyph(project.id), selected: !form.chat && project.id == form.project.projectId,
+        searchText: project.rootPath)
+    }
+    if recent { options.append(CreateOption(id: moreOption, title: text("create.context.moreProjects"), glyph: .symbol("ellipsis"))) }
+    return options
+  }
+
+  private static func abbreviated(_ path: String) -> String {
+    path.replacingOccurrences(of: #"^/(Users|home)/[^/]+"#, with: "~", options: .regularExpression)
+  }
+
+  private static func usableProjects(_ form: CreateSessionForm) -> [CreateProject] {
     let machine = form.current.machine?.id ?? form.current.machineId
-    let usable = form.projects.filter { CreateProjectPicker.isGithub($0.id) || machine.isEmpty || $0.machineId == machine }
-    var recent = Array(usable.prefix(recentLimit))
+    return form.projects.filter { CreateProjectPicker.isGithub($0.id) || machine.isEmpty || $0.machineId == machine }
+  }
+
+  /// `form.projects` is ordered by latest activity; the selected project always stays listed.
+  static func recentProjects(_ form: CreateSessionForm) -> [CreateProject] {
+    var recent = Array(usableProjects(form).prefix(recentLimit))
     if !form.chat, let current = form.projects.first(where: { $0.id == form.project.projectId }), !recent.contains(where: { $0.id == current.id }) {
       recent.insert(current, at: 0)
     }
     return recent
   }
 
-  /// Computers with assistants online (from the setup read) plus every computer the workspace knows.
+  /// Computers with assistants online plus every computer the workspace knows.
   static func allMachines(_ form: CreateSessionForm) -> [(id: String, name: String)] {
     var seen = Set<String>()
-    let online = form.current.machines
     let known = form.machineNames.sorted { $0.value.localizedCompare($1.value) == .orderedAscending }.map { (id: $0.key, name: $0.value) }
-    return (online + known).filter { seen.insert($0.id).inserted }
+    return (form.chatPage.machines + form.project.machines + known).filter { seen.insert($0.id).inserted }
+  }
+
+  /// Computers with an assistant online, read from the chat options (which cover every
+  /// computer); nil while unknown, so nothing is disabled on a guess.
+  private static func onlineMachines(_ form: CreateSessionForm) -> Set<String>? {
+    guard form.chatPage.options != nil else { return nil }
+    return Set((form.chatPage.machines + form.project.machines).map(\.id))
+  }
+
+  // MARK: Run configuration
+
+  static func runConfig(_ form: CreateSessionForm) -> [CreatePicker] {
+    let page = form.current
+    var rows: [CreatePicker] = []
+    if page.agents.count > 1 {
+      rows.append(CreatePicker(
+        id: "agent", glyph: agentGlyph(page.agent?.agentType), title: page.agent?.name ?? text("create.row.selectAgent"),
+        placeholder: page.agent == nil,
+        options: page.agents.map { CreateOption(id: $0.key, title: $0.name, glyph: agentGlyph($0.agentType), selected: $0.key == page.agentKey) }))
+    }
+    guard let capability = page.capability else { return rows }
+    if !capability.models.isEmpty {
+      let current = capability.models.first { $0.id == page.choice.modelId }
+      rows.append(CreatePicker(
+        id: "model", glyph: .symbol("cpu"), title: current?.name ?? text("model.default"), placeholder: current == nil,
+        options: capability.models.map { CreateOption(id: $0.id, title: $0.name, subtitle: $0.description ?? "", selected: $0.id == page.choice.modelId) },
+        searchPlaceholder: text("create.context.searchModels")))
+    }
+    let efforts = CreateLogic.effortsFor(capability, modelId: page.choice.modelId)
+    if !efforts.isEmpty {
+      rows.append(CreatePicker(
+        id: "effort", glyph: .symbol("brain"), title: page.choice.effort ?? text("model.default"), placeholder: page.choice.effort == nil,
+        options: efforts.map { CreateOption(id: $0, title: $0, selected: $0 == page.choice.effort) }))
+    }
+    if let permission = CreateLogic.permissionMode(capability, page.choice), !permission.options.isEmpty {
+      let current = permission.options.first { $0.id == permission.value }
+      rows.append(CreatePicker(
+        id: "permission", glyph: .symbol("checkmark.shield"), title: current?.name ?? text("model.default"), placeholder: current == nil,
+        options: permission.options.map { CreateOption(id: $0.id, title: $0.name, subtitle: $0.description ?? "", selected: $0.id == permission.value) }))
+    }
+    return rows
+  }
+
+  private static let runConfigLabels = [
+    "agent": "create.runConfig.agent", "model": "create.runConfig.model",
+    "effort": "create.runConfig.reasoning", "permission": "create.runConfig.mode",
+  ]
+
+  static func runConfigLabel(_ id: String) -> String { text(runConfigLabels[id] ?? "create.runConfig.mode") }
+
+  private static func agentGlyph(_ agentType: String?) -> CreateGlyph {
+    LodyAgentIcon.asset(modelId: agentType, name: nil).map(CreateGlyph.asset) ?? .lody(.agent)
   }
 }
 
+// MARK: - State
+
+/// Drives the SwiftUI context panel and run-config sheet from the UIKit controller.
 @MainActor
-final class CreateSessionContextView: UIView {
-  /// A row without a menu was tapped, or a menu option was picked (row id, option id).
-  var onPress: ((String) -> Void)?
-  var onPick: ((String, String) -> Void)?
-  var onToggle: ((String, Bool) -> Void)?
+final class CreatePanelState: ObservableObject {
+  @Published var panel = CreatePanel()
+  @Published var runConfig: [CreatePicker] = []
+  /// The one expanded list on the page, and separately in the sheet.
+  @Published var open: String?
+  @Published var openInSheet: String?
+  var onPick: (String, String) -> Void = { _, _ in }
+  var onWorktree: (Bool) -> Void = { _ in }
+}
 
-  private let stack = UIStackView()
-  private let note = UILabel()
-  private var buttons: [String: UIButton] = [:]
-  private var switches: [String: UISwitch] = [:]
-  private var rows: [CreateSessionContextRow] = []
+// MARK: - Page panel
 
-  override init(frame: CGRect) {
-    super.init(frame: frame)
-    stack.axis = .vertical
-    stack.alignment = .leading
-    stack.spacing = 0
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    addSubview(stack)
-    note.font = LodyTextStyle.footnote.uiFont
-    note.adjustsFontForContentSizeCategory = true
-    note.numberOfLines = 0
-    note.isHidden = true
-    NSLayoutConstraint.activate([
-      stack.topAnchor.constraint(equalTo: topAnchor),
-      stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-      stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-      stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ])
-  }
+struct CreateContextPanel: View {
+  @ObservedObject var state: CreatePanelState
 
-  @available(*, unavailable)
-  required init?(coder: NSCoder) { fatalError() }
-
-  func update(rows next: [CreateSessionContextRow], note text: (text: String, warning: Bool)?) {
-    if next.map(\.id) != rows.map(\.id) {
-      stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-      buttons = [:]
-      switches = [:]
-      for row in next {
-        let button = UIButton(type: .system)
-        button.contentHorizontalAlignment = .leading
-        button.accessibilityIdentifier = "create-context-\(row.id)"
-        button.addAction(UIAction { [weak self] _ in self?.pressed(row.id) }, for: .primaryActionTriggered)
-        buttons[row.id] = button
-        guard case .toggle = row.choice else {
-          stack.addArrangedSubview(button)
-          continue
+  var body: some View {
+    GeometryReader { geometry in
+      ScrollView {
+        VStack(alignment: .leading, spacing: LodySpacing.sm) {
+          Spacer(minLength: 0)
+          ForEach(state.panel.cards) { picker in
+            VStack(spacing: LodySpacing.xs) {
+              PickerFace(picker: picker, prominent: true) { toggle(picker.id) }
+              if state.open == picker.id { list(picker) }
+            }
+          }
+          if state.panel.worktree != nil || state.panel.branch != nil { branchLine }
+          if !state.panel.note.isEmpty {
+            Text(state.panel.note)
+              .lodyTextStyle(.footnote)
+              .foregroundStyle(state.panel.noteWarning ? LodyColor.warningDefault : LodyColor.textTertiary)
+              .padding(.horizontal, LodySpacing.xs)
+          }
         }
-        // The switch row spans the block so the switch sits trailing; the label stays inert.
-        let toggle = UISwitch()
-        toggle.onTintColor = LodyUIColor.accentSolid
-        toggle.accessibilityIdentifier = "create-context-\(row.id)-switch"
-        toggle.addAction(UIAction { [weak self, weak toggle] _ in
-          guard let toggle else { return }
-          self?.onToggle?(row.id, toggle.isOn)
-        }, for: .valueChanged)
-        switches[row.id] = toggle
-        let line = UIStackView(arrangedSubviews: [button, toggle])
-        line.alignment = .center
-        line.spacing = LodySpacing.md
-        stack.addArrangedSubview(line)
-        line.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        .padding(.horizontal, LodyLayout.screenPaddingX)
+        .padding(.bottom, LodySpacing.md)
+        .frame(minHeight: geometry.size.height, alignment: .bottom)
+        .animation(LodySpring.snappy, value: state.open)
       }
-      if let last = stack.arrangedSubviews.last { stack.setCustomSpacing(LodySpacing.xs, after: last) }
-      stack.addArrangedSubview(note)
+      .scrollBounceBehavior(.basedOnSize)
+      .defaultScrollAnchor(.bottom)
     }
-    for row in next where rows.first(where: { $0.id == row.id }) != row {
-      if let button = buttons[row.id] { configure(button, row) }
-    }
-    rows = next
-    note.text = text?.text
-    note.textColor = text?.warning == true ? LodyUIColor.warningDefault : LodyUIColor.textTertiary
-    note.isHidden = text == nil
   }
 
-  private func configure(_ button: UIButton, _ row: CreateSessionContextRow) {
-    var config = UIButton.Configuration.plain()
-    config.contentInsets = NSDirectionalEdgeInsets(top: LodySpacing.md, leading: 0, bottom: LodySpacing.md, trailing: LodySpacing.sm)
-    config.imagePadding = LodySpacing.md
-    config.imagePlacement = .leading
-    config.showsActivityIndicator = row.loading
-    config.activityIndicatorColorTransformer = UIConfigurationColorTransformer { _ in LodyUIColor.iconTertiary }
-    switch row.icon {
-    case .lody(let icon):
-      config.image = icon.uiImage?.withRenderingMode(.alwaysTemplate)
-      config.imageColorTransformer = UIConfigurationColorTransformer { _ in LodyUIColor.iconSecondary }
-    case .asset(let name):
-      config.image = UIImage(named: name, in: .main, compatibleWith: nil)?.withRenderingMode(.alwaysOriginal)
+  private var branchLine: some View {
+    VStack(alignment: .leading, spacing: LodySpacing.xs) {
+      HStack(spacing: LodySpacing.md) {
+        if let worktree = state.panel.worktree {
+          Button { state.onWorktree(!worktree) } label: {
+            HStack(spacing: LodySpacing.sm) {
+              Image(systemName: worktree ? "checkmark.square.fill" : "square")
+                .foregroundStyle(worktree ? LodyColor.accentDefault : LodyColor.iconTertiary)
+              Text(String(localized: "create.context.worktree", bundle: .lody))
+                .lodyTextStyle(.subhead)
+                .foregroundStyle(LodyColor.textSecondary)
+            }
+            .padding(.horizontal, LodySpacing.md)
+            .frame(minHeight: LodySize.controlMd)
+            .background(LodyColor.fillTertiary, in: RoundedRectangle(cornerRadius: LodyRadius.md, style: .continuous))
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityAddTraits(worktree ? [.isButton, .isSelected] : .isButton)
+        }
+        if let branch = state.panel.branch {
+          PickerFace(picker: branch, prominent: false) { toggle(branch.id) }
+        }
+        Spacer(minLength: 0)
+      }
+      if let branch = state.panel.branch, state.open == branch.id { list(branch) }
     }
-    config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: LodyIconSize.lg)
-    if let image = config.image {
-      // Lucide assets are 24 pt; scale to the row's icon size so marks line up.
-      config.image = image.resized(to: CGSize(width: LodyIconSize.lg, height: LodyIconSize.lg))
-    }
-    var title = AttributedString(row.title)
-    title.font = LodyTextStyle.title.uiFont
-    title.foregroundColor = row.placeholder ? LodyUIColor.textTertiary : LodyUIColor.textPrimary
-    config.attributedTitle = title
-    config.titleLineBreakMode = .byTruncatingMiddle
-    switch row.choice {
-    case .none:
-      config.indicator = .none
-      button.menu = nil
-      button.showsMenuAsPrimaryAction = false
-    case .push:
-      config.indicator = .popup
-      button.menu = nil
-      button.showsMenuAsPrimaryAction = false
-    case .toggle(let on):
-      config.indicator = .none
-      button.menu = nil
-      button.showsMenuAsPrimaryAction = false
-      if let toggle = switches[row.id], toggle.isOn != on { toggle.setOn(on, animated: true) }
-      switches[row.id]?.accessibilityLabel = row.title
-    case .menu(let options):
-      config.indicator = .popup
-      button.menu = UIMenu(options: .singleSelection, children: options.map { option in
-        UIAction(
-          title: option.title, subtitle: option.subtitle.isEmpty ? nil : option.subtitle,
-          image: option.symbol.isEmpty ? nil : UIImage(systemName: option.symbol),
-          state: option.selected ? .on : .off
-        ) { [weak self] _ in self?.onPick?(row.id, option.id) }
-      })
-      button.showsMenuAsPrimaryAction = true
-    }
-    button.configuration = config
-    let interactive: Bool = switch row.choice {
-    case .none, .toggle: false
-    default: true
-    }
-    button.isUserInteractionEnabled = interactive
-    button.accessibilityTraits = interactive ? .button : .staticText
-    if case .toggle = row.choice { button.accessibilityElementsHidden = true }
   }
 
-  private func pressed(_ id: String) {
-    guard let row = rows.first(where: { $0.id == id }), row.choice == .push else { return }
-    onPress?(id)
+  private func list(_ picker: CreatePicker) -> some View {
+    OptionList(picker: picker) { id in
+      if id != CreateSessionContext.loadMoreOption { state.open = nil }
+      state.onPick(picker.id, id)
+    }
+    .transition(.opacity.combined(with: .move(edge: .top)))
+  }
+
+  private func toggle(_ id: String) { state.open = state.open == id ? nil : id }
+}
+
+/// A picker's closed face: a filled full-width card (computer, project) or a plain line (branch).
+private struct PickerFace: View {
+  let picker: CreatePicker
+  let prominent: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: LodySpacing.md) {
+        if picker.loading { ProgressView().controlSize(.small) } else { GlyphView(glyph: picker.glyph, size: LodyIconSize.md) }
+        Text(picker.title)
+          .lodyTextStyle(.body)
+          .foregroundStyle(picker.placeholder ? LodyColor.textTertiary : LodyColor.textPrimary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .frame(maxWidth: prominent ? .infinity : nil, alignment: .leading)
+        if !picker.options.isEmpty {
+          Image(systemName: "chevron.up.chevron.down")
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(LodyColor.iconTertiary)
+        }
+      }
+      .padding(.horizontal, prominent ? LodySpacing.lg : LodySpacing.xs)
+      .frame(minHeight: prominent ? LodySize.controlLg : LodySize.controlMd)
+      .background {
+        if prominent { RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous).fill(LodyColor.fillTertiary) }
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(picker.options.isEmpty)
+    .accessibilityValue(picker.title)
   }
 }
 
-private extension UIImage {
-  func resized(to size: CGSize) -> UIImage {
-    UIGraphicsImageRenderer(size: size).image { _ in draw(in: CGRect(origin: .zero, size: size)) }.withRenderingMode(renderingMode)
+/// The expanded options: optional search, then rows with a check on the selected one.
+struct OptionList: View {
+  let picker: CreatePicker
+  let onPick: (String) -> Void
+  @State private var query = ""
+
+  private var shown: [CreateOption] {
+    let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !term.isEmpty else { return picker.options }
+    return (picker.searchOptions ?? picker.options).filter {
+      "\($0.title) \($0.subtitle) \($0.searchText)".lowercased().contains(term)
+    }
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      if picker.searchable {
+        HStack(spacing: LodySpacing.sm) {
+          LodyIcon.search.image.resizable().renderingMode(.template)
+            .frame(width: LodyIconSize.sm, height: LodyIconSize.sm)
+            .foregroundStyle(LodyColor.iconTertiary)
+          TextField(picker.searchPlaceholder, text: $query)
+            .lodyTextStyle(.body)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+        }
+        .padding(.horizontal, LodySpacing.lg)
+        .frame(minHeight: LodySize.controlMd)
+        Divider()
+      }
+      ScrollView {
+        LazyVStack(spacing: 0) {
+          ForEach(shown) { option in
+            Button { onPick(option.id) } label: { row(option) }
+              .buttonStyle(.plain)
+              .disabled(option.disabled)
+          }
+        }
+      }
+      .frame(maxHeight: 280)
+      .fixedSize(horizontal: false, vertical: shown.count < 6)
+    }
+    .background(LodyColor.bgRaised, in: RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous).stroke(LodyColor.borderSubtle, lineWidth: 0.5))
+    .clipShape(RoundedRectangle(cornerRadius: LodyRadius.xl, style: .continuous))
+  }
+
+  private func row(_ option: CreateOption) -> some View {
+    HStack(spacing: LodySpacing.md) {
+      if let glyph = option.glyph { GlyphView(glyph: glyph, size: LodyIconSize.md) }
+      VStack(alignment: .leading, spacing: 0) {
+        Text(option.title).lodyTextStyle(.body).lineLimit(1)
+          .foregroundStyle(option.disabled ? LodyColor.textTertiary : LodyColor.textPrimary)
+        if !option.subtitle.isEmpty {
+          Text(option.subtitle).lodyTextStyle(.footnote).lineLimit(1).truncationMode(.middle)
+            .foregroundStyle(LodyColor.textTertiary)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      if option.selected {
+        LodyIcon.check.image.resizable().renderingMode(.template)
+          .frame(width: LodyIconSize.sm, height: LodyIconSize.sm)
+          .foregroundStyle(LodyColor.accentFg)
+      }
+    }
+    .padding(.horizontal, LodySpacing.lg)
+    .frame(minHeight: LodySize.listRow)
+    .background(option.selected ? LodyColor.fillTertiary : .clear)
+    .contentShape(Rectangle())
+    .accessibilityAddTraits(option.selected ? [.isButton, .isSelected] : .isButton)
+  }
+}
+
+struct GlyphView: View {
+  let glyph: CreateGlyph
+  let size: CGFloat
+
+  var body: some View {
+    switch glyph {
+    case .lody(let icon):
+      icon.image.resizable().renderingMode(.template).frame(width: size, height: size).foregroundStyle(LodyColor.iconSecondary)
+    case .asset(let name):
+      Image(name, bundle: .main).resizable().scaledToFit().frame(width: size, height: size)
+    case .symbol(let name):
+      Image(systemName: name).font(.system(size: size * 0.8)).frame(width: size, height: size).foregroundStyle(LodyColor.iconSecondary)
+    }
+  }
+}
+
+// MARK: - Run configuration sheet
+
+/// Web's `MobileRunConfigSheet`: labelled rows whose value expands its options in place.
+struct CreateRunConfigSheet: View {
+  @ObservedObject var state: CreatePanelState
+
+  var body: some View {
+    VStack(spacing: LodySpacing.md) {
+      Text(String(localized: "create.runConfig.title", bundle: .lody))
+        .lodyTextStyle(.headline)
+        .foregroundStyle(LodyColor.textPrimary)
+        .padding(.top, LodySpacing.xl)
+      ScrollView {
+        VStack(spacing: LodySpacing.sm) {
+          ForEach(state.runConfig) { row in
+            VStack(spacing: LodySpacing.xs) {
+              rowFace(row)
+              if state.openInSheet == row.id {
+                OptionList(picker: row) { id in
+                  state.openInSheet = nil
+                  state.onPick(row.id, id)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+              }
+            }
+          }
+        }
+        .padding(.horizontal, LodyLayout.screenPaddingX)
+        .padding(.bottom, LodySpacing.lg)
+        .animation(LodySpring.snappy, value: state.openInSheet)
+      }
+    }
+    .background(LodyColor.bgBase)
+  }
+
+  private func rowFace(_ row: CreatePicker) -> some View {
+    HStack(spacing: LodySpacing.md) {
+      Text(CreateSessionContext.runConfigLabel(row.id))
+        .lodyTextStyle(.subhead)
+        .foregroundStyle(LodyColor.textSecondary)
+        .frame(width: 96, alignment: .leading)
+      Button { state.openInSheet = state.openInSheet == row.id ? nil : row.id } label: {
+        HStack(spacing: LodySpacing.sm) {
+          if row.id == "agent" || row.id == "permission" { GlyphView(glyph: row.glyph, size: LodyIconSize.sm) }
+          Text(row.title).lodyTextStyle(.body).lineLimit(1)
+            .foregroundStyle(row.placeholder ? LodyColor.textTertiary : LodyColor.textPrimary)
+          Spacer(minLength: 0)
+        }
+        .padding(.horizontal, LodySpacing.md)
+        .frame(minHeight: LodySize.controlMd)
+        .background(LodyColor.fillTertiary, in: RoundedRectangle(cornerRadius: LodyRadius.md, style: .continuous))
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .disabled(row.options.isEmpty)
+      .accessibilityLabel(CreateSessionContext.runConfigLabel(row.id))
+      .accessibilityValue(row.title)
+    }
+    .padding(LodySpacing.sm)
+    .padding(.leading, LodySpacing.sm)
+    .background(LodyColor.bgRaised, in: RoundedRectangle(cornerRadius: LodyRadius.lg, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: LodyRadius.lg, style: .continuous).stroke(LodyColor.borderSubtle, lineWidth: 0.5))
   }
 }

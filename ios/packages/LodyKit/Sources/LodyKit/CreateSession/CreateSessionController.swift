@@ -1,5 +1,6 @@
 import LodyCore
 import LodyDesignSystem
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -25,7 +26,11 @@ final class CreateSessionController: UIViewController {
 
   let composer: ChatComposerView
   private let host: UIView
-  private let context = CreateSessionContextView()
+  /// Computer / project / worktree-or-branch cards with inline lists (SwiftUI), and the
+  /// composer chip's run-config sheet, both driven by one state object.
+  private let panelState = CreatePanelState()
+  private lazy var context = UIHostingController(rootView: CreateContextPanel(state: panelState))
+  private weak var runConfigSheet: UIViewController?
   private let signedOutLabel = UILabel()
   private lazy var hostHeight = host.heightAnchor.constraint(equalToConstant: 64)
   private var loads: [Bool: Task<Void, Never>] = [:]
@@ -59,15 +64,18 @@ final class CreateSessionController: UIViewController {
     }
 
     view.backgroundColor = LodyUIColor.bgBase
-    context.onPress = { [weak self] id in self?.rowPressed(id) }
-    context.onPick = { [weak self] id, option in self?.optionPicked(id, option) }
-    context.onToggle = { [weak self] id, on in
-      guard let self, id == "worktree", !self.sending else { return }
+    panelState.onPick = { [weak self] id, option in self?.optionPicked(id, option) }
+    panelState.onWorktree = { [weak self] on in
+      guard let self, !self.sending else { return }
       self.form.project.worktree = on
       self.changed(prefs: false)
     }
-    context.translatesAutoresizingMaskIntoConstraints = false
-    view.addSubview(context)
+    composer.onRunConfig = { [weak self] in self?.presentRunConfig() }
+    addChild(context)
+    context.view.backgroundColor = .clear
+    context.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(context.view)
+    context.didMove(toParent: self)
     signedOutLabel.text = String(localized: "native.share.signIn", bundle: .lody)
     signedOutLabel.font = LodyTextStyle.body.uiFont
     signedOutLabel.adjustsFontForContentSizeCategory = true
@@ -86,11 +94,12 @@ final class CreateSessionController: UIViewController {
       host.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       host.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -16),
       keyboard, hostHeight,
-      // The context sits right above the composer, within thumb reach, and rides up with it.
-      context.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: LodyLayout.screenPaddingX * 2),
-      context.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -LodyLayout.screenPaddingX),
-      context.bottomAnchor.constraint(equalTo: host.topAnchor, constant: -LodySpacing.md),
-      context.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: LodySpacing.md),
+      // The context fills the space above the composer, bottom-aligned within thumb reach, and
+      // rides up with it; expanded lists grow upward and scroll when they run out of room.
+      context.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+      context.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+      context.view.bottomAnchor.constraint(equalTo: host.topAnchor),
+      context.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
       signedOutLabel.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
       signedOutLabel.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: LodyLayout.screenPaddingX * 2),
       signedOutLabel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -LodyLayout.screenPaddingX * 2),
@@ -124,12 +133,31 @@ final class CreateSessionController: UIViewController {
     guard isViewLoaded else { return }
     let signedOut = form.signedOut
     signedOutLabel.isHidden = !signedOut
-    context.isHidden = signedOut
-    if !signedOut { context.update(rows: CreateSessionContext.rows(form), note: CreateSessionContext.note(form)) }
+    context.view.isHidden = signedOut
+    if !signedOut {
+      let panel = CreateSessionContext.panel(form)
+      if panelState.panel != panel { panelState.panel = panel }
+      let rows = CreateSessionContext.runConfig(form)
+      if panelState.runConfig != rows { panelState.runConfig = rows }
+    }
     renderComposer()
   }
 
-  /// A menu choice in the context block: computer, assistant, or project vs plain chat.
+  /// Web's run-config sheet from the composer chip: Agent (when there is a choice), Model,
+  /// Reasoning and Mode rows that expand in place.
+  private func presentRunConfig() {
+    guard !sending, runConfigSheet == nil, !panelState.runConfig.isEmpty else { return }
+    panelState.openInSheet = nil
+    let sheet = UIHostingController(rootView: CreateRunConfigSheet(state: panelState))
+    if let presentation = sheet.sheetPresentationController {
+      presentation.detents = [.medium(), .large()]
+      presentation.prefersGrabberVisible = true
+    }
+    runConfigSheet = sheet
+    present(sheet, animated: true)
+  }
+
+  /// A choice in the context panel or the run-config sheet.
   private func optionPicked(_ id: String, _ option: String) {
     guard !sending else { return render() }
     switch (id, option) {
@@ -137,8 +165,20 @@ final class CreateSessionController: UIViewController {
       guard !form.chat else { return }
       form.switchPage(chat: true)
       changed()
-    case ("project", CreateSessionContext.pickProjectOption):
+    case ("project", CreateSessionContext.moreOption):
       pickProject()
+    case ("branch", CreateSessionContext.loadMoreOption):
+      fetchBranches()
+    case ("branch", _):
+      guard form.project.branches?.names.contains(option) == true else { return }
+      form.project.branch = option
+      changed(prefs: false)
+    case ("model", _):
+      composerOptionChanged(["modelId": option, "effort": form.current.choice.effort ?? ""])
+    case ("effort", _):
+      composerOptionChanged(["modelId": form.current.choice.modelId ?? "", "effort": option])
+    case ("permission", _):
+      composerOptionChanged(["permissionId": option])
     case ("project", _):
       guard let project = form.projects.first(where: { $0.id == option }) else { return pickProject() }
       if form.chat { form.switchPage(chat: false) }

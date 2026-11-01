@@ -1,16 +1,22 @@
 // New session, full screen like web; iOS counterpart: CreateSessionController + CreateSessionContext.
 //
-// Context lines (computer, project or chat only, GitHub branch, worktree switch for local
-// projects, assistant) sit right above the composer in the title style, within thumb reach and
-// riding up with the keyboard. The composer follows web's mobile composer: a card with the
-// prompt, + and @ leading, the run-config chip and the send button trailing.
+// Follows web's mobile new-chat page (`mobile-new-chat-sheet.tsx`, `mobile-inline-picker.tsx`,
+// `mobile-run-config-sheet.tsx`), checked by driving its Storybook stories: computer and project
+// are full-width cards whose options expand in place right below them (one open at a time, the
+// project list searchable); then the worktree chip for local projects or the branch line for
+// GitHub projects; then the composer card (+, @, the run-config chip, send). The assistant lives
+// in the run-config chip's sheet, not on the page.
 //
-// Android is still read-only: assistants and branches need Machine RPC / GitHub reads, and
-// sending needs writes, so those say they are not available yet instead of pretending.
+// Android is still read-only: assistants, models and branches need Machine RPC / GitHub reads,
+// and sending needs writes, so those say they are not available yet instead of pretending.
 
 package app.lody.android.create
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,21 +33,21 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -55,11 +61,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,6 +79,7 @@ import app.lody.android.designsystem.LodyRadius
 import app.lody.android.designsystem.LodySize
 import app.lody.android.designsystem.LodySpacing
 import app.lody.android.designsystem.LodyTheme
+import app.lody.android.runtime.CatalogProject
 import app.lody.android.runtime.CatalogSnapshot
 import kotlinx.coroutines.launch
 
@@ -81,6 +90,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, onBack: () -> Unit) {
     val catalog = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
     var target by remember(catalog.revision == 0L) { mutableStateOf(CreateSessionModel.initial(catalog)) }
     var prompt by rememberSaveable { mutableStateOf("") }
+    var runConfig by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.home_new_chat_unavailable)
@@ -109,164 +119,309 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, onBack: () -> Unit) {
                 .imePadding()
                 .navigationBarsPadding(),
         ) {
-            // The lines hug the composer; extra height stays above them.
-            Spacer(Modifier.weight(1f))
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = LodyLayout.screenPaddingX * 2),
-            ) {
-                ContextLines(catalog, target, onChange = { target = it })
+            // Bottom-aligned above the composer; an expanded list grows upward and, once the
+            // panel outgrows the space, scrolls (anchored at its bottom).
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomStart) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState(), reverseScrolling = true)
+                        .padding(horizontal = LodyLayout.screenPaddingX),
+                    verticalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                ) {
+                    ContextPanel(catalog, target, onChange = { target = it })
+                }
             }
-            Composer(prompt, onPromptChange = { prompt = it }, onAttach = notice, onMention = notice, onSend = notice)
+            Composer(prompt, onPromptChange = { prompt = it }, onAttach = notice, onMention = notice, onRunConfig = { runConfig = true }, onSend = notice)
+        }
+    }
+    if (runConfig) {
+        ModalBottomSheet(onDismissRequest = { runConfig = false }, containerColor = colors.bgBase) {
+            RunConfigSheet()
         }
     }
 }
 
 @Composable
-private fun ContextLines(catalog: CatalogSnapshot, target: CreateTarget, onChange: (CreateTarget) -> Unit) {
+private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChange: (CreateTarget) -> Unit) {
     val colors = LodyTheme.colors
+    // One list open at a time, as web's picker coordinator.
+    var open by remember { mutableStateOf<String?>(null) }
+    val toggle = { id: String -> open = if (open == id) null else id }
+
     val machines = CreateSessionModel.machines(catalog)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
-    val machineChoosable = CreateSessionModel.machineChoosable(catalog)
-    MenuLine(
+    PickerCard(
+        id = MACHINE,
         icon = LodyIcons.Machine,
         title = machineName ?: stringResource(R.string.create_pick_machine),
         placeholder = machineName == null,
-        options = if (machineChoosable) machines.map { (id, name) -> MenuOption(id, name, selected = id == target.machineId) } else emptyList(),
-        onPick = { onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
+        options = if (CreateSessionModel.machineChoosable(catalog)) machines.map { (id, name) -> PickerOption(id, name, selected = id == target.machineId) } else emptyList(),
+        open = open == MACHINE,
+        onToggle = { toggle(MACHINE) },
+        onPick = { open = null; onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
     )
 
     val projects = CreateSessionModel.projects(catalog)
     val project = projects.firstOrNull { it.id == target.projectId }
     val chatLabel = stringResource(R.string.create_chat_only)
-    // Chat only, the five most recent projects, then "More projects…" opening the full list.
-    var allProjects by remember { mutableStateOf(false) }
-    val listed = if (allProjects) projects else CreateSessionModel.recent(catalog, target)
-    val more = if (!allProjects && projects.size > listed.size) listOf(MenuOption(MORE, stringResource(R.string.create_more_projects), selected = false, icon = LodyIcons.More)) else emptyList()
-    MenuLine(
+    val chatOption = PickerOption(CHAT, chatLabel, selected = target.chat, icon = LodyIcons.Close)
+    val usable = projects.filter { CreateSessionModel.isGithub(it.id) || target.machineId == null || it.machineId == target.machineId }
+    PickerCard(
+        id = PROJECT,
         icon = when {
-            target.chat -> LodyIcons.Session
+            target.chat -> LodyIcons.Close
             CreateSessionModel.isGithub(project?.id) -> LodyIcons.Github
             else -> LodyIcons.Folder
         },
         title = if (target.chat) chatLabel else project?.name ?: stringResource(R.string.create_pick_project),
         placeholder = !target.chat && project == null,
-        options = listOf(MenuOption(CHAT, chatLabel, selected = target.chat, icon = LodyIcons.Session)) +
-            listed.map {
-                MenuOption(it.id, it.name, selected = !target.chat && it.id == target.projectId, icon = if (CreateSessionModel.isGithub(it.id)) LodyIcons.Github else LodyIcons.Folder)
-            } + more,
+        // No project, the five most recent, then More projects…; search covers every project.
+        options = listOf(chatOption) + CreateSessionModel.recent(catalog, target).map { it.option(target) } +
+            PickerOption(MORE, stringResource(R.string.create_more_projects), selected = false, icon = LodyIcons.More),
+        searchOptions = listOf(chatOption) + usable.map { it.option(target) },
+        searchPlaceholder = stringResource(R.string.create_search_projects),
+        open = open == PROJECT,
+        onToggle = { toggle(PROJECT) },
         onPick = { id ->
             when (id) {
-                MORE -> allProjects = true
-                CHAT -> onChange(CreateSessionModel.chat(catalog, target))
-                else -> { allProjects = false; onChange(CreateSessionModel.select(catalog, target, id)) }
+                MORE -> Unit // The search field below lists every project; More keeps the list open.
+                CHAT -> { open = null; onChange(CreateSessionModel.chat(catalog, target)) }
+                else -> { open = null; onChange(CreateSessionModel.select(catalog, target, id)) }
             }
         },
-        keepOpen = { it == MORE },
-        onDismiss = { allProjects = false },
+        expandAllOn = MORE,
     )
 
-    if (CreateSessionModel.isGithub(target.projectId) && !target.chat) {
-        // Branches come from GitHub reads Android does not make yet.
-        Line(LodyIcons.Branch, stringResource(R.string.create_branch_unavailable), placeholder = true)
-    }
-    if (!target.chat && project != null && !CreateSessionModel.isGithub(project.id)) {
-        Line(LodyIcons.Branch, stringResource(R.string.create_worktree), placeholder = !target.worktree) {
-            Switch(
-                checked = target.worktree,
-                onCheckedChange = { onChange(target.copy(worktree = it)) },
-                colors = SwitchDefaults.colors(checkedTrackColor = colors.accentSolid),
-            )
+    val local = !target.chat && project != null && !CreateSessionModel.isGithub(project.id)
+    val github = !target.chat && CreateSessionModel.isGithub(target.projectId)
+    if (local || github) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
+            if (local) WorktreeChip(target.worktree) { onChange(target.copy(worktree = it)) }
+            // Branches come from GitHub / local git reads Android does not make yet.
+            if (github) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
+                    Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+                    Text(stringResource(R.string.create_branch_unavailable), style = LodyTheme.typography.body, color = colors.textTertiary)
+                }
+            }
         }
     }
-    // Assistants are read from the computer over Machine RPC, which Android does not run yet.
-    Line(LodyIcons.Agent, stringResource(R.string.create_agent_unavailable), placeholder = true)
     Text(
         stringResource(R.string.create_readonly_note),
         style = LodyTheme.typography.footnote,
         color = colors.textTertiary,
-        modifier = Modifier.padding(top = LodySpacing.xs, bottom = LodySpacing.md),
+        modifier = Modifier.padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
     )
 }
 
+private const val MACHINE = "machine"
+private const val PROJECT = "project"
 private const val CHAT = "chat"
 private const val MORE = "more"
 
-private data class MenuOption(val id: String, val title: String, val selected: Boolean, val icon: ImageVector? = null)
+private data class PickerOption(
+    val id: String,
+    val title: String,
+    val selected: Boolean,
+    val subtitle: String = "",
+    val icon: ImageVector? = null,
+)
 
-/** A context line that opens a menu in place; with no options it is plain text. */
+private fun CatalogProject.option(target: CreateTarget) = PickerOption(
+    id = id,
+    title = name,
+    selected = !target.chat && id == target.projectId,
+    subtitle = if (CreateSessionModel.isGithub(id)) "GitHub" else rootPath.replace(Regex("^/(Users|home)/[^/]+"), "~"),
+    icon = if (CreateSessionModel.isGithub(id)) LodyIcons.Github else LodyIcons.Folder,
+)
+
+/** A full-width filled card; its options expand in place right below it (web's inline picker). */
 @Composable
-private fun MenuLine(
+private fun PickerCard(
+    id: String,
     icon: ImageVector,
     title: String,
     placeholder: Boolean,
-    options: List<MenuOption>,
+    options: List<PickerOption>,
+    open: Boolean,
+    onToggle: () -> Unit,
     onPick: (String) -> Unit,
-    keepOpen: (String) -> Boolean = { false },
-    onDismiss: () -> Unit = {},
+    searchOptions: List<PickerOption>? = null,
+    searchPlaceholder: String = "",
+    expandAllOn: String? = null,
 ) {
     val colors = LodyTheme.colors
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Line(icon, title, placeholder, chooser = options.isNotEmpty(), onClick = if (options.isNotEmpty()) ({ open = true }) else null)
-        DropdownMenu(
-            expanded = open,
-            onDismissRequest = { open = false; onDismiss() },
-            shape = RoundedCornerShape(LodyRadius.lg),
-            containerColor = colors.bgOverlay,
-            border = BorderStroke(0.5.dp, colors.borderSubtle),
+    val shape = RoundedCornerShape(LodyRadius.xl)
+    Column(verticalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = LodySize.controlLg)
+                .clip(shape)
+                .background(colors.fillTertiary, shape)
+                .clickable(enabled = options.isNotEmpty(), role = Role.Button, onClick = onToggle)
+                .semantics { contentDescription = title }
+                .padding(horizontal = LodySpacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
         ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.title, style = LodyTheme.typography.body, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = option.icon?.let { { Icon(it, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm)) } },
-                    trailingIcon = { if (option.selected) Icon(LodyIcons.Check, contentDescription = null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm)) },
-                    onClick = { if (!keepOpen(option.id)) open = false; onPick(option.id) },
+            Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+            Text(
+                title,
+                style = LodyTheme.typography.body,
+                color = if (placeholder) colors.textTertiary else colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.MiddleEllipsis,
+                modifier = Modifier.weight(1f),
+            )
+            // The pop-up indicator (⌃⌄), drawn as a stacked up / down pair.
+            if (options.isNotEmpty()) {
+                Column {
+                    Icon(LodyIcons.Collapse, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
+                    Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
+                }
+            }
+        }
+        AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+            OptionList(options, searchOptions, searchPlaceholder, onPick, expandAllOn)
+        }
+    }
+}
+
+/** The expanded options: optional search, then rows with a check on the selected one. */
+@Composable
+private fun OptionList(
+    options: List<PickerOption>,
+    searchOptions: List<PickerOption>?,
+    searchPlaceholder: String,
+    onPick: (String) -> Unit,
+    expandAllOn: String?,
+) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val shape = RoundedCornerShape(LodyRadius.xl)
+    var query by remember { mutableStateOf("") }
+    var all by remember { mutableStateOf(false) }
+    val term = query.trim()
+    val shown = when {
+        term.isNotEmpty() -> (searchOptions ?: options).filter { "${it.title} ${it.subtitle}".contains(term, ignoreCase = true) }
+        all && searchOptions != null -> searchOptions
+        else -> options
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.bgRaised, shape)
+            .border(0.5.dp, colors.borderSubtle, shape),
+    ) {
+        if (searchOptions != null || options.size > 8) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).padding(horizontal = LodySpacing.lg),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+            ) {
+                Icon(LodyIcons.Search, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = type.body.copy(color = colors.textPrimary),
+                    cursorBrush = SolidColor(colors.accentDefault),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        Box {
+                            if (query.isEmpty()) Text(searchPlaceholder, style = type.body, color = colors.textPlaceholder)
+                            inner()
+                        }
+                    },
                 )
+            }
+            HorizontalDivider(thickness = 0.5.dp, color = colors.borderSubtle)
+        }
+        LazyColumn(Modifier.heightIn(max = 280.dp)) {
+            items(shown, key = { it.id }) { option ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = LodySize.listRow)
+                        .background(if (option.selected) colors.fillTertiary else Color.Transparent)
+                        .clickable(role = Role.Button) { if (option.id == expandAllOn) all = true; onPick(option.id) }
+                        .semantics { selected = option.selected }
+                        .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+                ) {
+                    option.icon?.let { Icon(it, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) }
+                    Column(Modifier.weight(1f)) {
+                        Text(option.title, style = type.body, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (option.subtitle.isNotEmpty()) {
+                            Text(option.subtitle, style = type.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                        }
+                    }
+                    if (option.selected) Icon(LodyIcons.Check, contentDescription = null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm))
+                }
             }
         }
     }
 }
 
+/** Web's worktree chip: a checkbox and the word, toggling the local project's worktree mode. */
 @Composable
-private fun Line(
-    icon: ImageVector,
-    title: String,
-    placeholder: Boolean,
-    chooser: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null,
-) {
+private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
     val colors = LodyTheme.colors
+    val shape = RoundedCornerShape(LodyRadius.md)
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = LodySize.controlLg)
-            .clip(RoundedCornerShape(LodyRadius.md))
-            .let { if (onClick != null) it.clickable(role = Role.Button, onClick = onClick) else it }
-            .padding(vertical = LodySpacing.sm),
+            .heightIn(min = LodySize.controlMd)
+            .clip(shape)
+            .background(colors.fillTertiary, shape)
+            .clickable(role = Role.Checkbox) { onChange(!on) }
+            .semantics { selected = on }
+            .padding(horizontal = LodySpacing.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
     ) {
-        Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.lg))
-        Text(
-            title,
-            style = LodyTheme.typography.title,
-            color = if (placeholder) colors.textTertiary else colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = trailing != null),
-        )
-        // The pop-up indicator (⌃⌄) of a line with a choice, as iOS shows.
-        if (chooser) Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
-        trailing?.invoke()
+        Box(
+            Modifier
+                .size(LodyIconSize.md)
+                .clip(RoundedCornerShape(LodyRadius.xs))
+                .background(if (on) colors.accentSolid else Color.Transparent)
+                .border(1.dp, if (on) colors.accentSolid else colors.borderDefault, RoundedCornerShape(LodyRadius.xs)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (on) Icon(LodyIcons.Check, contentDescription = null, tint = colors.textOnAccent, modifier = Modifier.size(LodyIconSize.xs))
+        }
+        Text(stringResource(R.string.create_worktree), style = LodyTheme.typography.subhead, color = colors.textSecondary)
     }
 }
 
-/** Web's mobile composer: prompt in a card; + and @ leading, run config and send trailing. */
+/** Web's run-config sheet; assistants and models need Machine RPC, so it explains that for now. */
 @Composable
-private fun Composer(prompt: String, onPromptChange: (String) -> Unit, onAttach: () -> Unit, onMention: () -> Unit, onSend: () -> Unit) {
+private fun RunConfigSheet() {
+    val colors = LodyTheme.colors
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(LodySpacing.md),
+    ) {
+        Text(stringResource(R.string.create_run_config), style = LodyTheme.typography.headline, color = colors.textPrimary)
+        Text(stringResource(R.string.create_agent_unavailable), style = LodyTheme.typography.body, color = colors.textSecondary)
+        Spacer(Modifier.heightIn(min = LodySpacing.xl))
+    }
+}
+
+/** Web's mobile composer: prompt in a card; +, @ and the run-config chip leading, send trailing. */
+@Composable
+private fun Composer(
+    prompt: String,
+    onPromptChange: (String) -> Unit,
+    onAttach: () -> Unit,
+    onMention: () -> Unit,
+    onRunConfig: () -> Unit,
+    onSend: () -> Unit,
+) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val shape = RoundedCornerShape(LodyRadius.xl)
@@ -301,6 +456,21 @@ private fun Composer(prompt: String, onPromptChange: (String) -> Unit, onAttach:
         Row(verticalAlignment = Alignment.CenterVertically) {
             ComposerButton(LodyIcons.Plus, stringResource(R.string.create_attach), onAttach)
             ComposerButton(LodyIcons.AtSign, stringResource(R.string.create_mention), onMention)
+            // The run-config chip: assistant mark + model · reasoning · mode on web; Android has
+            // no assistant data yet, so it reads as unavailable and opens the explaining sheet.
+            Row(
+                Modifier
+                    .weight(1f, fill = false)
+                    .heightIn(min = LodySize.controlMd)
+                    .clip(RoundedCornerShape(LodyRadius.md))
+                    .clickable(role = Role.Button, onClick = onRunConfig)
+                    .padding(horizontal = LodySpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+            ) {
+                Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                Text(stringResource(R.string.create_run_config_unavailable), style = type.subhead, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Spacer(Modifier.weight(1f))
             val ready = prompt.isNotBlank()
             val send = stringResource(R.string.create_send)

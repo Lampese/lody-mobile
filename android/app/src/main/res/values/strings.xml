@@ -98,7 +98,7 @@
     <string name="create_pick_machine">Choose computer</string>
     <string name="create_pick_project">Choose project</string>
     <string name="create_more_projects">More projects…</string>
-    <string name="create_chat_only">Chat only (no project)</string>
+    <string name="create_chat_only">No project</string>
     <string name="create_branch_unavailable">Branches aren’t available on Android yet</string>
     <string name="create_worktree">Run in a worktree</string>
     <string name="create_agent_unavailable">Assistants aren’t available on Android yet</string>
@@ -107,4 +107,7 @@
     <string name="create_attach">Add attachment</string>
     <string name="create_mention">Mention</string>
     <string name="create_send">Send</string>
+    <string name="create_search_projects">Search projects</string>
+    <string name="create_run_config">Run configuration</string>
+    <string name="create_run_config_unavailable">Assistant unavailable</string>
 </resources>
