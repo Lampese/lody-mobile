@@ -2,15 +2,14 @@
 
 package app.lody.android.designsystem
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.withFrameMillis
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -21,6 +20,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 
 private const val PERIOD_MS = 1600
+private const val FRAME_INTERVAL_MS = 50L
 private const val GAP = 0.18f
 private const val CORNER = 0.4f
 private const val STEP = 0.12f
@@ -32,12 +32,16 @@ private const val STEP = 0.12f
  */
 @Composable
 fun LodyWorkingGrid(modifier: Modifier = Modifier, size: Dp = LodyIconSize.xs, color: Color = LodyTheme.colors.accentDefault) {
-    val time by rememberInfiniteTransition(label = "working").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(PERIOD_MS, easing = LinearEasing)),
-        label = "phase",
-    )
+    val time by produceState(0f) {
+        while (isActive) {
+            // Read Compose's frame clock so updates pause when the host is stopped.
+            // Absolute time keeps separately mounted rows on the same 20 Hz cadence;
+            // delayed frames skip ahead rather than replaying missed animation steps.
+            val frameMillis = withFrameMillis { it }
+            value = (frameMillis % PERIOD_MS).toFloat() / PERIOD_MS
+            delay(FRAME_INTERVAL_MS - frameMillis % FRAME_INTERVAL_MS)
+        }
+    }
     Canvas(modifier.size(size)) {
         val tile = this.size.width / (3 + 2 * GAP)
         for (row in 0 until 3) {

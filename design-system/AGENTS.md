@@ -52,6 +52,8 @@ Principles and integration steps: [README.md](README.md).
   selection-color mapping, `LodyElevation.shadow()`.
 - `runtime/{ios,android}/LodyWorkingGrid`: the web `WorkingGrid` (3×3 tiles
   pulsing on a diagonal, 1.6 s) used as the "working" session mark; keep the
-  two implementations' math identical. Session status marks follow web
+  two implementations' math identical. Android samples the wave at 20 Hz on aligned
+  frame-clock boundaries; the phase is read only during drawing, and frame-clock
+  suspension pauses updates when the host is stopped. Session status marks follow web
   `SessionRowStatusIndicator` (alert / hand / grid / unread dot) and PR marks
   web `SessionPrIcon`, coloured by the `pr.*` tokens.
