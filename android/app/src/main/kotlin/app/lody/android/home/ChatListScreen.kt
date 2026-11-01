@@ -11,6 +11,10 @@ package app.lody.android.home
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,13 +38,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -81,6 +78,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -492,8 +490,9 @@ private fun HomeBottomBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, onCrea
 // MARK: - Lists
 
 /** Flat groups with a text header. The status view's idle group folds after [ChatListModel.IDLE_LIMIT] chats. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HomeList(
+internal fun HomeList(
     sections: List<HomeSection>,
     details: Set<ChatRowDetail>,
     padding: PaddingValues,
@@ -511,37 +510,33 @@ private fun HomeList(
     // Resolved here: LazyListScope builders are not composable.
     val titles = sections.associate { it.id to it.header.title() }
     val showLess = stringResource(R.string.home_group_show_less)
-    val listState = rememberLazyListState()
-    // Where each label sits in the lazy list, for the pinned copy.
-    val headers = remember(sections, titles, idleExpanded) {
-        var index = 0
-        sections.map { section ->
-            PinnedHeader(index, titles.getValue(section.id)).also {
-                index += 1 + section.visibleChats(idleExpanded).size + if (section.folds) 1 else 0
-            }
-        }
-    }
-    val labelHeight = with(LocalDensity.current) { LodyTheme.typography.subhead.lineHeight.toPx() + LodySpacing.xs.toPx() * 2 }
-    val pinned by remember(headers, labelHeight, pinsLabels) {
-        derivedStateOf { if (pinsLabels) pinnedHeader(listState, headers, labelHeight) else null }
-    }
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = padding) {
-            sections.forEach { section ->
+    val direction = LocalLayoutDirection.current
+    // Keep the sticky slot below the app bar; content padding alone scrolls away.
+    LazyColumn(
+        Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+        contentPadding = PaddingValues(
+            start = padding.calculateStartPadding(direction),
+            end = padding.calculateEndPadding(direction),
+            bottom = padding.calculateBottomPadding(),
+        ),
+    ) {
+        sections.forEach { section ->
+            if (pinsLabels) {
+                stickyHeader(key = section.id) { SectionTitle(titles.getValue(section.id)) }
+            } else {
                 item(key = section.id) { SectionTitle(titles.getValue(section.id)) }
-                items(section.visibleChats(idleExpanded), key = { "${section.id}/${it.id}" }) { chat -> ChatRow(chat, details, now) { onOpenChat(chat) } }
-                if (section.folds) {
-                    item(key = "${section.id}/more") {
-                        MoreRow(
-                            if (idleExpanded) showLess else pluralStringResource(R.plurals.home_group_show_all, section.chats.size, section.chats.size),
-                            onToggleIdle,
-                        )
-                    }
+            }
+            items(section.visibleChats(idleExpanded), key = { "${section.id}/${it.id}" }) { chat ->
+                ChatRow(chat, details, now) { onOpenChat(chat) }
+            }
+            if (section.folds) {
+                item(key = "${section.id}/more") {
+                    MoreRow(
+                        if (idleExpanded) showLess else pluralStringResource(R.plurals.home_group_show_all, section.chats.size, section.chats.size),
+                        onToggleIdle,
+                    )
                 }
             }
-        }
-        pinned?.let { (title, push) ->
-            PinnedLabel(title, Modifier.padding(top = padding.calculateTopPadding()).offset { IntOffset(0, push) })
         }
     }
 }
@@ -551,53 +546,6 @@ private val HomeSection.folds: Boolean
     get() = (header as? HomeSection.Header.Status)?.group == StatusGroup.Idle && chats.size > ChatListModel.IDLE_LIMIT
 
 private fun HomeSection.visibleChats(idleExpanded: Boolean) = if (folds && !idleExpanded) chats.take(ChatListModel.IDLE_LIMIT) else chats
-
-private data class PinnedHeader(val index: Int, val title: String)
-
-/**
- * The last label whose in-list copy has reached the top, and how far the next label pushes it
- * up (px, <= 0). A label sits at the bottom of its header item, so it reaches the pinned slot
- * when the item's bottom does. iOS counterpart: `ChatListView.updatePinned`.
- */
-private fun pinnedHeader(state: LazyListState, headers: List<PinnedHeader>, labelHeight: Float): Pair<String, Int>? {
-    val visible = state.layoutInfo.visibleItemsInfo.associateBy { it.index }
-    var current: PinnedHeader? = null
-    for (header in headers) {
-        val labelTop = visible[header.index]?.let { it.offset + it.size - labelHeight }
-        val passed = labelTop?.let { it <= 0f } ?: (header.index < state.firstVisibleItemIndex)
-        if (passed) {
-            current = header
-            continue
-        }
-        val pinnedNow = current ?: return null
-        return pinnedNow.title to (labelTop?.let { minOf(0f, it - labelHeight) } ?: 0f).toInt()
-    }
-    return current?.let { it.title to 0 }
-}
-
-/**
- * The pinned copy of [SectionTitle]'s label. Android has no system scroll edge blur, so the
- * label sits on the page colour and fades into the rows below; iOS joins the bar's soft blur.
- */
-@Composable
-private fun PinnedLabel(title: String, modifier: Modifier) {
-    val colors = LodyTheme.colors
-    // The in-list label stays the accessible one; this is a visual duplicate.
-    Column(modifier.fillMaxWidth().clearAndSetSemantics {}) {
-        Text(
-            title,
-            style = LodyTheme.typography.subhead,
-            color = colors.textTertiary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(colors.bgBase)
-                .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.xs),
-        )
-        Spacer(Modifier.fillMaxWidth().height(LodySpacing.lg).background(Brush.verticalGradient(listOf(colors.bgBase, Color.Transparent))))
-    }
-}
 
 @Composable
 private fun HomeSection.Header.title(): String = when (this) {
@@ -689,6 +637,7 @@ private fun SectionTitle(text: String) {
         color = LodyTheme.colors.textTertiary,
         modifier = Modifier
             .fillMaxWidth()
+            .background(LodyTheme.colors.bgBase)
             .semantics { heading() }
             .padding(start = LodyLayout.screenPaddingX, end = LodyLayout.screenPaddingX, top = LodySpacing.lg, bottom = LodySpacing.xs),
     )
@@ -832,7 +781,7 @@ private fun ageText(at: Long, now: Long): String = when (val age = ChatListModel
     is ChatListModel.Age.Hours -> stringResource(R.string.home_age_hours, age.value)
     is ChatListModel.Age.Days -> stringResource(R.string.home_age_days, age.value)
     is ChatListModel.Age.Date -> {
-        val locale = LocalContext.current.resources.configuration.locales[0]
+        val locale = LocalConfiguration.current.locales[0]
         remember(locale) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale) }.format(age.date)
     }
 }
