@@ -90,6 +90,7 @@ final class InboxController: UIViewController {
     list.setPreviewUserId(state.userId)
     list.setPreviewWorkspaceId(state.workspaceId)
     let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    list.setPinsGroupLabels(term.isEmpty)
     guard term.isEmpty else {
       renderSearch(term, state: state, catalog: catalog)
       return

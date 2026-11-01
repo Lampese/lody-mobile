@@ -36,6 +36,22 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private let placeholder = UILabel()
   private var placeholderText = ""
   private var details = ChatRowDetails.stored
+  /// The current group's label, pinned under the navigation bar while its rows scroll beneath.
+  /// It has no backdrop of its own: it joins the system top scroll edge effect, so the bar's
+  /// soft blur extends under it as one continuous band.
+  private lazy var pinned: UIView & UIContentView = Self.pinnedConfiguration("").makeContentView()
+  private var pinnedText = ""
+  private let pinnedEdge = UIScrollEdgeElementContainerInteraction()
+  /// Matches `SectionTitle`'s label line (scaled like `lodyTextStyle`) plus its bottom inset, twice.
+  private var pinnedHeight: CGFloat {
+    let style = LodyTextStyle.subhead
+    return UIFontMetrics(forTextStyle: style.dynamicType.uiTextStyle).scaledValue(for: style.lineHeight, compatibleWith: traitCollection)
+      + LodySpacing.xs * 2
+  }
+  /// Search results keep their labels in the flow.
+  var pinsGroupLabels = true {
+    didSet { if pinsGroupLabels != oldValue { updatePinned() } }
+  }
   private var detailsObserver: NSObjectProtocol?
 
   override init(frame: CGRect) {
@@ -61,6 +77,14 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     collection.delegate = self
     collection.accessibilityIdentifier = "home-chat-list"
     addSubview(collection)
+    pinned.isUserInteractionEnabled = false
+    // The in-list header stays the accessible one; this is a visual duplicate.
+    pinned.accessibilityElementsHidden = true
+    pinned.alpha = 0
+    pinnedEdge.scrollView = collection
+    pinnedEdge.edge = .top
+    pinned.addInteraction(pinnedEdge)
+    addSubview(pinned)
 
     let cell = UICollectionView.CellRegistration<UICollectionViewListCell, Item> { [weak self] cell, _, item in
       self?.configure(cell, item)
@@ -112,6 +136,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   override func layoutSubviews() {
     super.layoutSubviews()
     collection.frame = bounds
+    updatePinned()
     let inset = LodyLayout.screenPaddingX * 2
     placeholder.frame = CGRect(x: inset, y: bounds.midY - 60, width: max(0, bounds.width - inset * 2), height: 120)
   }
@@ -154,7 +179,46 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     titles = nextTitles
     snapshot.reconfigureItems(Array(changed))
     dataSource.apply(snapshot, animatingDifferences: window != nil && !UIAccessibility.isReduceMotionEnabled)
+    updatePinned()
     updatePlaceholder()
+  }
+
+  func scrollViewDidScroll(_ scrollView: UIScrollView) {
+    updatePinned()
+  }
+
+  /// Pins the last labelled group whose in-list label has reached the top; the next label
+  /// pushes it up as it arrives, like a pinned header, but over the system edge effect.
+  private func updatePinned() {
+    let height = pinnedHeight
+    let top = collection.contentOffset.y + collection.adjustedContentInset.top
+    var current: (title: String, push: CGFloat)?
+    if pinsGroupLabels {
+      let sections = dataSource.snapshot().sectionIdentifiers
+      for (index, id) in sections.enumerated() {
+        guard let title = titles[id], !title.isEmpty,
+          let header = collection.layoutAttributesForSupplementaryElement(
+            ofKind: UICollectionView.elementKindSectionHeader, at: IndexPath(item: 0, section: index))
+        else { continue }
+        // A header's label sits at its bottom, so it reaches the pinned slot when its maxY does.
+        let labelTop = header.frame.maxY - height
+        if labelTop <= top {
+          current = (title, 0)
+        } else {
+          if let pinnedNow = current { current = (pinnedNow.title, min(0, labelTop - top - height)) }
+          break
+        }
+      }
+    }
+    pinned.frame = CGRect(x: 0, y: collection.adjustedContentInset.top + (current?.push ?? 0), width: bounds.width, height: height)
+    pinned.alpha = current == nil ? 0 : 1
+    guard let title = current?.title, title != pinnedText else { return }
+    pinnedText = title
+    pinned.configuration = Self.pinnedConfiguration(title)
+  }
+
+  private static func pinnedConfiguration(_ text: String) -> UIHostingConfiguration<PinnedGroupLabel, EmptyView> {
+    UIHostingConfiguration { PinnedGroupLabel(text: text) }.margins(.all, 0)
   }
 
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
@@ -544,6 +608,21 @@ private struct MoreRowContent: View {
       .padding(.leading, LodyLayout.childIndent)
       .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
       .accessibilityAddTraits(.isButton)
+  }
+}
+
+/// The pinned copy of `SectionTitle`'s label: same type and inset, without the top spacing.
+private struct PinnedGroupLabel: View {
+  let text: String
+
+  var body: some View {
+    Text(text)
+      .lodyTextStyle(.subhead)
+      .foregroundStyle(LodyColor.textTertiary)
+      .lineLimit(1)
+      .padding(.horizontal, LodyLayout.screenPaddingX)
+      .padding(.vertical, LodySpacing.xs)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
   }
 }
 

@@ -33,6 +33,8 @@ final class SessionListView: UIView {
   func setContentStyle(_ value: Bool) {}
   func setPreviewUserId(_ value: String) { sidebar.previewUserId = value }
   func setPreviewWorkspaceId(_ value: String) { sidebar.previewWorkspaceId = value }
+  /// Home pins the current group's label; search results keep labels in the flow.
+  func setPinsGroupLabels(_ value: Bool) { grouped.pinsGroupLabels = value }
   func setPlaceholder(_ value: String) { grouped.setPlaceholder(value); sidebar.setPlaceholder(value) }
   func setSections(_ value: [LodyListSection]) { sections = value; render() }
   private func render() {
