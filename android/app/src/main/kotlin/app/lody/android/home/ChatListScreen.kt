@@ -163,7 +163,7 @@ fun ChatListScreen(
     var projectId by rememberSaveable { mutableStateOf<String?>(null) }
     val project = state.projects.firstOrNull { it.id == projectId }
     val snackbar = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.home_new_chat_unavailable)
     val closeSearch = { searching = false; query = "" }
     val context = LocalContext.current
@@ -204,7 +204,7 @@ fun ChatListScreen(
                 HomeBottomBar(
                     selected = tab,
                     onSelect = { tab = it },
-                    onCreate = { scope.launch { snackbar.showSnackbar(unavailable) } },
+                    onCreate = { coroutineScope.launch { snackbar.showSnackbar(unavailable) } },
                 )
             }
         },
@@ -372,7 +372,7 @@ private fun ViewMenu(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = LodySize.controlLg)
+                        .heightIn(min = LodySize.controlMd)
                         .toggleable(value = checked, role = Role.Checkbox) { onToggle(detail) }
                         .padding(horizontal = LodySpacing.lg),
                     verticalAlignment = Alignment.CenterVertically,
@@ -780,7 +780,7 @@ private fun ChatRow(
                 Modifier
                     .width(LodyLayout.childIndent)
                     .heightIn(min = LodySize.listRow)
-                    .clickable(role = Role.Button, onClickLabel = label, onClick = onToggle)
+                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = label, onClick = onToggle)
                     .semantics { stateDescription = label },
                 contentAlignment = Alignment.Center,
             ) {
