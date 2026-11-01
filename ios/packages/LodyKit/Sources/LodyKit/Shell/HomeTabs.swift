@@ -27,8 +27,8 @@ enum HomeTab: CaseIterable, Sendable {
 /// button. The bar is a standalone `UITabBar` rather than a `UITabBarController`, because Home
 /// stays a split view and the slot beside a controller's capsule belongs to search.
 ///
-/// It is installed on each tab's root page, so pushing a session or project slides it away
-/// with the page and popping brings it back; no visibility bookkeeping is needed.
+/// One instance stays on the navigation host while roots slide underneath it. UIKit can
+/// finish its Liquid Glass selection animation without replacing the bar on every tap.
 @MainActor
 final class HomeTabBar: NSObject, UITabBarDelegate {
   struct Actions {
@@ -49,14 +49,13 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
   private let actions: Actions
   private weak var page: UIViewController?
   private weak var content: UIViewController?
+  private var rootVisible = true
 
   /// - Parameters:
-  ///   - page: the hosting `LodyPageController`; the bar is pinned to its bottom edge, as a
+  ///   - page: the hosting navigation controller; the bar is pinned to its bottom edge, as a
   ///     system tab bar is, and lays its capsule out above the home indicator itself.
-  ///   - content: the page's content; its bottom safe area grows so lists scroll clear of the bar.
-  init(page: UIViewController, content: UIViewController, selected: HomeTab, actions: Actions) {
+  init(page: UIViewController, selected: HomeTab, actions: Actions) {
     self.page = page
-    self.content = content
     self.actions = actions
     super.init()
     page.loadViewIfNeeded()
@@ -107,14 +106,23 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     updateVisibility()
   }
 
-  /// Each tab page owns a bar, and a tap or drag moves only the bar it happened on. A cached page
-  /// coming back would still show whatever its bar last selected, so the shell re-selects its
-  /// own tab before the page is shown.
+  /// User taps already animate the native selection. Programmatic restoration uses the same
+  /// live bar; never replace it or force its layout without animation during a tab transition.
   func show(_ tab: HomeTab) {
     guard let index = HomeTab.allCases.firstIndex(of: tab), let item = bar.items?[index], bar.selectedItem !== item else { return }
-    UIView.performWithoutAnimation {
-      bar.selectedItem = item
-      bar.layoutIfNeeded()
+    bar.selectedItem = item
+  }
+
+  func display(content: UIViewController?, visible: Bool) {
+    if self.content !== content {
+      self.content?.additionalSafeAreaInsets.bottom = 0
+      self.content = content
+    }
+    rootVisible = visible
+    updateVisibility()
+    if let page {
+      page.view.bringSubviewToFront(bar)
+      page.view.bringSubviewToFront(create)
     }
   }
 
@@ -131,9 +139,15 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     if index == settings { actions.openDebug() }
   }
 
-  /// Follow vertical geometry only. UIKit centres a width-capped capsule inside the bar;
-  /// feeding its horizontal insets back into the bar constraints creates a layout loop.
+  /// Centre the visible capsule/button group without changing its layout constraints.
+  /// UIKit centres a width-capped capsule inside the bar. Translating both controls by half
+  /// the outer inset balances the visible margins without feeding that inset into bar width.
   private func follow(_ capsule: CGRect) {
+    let rtl = bar.effectiveUserInterfaceLayoutDirection == .rightToLeft
+    let offset = rtl ? (bar.bounds.width - capsule.maxX) / 2 : -capsule.minX / 2
+    let translation = CGAffineTransform(translationX: offset, y: 0)
+    bar.transform = translation
+    create.transform = translation
     if createCenter.constant != capsule.midY { createCenter.constant = capsule.midY }
     if createSize.constant != capsule.height { createSize.constant = capsule.height }
     updateVisibility()
@@ -141,7 +155,7 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
 
   private func updateVisibility() {
     guard let page else { return }
-    let shown = page.traitCollection.horizontalSizeClass != .regular
+    let shown = rootVisible && page.traitCollection.horizontalSizeClass != .regular
     bar.isHidden = !shown
     create.isHidden = !shown
     // The content's bottom safe area already covers the home indicator; add what the capsule

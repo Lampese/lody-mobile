@@ -208,6 +208,8 @@ enum SessionCatalogPreview {
       userId: (account?["user"] as? [String: Any])?["id"] as? String ?? "", workspaceId: workspaceId, workspaces: workspaces,
       catalog: decoded
     )
+    next.loading = payload["loading"] as? Bool ?? false
+    next.connected = payload["connected"] as? Bool ?? true
     if let scoped = payload["presence"] as? [String: Any], scoped["workspaceId"] as? String == workspaceId,
       let data = try? JSONSerialization.data(withJSONObject: scoped["presence"] ?? [:]),
       let presence = try? JSONDecoder().decode(SettingsMachinePresence.self, from: data) {

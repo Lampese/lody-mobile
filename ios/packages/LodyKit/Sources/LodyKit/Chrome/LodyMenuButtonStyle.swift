@@ -18,9 +18,15 @@ enum LodyMenuButtonStyle {
     button.subtitleLabel?.numberOfLines = 1
   }
 
-  static func apply(label: String, detail: String = "", avatar: UIImage, to button: UIButton) {
+  static func apply(label: String, detail: String = "", avatar: UIImage, showsLabel: Bool = true, to button: UIButton) {
     var configuration = UIButton.Configuration.plain()
     configuration.image = avatar
+    if !showsLabel {
+      let inset = (height - avatarSide) / 2
+      configuration.contentInsets = NSDirectionalEdgeInsets(top: inset, leading: inset, bottom: inset, trailing: inset)
+      apply(configuration, to: button)
+      return
+    }
     configuration.imagePadding = imagePadding + 2
     configuration.titleAlignment = .leading
     configuration.titlePadding = 1

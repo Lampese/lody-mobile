@@ -224,6 +224,7 @@ enum NativeHomeFixture {
   private static var workspaces: [[String: Any]] = []
   private static var selected = "ui-home"
   private static var rejectedDelete = false
+  private static var syncPreview = false
 
   static func prepare() throws {
     let url = Bundle.main.url(forResource: "DebugHome", withExtension: "json")!
@@ -235,6 +236,15 @@ enum NativeHomeFixture {
       if let url = URL(string: photo), let data = URL(string: source) { LodyListPhoto.prime(url, from: data) }
     }
     selected = "ui-home"; rejectedDelete = false
+    syncPreview = LodyUIVerify.has("--ui-verify-home-syncing")
+    if LodyUIVerify.has("--ui-verify-home-sync-cycle") {
+      Task {
+        try? await Task.sleep(for: .seconds(3))
+        syncPreview = true; publish()
+        try? await Task.sleep(for: .seconds(4))
+        syncPreview = false; publish()
+      }
+    }
     for key in ["inboxView", "inboxProjectSort", "inboxExpansion", "inboxPinOrder.ui-home.ui-home"] {
       UserDefaults.standard.removeObject(forKey: key)
     }
@@ -306,6 +316,7 @@ enum NativeHomeFixture {
     let empty: [String: Any] = ["projects": [], "sessions": [], "machineIds": []]
     let payload: [String: Any] = ["account": ["user": ["id": "ui-home", "name": "UI Preview", "email": ""], "workspaces": workspaces],
       "workspaceId": selected, "catalog": catalogs[selected] ?? empty,
+      "loading": syncPreview,
       "presence": ["workspaceId": selected, "presence": presence]]
     let json = String(decoding: try! JSONSerialization.data(withJSONObject: payload), as: UTF8.self)
     SettingsPreview.set(json)

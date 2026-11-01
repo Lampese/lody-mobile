@@ -26,6 +26,7 @@ final class LodyMenuButton: UIView {
   private var photoURL: URL?
   private var photo: UIImage?
   private var label = ""
+  private var labelHidden = false
   private var detail = ""
 
   @available(*, unavailable)
@@ -68,6 +69,12 @@ final class LodyMenuButton: UIView {
 
   func setLabel(_ value: String) {
     label = value
+    apply()
+  }
+
+  func setLabelHidden(_ hidden: Bool) {
+    guard labelHidden != hidden else { return }
+    labelHidden = hidden
     apply()
   }
 
@@ -125,7 +132,7 @@ final class LodyMenuButton: UIView {
         foreground: tint == nil ? LodyAccentChoice.current.foregroundColor : .white,
         photo: photo
       ),
-      to: button
+      showsLabel: !labelHidden, to: button
     )
     let width = LodyMenuButtonStyle.unconstrainedWidth(for: button)
     onSize(["width": width])

@@ -50,7 +50,8 @@ final class InboxChrome {
   private var waitingForTransition = false
   /// While the expanded search field is active, the workspace capsule steps aside for it.
   private var searching = false
-  private let syncPill = UIHostingController(rootView: HomeSyncPill(state: nil))
+  private let syncPill = UIHostingConfiguration { HomeSyncPill(state: nil) }.margins(.all, 0).makeContentView()
+  private var workspaceCollapsed = false
   private var syncState: HomeSyncState = .live
   private var syncShown: HomeSyncPill.Shown?
   private var recoveryTask: Task<Void, Never>?
@@ -150,7 +151,7 @@ final class InboxChrome {
     if let item = workspaceItem, header.leftItems == [item] { header.leftItems = nil }
     if let filterItem, let right = header.rightItems, right.contains(filterItem) { header.rightItems = nil }
     if header.search === search { header.search = nil }
-    if let host, host.navigationItem.titleView === syncPill.view { host.navigationItem.titleView = nil }
+    if let host, host.navigationItem.titleView === syncPill { host.navigationItem.titleView = nil }
     recoveryTask?.cancel()
     showPadBar(false)
     if let host, !toolbar.isEmpty, host.toolbarItems ?? [] == toolbar {
@@ -309,12 +310,27 @@ final class InboxChrome {
 
   private func showSync(_ shown: HomeSyncPill.Shown?, in host: UIViewController, compact: Bool) {
     syncShown = shown
-    syncPill.rootView = HomeSyncPill(state: compact ? shown : nil)
-    syncPill.view.backgroundColor = .clear
-    syncPill.view.isUserInteractionEnabled = false
-    syncPill.sizingOptions = .intrinsicContentSize
-    let wanted: UIView? = compact ? syncPill.view : nil
-    if host.navigationItem.titleView !== wanted { host.navigationItem.titleView = wanted }
+    syncPill.configuration = UIHostingConfiguration { HomeSyncPill(state: compact ? shown : nil) }.margins(.all, 0)
+    syncPill.backgroundColor = .clear
+    syncPill.isUserInteractionEnabled = false
+    syncPill.accessibilityIdentifier = "home-sync-status"
+    let collapsed = compact && shown != nil
+    let animate = workspaceCollapsed != collapsed && host.viewIfLoaded?.window != nil && !UIAccessibility.isReduceMotionEnabled
+    workspaceCollapsed = collapsed
+    let bar = host.navigationController?.navigationBar
+    bar?.layoutIfNeeded()
+    let changes = {
+      self.workspace.setLabelHidden(collapsed)
+      host.navigationItem.titleView = collapsed ? self.syncPill : nil
+      bar?.layoutIfNeeded()
+    }
+    if animate {
+      let fadeDuration = collapsed ? LodyMotion.base : LodyMotion.slower
+      let layoutDuration = collapsed ? LodyMotion.slow : LodyMotion.slower
+      UIView.transition(with: workspace, duration: fadeDuration, options: [.transitionCrossDissolve, .allowAnimatedContent, .beginFromCurrentState]) {
+        UIView.animate(withDuration: layoutDuration, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState], animations: changes)
+      }
+    } else { changes() }
   }
 
   private func filterMenu(mode: Int, sort: InboxSort) -> UIMenu {

@@ -1,4 +1,5 @@
 import LodyCore
+import LodyDesignSystem
 import UIKit
 
 @MainActor
@@ -13,7 +14,10 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
   /// iPhone tabs: each root page is built on first use and kept, so lists keep their scroll and state.
   private var selectedTab: HomeTab = .chats
   private var tabPages: [HomeTab: LodyPageController] = [:]
-  private var tabBars: [HomeTab: HomeTabBar] = [:]
+  private var tabBar: HomeTabBar?
+  private let tabNavigation = HomeTabNavigationDelegate()
+  private var changingTab = false
+  private var pendingTab: HomeTab?
   private var session: SessionController?
   private var scope = ""
   private var observers: [NSObjectProtocol] = []
@@ -76,6 +80,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
       LodyShell.shared.configureNavigation(controller)
       split.setViewController(controller, for: column)
     }
+    configureTabs()
     adopt(split)
     addChild(parking); parking.view.isHidden = true; view.addSubview(parking.view); parking.didMove(toParent: self)
     LodyFoldHost.observeHinge(on: view) { [weak self] book in
@@ -104,6 +109,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     view.accessibilityIdentifier = traitCollection.horizontalSizeClass == .regular ? "ipad-home" : "home"
     // Tabs exist only on compact width; a wide layout lists chats in its sidebar.
     if traitCollection.horizontalSizeClass == .regular, selectedTab != .chats { selectTab(.chats) }
+    updateTabBar(for: primary.topViewController)
     layoutColumns()
   }
   private func scopeChanged() {
@@ -225,16 +231,57 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     controller.contentUnavailableConfiguration = configuration
     return controller
   }
+  private func configureTabs() {
+    tabBar = HomeTabBar(page: primary, selected: selectedTab, actions: HomeTabBar.Actions(
+      select: { [weak self] in self?.selectTab($0) },
+      create: { [weak self] in self?.inbox.newSession() },
+      openDebug: { [weak self] in
+        guard let self else { return }
+        LodyShell.shared.openPage("debug", from: self.tabPages[.settings])
+      }
+    ))
+    tabNavigation.forwarded = primary.delegate
+    tabNavigation.duration = LodyMotion.slow
+    tabNavigation.index = { [weak self] controller in
+      guard let self, let tab = HomeTab.allCases.first(where: { self.tabPages[$0] === controller }) else { return nil }
+      return HomeTab.allCases.firstIndex(of: tab)
+    }
+    tabNavigation.willShow = { [weak self] controller, _ in self?.updateTabBar(for: controller) }
+    tabNavigation.didShow = { [weak self] controller in
+      guard let self else { return }
+      self.updateTabBar(for: controller)
+      self.changingTab = false
+      // UIKit may still expose the finishing transition coordinator in didShow.
+      let next = self.pendingTab
+      self.pendingTab = nil
+      if let next { DispatchQueue.main.async { [weak self] in self?.selectTab(next) } }
+      else { self.tabBar?.show(self.selectedTab) }
+    }
+    primary.delegate = tabNavigation
+    updateTabBar(for: primary.topViewController)
+  }
+
+  private func updateTabBar(for controller: UIViewController?) {
+    let root = tabPages.values.first { $0 === controller }
+    tabBar?.display(content: root?.children.first, visible: root != nil)
+  }
+
   func selectTab(_ next: HomeTab) {
+    if changingTab || primary.transitionCoordinator != nil {
+      pendingTab = next
+      return
+    }
     guard next != selectedTab else {
-      // Re-selecting the current tab returns to its root, like a system tab bar.
-      primary.popToRootViewController(animated: true)
+      primary.popToRootViewController(animated: !UIAccessibility.isReduceMotionEnabled)
       return
     }
     selectedTab = next
     let page = tabPage(next)
-    tabBars[next]?.show(next)
-    primary.setViewControllers([page], animated: false)
+    tabBar?.show(next)
+    changingTab = true
+    let animated = view.window != nil && traitCollection.horizontalSizeClass != .regular && !UIAccessibility.isReduceMotionEnabled
+    primary.setViewControllers([page], animated: animated)
+    if !animated { changingTab = false; updateTabBar(for: page) }
   }
 
   private func tabPage(_ tab: HomeTab) -> LodyPageController {
@@ -245,14 +292,6 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     case .settings: (SettingsController(), tab.title)
     }
     let next = page(content, title: title)
-    tabBars[tab] = HomeTabBar(page: next, content: content, selected: tab, actions: HomeTabBar.Actions(
-      select: { [weak self] in self?.selectTab($0) },
-      create: { [weak self] in self?.inbox.newSession() },
-      openDebug: { [weak self] in
-        guard let self else { return }
-        LodyShell.shared.openPage("debug", from: self.tabPages[.settings])
-      }
-    ))
     tabPages[tab] = next
     return next
   }
