@@ -89,13 +89,17 @@ enum InboxSections {
   /// iPhone Home "by time": activity buckets only (no pinned / status groups); archived chats are hidden.
   static func timeline(_ catalog: SessionCatalog, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
     let names = projectNames(catalog)
+    let repos = Set(catalog.projects.filter { !($0.repoFullName ?? "").isEmpty }.map(\.id))
     let visible = catalog.sessions.filter { !$0.archived }.sorted { $0.activityAt > $1.activityAt }
     var buckets: [String: [SessionItem]] = [:]
     for session in visible { buckets[activityBucket(session.activityAt, now: now), default: []].append(session) }
     return ["today", "yesterday", "week", "month", "older"].compactMap { id in
       guard let sessions = buckets[id], !sessions.isEmpty else { return nil }
       let rows = SessionRows.treeRows(sessions, all: catalog.sessions) { session in
-        SessionRows.row(session, projectName: place(session, names), now: now)
+        var row = SessionRows.row(session, projectName: place(session, names), now: now)
+        row.place = SessionRows.isChat(session.projectId) ? "" : names[session.projectId] ?? ""
+        row.placeIsRepo = repos.contains(session.projectId)
+        return row
       }
       return section(id, header: String(localized: String.LocalizationValue("inbox.section." + id), bundle: .lody), rows: rows)
     }

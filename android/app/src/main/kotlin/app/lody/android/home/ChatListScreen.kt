@@ -1,20 +1,16 @@
 // Home in the mobile design language; iOS counterpart: LodyKit HomeController + HomeTabs + ChatListView.
 //
 // Chats tab: workspace capsule leading, search and view trailing; search expands over the bar and
-// hides the capsule. Chats are grouped by time (the view menu will add by project / by status).
-// Rows are one line: the gutter shows a glyph only when a chat needs attention and the project
-// name sits trailing. A floating bar holds labelled Chats / Projects / Settings tabs and a separate
-// new-chat button. This phase is read-only, so new chat explains that it is not available yet.
+// hides the capsule. Connection trouble floats as a centred pill over the bar (web parity). Chats
+// are grouped by time. A row is the status mark, title and age; an optional second line carries
+// project, branch and PR state, chosen in the view menu. A floating bar holds labelled Chats /
+// Projects / Settings tabs and a separate new-chat button. This phase is read-only, so new chat
+// explains that it is not available yet.
 
 package app.lody.android.home
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +36,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,15 +65,19 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import app.lody.android.R
 import app.lody.android.auth.Workspace
 import app.lody.android.designsystem.LodyElevations
@@ -85,15 +87,18 @@ import app.lody.android.designsystem.LodyLayout
 import app.lody.android.designsystem.LodySize
 import app.lody.android.designsystem.LodySpacing
 import app.lody.android.designsystem.LodyTheme
+import app.lody.android.designsystem.LodyWorkingGrid
 import app.lody.android.designsystem.shadow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.format.DateTimeFormatter
 
 /** Everything Home renders; HomeActivity derives it from account and catalog state. */
 data class ChatListUiState(
     val workspaceName: String,
     val initial: String,
-    /** Actionable connection state (syncing, offline); empty when live. */
-    val status: String,
+    /** Catalog connection; Home floats a pill over the bar unless live. */
+    val sync: HomeSyncState,
     val accountName: String,
     val timeline: List<TimeSection>,
     val projects: List<ChatGroup>,
@@ -134,6 +139,12 @@ fun ChatListScreen(
     val scope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.home_new_chat_unavailable)
     val closeSearch = { searching = false; query = "" }
+    val context = LocalContext.current
+    var details by remember { mutableStateOf(ChatRowDetails.load(context)) }
+    val toggleDetail = { detail: ChatRowDetail ->
+        details = if (detail in details) details - detail else details + detail
+        ChatRowDetails.save(context, details)
+    }
 
     BackHandler(enabled = searching || project != null) {
         if (searching) closeSearch() else projectId = null
@@ -147,7 +158,10 @@ fun ChatListScreen(
             when {
                 searching -> SearchTopBar(query, onQueryChange = { query = it }, onClose = closeSearch)
                 project != null -> TitleTopBar(project.name, onBack = { projectId = null })
-                tab == HomeTab.Chats -> ChatsTopBar(state, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace)
+                tab == HomeTab.Chats -> Box {
+                    ChatsTopBar(state, details, onToggleDetail = toggleDetail, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace)
+                    HomeSyncPill(state.sync, Modifier.align(Alignment.Center).statusBarsPadding())
+                }
                 else -> TitleTopBar(stringResource(tab.label), onBack = null)
             }
         },
@@ -162,9 +176,9 @@ fun ChatListScreen(
         },
     ) { padding ->
         when {
-            searching -> TimelineList(ChatListModel.searchTimeline(state.timeline, query), padding, empty = stringResource(R.string.home_search_empty, query.trim()).takeIf { query.isNotBlank() }, onOpenChat)
-            project != null -> ProjectChatList(project, padding, onOpenChat)
-            tab == HomeTab.Chats -> TimelineList(state.timeline, padding, empty = state.placeholder, onOpenChat)
+            searching -> TimelineList(ChatListModel.searchTimeline(state.timeline, query), details, padding, empty = stringResource(R.string.home_search_empty, query.trim()).takeIf { query.isNotBlank() }, onOpenChat)
+            project != null -> ProjectChatList(project, details - ChatRowDetail.Project, padding, onOpenChat)
+            tab == HomeTab.Chats -> TimelineList(state.timeline, details, padding, empty = state.placeholder, onOpenChat)
             tab == HomeTab.Projects -> ProjectList(state.projects, padding, onOpen = { projectId = it.id })
             else -> SettingsList(state, padding, onSelectWorkspace, onSignOut)
         }
@@ -175,7 +189,13 @@ fun ChatListScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatsTopBar(state: ChatListUiState, onSearch: () -> Unit, onSelectWorkspace: (Workspace) -> Unit) {
+private fun ChatsTopBar(
+    state: ChatListUiState,
+    details: Set<ChatRowDetail>,
+    onToggleDetail: (ChatRowDetail) -> Unit,
+    onSearch: () -> Unit,
+    onSelectWorkspace: (Workspace) -> Unit,
+) {
     val colors = LodyTheme.colors
     TopAppBar(
         title = { WorkspaceCapsule(state, onSelectWorkspace) },
@@ -184,7 +204,7 @@ private fun ChatsTopBar(state: ChatListUiState, onSearch: () -> Unit, onSelectWo
             IconButton(onClick = onSearch, modifier = Modifier.semantics { contentDescription = search }) {
                 Glyph(LodyIcons.Search, colors.iconPrimary)
             }
-            ViewMenu()
+            ViewMenu(details, onToggleDetail)
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.bgBase, scrolledContainerColor = colors.bgBase),
     )
@@ -208,7 +228,7 @@ private fun TitleTopBar(title: String, onBack: (() -> Unit)?) {
     )
 }
 
-/** Workspace logo + name; tapping switches workspace. Connection trouble shows as a second line. */
+/** Workspace logo + name; tapping switches workspace. Connection state floats in [HomeSyncPill] instead. */
 @Composable
 private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Unit) {
     val colors = LodyTheme.colors
@@ -227,12 +247,15 @@ private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Un
             Box(Modifier.size(LodySize.avatarMd).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
                 Text(state.initial, style = LodyTheme.typography.subhead, color = colors.textPrimary)
             }
-            Column {
-                Text(state.workspaceName, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (state.status.isNotEmpty()) {
-                    Text(state.status, style = LodyTheme.typography.caption, color = colors.textSecondary, maxLines = 1)
-                }
-            }
+            // Capped so a long name ellipsizes before the centred sync pill.
+            Text(
+                state.workspaceName,
+                style = LodyTheme.typography.headline,
+                color = colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = LodyLayout.trailingMetaMaxWidth),
+            )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bgOverlay) {
             if (state.workspaces.isEmpty()) {
@@ -253,9 +276,12 @@ private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Un
     }
 }
 
-/** Grouping by time is the only view for now; by project and by status come later. */
+/**
+ * Chats are grouped by time (by project / by status come later). The menu is a multi-select of what
+ * the second row line shows; toggles keep the menu open so several can change at once.
+ */
 @Composable
-private fun ViewMenu() {
+private fun ViewMenu(details: Set<ChatRowDetail>, onToggle: (ChatRowDetail) -> Unit) {
     val colors = LodyTheme.colors
     var open by remember { mutableStateOf(false) }
     val label = stringResource(R.string.home_view)
@@ -264,11 +290,28 @@ private fun ViewMenu() {
             Glyph(LodyIcons.Filter, colors.iconPrimary)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = colors.bgOverlay) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.home_view_time), style = LodyTheme.typography.body, color = colors.textPrimary) },
-                trailingIcon = { Glyph(LodyIcons.Check, colors.accentFg, LodyIconSize.sm) },
-                onClick = { open = false },
+            Text(
+                stringResource(R.string.home_view_details),
+                style = LodyTheme.typography.footnote,
+                color = colors.textTertiary,
+                modifier = Modifier.semantics { heading() }.padding(horizontal = LodySpacing.lg, vertical = LodySpacing.sm),
             )
+            ChatRowDetail.entries.forEach { detail ->
+                val checked = detail in details
+                DropdownMenuItem(
+                    text = { Text(stringResource(detail.label), style = LodyTheme.typography.body, color = colors.textPrimary) },
+                    leadingIcon = { Glyph(detail.icon, colors.iconSecondary, LodyIconSize.sm) },
+                    trailingIcon = {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = null,
+                            colors = CheckboxDefaults.colors(checkedColor = colors.accentDefault, uncheckedColor = colors.iconTertiary, checkmarkColor = colors.textOnAccent),
+                        )
+                    },
+                    onClick = { onToggle(detail) },
+                    modifier = Modifier.semantics { this.selected = checked },
+                )
+            }
         }
     }
 }
@@ -389,15 +432,16 @@ private fun HomeBottomBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, onCrea
 // MARK: - Lists
 
 @Composable
-private fun TimelineList(sections: List<TimeSection>, padding: PaddingValues, empty: String?, onOpenChat: (ChatItem) -> Unit) {
+private fun TimelineList(sections: List<TimeSection>, details: Set<ChatRowDetail>, padding: PaddingValues, empty: String?, onOpenChat: (ChatItem) -> Unit) {
     if (sections.isEmpty()) {
         EmptyText(empty.orEmpty(), padding)
         return
     }
+    val now = rememberNow()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
         sections.forEach { section ->
             item(key = "bucket-${section.bucket}") { SectionTitle(stringResource(section.bucket.label)) }
-            items(section.chats, key = { "${section.bucket}/${it.id}" }) { chat -> ChatRow(chat, showsPlace = true) { onOpenChat(chat) } }
+            items(section.chats, key = { "${section.bucket}/${it.id}" }) { chat -> ChatRow(chat, details, now) { onOpenChat(chat) } }
         }
     }
 }
@@ -424,9 +468,10 @@ private fun ProjectList(projects: List<ChatGroup>, padding: PaddingValues, onOpe
 }
 
 @Composable
-private fun ProjectChatList(project: ChatGroup, padding: PaddingValues, onOpenChat: (ChatItem) -> Unit) {
+private fun ProjectChatList(project: ChatGroup, details: Set<ChatRowDetail>, padding: PaddingValues, onOpenChat: (ChatItem) -> Unit) {
+    val now = rememberNow()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        items(project.chats, key = { it.id }) { chat -> ChatRow(chat, showsPlace = false) { onOpenChat(chat) } }
+        items(project.chats, key = { it.id }) { chat -> ChatRow(chat, details, now) { onOpenChat(chat) } }
     }
 }
 
@@ -465,41 +510,109 @@ private fun SectionTitle(text: String) {
     )
 }
 
+/**
+ * Line 1: status slot, title, age. Line 2 (only when an enabled detail has a value): repo or folder
+ * mark + project, branch, and the PR mark trailing. iOS counterpart: `ChatRowContent`.
+ */
 @Composable
-private fun ChatRow(chat: ChatItem, showsPlace: Boolean, onClick: () -> Unit) {
+private fun ChatRow(chat: ChatItem, details: Set<ChatRowDetail>, now: Long, onClick: () -> Unit) {
     val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val place = chat.place.takeIf { ChatRowDetail.Project in details && it.isNotEmpty() }
+    val branch = chat.branch.takeIf { ChatRowDetail.Branch in details && it.isNotEmpty() }
+    val pr = chat.prStatus.takeIf { ChatRowDetail.PullRequest in details && it in PrStatuses }
+    val twoLine = place != null || branch != null || pr != null
+    val titleLine = with(LocalDensity.current) { type.body.lineHeight.toDp() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LodySize.listRow)
             .clickable(onClick = onClick)
-            .padding(horizontal = LodyLayout.screenPaddingX),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(end = LodyLayout.screenPaddingX)
+            .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
+        verticalAlignment = if (twoLine) Alignment.Top else Alignment.CenterVertically,
     ) {
-        // The gutter: empty unless the chat needs attention.
-        Box(Modifier.width(LodyLayout.childIndent - LodyLayout.screenPaddingX), contentAlignment = Alignment.CenterStart) {
-            Box(Modifier.size(LodyIconSize.md), contentAlignment = Alignment.Center) {
-                chat.attention?.let { AttentionGlyph(it) }
+        // The status slot spans the gutter and centres on the title line; empty when idle.
+        Box(Modifier.width(LodyLayout.childIndent).height(titleLine), contentAlignment = Alignment.Center) {
+            chat.attention?.let { AttentionGlyph(it) }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    chat.title,
+                    style = if (chat.unread) type.bodyEmphasis else type.body,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                chat.activityAt?.let { at ->
+                    Text(
+                        ageText(at, now),
+                        style = type.footnote.copy(fontFeatureSettings = "tnum"),
+                        color = colors.textTertiary,
+                        maxLines = 1,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.padding(start = LodySpacing.sm),
+                    )
+                }
+            }
+            if (twoLine) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                    if (place != null) {
+                        Glyph(if (chat.placeIsRepo) LodyIcons.Github else LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
+                        Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    }
+                    if (branch != null) {
+                        Glyph(LodyIcons.Branch, colors.iconTertiary, LodyIconSize.sm, Modifier.padding(start = if (place != null) LodySpacing.xs else 0.dp))
+                        Text(branch, style = type.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (pr != null) PullRequestMark(pr)
+                }
             }
         }
-        Text(
-            chat.title,
-            style = LodyTheme.typography.body,
-            color = colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (showsPlace && chat.place.isNotEmpty()) {
-            Text(
-                chat.place,
-                style = LodyTheme.typography.footnote,
-                color = colors.textTertiary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = LodySpacing.sm).widthIn(max = LodyLayout.trailingMetaMaxWidth),
-            )
+    }
+}
+
+private val PrStatuses = setOf("open", "merged", "closed", "draft")
+
+/** Web `SessionPrIcon`: open, merged, closed and draft each have their own Lucide mark and colour. */
+@Composable
+private fun PullRequestMark(status: String) {
+    val colors = LodyTheme.colors
+    val (icon, tint, label) = when (status) {
+        "merged" -> Triple(LodyIcons.Merge, colors.prMerged, R.string.home_pr_merged)
+        "closed" -> Triple(LodyIcons.PullRequestClosed, colors.prClosed, R.string.home_pr_closed)
+        "draft" -> Triple(LodyIcons.PullRequestDraft, colors.prDraft, R.string.home_pr_draft)
+        else -> Triple(LodyIcons.PullRequest, colors.prOpen, R.string.home_pr_open)
+    }
+    val description = stringResource(label)
+    Glyph(icon, tint, LodyIconSize.sm, Modifier.semantics { contentDescription = description })
+}
+
+/** Wall clock for row ages, refreshed each minute while the list is on screen. */
+@Composable
+private fun rememberNow(): Long {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L - now % 60_000L)
+            now = System.currentTimeMillis()
         }
+    }
+    return now
+}
+
+@Composable
+private fun ageText(at: Long, now: Long): String = when (val age = ChatListModel.age(at, now)) {
+    ChatListModel.Age.Now -> stringResource(R.string.home_age_now)
+    is ChatListModel.Age.Minutes -> stringResource(R.string.home_age_minutes, age.value)
+    is ChatListModel.Age.Hours -> stringResource(R.string.home_age_hours, age.value)
+    is ChatListModel.Age.Days -> stringResource(R.string.home_age_days, age.value)
+    is ChatListModel.Age.Date -> {
+        val locale = LocalContext.current.resources.configuration.locales[0]
+        remember(locale) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale) }.format(age.date)
     }
 }
 
@@ -558,20 +671,14 @@ private fun Glyph(icon: ImageVector, tint: Color, size: Dp = LodyIconSize.md, mo
     Icon(icon, contentDescription = null, modifier = modifier.size(size), tint = tint)
 }
 
+/** Web `SessionRowStatusIndicator`: alert when failed, hand when waiting, working grid, unread dot. */
 @Composable
 private fun AttentionGlyph(attention: ChatAttention) {
     val colors = LodyTheme.colors
     when (attention) {
-        ChatAttention.Running -> {
-            val angle by rememberInfiniteTransition(label = "running").animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing)),
-                label = "angle",
-            )
-            Glyph(LodyIcons.StateRunning, colors.stateRunning, LodyIconSize.sm, Modifier.graphicsLayer { rotationZ = angle })
-        }
-        ChatAttention.Waiting -> Glyph(LodyIcons.StateWaiting, colors.stateWaiting, LodyIconSize.sm)
-        ChatAttention.Failed -> Glyph(LodyIcons.StateFailed, colors.stateFailed, LodyIconSize.sm)
+        ChatAttention.Failed -> Glyph(LodyIcons.Alert, colors.dangerDefault, LodyIconSize.sm)
+        ChatAttention.Waiting -> Glyph(LodyIcons.Hand, colors.accentDefault, LodyIconSize.sm)
+        ChatAttention.Running -> LodyWorkingGrid()
+        ChatAttention.Unread -> Box(Modifier.size(LodySpacing.sm).background(colors.accentDefault, CircleShape))
     }
 }

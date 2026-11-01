@@ -32,8 +32,14 @@ enum class RuntimeErrorCategory { AUTH, NETWORK, PROTOCOL, RUNTIME, BUSINESS, CA
 data class RuntimeFault(val code: String, val category: RuntimeErrorCategory)
 class RuntimeException(val fault: RuntimeFault) : Exception(fault.code)
 
-data class CatalogProject(val id: String, val machineId: String, val name: String, val rootPath: String)
-data class CatalogSession(val id: String, val machineId: String, val projectId: String, val title: String, val status: String, val archived: Boolean, val pinned: Boolean, val createdAt: String)
+data class CatalogProject(val id: String, val machineId: String, val name: String, val rootPath: String, val repoFullName: String? = null)
+data class CatalogPullRequest(val repository: String, val number: Int, val status: String, val ci: String? = null)
+/** Required identity / state fields first; the rest are optional display fields (times in epoch ms). */
+data class CatalogSession(
+    val id: String, val machineId: String, val projectId: String, val title: String, val status: String, val archived: Boolean, val pinned: Boolean, val createdAt: String,
+    val branchName: String? = null, val lastMessageAt: Long? = null, val lastReadAt: Long? = null, val awaitingUserSince: Long? = null,
+    val pullRequests: List<CatalogPullRequest> = emptyList(),
+)
 /** Read projection, never a CRDT replica. Optional feature-specific fields come later. */
 data class CatalogSnapshot(val revision: Long, val projects: List<CatalogProject>, val sessions: List<CatalogSession>, val machineIds: List<String>)
 data class SessionMessage(val id: String, val role: String, val text: String, val streaming: Boolean)

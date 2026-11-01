@@ -83,7 +83,7 @@ final class InboxController: UIViewController {
       workspaces: state.workspaces, selected: state.workspace,
       devices: InboxDevices(catalog: state.catalog, presence: state.presence),
       running: state.catalog.sessions.filter { !$0.archived && SessionState($0) == .live }.count,
-      mode: mode, sort: sort
+      mode: mode, sort: sort, connection: syncState(state)
     ))
     list.setPreviewUserId(state.userId)
     list.setPreviewWorkspaceId(state.workspaceId)
@@ -170,6 +170,11 @@ final class InboxController: UIViewController {
       return (id, item["snippet"] as? String)
     }
     return InboxSearchHits(projectIds: raw["projectIds"] as? [String] ?? [], sessions: sessions)
+  }
+
+  private func syncState(_ state: SessionListState) -> HomeSyncState {
+    if !state.connected { return .offline }
+    return state.loading ? .syncing : .live
   }
 
   private func listPlaceholder(_ state: SessionListState) -> String {

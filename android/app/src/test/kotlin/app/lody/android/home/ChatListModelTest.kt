@@ -1,11 +1,15 @@
 package app.lody.android.home
 
 import app.lody.android.runtime.CatalogProject
+import app.lody.android.runtime.CatalogPullRequest
 import app.lody.android.runtime.CatalogSession
 import app.lody.android.runtime.CatalogSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
@@ -48,8 +52,10 @@ class ChatListModelTest {
         assertEquals(ChatAttention.Running, groups.getValue("p-zed").chats.first().attention)
         assertNull(groups.getValue("p-zed").chats.last().attention)
         assertEquals(ChatAttention.Failed, groups.getValue("chats").chats.single().attention)
-        val mixed = ChatGroup("x", "x", ChatGroup.Kind.Project, listOf(ChatItem("a", "a", ChatAttention.Running), ChatItem("b", "b", ChatAttention.Waiting)))
+        val mixed = ChatGroup("x", "x", ChatGroup.Kind.Project, listOf(ChatItem("u", "u", ChatAttention.Unread), ChatItem("a", "a", ChatAttention.Running), ChatItem("b", "b", ChatAttention.Waiting)))
         assertEquals(ChatAttention.Waiting, mixed.mostUrgent)
+        val failed = mixed.copy(chats = mixed.chats + ChatItem("c", "c", ChatAttention.Failed))
+        assertEquals(ChatAttention.Failed, failed.mostUrgent)
     }
 
     @Test
@@ -90,5 +96,56 @@ class ChatListModelTest {
         val sections = ChatListModel.timeline(snapshot, LocalDate.parse("2026-10-06"), ZoneOffset.UTC)
         assertEquals(listOf("3"), ChatListModel.searchTimeline(sections, "alpha").flatMap { section -> section.chats.map { it.id } })
         assertEquals(listOf("6"), ChatListModel.searchTimeline(sections, "chat 6").flatMap { section -> section.chats.map { it.id } })
+    }
+
+    @Test
+    fun attentionFollowsWebPriority() {
+        val base = session("a", "p-zed", at = "2026-10-01T00:00:00Z")
+        assertNull(ChatListModel.attention(base))
+        // A reply the user has not read yet; no read mark at all counts as unread.
+        assertEquals(ChatAttention.Unread, ChatListModel.attention(base.copy(lastMessageAt = 20, lastReadAt = 10)))
+        assertEquals(ChatAttention.Unread, ChatListModel.attention(base.copy(lastMessageAt = 20)))
+        assertNull(ChatListModel.attention(base.copy(lastMessageAt = 20, lastReadAt = 20)))
+        // An open question outranks unread, but a running turn still shows as working.
+        assertEquals(ChatAttention.Waiting, ChatListModel.attention(base.copy(lastMessageAt = 20, awaitingUserSince = 15)))
+        assertEquals(ChatAttention.Running, ChatListModel.attention(base.copy(status = "running", awaitingUserSince = 15)))
+        assertEquals(ChatAttention.Failed, ChatListModel.attention(base.copy(status = "error", awaitingUserSince = 15)))
+    }
+
+    @Test
+    fun rowsCarryActivityBranchLatestPrAndRepoPlace() {
+        val activity = Instant.parse("2026-10-06T08:00:00Z").toEpochMilli()
+        val withRepo = snapshot.copy(
+            projects = snapshot.projects.map { if (it.id == "p-alpha") it.copy(repoFullName = "lody/alpha") else it },
+            sessions = snapshot.sessions.map {
+                if (it.id != "3") it else it.copy(
+                    lastMessageAt = activity,
+                    lastReadAt = activity,
+                    branchName = "feat/rows",
+                    pullRequests = listOf(CatalogPullRequest("lody/alpha", 1, "closed"), CatalogPullRequest("lody/alpha", 2, "merged")),
+                )
+            },
+        )
+        val sections = ChatListModel.timeline(withRepo, LocalDate.parse("2026-10-06"), ZoneOffset.UTC)
+        // The last message moves #3 into today, ahead of #6 (created at midnight).
+        assertEquals(listOf("3", "6"), sections[0].chats.map { it.id })
+        val row = sections[0].chats[0]
+        assertEquals(activity, row.activityAt)
+        assertEquals("Alpha", row.place)
+        assertTrue(row.placeIsRepo)
+        assertEquals("feat/rows", row.branch)
+        assertEquals("merged", row.prStatus)
+        assertFalse(sections[2].chats.first { it.id == "2" }.placeIsRepo)
+    }
+
+    @Test
+    fun compactAgeUnits() {
+        val now = Instant.parse("2026-10-31T12:00:00Z").toEpochMilli()
+        fun age(seconds: Long) = ChatListModel.age(now - seconds * 1000, now, ZoneOffset.UTC)
+        assertEquals(ChatListModel.Age.Now, age(59))
+        assertEquals(ChatListModel.Age.Minutes(5), age(5 * 60))
+        assertEquals(ChatListModel.Age.Hours(23), age(23 * 3600 + 59 * 60))
+        assertEquals(ChatListModel.Age.Days(6), age(6 * 86400))
+        assertEquals(ChatListModel.Age.Date(LocalDate.parse("2026-10-24")), age(7 * 86400))
     }
 }

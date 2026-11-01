@@ -57,6 +57,12 @@ struct LodyListRow {
   var trailingSymbol: String = ""
   var trailingSymbolLabel: String = ""
   var valueSymbol: String = ""
+  /// Chat list second line (`ChatListView`): project name, whether it is a GitHub repository,
+  /// branch, and the latest pull request state (open / merged / closed / draft).
+  var place: String = ""
+  var placeIsRepo: Bool = false
+  var branch: String = ""
+  var prStatus: String = ""
 }
 
 struct LodyListVisualItem {

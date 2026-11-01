@@ -14,7 +14,10 @@
     <string name="home_search_clear">Clear search</string>
     <string name="home_search_empty">No chats match “%1$s”</string>
     <string name="home_view">View</string>
-    <string name="home_view_time">By time</string>
+    <string name="home_view_details">Show on second line</string>
+    <string name="home_view_project">Project</string>
+    <string name="home_view_pull_request">PR status</string>
+    <string name="home_view_branch">Branch</string>
 
     <!-- Home: chats grouped by time -->
     <string name="home_bucket_today">Today</string>
@@ -23,13 +26,23 @@
     <string name="home_bucket_month">This month</string>
     <string name="home_bucket_older">Older</string>
 
+    <!-- Home: chat rows -->
+    <string name="home_age_now">now</string>
+    <string name="home_age_minutes">%1$dm</string>
+    <string name="home_age_hours">%1$dh</string>
+    <string name="home_age_days">%1$dd</string>
+    <string name="home_pr_open">PR open</string>
+    <string name="home_pr_merged">PR merged</string>
+    <string name="home_pr_closed">PR closed</string>
+    <string name="home_pr_draft">Draft PR</string>
+
     <!-- Home: states -->
     <string name="home_loading">Loading chats…</string>
     <string name="home_empty">No chats yet</string>
     <string name="home_projects_empty">No projects yet</string>
     <string name="home_offline">Offline</string>
-    <string name="home_offline_cached">Offline · showing saved chats</string>
     <string name="home_syncing">Syncing…</string>
+    <string name="home_connected">Connected</string>
     <string name="home_no_workspaces">No accessible workspaces</string>
 
     <!-- Home: settings tab -->

@@ -1,3 +1,5 @@
+import LodyDesignSystem
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -9,6 +11,7 @@ final class InboxChrome {
     var running = 0
     var mode: Int
     var sort: InboxSort
+    var connection: HomeSyncState = .live
   }
 
   var selectWorkspace: ((String) -> Void)?
@@ -47,6 +50,10 @@ final class InboxChrome {
   private var waitingForTransition = false
   /// While the expanded search field is active, the workspace capsule steps aside for it.
   private var searching = false
+  private let syncPill = UIHostingController(rootView: HomeSyncPill(state: nil))
+  private var syncState: HomeSyncState = .live
+  private var syncShown: HomeSyncPill.Shown?
+  private var recoveryTask: Task<Void, Never>?
 
   init() {
     workspace.accessibilityIdentifier = "workspace-menu"
@@ -103,7 +110,10 @@ final class InboxChrome {
     let running = model.running > 0
       ? String.localizedStringWithFormat(String(localized: "inbox.header.running", bundle: .lody), model.running)
       : ""
-    workspace.setDetail([model.devices.summary, running].filter { !$0.isEmpty }.joined(separator: " · "))
+    // iPhone keeps the capsule to logo + name; connection state floats in the centre pill instead.
+    let compactLayout = host.traitCollection.horizontalSizeClass != .regular
+    workspace.setDetail(compactLayout ? "" : [model.devices.summary, running].filter { !$0.isEmpty }.joined(separator: " · "))
+    updateSync(model.connection, compact: compactLayout)
     workspace.setItems(menuItems(model))
     layout()
     let regular = host.traitCollection.horizontalSizeClass == .regular
@@ -136,6 +146,8 @@ final class InboxChrome {
     if let item = workspaceItem, header.leftItems == [item] { header.leftItems = nil }
     if let filterItem, let right = header.rightItems, right.contains(filterItem) { header.rightItems = nil }
     if header.search === search { header.search = nil }
+    if let host, host.navigationItem.titleView === syncPill.view { host.navigationItem.titleView = nil }
+    recoveryTask?.cancel()
     showPadBar(false)
     if let host, !toolbar.isEmpty, host.toolbarItems ?? [] == toolbar {
       host.setToolbarItems(nil, animated: false)
@@ -225,10 +237,67 @@ final class InboxChrome {
     header.leftItems = value ? nil : [workspaceItem]
   }
 
-  /// iPhone view menu: grouping by time is the only view for now; by project and by status come later.
+  /// iPhone view menu: multi-select toggles for what each chat row's second line shows.
+  /// Built on open so the checkmarks always match the stored choice; the menu stays open while toggling.
   private func compactViewMenu() -> UIMenu {
-    let time = UIAction(title: String(localized: "home.view.time", bundle: .lody), image: UIImage(systemName: "clock"), state: .on) { _ in }
-    return UIMenu(title: String(localized: "inbox.settings.section.view", bundle: .lody), children: [time])
+    let options: [(ChatRowDetails, String, String)] = [
+      (.project, "home.view.project", "folder"),
+      (.pullRequest, "home.view.pullRequest", "arrow.triangle.pull"),
+      (.branch, "home.view.branch", "arrow.triangle.branch"),
+    ]
+    let toggles = UIDeferredMenuElement.uncached { completion in
+      let current = ChatRowDetails.stored
+      completion(options.map { option, key, symbol in
+        let action = UIAction(
+          title: String(localized: String.LocalizationValue(key), bundle: .lody), image: UIImage(systemName: symbol),
+          attributes: .keepsMenuPresented, state: current.contains(option) ? .on : .off
+        ) { action in
+          var next = ChatRowDetails.stored
+          if next.contains(option) { next.remove(option) } else { next.insert(option) }
+          action.state = next.contains(option) ? .on : .off
+          ChatRowDetails.store(next)
+        }
+        return action
+      })
+    }
+    return UIMenu(
+      title: String(localized: "inbox.settings.section.view", bundle: .lody),
+      children: [UIMenu(title: String(localized: "home.view.details", bundle: .lody), options: .displayInline, children: [toggles])]
+    )
+  }
+
+  /// Centre pill, as on the web mobile header: syncing / offline, plus a brief "connected" flash on recovery.
+  private func updateSync(_ next: HomeSyncState, compact: Bool) {
+    guard let host else { return }
+    let previous = syncState
+    syncState = next
+    if next == .live, previous != .live {
+      recoveryTask?.cancel()
+      showSync(.recovered, in: host, compact: compact)
+      recoveryTask = Task { [weak self] in
+        try? await Task.sleep(for: .milliseconds(1200))
+        guard let self, !Task.isCancelled, self.syncState == .live, let host = self.host else { return }
+        self.showSync(nil, in: host, compact: host.traitCollection.horizontalSizeClass != .regular)
+      }
+      return
+    }
+    if next != .live { recoveryTask?.cancel() }
+    let shown: HomeSyncPill.Shown? = switch next {
+    case .live: syncShown == .recovered ? .recovered : nil
+    case .syncing: .syncing
+    case .offline: .offline
+    }
+    showSync(shown, in: host, compact: compact)
+  }
+
+  private func showSync(_ shown: HomeSyncPill.Shown?, in host: UIViewController, compact: Bool) {
+    syncShown = shown
+    syncPill.rootView = HomeSyncPill(state: compact ? shown : nil)
+    syncPill.view.backgroundColor = .clear
+    syncPill.view.isUserInteractionEnabled = false
+    syncPill.sizingOptions = .intrinsicContentSize
+    let wanted: UIView? = compact ? syncPill.view : nil
+    if host.navigationItem.titleView !== wanted { host.navigationItem.titleView = wanted }
   }
 
   private func filterMenu(mode: Int, sort: InboxSort) -> UIMenu {

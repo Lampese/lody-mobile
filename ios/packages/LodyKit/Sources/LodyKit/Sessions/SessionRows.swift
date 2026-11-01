@@ -76,6 +76,8 @@ enum SessionRows {
     row.leadingActions = [pin(session.pinned)]
     row.menuActions = [rename(), pin(session.pinned), archive(session.archived), share(), delete()]
     row.preview = "session"
+    row.branch = session.branchName ?? ""
+    row.prStatus = session.pullRequests.last?.status ?? ""
     return row
   }
 

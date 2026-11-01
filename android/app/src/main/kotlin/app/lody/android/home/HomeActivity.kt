@@ -100,12 +100,11 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
     val user = auth.account
     val workspace = catalog.workspace
     val snapshot = catalog.snapshot
-    // Only actionable connection state reaches the workspace capsule; a live list shows none.
-    val status = when (catalog.phase) {
-        ConnectionPhase.CONNECTING, ConnectionPhase.SYNCING -> stringResource(R.string.home_syncing)
-        ConnectionPhase.UNAVAILABLE, ConnectionPhase.PAUSED ->
-            stringResource(if (catalog.cached) R.string.home_offline_cached else R.string.home_offline)
-        else -> ""
+    // Only actionable connection state reaches the sync pill; a live list shows none.
+    val sync = when (catalog.phase) {
+        ConnectionPhase.CONNECTING, ConnectionPhase.SYNCING -> HomeSyncState.Syncing
+        ConnectionPhase.UNAVAILABLE, ConnectionPhase.PAUSED -> HomeSyncState.Offline
+        else -> HomeSyncState.Live
     }
     val placeholder = when {
         snapshot == null && catalog.phase in setOf(ConnectionPhase.UNAVAILABLE, ConnectionPhase.PAUSED) -> stringResource(R.string.home_offline)
@@ -117,7 +116,7 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
     return ChatListUiState(
         workspaceName = name,
         initial = name.take(1).uppercase(),
-        status = status,
+        sync = sync,
         accountName = user?.name.orEmpty(),
         timeline = snapshot?.let { ChatListModel.timeline(it) }.orEmpty(),
         projects = snapshot?.let(ChatListModel::groups).orEmpty(),

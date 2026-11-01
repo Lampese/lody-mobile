@@ -77,8 +77,8 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
         try {
             require(data.getString("account") == scope.accountId && data.getString("workspace") == scope.workspaceId)
             SavedCatalog(CatalogSnapshot(data.getLong("revision"),
-                data.getJSONArray("projects").objects().map { CatalogProject(it.getString("id"), it.getString("machineId"), it.getString("name"), it.getString("rootPath")) },
-                data.getJSONArray("sessions").objects().map { CatalogSession(it.getString("id"), it.getString("machineId"), it.getString("projectId"), it.getString("title"), it.getString("status"), it.getBoolean("archived"), it.getBoolean("pinned"), it.getString("createdAt")) },
+                data.getJSONArray("projects").objects().map { CatalogJson.project(CatalogProject(it.getString("id"), it.getString("machineId"), it.getString("name"), it.getString("rootPath")), it) },
+                data.getJSONArray("sessions").objects().map { CatalogJson.session(CatalogSession(it.getString("id"), it.getString("machineId"), it.getString("projectId"), it.getString("title"), it.getString("status"), it.getBoolean("archived"), it.getBoolean("pinned"), it.getString("createdAt")), it) },
                 data.getJSONArray("machines").let { array -> (0 until array.length()).map { array.getString(it) } }), data.getLong("syncedAt"))
         } catch (_: Exception) { AtomicFile(file).delete(); null }
     }
@@ -87,8 +87,8 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
         val snapshot = catalog.snapshot
         val data = JSONObject().put("account", scope.accountId).put("workspace", scope.workspaceId)
             .put("revision", snapshot.revision).put("syncedAt", catalog.syncedAt).put("machines", JSONArray(snapshot.machineIds))
-            .put("projects", JSONArray(snapshot.projects.map { JSONObject().put("id", it.id).put("machineId", it.machineId).put("name", it.name).put("rootPath", it.rootPath) }))
-            .put("sessions", JSONArray(snapshot.sessions.map { JSONObject().put("id", it.id).put("machineId", it.machineId).put("projectId", it.projectId).put("title", it.title).put("status", it.status).put("archived", it.archived).put("pinned", it.pinned).put("createdAt", it.createdAt) }))
+            .put("projects", JSONArray(snapshot.projects.map { CatalogJson.putProject(JSONObject().put("id", it.id).put("machineId", it.machineId).put("name", it.name).put("rootPath", it.rootPath), it) }))
+            .put("sessions", JSONArray(snapshot.sessions.map { CatalogJson.putSession(JSONObject().put("id", it.id).put("machineId", it.machineId).put("projectId", it.projectId).put("title", it.title).put("status", it.status).put("archived", it.archived).put("pinned", it.pinned).put("createdAt", it.createdAt), it) }))
         val target = catalogFile(scope)
         save(target, data)
         // Bound disk use to eight recently updated workspace projections (<=64 MiB).

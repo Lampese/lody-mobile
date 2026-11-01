@@ -89,6 +89,14 @@
     "failed": { "$value": "{danger.9}" },
     "merged": { "$value": "{merged.9}", "$description": "Pull request merged." }
   },
+  "pr": {
+    "$type": "color",
+    "$description": "Pull request state marks, matching the web SessionPrIcon (GitHub hues): open, merged, closed, draft.",
+    "open": { "$value": "{prOpen.9}" },
+    "merged": { "$value": "{merged.9}" },
+    "closed": { "$value": "{danger.9}" },
+    "draft": { "$value": "{neutral.10}" }
+  },
   "label": {
     "$type": "color",
     "$description": "Categorical colors for project labels, tags and avatar backgrounds; hues generated to sit in the theme. fg reads on bg.base and on the matching bg.",

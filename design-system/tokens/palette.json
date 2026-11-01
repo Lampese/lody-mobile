@@ -6,7 +6,8 @@
     "danger": "hsl(356 72% 47%)",
     "success": "hsl(151 55% 36%)",
     "warning": "hsl(32 90% 48%)",
-    "merged": "hsl(261 69% 59%)"
+    "merged": "hsl(261 69% 59%)",
+    "prOpen": "hsl(137 66% 30%)"
   },
   "modes": {
     "light": {

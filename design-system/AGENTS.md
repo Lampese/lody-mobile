@@ -50,3 +50,8 @@ Principles and integration steps: [README.md](README.md).
 - `runtime/ios/LodyElevation+View.swift`: `.lodyElevation(_:)` shadow modifier.
 - `runtime/android/LodyTheme.kt`: `LodyTheme`, Material 3 color/type/shape and
   selection-color mapping, `LodyElevation.shadow()`.
+- `runtime/{ios,android}/LodyWorkingGrid`: the web `WorkingGrid` (3×3 tiles
+  pulsing on a diagonal, 1.6 s) used as the "working" session mark; keep the
+  two implementations' math identical. Session status marks follow web
+  `SessionRowStatusIndicator` (alert / hand / grid / unread dot) and PR marks
+  web `SessionPrIcon`, coloured by the `pr.*` tokens.

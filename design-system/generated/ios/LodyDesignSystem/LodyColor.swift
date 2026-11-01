@@ -94,6 +94,10 @@ public enum LodyColor {
     public static let stateFailed = Color(uiColor: LodyUIColor.stateFailed)
     /// Pull request merged.
     public static let stateMerged = Color(uiColor: LodyUIColor.stateMerged)
+    public static let prOpen = Color(uiColor: LodyUIColor.prOpen)
+    public static let prMerged = Color(uiColor: LodyUIColor.prMerged)
+    public static let prClosed = Color(uiColor: LodyUIColor.prClosed)
+    public static let prDraft = Color(uiColor: LodyUIColor.prDraft)
     public static let labelGrayFg = Color(uiColor: LodyUIColor.labelGrayFg)
     public static let labelGrayBg = Color(uiColor: LodyUIColor.labelGrayBg)
     public static let labelRedFg = Color(uiColor: LodyUIColor.labelRedFg)
@@ -207,6 +211,10 @@ public enum LodyColor {
         ("state.done", stateDone),
         ("state.failed", stateFailed),
         ("state.merged", stateMerged),
+        ("pr.open", prOpen),
+        ("pr.merged", prMerged),
+        ("pr.closed", prClosed),
+        ("pr.draft", prDraft),
         ("label.gray.fg", labelGrayFg),
         ("label.gray.bg", labelGrayBg),
         ("label.red.fg", labelRedFg),
@@ -313,6 +321,10 @@ public enum LodyUIColor {
     public static let stateDone = UIColor(lodyLight: 0x298E5DFF, dark: 0x4EAE7BFF)
     public static let stateFailed = UIColor(lodyLight: 0xCE222DFF, dark: 0xFD5554FF)
     public static let stateMerged = UIColor(lodyLight: 0x814EDFFF, dark: 0xA37AFFFF)
+    public static let prOpen = UIColor(lodyLight: 0x1A7F37FF, dark: 0x53AF65FF)
+    public static let prMerged = UIColor(lodyLight: 0x814EDFFF, dark: 0xA37AFFFF)
+    public static let prClosed = UIColor(lodyLight: 0xCE222DFF, dark: 0xFD5554FF)
+    public static let prDraft = UIColor(lodyLight: 0x898989FF, dark: 0x8C8C8CFF)
     public static let labelGrayFg = UIColor(lodyLight: 0x646464FF, dark: 0xABABABFF)
     public static let labelGrayBg = UIColor(lodyLight: 0x0000000F, dark: 0xFFFFFF1A)
     public static let labelRedFg = UIColor(lodyLight: 0xAB3937FF, dark: 0xF58B84FF)

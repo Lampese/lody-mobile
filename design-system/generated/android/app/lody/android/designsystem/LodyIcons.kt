@@ -409,6 +409,47 @@ object LodyIcons {
         )
     }
 
+    val PullRequestClosed: ImageVector by lazy {
+        lodyIcon(
+            "PullRequestClosed",
+            "M3 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+            "M6 9v12",
+            "m21 3-6 6",
+            "m21 9-6-6",
+            "M18 11.5V15",
+            "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+        )
+    }
+
+    val PullRequestDraft: ImageVector by lazy {
+        lodyIcon(
+            "PullRequestDraft",
+            "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+            "M3 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+            "M18 6V5",
+            "M18 11v-1",
+            "M6 9L6 21",
+        )
+    }
+
+    val Github: ImageVector by lazy {
+        lodyIcon(
+            "Github",
+            "M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4",
+            "M9 18c-4.51 2-5-2-7-2",
+        )
+    }
+
+    val Hand: ImageVector by lazy {
+        lodyIcon(
+            "Hand",
+            "M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2",
+            "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2",
+            "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8",
+            "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15",
+        )
+    }
+
     val Merge: ImageVector by lazy {
         lodyIcon(
             "Merge",
@@ -573,6 +614,10 @@ object LodyIcons {
             "branch" to Branch,
             "commit" to Commit,
             "pullRequest" to PullRequest,
+            "pullRequestClosed" to PullRequestClosed,
+            "pullRequestDraft" to PullRequestDraft,
+            "github" to Github,
+            "hand" to Hand,
             "merge" to Merge,
             "diff" to Diff,
             "stateIdle" to StateIdle,

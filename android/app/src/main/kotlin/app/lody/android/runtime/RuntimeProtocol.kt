@@ -33,10 +33,10 @@ internal object RuntimeProtocol {
         "catalog" -> {
             val catalog = JSONObject(message.get("catalog") as String)
             val projects = catalog.getJSONArray("projects").objects().map {
-                CatalogProject(it.text("id"), it.text("machineId"), it.text("name"), it.text("rootPath"))
+                CatalogJson.project(CatalogProject(it.text("id"), it.text("machineId"), it.text("name"), it.text("rootPath")), it)
             }
             val sessions = catalog.getJSONArray("sessions").objects().map {
-                CatalogSession(it.text("id"), it.text("machineId"), it.text("projectId"), it.text("title"), it.text("status"), it.get("archived") as Boolean, it.get("pinned") as Boolean, it.text("createdAt"))
+                CatalogJson.session(CatalogSession(it.text("id"), it.text("machineId"), it.text("projectId"), it.text("title"), it.text("status"), it.get("archived") as Boolean, it.get("pinned") as Boolean, it.text("createdAt")), it)
             }
             RuntimeEvent.CatalogUpdated(CatalogSnapshot(message.nonnegative("revision"), projects, sessions, strings(catalog.getJSONArray("machineIds"))))
         }

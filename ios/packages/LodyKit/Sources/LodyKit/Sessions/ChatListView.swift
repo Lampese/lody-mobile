@@ -26,8 +26,6 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     /// nil when the group cannot collapse.
     let expanded: Bool?
     let canToggle: Bool
-    /// Rows outside a group header (time buckets, search) name their project, since nothing above them does.
-    var showsPlace = false
   }
 
   var forwarded: ((String, [String: Any]) -> Void)?
@@ -37,6 +35,8 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private var titles: [String: String] = [:]
   private let placeholder = UILabel()
   private var placeholderText = ""
+  private var details = ChatRowDetails.stored
+  private var detailsObserver: NSObjectProtocol?
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -82,6 +82,21 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     placeholder.adjustsFontForContentSizeCategory = true
     placeholder.isHidden = true
     addSubview(placeholder)
+    detailsObserver = NotificationCenter.default.addObserver(forName: .lodyChatRowDetailsChanged, object: nil, queue: .main) {
+      [weak self] _ in MainActor.assumeIsolated { self?.detailsChanged() }
+    }
+  }
+
+  isolated deinit {
+    if let detailsObserver { NotificationCenter.default.removeObserver(detailsObserver) }
+  }
+
+  /// The view menu changed which details rows show: re-render visible rows in place.
+  private func detailsChanged() {
+    details = ChatRowDetails.stored
+    var snapshot = dataSource.snapshot()
+    snapshot.reconfigureItems(snapshot.itemIdentifiers.filter { entries[$0]?.kind == .session })
+    dataSource.apply(snapshot, animatingDifferences: false)
   }
 
   @available(*, unavailable)
@@ -120,7 +135,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
         } else if row.id.hasPrefix("project:") || row.id.hasPrefix("view:") {
           entry = Entry(kind: .more, row: row, expanded: nil, canToggle: false)
         } else {
-          entry = Entry(kind: .session, row: row, expanded: nil, canToggle: false, showsPlace: section.rows.first?.parent != true)
+          entry = Entry(kind: .session, row: row, expanded: nil, canToggle: false)
         }
         guard next[item] == nil else { continue }
         next[item] = entry
@@ -137,6 +152,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
 
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
     a.title == b.title && a.subtitle == b.subtitle && a.unread == b.unread && a.imageTint == b.imageTint
+      && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus
       && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.highlight == b.highlight && ea == eb
   }
 
@@ -156,7 +172,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       switch entry.kind {
       case .header: GroupHeader(row: entry.row, expanded: entry.expanded, canToggle: entry.canToggle, onAction: emit)
       case .link: GroupHeader(row: entry.row, expanded: nil, canToggle: false, onAction: emit)
-      case .session: ChatRowContent(row: entry.row, showsPlace: entry.showsPlace)
+      case .session: ChatRowContent(row: entry.row, details: details)
       case .more: MoreRowContent(title: entry.row.title)
       }
     }
@@ -224,20 +240,25 @@ final class ChatListView: UIView, UICollectionViewDelegate {
 
 // MARK: - Content
 
-/// The most urgent thing a chat (or a collapsed group) wants, from the row's state tint.
+/// The status mark a chat shows, matching the web `SessionRowStatusIndicator` and its priority:
+/// failed (circle alert, danger) > waiting for permission (hand) > working (grid) > unread (dot).
+/// Idle and done chats show nothing.
 private enum Attention {
-  case running, waiting, failed, unread
+  case failed, waiting, working, unread
 
   init?(tint: String, unread: Bool) {
     switch tint {
-    case "blue": self = .running
-    case "warning": self = .waiting
     case "danger": self = .failed
+    case "warning": self = .waiting
+    case "blue": self = .working
     default:
       guard unread else { return nil }
       self = .unread
     }
   }
+
+  /// The web draws a 12 px mark in a 14 px box beside 14 px text.
+  static let size = LodyIconSize.xs + LodySpacing.xxs
 }
 
 private struct Glyph: View {
@@ -252,17 +273,12 @@ private struct Glyph: View {
 
 private struct AttentionGlyph: View {
   let attention: Attention
-  @State private var spinning = false
 
   var body: some View {
     switch attention {
-    case .running:
-      Glyph(icon: .stateRunning, size: LodyIconSize.sm, color: LodyColor.stateRunning)
-        .rotationEffect(.degrees(spinning ? 360 : 0))
-        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: spinning)
-        .onAppear { spinning = !UIAccessibility.isReduceMotionEnabled }
-    case .waiting: Glyph(icon: .stateWaiting, size: LodyIconSize.sm, color: LodyColor.stateWaiting)
-    case .failed: Glyph(icon: .stateFailed, size: LodyIconSize.sm, color: LodyColor.stateFailed)
+    case .failed: Glyph(icon: .alert, size: Attention.size, color: LodyColor.dangerDefault)
+    case .waiting: Glyph(icon: .hand, size: Attention.size, color: LodyColor.accentDefault)
+    case .working: LodyWorkingGrid(size: Attention.size, color: LodyColor.accentDefault)
     case .unread: Circle().fill(LodyColor.accentDefault).frame(width: LodySize.dot, height: LodySize.dot)
     }
   }
@@ -327,60 +343,132 @@ private struct GroupHeader: View {
   }
 }
 
-private struct ChatRowContent: View {
-  let row: LodyListRow
-  var showsPlace = false
+/// Which details a chat row's second line shows. Chosen from the Home view menu and persisted;
+/// with none selected (or nothing to show for a row) the row is a single title line.
+struct ChatRowDetails: OptionSet, Sendable {
+  let rawValue: Int
+  static let project = ChatRowDetails(rawValue: 1 << 0)
+  static let pullRequest = ChatRowDetails(rawValue: 1 << 1)
+  static let branch = ChatRowDetails(rawValue: 1 << 2)
+  static let defaults: ChatRowDetails = [.project, .pullRequest]
 
-  /// The project part of "project · branch"; empty when the row already sits under its project.
-  private var place: String {
-    guard showsPlace, !row.wrapSubtitle else { return "" }
-    return row.subtitle.components(separatedBy: " · ").first ?? ""
+  private static let key = "homeChatRowDetails"
+
+  static var stored: ChatRowDetails {
+    guard UserDefaults.standard.object(forKey: key) != nil else { return defaults }
+    return ChatRowDetails(rawValue: UserDefaults.standard.integer(forKey: key))
   }
 
-  /// Search results keep their match snippet; everything else is one line.
-  private var detail: String? {
+  static func store(_ value: ChatRowDetails) {
+    UserDefaults.standard.set(value.rawValue, forKey: key)
+    NotificationCenter.default.post(name: .lodyChatRowDetailsChanged, object: nil)
+  }
+}
+
+extension Notification.Name {
+  static let lodyChatRowDetailsChanged = Notification.Name("LodyChatRowDetailsChanged")
+}
+
+/// Line 1: status mark slot · title · updated time. Line 2 (aligned with the title): folder or
+/// repository mark · project · branch, with the pull request mark trailing.
+private struct ChatRowContent: View {
+  let row: LodyListRow
+  let details: ChatRowDetails
+
+  private var project: String { details.contains(.project) ? row.place : "" }
+  private var branch: String { details.contains(.branch) ? row.branch : "" }
+  private var pullRequest: PullRequestMark? { details.contains(.pullRequest) ? PullRequestMark(row.prStatus) : nil }
+  private var hasDetailLine: Bool { !project.isEmpty || !branch.isEmpty || pullRequest != nil }
+
+  /// Search results keep their match snippet in place of the detail line.
+  private var snippet: String? {
     row.wrapSubtitle && !row.subtitle.isEmpty ? row.subtitle : nil
   }
 
   var body: some View {
-    HStack(alignment: detail == nil ? .center : .firstTextBaseline, spacing: 0) {
-      // The gutter: its glyph sits exactly under the group icon, empty unless the chat needs attention.
+    HStack(alignment: .top, spacing: 0) {
+      // The status slot under the group icon, one title line tall so the mark centres on it.
       ZStack {
         if let attention = Attention(tint: row.imageTint, unread: row.unread) { AttentionGlyph(attention: attention) }
       }
-      .frame(width: LodyIconSize.md)
+      .frame(width: LodyIconSize.md, height: LodyTextStyle.body.lineHeight)
       .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (row.parentId.isEmpty ? 0 : LodySpacing.lg), alignment: .leading)
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
-        Text(row.title)
-          .lodyTextStyle(row.unread ? .bodyEmphasis : .body)
-          .foregroundStyle(LodyColor.textPrimary)
-          .lineLimit(1)
-        if let detail {
-          Text(detail)
-            .lodyTextStyle(.footnote)
-            .foregroundStyle(LodyColor.textSecondary)
-            .lineLimit(2)
+        HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
+          Text(row.title)
+            .lodyTextStyle(row.unread ? .bodyEmphasis : .body)
+            .foregroundStyle(LodyColor.textPrimary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          if !row.value.isEmpty {
+            Text(row.value)
+              .lodyTextStyle(.footnote)
+              .foregroundStyle(LodyColor.textTertiary)
+              .monospacedDigit()
+              .fixedSize()
+          }
+        }
+        if let snippet {
+          Text(snippet).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textSecondary).lineLimit(2)
+        } else if hasDetailLine {
+          detailLine
         }
       }
-      Spacer(minLength: LodySpacing.sm)
-      if !place.isEmpty {
-        Text(place)
-          .lodyTextStyle(.footnote)
-          .foregroundStyle(LodyColor.textTertiary)
-          .lineLimit(1)
-          // Ideal width clamped to the token, then fixed: short names take only their width, long ones truncate.
-          .frame(maxWidth: LodyLayout.trailingMetaMaxWidth, alignment: .trailing)
-          .fixedSize(horizontal: true, vertical: false)
-      }
     }
-    .padding(.leading, LodyLayout.screenPaddingX)
-    .padding(.trailing, LodyLayout.screenPaddingX)
-    .padding(.vertical, detail == nil ? 0 : LodySpacing.sm)
+    .padding(.horizontal, LodyLayout.screenPaddingX)
+    .padding(.vertical, snippet != nil || hasDetailLine ? LodySpacing.sm : 0)
     .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.title)
-    .accessibilityValue([row.badge, place, row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", "))
+    .accessibilityValue(
+      [row.badge, project, branch, pullRequest?.label ?? "", row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", ")
+    )
     .accessibilityAddTraits(.isButton)
+  }
+
+  private var detailLine: some View {
+    HStack(spacing: LodySpacing.xs) {
+      if !project.isEmpty {
+        Glyph(icon: row.placeIsRepo ? .github : .folder, size: LodyIconSize.sm, color: LodyColor.iconSecondary)
+        Text(project).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textSecondary).lineLimit(1)
+      }
+      if !branch.isEmpty {
+        Glyph(icon: .branch, size: LodyIconSize.sm, color: LodyColor.iconTertiary)
+          .padding(.leading, project.isEmpty ? 0 : LodySpacing.xs)
+        Text(branch).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textTertiary).lineLimit(1).truncationMode(.middle)
+      }
+      Spacer(minLength: LodySpacing.sm)
+      if let pullRequest {
+        Glyph(icon: pullRequest.icon, size: LodyIconSize.sm, color: pullRequest.color)
+      }
+    }
+  }
+}
+
+/// The web `SessionPrIcon` states: open, merged, closed, draft.
+private struct PullRequestMark {
+  let icon: LodyIcon
+  let color: Color
+  let label: String
+
+  init?(_ status: String) {
+    switch status {
+    case "open":
+      icon = .pullRequest
+      color = LodyColor.prOpen
+    case "merged":
+      icon = .merge
+      color = LodyColor.prMerged
+    case "closed":
+      icon = .pullRequestClosed
+      color = LodyColor.prClosed
+    case "draft":
+      icon = .pullRequestDraft
+      color = LodyColor.prDraft
+    default:
+      return nil
+    }
+    label = String(localized: String.LocalizationValue("home.pr." + status), bundle: .lody)
   }
 }
 
