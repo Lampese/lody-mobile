@@ -35,10 +35,13 @@ for _ in range(3):
     drag(18)
 second = label('Beta project')
 assert abs(second['y'] - first['y']) < 2, (first, second)
+# Visual regression: the departing title must blur behind the navigation area.
+ui.screenshot("handoff")
 for _ in range(5):
     drag(-100)
     if any(i.get('AXLabel') == 'Alpha project' and i.get('type') == 'Heading' for i in ui.state()):
         break
 label('Alpha project')
 label('Beta project')
+ui.screenshot('return')
 print('PASS: single native group labels pin, hand off, and return while reverse scrolling')

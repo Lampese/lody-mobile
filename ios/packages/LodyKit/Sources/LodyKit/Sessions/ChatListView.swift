@@ -195,13 +195,21 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       else { return nil }
       return attributes.frame.minY <= top + 1 ? attributes : nil
     }.max { $0.indexPath.section < $1.indexPath.section }
+    // Once pushed above the pinned slot, a departing header becomes background
+    // content too. Restore its foreground layer when scrolling back down.
+    for path in paths {
+      guard let header = collection.supplementaryView(forElementKind: UICollectionView.elementKindSectionHeader, at: path),
+            let attributes = collection.layoutAttributesForSupplementaryElement(ofKind: UICollectionView.elementKindSectionHeader, at: path)
+      else { continue }
+      header.layer.zPosition = pinsGroupLabels && attributes.frame.minY < top - 1 ? 0 : 2
+    }
     // A second system edge would introduce a seam in the middle of the gradient.
     collection.topEdgeEffect.isHidden = active != nil
     topBackdrop.isHidden = active == nil
     if let attributes = active {
       topBackdrop.frame = CGRect(x: collection.bounds.minX, y: collection.bounds.minY,
                                 width: collection.bounds.width,
-                                height: max(0, attributes.frame.maxY - collection.bounds.minY) + LodySpacing.xxl)
+                                height: collection.adjustedContentInset.top + attributes.frame.height + LodySpacing.xxl)
     }
   }
 
@@ -301,8 +309,8 @@ final class ChatListView: UIView, UICollectionViewDelegate {
 /// Keep a blurred base under the upper gradient: fading a single blur view mixes
 /// sharp source text back in. Only the tail below the label fades to clear.
 private final class ChatHeaderBackdrop: UIView {
-  private let base = ChatBlurLayer(intensity: 0.4)
-  private let upper = ChatBlurLayer(intensity: 1)
+  private let base = ChatBlurLayer(intensity: 0.2)
+  private let upper = ChatBlurLayer(intensity: 0.75)
 
   init() {
     super.init(frame: .zero)
@@ -320,8 +328,8 @@ private final class ChatHeaderBackdrop: UIView {
 
   private func updateTone() {
     let dark = traitCollection.userInterfaceStyle == .dark
-    base.contentView.backgroundColor = dark ? LodyUIColor.bgBase.withAlphaComponent(0.25) : .clear
-    upper.contentView.backgroundColor = dark ? LodyUIColor.bgBase.withAlphaComponent(0.6) : .clear
+    base.contentView.backgroundColor = dark ? LodyUIColor.bgBase.withAlphaComponent(0.1) : .clear
+    upper.contentView.backgroundColor = dark ? LodyUIColor.bgBase.withAlphaComponent(0.3) : .clear
   }
 
   override func layoutSubviews() {
@@ -329,7 +337,7 @@ private final class ChatHeaderBackdrop: UIView {
     base.frame = bounds
     upper.frame = bounds
     let labelEnd = max(0, min(1, (bounds.height - LodySpacing.xxl) / max(1, bounds.height)))
-    base.setFade(colors: [1, 1, 0], locations: [0, labelEnd, 1])
+    base.setFade(colors: [1, 0.85, 0], locations: [0, labelEnd, 1])
     upper.setFade(colors: [1, 0, 0], locations: [0, labelEnd, 1])
   }
 }
