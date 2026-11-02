@@ -28,4 +28,13 @@ class CloudAuthHttpTest {
   assertEquals(TokenPoll.Pending,api.poll(DeviceAuthorization("d","u","https://lody.ai",60,2)))
   assertEquals(Account("u","Fixture",listOf(Workspace("w","Workspace"))),api.account(Credential("secret")))
  }
+ @Test fun parsesHttpsAvatarsOnly()=runTest {
+  val api=CloudAuthHttp {path,_,_-> when(path) {
+   "/api/auth/get-session"->HttpReply(200,"""{"user":{"id":"u","name":"Fixture","image":"https://avatars.example/u.png"}}""")
+   else->HttpReply(200,"""[{"id":"w","name":"Work","logo":"https://cdn.example/w.png"},{"id":"x","name":"Other","logo":"http://insecure/x.png"}]""")
+  }}
+  val account=api.account(Credential("secret"))
+  assertEquals("https://avatars.example/u.png",account.image)
+  assertEquals(listOf("https://cdn.example/w.png",null),account.workspaces.map { it.image })
+ }
 }

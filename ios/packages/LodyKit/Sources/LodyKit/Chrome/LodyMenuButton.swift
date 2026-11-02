@@ -8,6 +8,9 @@ struct LodyMenuItem {
   var subtitle: String = ""
   var disabled: Bool = false
   var children: [LodyMenuItem] = []
+  /// A remote avatar (workspace logo) drawn as the item's image; `monogram` until it loads.
+  var photo: String = ""
+  var monogram: String = ""
 }
 
 struct LodyMenuAvatar {
@@ -83,11 +86,37 @@ final class LodyMenuButton: UIView {
     apply()
   }
 
+  private var items: [LodyMenuItem] = []
+  private var loadingPhotos = Set<URL>()
+
+  /// The item's avatar: a cached photo, else its monogram while the photo loads (the menu is
+  /// rebuilt once it arrives), else its SF Symbol.
+  private func image(_ item: LodyMenuItem) -> UIImage? {
+    let side: CGFloat = 24
+    if let url = LodyListPhoto.url(item.photo) {
+      if let photo = LodyListPhoto.cached(url) {
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
+          photo.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+        }.withRenderingMode(.alwaysOriginal)
+      }
+      if loadingPhotos.insert(url).inserted {
+        LodyListPhoto.load(url) { [weak self] loaded in
+          guard let self else { return }
+          self.loadingPhotos.remove(url)
+          if loaded != nil { self.setItems(self.items) }
+        }
+      }
+    }
+    if !item.monogram.isEmpty { return LodyListPhoto.monogram(item.monogram, side: side).withRenderingMode(.alwaysOriginal) }
+    return item.symbol.isEmpty ? nil : UIImage(systemName: item.symbol)
+  }
+
   func setItems(_ value: [LodyMenuItem]) {
+    items = value
     func action(_ item: LodyMenuItem, state: UIMenuElement.State = .off) -> UIAction {
       let result = UIAction(
         title: item.title,
-        image: item.symbol.isEmpty ? nil : UIImage(systemName: item.symbol),
+        image: image(item),
         attributes: item.disabled ? .disabled : [],
         state: state
       ) { [weak self] _ in

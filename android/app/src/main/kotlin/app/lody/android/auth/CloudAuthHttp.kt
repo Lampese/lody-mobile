@@ -49,7 +49,12 @@ internal class CloudAuthHttp(private val transport: AuthTransport) : CloudAuthAp
             val user = JSONObject(session).getJSONObject("user")
             val list = JSONArray(workspaces)
             require(list.length() <= 1000)
-            Account(user.text("id"), user.optString("name").ifBlank { "Lody account" }, (0 until list.length()).map { list.getJSONObject(it).let { row -> Workspace(row.text("id"), row.text("name")) } })
+            Account(
+                user.text("id"),
+                user.optString("name").ifBlank { "Lody account" },
+                (0 until list.length()).map { list.getJSONObject(it).let { row -> Workspace(row.text("id"), row.text("name"), httpsImage(row.optString("logo"))) } },
+                httpsImage(user.optString("image")),
+            )
         }
     }
     override suspend fun grant(credential: Credential, workspaceId: String): ShortLivedGrant {

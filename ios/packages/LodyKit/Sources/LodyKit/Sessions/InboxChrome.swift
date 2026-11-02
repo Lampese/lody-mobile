@@ -216,6 +216,9 @@ final class InboxChrome {
       item.id = workspace.id
       item.title = workspace.name
       item.selected = workspace.id == model.selected?.id
+      // Each workspace shows its real logo, its initial until that loads (as the capsule).
+      item.photo = workspace.image ?? ""
+      item.monogram = String(workspace.name.prefix(1)).uppercased()
       return item
     }
     if model.selected != nil {

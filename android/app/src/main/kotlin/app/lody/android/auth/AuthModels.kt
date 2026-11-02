@@ -6,8 +6,14 @@ class Credential(val token: String) {
     init { require(token.isNotBlank() && token.length <= 16384 && token.all { it in '!'..'~' }) }
     override fun toString() = "Credential(<redacted>)"
 }
-data class Workspace(val id: String, val name: String)
-data class Account(val id: String, val name: String, val workspaces: List<Workspace>)
+/** [image] is the workspace logo (HTTPS only), null when it has none. */
+data class Workspace(val id: String, val name: String, val image: String? = null)
+/** [image] is the user's avatar (HTTPS only), null when they have none. */
+data class Account(val id: String, val name: String, val workspaces: List<Workspace>, val image: String? = null)
+
+/** Avatar URLs are display data: keep only HTTPS, as iOS `AuthAPI.optionalHTTPS`. */
+internal fun httpsImage(value: String?): String? =
+    value?.trim()?.takeIf { it.length <= 2048 && it.startsWith("https://", ignoreCase = true) }
 class DeviceAuthorization(val deviceCode: String, val userCode: String, val verificationUrl: String, val expiresIn: Int, val interval: Int) {
     override fun toString() = "DeviceAuthorization(<redacted>)"
 }

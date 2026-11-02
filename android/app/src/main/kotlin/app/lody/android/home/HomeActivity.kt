@@ -125,6 +125,9 @@ private fun uiState(auth: AuthState, catalog: CatalogState): ChatListUiState {
     return ChatListUiState(
         workspaceName = name,
         initial = name.take(1).uppercase(),
+        // The selected workspace's logo comes from the account's list (the catalog may hold an older copy).
+        workspaceImage = user?.workspaces?.firstOrNull { it.id == workspace?.id }?.image ?: workspace?.image,
+        accountImage = user?.image,
         sync = sync,
         accountName = user?.name.orEmpty(),
         timeline = snapshot?.let { ChatListModel.timeline(it) }.orEmpty(),

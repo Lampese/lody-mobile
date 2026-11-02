@@ -118,6 +118,9 @@ import java.time.format.DateTimeFormatter
 data class ChatListUiState(
     val workspaceName: String,
     val initial: String,
+    /** The selected workspace's logo and the user's avatar (HTTPS), null when they have none. */
+    val workspaceImage: String? = null,
+    val accountImage: String? = null,
     /** Catalog connection; Home floats a pill over the bar unless live. */
     val sync: HomeSyncState,
     val accountName: String,
@@ -292,9 +295,8 @@ private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Un
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
         ) {
-            Box(Modifier.size(LodySize.avatarMd).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
-                Text(state.initial, style = LodyTheme.typography.subhead, color = colors.textPrimary)
-            }
+            // The workspace's real logo once loaded, its initial until then (as iOS).
+            Avatar(state.workspaceImage, state.initial, LodySize.avatarMd)
             // Capped so a long name ellipsizes before the centred sync pill.
             Text(
                 state.workspaceName,
@@ -316,6 +318,7 @@ private fun WorkspaceCapsule(state: ChatListUiState, onSelect: (Workspace) -> Un
             state.workspaces.forEach { workspace ->
                 DropdownMenuItem(
                     text = { Text(workspace.name, style = LodyTheme.typography.body, color = colors.textPrimary) },
+                    leadingIcon = { Avatar(workspace.image, workspace.name, LodyIconSize.lg) },
                     trailingIcon = { if (workspace.id == state.workspaceId) Glyph(LodyIcons.Check, colors.accentFg, LodyIconSize.sm) },
                     onClick = { open = false; if (workspace.id != state.workspaceId) onSelect(workspace) },
                 )
@@ -702,7 +705,11 @@ private fun SettingsList(state: ChatListUiState, padding: PaddingValues, onSelec
     val colors = LodyTheme.colors
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
         item { SectionTitle(stringResource(R.string.home_settings_account)) }
-        item { SettingsRow(state.accountName.ifEmpty { "—" }, LodyIcons.User, colors.textPrimary, onClick = null) }
+        item {
+            SettingsRow(state.accountName.ifEmpty { "—" }, null, colors.textPrimary, onClick = null) {
+                Avatar(state.accountImage, state.accountName.ifEmpty { "?" }, LodySize.avatarMd)
+            }
+        }
         item { SectionTitle(stringResource(R.string.home_settings_workspace)) }
         items(state.workspaces, key = { it.id }) { workspace ->
             SettingsRow(
@@ -710,7 +717,7 @@ private fun SettingsList(state: ChatListUiState, padding: PaddingValues, onSelec
                 icon = if (workspace.id == state.workspaceId) LodyIcons.Check else null,
                 tint = colors.textPrimary,
                 onClick = { if (workspace.id != state.workspaceId) onSelectWorkspace(workspace) },
-            )
+            ) { Avatar(workspace.image, workspace.name, LodyIconSize.lg) }
         }
         item { Spacer(Modifier.height(LodySpacing.xxl)) }
         item { SettingsRow(stringResource(R.string.home_sign_out), LodyIcons.LogOut, colors.dangerDefault, onClick = onSignOut) }
@@ -960,7 +967,7 @@ private fun ProjectRow(project: ChatGroup, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SettingsRow(title: String, icon: ImageVector?, tint: Color, onClick: (() -> Unit)?) {
+private fun SettingsRow(title: String, icon: ImageVector?, tint: Color, onClick: (() -> Unit)?, leading: (@Composable () -> Unit)? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -970,6 +977,7 @@ private fun SettingsRow(title: String, icon: ImageVector?, tint: Color, onClick:
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodyLayout.listRowGap),
     ) {
+        leading?.invoke()
         Text(title, style = LodyTheme.typography.body, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (icon != null) Glyph(icon, if (icon == LodyIcons.Check) LodyTheme.colors.accentFg else tint)
     }
