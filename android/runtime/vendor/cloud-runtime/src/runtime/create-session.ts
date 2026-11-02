@@ -10,6 +10,7 @@ import type {
 import { githubProject, projectRows } from '../protocol/catalog.ts';
 import { isThoughtLevel, validConfigValue } from '../protocol/capability';
 import { encodeFrame } from '../frames';
+import type { CreateSessionResult } from '../contract/methods.ts';
 import { clientFor } from './session';
 import {
   quotaReason,
@@ -26,6 +27,8 @@ export type CreateSessionArgs = {
   userId: string;
   title: string;
   branch?: string;
+  /** Local projects: start in a new git worktree (web `project.useWorktree`). */
+  useWorktree?: boolean;
   billingEntitlement?: BillingEntitlement | null;
 };
 
@@ -97,8 +100,18 @@ export function creationOptions(
         const cliType = String(value.cliType);
         const agentType = String(value.agentType);
         if (!agentType || !cliType) continue;
-        const key = `${machineId}:${cliType}:${agentType}`;
-        // The same agent can publish more than one capability row; the most
+        // Rows are keyed by agent config (`['acpCapability', configId]`, web's
+        // `machineFlockKeys.acpCapability`): two ACP providers of one agent type
+        // offer different models, so never merge them by type. Legacy
+        // ['acpCapability', cliType, agentType] rows fall back to the type key.
+        const configId =
+          row.key.length === 2 && typeof row.key[1] === 'string'
+            ? row.key[1]
+            : '';
+        const key = configId
+          ? `${machineId}:config:${configId}`
+          : `${machineId}:${cliType}:${agentType}`;
+        // The same config can publish more than one capability row; the most
         // recently fetched one describes what the machine will actually accept.
         const fetchedAt = Number(value.fetchedAt) || 0;
         if ((capabilities.get(key)?.fetchedAt ?? -1) >= fetchedAt) continue;
@@ -145,6 +158,7 @@ export function creationOptions(
         );
         capabilities.set(key, {
           machineId,
+          ...(configId ? { agentConfigId: configId } : {}),
           cliType,
           agentType,
           models: modelOption?.options ?? choices(value.models, 'modelId'),
@@ -187,7 +201,7 @@ export function creationOptions(
         !['builtin', 'registry', 'custom'].includes(String(value.cliType))
       )
         continue;
-      // Project only labels and IDs; never send launch environment or secrets to RN.
+      // Project only labels and IDs; never send launch environment or secrets to the UI.
       agents.push({
         id: value.id,
         name: value.name,
@@ -223,7 +237,7 @@ export async function createSession(
   options: CreationOptions,
   replica: { flock: Flock; client: StreamsClient },
   getGrant: () => Promise<{ token: string; gatewayBaseUrl: string }>,
-) {
+): Promise<CreateSessionResult> {
   const agent = options.agents.find(
     (a) => a.id === args.agentConfigId && a.machineId === args.machineId,
   );
@@ -257,7 +271,7 @@ export async function createSession(
     workspaceSessionCount(replica.flock.scan()),
   );
   if (reason) return { state: 'rejected', reason } as const;
-  let project: Record<string, string> | undefined;
+  let project: Record<string, string | boolean> | undefined;
   if (!chat && github) {
     project = {
       kind: 'github',
@@ -270,6 +284,7 @@ export async function createSession(
       localProjectId: options.project!.id.slice(
         `${agent.machineId}:local:`.length,
       ),
+      ...(args.useWorktree === true ? { useWorktree: true } : {}),
     };
   }
   const meta = {

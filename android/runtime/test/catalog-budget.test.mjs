@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {adaptCatalogBudget} from '../src/catalog-budget.mjs';
 
 const source=await readFile(new URL('../vendor/cloud-runtime/src/runtime/index.ts',import.meta.url),'utf8');
 
@@ -10,14 +9,14 @@ const source=await readFile(new URL('../vendor/cloud-runtime/src/runtime/index.t
 // transport supplies byte counts; no captured account or catalog data is used.
 async function runWatcher(snapshotBytes, updateBytes=0, liveBytes=0) {
  const {transform}=await import('esbuild');
- const adapted=adaptCatalogBudget(source);
- const watch=adapted.slice(adapted.indexOf('function watch('),adapted.indexOf('function machineFor('));
+ const start=source.indexOf('function watch(');
+ const watch=source.slice(start,source.indexOf('\nconst ctx',start));
  const js=(await transform(watch,{loader:'ts',format:'cjs'})).code;
  const events=[],watchers=new Map(),catalogs=new Map();
  let reads=0,finish;
  const done=new Promise(resolve=>{finish=resolve;});
  const context={
-  AbortController,Error,Uint8Array,crypto,watchers,catalogs,unhealthy:new Set(),machineReplicas:new Map(),workspace:'fixture',
+  AbortController,Error,Uint8Array,crypto,watchers,catalogs,unhealthy:new Set(),machineReplicas:new Map(),workspace:'fixture',state:{workspace:'fixture'},
   getGrant:async()=>({gatewayBaseUrl:'https://example.org',token:'fixture'}),
   Flock:class {importFile(){} scan(){return [];}},
   StreamsClient:class {
@@ -30,6 +29,7 @@ async function runWatcher(snapshotBytes, updateBytes=0, liveBytes=0) {
   },
   apply(){},decompress:bytes=>bytes,projectRows:()=>({projects:[],sessions:[]}),
   publish(){events.push({type:'published'});},send:event=>{events.push(event);if(event.type==='syncError')finish();},
+  channel:{emit(type,payload){events.push({type,...payload});if(type==='syncError')finish();}},
   delay:async()=>{},grant:{},
  };
  vm.runInNewContext(js+'\nwatch("machine");',context);

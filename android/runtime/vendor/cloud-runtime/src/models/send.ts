@@ -18,6 +18,8 @@ export type ConfigOption = {
 
 export type Capability = {
   machineId: string;
+  /** The agent config (ACP provider) this was probed for; capabilities are per config, as web. */
+  agentConfigId?: string;
   cliType: string;
   agentType: string;
   models: CapabilityChoice[];

@@ -21,7 +21,10 @@ export function githubProject(repo: string): Project | undefined {
   };
 }
 
-export function keepRepos(next: Catalog, previous: Catalog): Catalog {
+export function keepRepos(
+  next: Catalog,
+  previous: { projects: readonly Pick<Project, 'id' | 'repoFullName'>[] },
+): Catalog {
   const known = new Map(
     previous.projects.flatMap((p) =>
       p.repoFullName ? [[p.id, p.repoFullName] as const] : [],
@@ -74,6 +77,7 @@ export function projectRows(
     sessions: Session[] = [],
     machineIds = new Set<string>(),
     machineNames: Record<string, string> = {},
+    machineOs: Record<string, string> = {},
     machineSimulators: NonNullable<Catalog['machineSimulators']> = {};
   if (mode !== 'meta') {
     for (const row of rows) {
@@ -122,6 +126,8 @@ export function projectRows(
       machineIds.add(machineId);
       const name = text(value.name);
       if (name) machineNames[machineId] = name;
+      const os = text(value.os);
+      if (os) machineOs[machineId] = os;
       if (value.os === 'darwin')
         machineSimulators[machineId] =
           Number(object(value.protocolCapabilities).iosSimulator) >= 1
@@ -168,6 +174,8 @@ export function projectRows(
         text(value.status) || text(object(value.status).type) || labels.unknown,
       archived: value.isArchived === true,
       pinned: value.isPinned === true,
+      userId: text(value.userId) || undefined,
+      agentConfigId: text(value.agentConfigId) || undefined,
       projectId,
       createdAt: text(value.createdAt),
       latestUserMsgId: text(value.latestUserMsgId) || undefined,
@@ -183,6 +191,8 @@ export function projectRows(
         value.pullRequestState,
       ),
       diff: diffOf(value.diffStats),
+      workspaceDirty: value.workspaceDirty === true || undefined,
+      workspaceUnpushed: value.workspaceUnpushed === true || undefined,
     });
     if (localId || repo) {
       const githubRepo = repo || text(project.githubRepoFullName);
@@ -207,6 +217,7 @@ export function projectRows(
     sessions,
     machineIds: [...machineIds],
     machineNames,
+    machineOs,
     machineSimulators,
     agentUsage,
   };

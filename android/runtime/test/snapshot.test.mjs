@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtemp, cp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { verifySnapshot } from '../snapshot.mjs';
 test('source snapshot remains unchanged and detects modified or extra files', async()=>{
-  assert.equal(await verifySnapshot(),64);
+  const manifest=JSON.parse(await readFile(new URL('../vendor/SHA256.json',import.meta.url),'utf8'));
+  assert.equal(await verifySnapshot(),Object.keys(manifest).length);
   const directory=await mkdtemp(path.join(tmpdir(),'lody-snapshot-'));
   try {
     await cp(new URL('../vendor/cloud-runtime',import.meta.url),directory,{recursive:true});

@@ -16,19 +16,19 @@ test('a lost send acknowledgement is reported without replay',async()=>{
  assert.equal((await c.createAndSend(input)).state,'unknown');await assert.rejects(c.createAndSend(input),/already_attempted/);assert.equal(calls.length,1);
 });
 test('only advertised models can be sent',async()=>{const {c,calls}=fixture();await assert.rejects(c.createAndSend({...input,modelId:'invented'}),/invalid_model/);assert.equal(calls.length,0);});
-test('worktree adaptation forwards explicit choice in the local project reference',async()=>{
- const {readFile}=await import('node:fs/promises');const {adaptCreationRuntime}=await import('../src/creation-adapter.mjs');
+test('the local project reference carries an explicit worktree choice',async()=>{
+ const {readFile}=await import('node:fs/promises');
  const source=await readFile(new URL('../vendor/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8');
  const {transform}=await import('esbuild');const vm=await import('node:vm');
- const adapted=adaptCreationRuntime(source);const start=adapted.indexOf('export async function createSession(');
- const code=(await transform(adapted.slice(start).replace('export async function','async function'),{loader:'ts'})).code;
+ const start=source.indexOf('export async function createSession(');
+ const code=(await transform(source.slice(start).replace('export async function','async function'),{loader:'ts'})).code;
  for(const worktree of [false,true]) {
   let meta;
   class Flock {set(key,value){if(key[0]==='m')meta=value}commit(){}exportJson(){return {}}}
   const context={Flock,crypto,Date,TextEncoder,attempted:new Set(),quotaReason:()=>undefined,workspaceSessionCount:()=>0,encodeFrame:x=>x,clientFor:async()=>({create:async()=>({ok:true})})};
   vm.runInNewContext(code+';globalThis.create=createSession',context);
   const result=await context.create({workspaceId:'w',sessionId:input.sessionId,machineId:'m',agentConfigId:'a',userId:'u',title:'hello',projectId:'m:local:p',useWorktree:worktree},{agents:[{id:'a',machineId:'m',cliType:'builtin',agentType:'codex'}],project:{id:'m:local:p'}},{flock:{get(){},scan(){return []},importJson(){}},client:{append:async()=>({ok:true})}},()=>{});
-  assert.equal(result.state,'created');assert.equal(meta.project.useWorktree,worktree);
+  assert.equal(result.state,'created');assert.equal(meta.project.useWorktree===true,worktree);
  }
 });
 test('models from another provider of the same type cannot be used',async()=>{
@@ -36,8 +36,8 @@ test('models from another provider of the same type cannot be used',async()=>{
  const c=createCommands(runtime,()=>{},()=>({workspaceId:'w',userId:'u'}));await assert.rejects(c.createAndSend({...input,modelId:'other-model'}),/invalid_model/);
 });
 test('runtime projection preserves capabilities for providers of one agent type',async()=>{
- const {readFile}=await import('node:fs/promises'),{adaptCreationRuntime}=await import('../src/creation-adapter.mjs'),{transform}=await import('esbuild'),vm=await import('node:vm');
- const source=adaptCreationRuntime(await readFile(new URL('../vendor/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8'));
+ const {readFile}=await import('node:fs/promises'),{transform}=await import('esbuild'),vm=await import('node:vm');
+ const source=(await readFile(new URL('../vendor/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8'));
  const code=(await transform(source.slice(source.indexOf('export function creationOptions('),source.indexOf('const attempted =')).replace('export function','function'),{loader:'ts'})).code;
  const context={crypto,projectRows:()=>({projects:[]}),isThoughtLevel:()=>false,validConfigValue:()=>false};vm.runInNewContext(code+';globalThis.options=creationOptions',context);
  const rows=['a','b'].map(id=>({key:['acpCapability',id],value:{cliType:'builtin',agentType:'codex',models:[{modelId:id,name:id}],fetchedAt:1}}));
@@ -45,8 +45,8 @@ test('runtime projection preserves capabilities for providers of one agent type'
 });
 
 test('legacy capability keys preserve all builtin agent types',async()=>{
- const {readFile}=await import('node:fs/promises'),{adaptCreationRuntime}=await import('../src/creation-adapter.mjs'),{transform}=await import('esbuild'),vm=await import('node:vm');
- const source=adaptCreationRuntime(await readFile(new URL('../vendor/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8'));
+ const {readFile}=await import('node:fs/promises'),{transform}=await import('esbuild'),vm=await import('node:vm');
+ const source=(await readFile(new URL('../vendor/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8'));
  const code=(await transform(source.slice(source.indexOf('export function creationOptions('),source.indexOf('const attempted =')).replace('export function','function'),{loader:'ts'})).code;
  const context={crypto,projectRows:()=>({projects:[]}),isThoughtLevel:()=>false,validConfigValue:()=>false};vm.runInNewContext(code+';globalThis.options=creationOptions',context);
  const rows=['grok','codex'].map(id=>({key:['acpCapability','builtin',id],value:{cliType:'builtin',agentType:id,models:[{modelId:id,name:id}],fetchedAt:1}}));

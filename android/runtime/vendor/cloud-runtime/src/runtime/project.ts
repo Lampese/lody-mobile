@@ -86,6 +86,7 @@ export type EntrySummary = TurnMetadata & {
   status: string;
   finished: boolean;
   userTurnId?: string;
+  userId?: string;
   executionId?: string;
   executionFinished?: boolean;
   steerCount?: number;
@@ -484,6 +485,8 @@ function summarizeEntry(
     permissionWaitMs: entry?.permissionWaitMs,
     modelInfo: modelInfo.name || modelInfo.modelId ? modelInfo : undefined,
     userTurnId: entry?.userTurnId,
+    // Who sent a user turn, for its avatar and name.
+    userId: typeof entry?.userId === 'string' ? entry.userId : undefined,
     items: summarizedItems,
     ...(fileDiffs.length ? { fileDiffs } : {}),
   };

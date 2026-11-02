@@ -1,6 +1,6 @@
 # Shared runtime source and dependency updates
 
-`runtime/vendor/cloud-runtime` is an unchanged 64-file snapshot from Lody iOS `packages/cloud-runtime`, commit `8c741f17dbd690fcce9ae1f5bdd5f250613fe2c8`. Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
+`runtime/vendor/cloud-runtime` is an unchanged 96-file snapshot of this monorepo's `ios/packages/cloud-runtime`, commit `bdb9cb467979e36b9a84b43ad2fd561c47533269` (`git archive <commit> ios/packages/cloud-runtime`). Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
 
 For an intentional update:
 
@@ -15,20 +15,12 @@ References: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5 and https://zod.de
 
 Bridge protocol 2 adds an explicit command capability handshake, `$cancel`, native command deadlines, and ordered message chunks. It wraps the original JS runtime; it does not change the upstream cloud protocol. Fixtures use synthetic catalog data matching the vendored event shapes, not captured user data. The offline document exposes `ping`, `setActive`, and `probeSchema`. The network document additionally advertises `connect`, `grant`, `watchSession`, `closeSession`, `creationOptions`, and `createAndSend`, used through the native scoped runtime. Session reads reuse the upstream Loro projection and emit typed text messages to Compose. Both network gates restrict reads and the creation/dispatch writes described below to the current workspace; returning to the list stops the session subscription.
 
-Android also applies `src/catalog-owner.mjs` at bundle time: it adds the session owner
-(`userId`, from session meta) to the catalog projection, the same line upstream
-`packages/cloud-runtime` now carries, for Home's "My tasks". It fails the build if
-the anchor moves; drop it at the next re-snapshot.
-
-Android applies `src/catalog-budget.mjs` at bundle time to raise the three catalog
-input guards from 8 MiB to 16 MiB per replica. A real machine catalog with about
-9.2 MiB of bootstrap input exceeded the original limit and prevented workspace
-publication. The pinned source and its hashes remain unchanged; the adapter fails
-the build if the expected upstream guards change. Snapshot, bootstrap updates,
-and live updates share the bounded budget; the existing 100-page limit remains.
-The network adapter separately caps each response at 16 MiB. Synthetic watcher
-tests verify large-catalog publication and rejection beyond the new budget.
+The snapshot carries every catalog field Android reads (session owner, `machineOs`, git
+state, PR merge state), the 16 MiB per-replica catalog input budget and per-config
+creation capabilities, so no bundle-time source adapters remain. A later difference
+belongs in the next re-snapshot, not in a patch over the snapshot. `catalog-budget.test.mjs`
+still runs the bundled watcher against a synthetic transport to pin the budget.
 
 ## Android text creation
 
-`create-commands.mjs` exposes creation options and create-and-send using native scope identity. Presence is read through the grant origin; the UI only offers currently online agents. The adapter calls upstream creation, session bootstrap and text send in order, retaining IDs and never retrying writes. It deliberately uses plain text (no shortcut, attachment or mention expansion). `creation-adapter.mjs` adds the current public `useWorktree` project field at bundle time, without modifying the provenance-tracked snapshot. Native and JavaScript network gates permit only the exact workspace stream kinds needed for persistence and dispatch. An accepted Machine RPC is not task completion. GitHub branches are entered by name in this first integration.
+`create-commands.mjs` exposes creation options and create-and-send using native scope identity. Presence is read through the grant origin; the UI only offers currently online agents. The adapter calls upstream creation, session bootstrap and text send in order, retaining IDs and never retrying writes. It deliberately uses plain text (no shortcut, attachment or mention expansion). The snapshot's creation carries the public local-project `useWorktree` field. Native and JavaScript network gates permit only the exact workspace stream kinds needed for persistence and dispatch. An accepted Machine RPC is not task completion. GitHub branches are entered by name in this first integration.

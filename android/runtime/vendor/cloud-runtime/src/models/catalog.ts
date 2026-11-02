@@ -19,6 +19,10 @@ export type Session = {
   status: string;
   archived: boolean;
   pinned: boolean;
+  /** The Lody user who owns the session (session meta `userId`). */
+  userId?: string;
+  /** The agent config (ACP provider) the session runs; picks its model capability. */
+  agentConfigId?: string;
   projectId: string;
   createdAt: string;
   latestUserMsgId?: string;
@@ -30,6 +34,9 @@ export type Session = {
   iosSimulatorPreviewRequestId?: string;
   pullRequests?: import('./pull-request').PullRequestReference[];
   diff?: { add: number; del: number };
+  /** Uncommitted changes / local commits the remote lacks; drive the action bar's Commit & Push. */
+  workspaceDirty?: boolean;
+  workspaceUnpushed?: boolean;
 };
 export type Catalog = {
   agentUsage?: Record<string, import('./agent-usage.ts').AgentUsage>;
@@ -37,6 +44,8 @@ export type Catalog = {
   sessions: Session[];
   machineIds: string[];
   machineNames?: Record<string, string>;
+  /** Each computer's OS (`darwin` / `win32` / `linux`), for its icon. */
+  machineOs?: Record<string, string>;
   machineSimulators?: Record<string, 'available' | 'upgrade-required'>;
 };
 export type SavedCatalog = { catalog: Catalog; syncedAt: number };

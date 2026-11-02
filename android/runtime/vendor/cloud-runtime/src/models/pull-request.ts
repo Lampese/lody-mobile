@@ -1,5 +1,5 @@
 // Read projection aligned with Lody OSS session-comment-types.ts. No runtime
-// imports from @lody/shared: its root is not safe to bundle with Metro.
+// imports from @lody/shared: its root is not safe for browser bundles.
 export type PullRequestCheck = {
   id: number;
   name: string;
@@ -46,6 +46,8 @@ export type PullRequestReference = {
   number: number;
   status: PullRequestPreviewData['state'];
   ci?: 's' | 'f' | 'p' | 'e' | 'x';
+  /** GitHub merge state: clean / blocked / dirty (conflicts) / behind / unstable. */
+  merge?: 'c' | 'b' | 'd' | 'h' | 'u';
 };
 
 // Transient presentation params stay in memory, including these service actions.

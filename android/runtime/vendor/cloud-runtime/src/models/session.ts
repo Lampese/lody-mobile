@@ -74,6 +74,7 @@ export type EntrySummary = TurnMetadata & {
   finished: boolean;
   canSteer?: boolean;
   userTurnId?: string;
+  userId?: string;
   executionId?: string;
   executionFinished?: boolean;
   steerCount?: number;
