@@ -65,7 +65,7 @@ class HomeActivity : ComponentActivity() {
                 var selectedId by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf<String?>(null) }
                 var selectedTitle by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf("") }
                 var creating by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf(false) }
-                val repository = remember { ChatRepository(app.runtimeOwner) }
+                val repository = remember { ChatRepository(app.runtimeOwner, app.pullRequests) }
                 val creator = app.creation
                 val screens = rememberSaveableStateHolder()
                 // The repository restores the cached workspace; a first sign-in picks the first one.

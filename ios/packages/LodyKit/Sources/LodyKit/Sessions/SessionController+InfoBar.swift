@@ -4,7 +4,8 @@ import UIKit
 /// composer's chip row: the computer (icon; its menu says which and whether it is online), the
 /// repository context (PR / branch with ±diff; its menu opens the PR page, the workspace changes
 /// or copies the branch) and the top repository action as the prominent chip, with the rest in a
-/// menu. An action sends web's quick-action prompt as an ordinary turn.
+/// menu. Prompt actions send web's quick-action prompt as an ordinary turn; Merge (after a native
+/// method sheet that doubles as confirmation) and Ready for review write to GitHub directly.
 extension SessionController {
   func infoBarChips(_ session: SessionItem, busy: Bool) -> [[String: Any]] {
     let state = source.state
@@ -92,6 +93,8 @@ extension SessionController {
     case .commitAndPush: "arrow.up.circle"
     case .resolveConflicts: "arrow.triangle.merge"
     case .fixCi: "wrench.and.screwdriver"
+    case .readyForReview: "eye"
+    case .merge: "arrow.triangle.merge"
     }
   }
 
@@ -100,7 +103,7 @@ extension SessionController {
     guard let bar = infoBar else { return }
     switch id {
     case "act":
-      if let first = bar.actions.first { sendInfoBarPrompt(first) }
+      if let first = bar.actions.first { performInfoBarAction(first) }
     case "context:pr":
       if let pr = bar.pullRequest { openPullRequest(pr) }
     case "context:changes":
@@ -110,8 +113,73 @@ extension SessionController {
       UIPasteboard.general.string = bar.branch
       LodyToastOverlay.shared.show(message: String(localized: "session.title.branchCopied", bundle: .lody), kind: "info")
     default:
-      if id.hasPrefix("more:"), let action = SessionInfoBar.Action(rawValue: String(id.dropFirst(5))) { sendInfoBarPrompt(action) }
+      if id.hasPrefix("more:"), let action = SessionInfoBar.Action(rawValue: String(id.dropFirst(5))) { performInfoBarAction(action) }
     }
+  }
+
+  private func performInfoBarAction(_ action: SessionInfoBar.Action) {
+    switch action {
+    case .merge: chooseMergeMethod()
+    case .readyForReview: writePullRequest("ready")
+    default: sendInfoBarPrompt(action)
+    }
+  }
+
+  /// Merging cannot be undone, so the method sheet is also the confirmation. The last method
+  /// chosen leads (web `usePreferredPrMergeMethod`, default merge commit).
+  private func chooseMergeMethod() {
+    guard let pr = infoBar?.pullRequest else { return }
+    let preferred = UserDefaults.standard.string(forKey: Self.mergeMethodKey) ?? "merge"
+    let methods = ["merge", "squash", "rebase"].sorted { a, _ in a == preferred }
+    let sheet = UIAlertController(
+      title: "\(pr.repository) #\(pr.number)",
+      message: String(localized: "bar.merge.message", bundle: .lody), preferredStyle: .actionSheet
+    )
+    for method in methods {
+      sheet.addAction(UIAlertAction(title: String(localized: String.LocalizationValue("bar.merge." + method), bundle: .lody), style: .default) { [weak self] _ in
+        UserDefaults.standard.set(method, forKey: Self.mergeMethodKey)
+        self?.writePullRequest("merge", method: method)
+      })
+    }
+    sheet.addAction(UIAlertAction(title: String(localized: "common.cancel", bundle: .lody), style: .cancel))
+    sheet.popoverPresentationController?.sourceView = chat.composer
+    sheet.popoverPresentationController?.sourceRect = chat.composer.bounds
+    present(sheet, animated: true)
+  }
+
+  private static let mergeMethodKey = "lody.prMergeMethod"
+
+  /// One GitHub write at a time, scoped to the account and workspace that started it. Never
+  /// retried: an unknown result says so instead of claiming failure.
+  private func writePullRequest(_ operation: String, method: String? = nil) {
+    guard !githubWriting, let pr = infoBar?.pullRequest else { return }
+    let state = source.state
+    githubWriting = true
+    var payload: [String: Any] = ["workspaceId": state.workspaceId, "repository": pr.repository, "number": pr.number, "operation": operation]
+    if let method { payload["method"] = method }
+    let pending = operation == "merge" ? "bar.merge.pending" : "bar.ready.pending"
+    LodyToastOverlay.shared.show(message: String(localized: String.LocalizationValue(pending), bundle: .lody), kind: "info")
+    Task { @MainActor [weak self] in
+      defer { self?.githubWriting = false }
+      do {
+        _ = try await GitHubPullRequests.run(Self.json(payload))
+        guard let self, self.source.state.key == state.key else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        let done = operation == "merge" ? "bar.merge.done" : "bar.ready.done"
+        LodyToastOverlay.shared.show(message: String(localized: String.LocalizationValue(done), bundle: .lody), kind: "success")
+      } catch {
+        guard let self, self.source.state.key == state.key else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        LodyToastOverlay.shared.show(message: Self.writeError(error, operation: operation), kind: "error")
+      }
+    }
+  }
+
+  private static func writeError(_ error: Error, operation: String) -> String {
+    let known = ["not_mergeable", "head_changed", "authorization_required", "merge_unknown", "ready_unknown", "not_open", "forbidden"]
+    let code = error.localizedDescription
+    let key = known.contains(code) ? "bar.error." + code : (operation == "merge" ? "bar.merge.error" : "bar.ready.error")
+    return String(localized: String.LocalizationValue(key), bundle: .lody)
   }
 
   /// Sent like a typed turn (pending bubble, outbox, no automatic replay); only while the action

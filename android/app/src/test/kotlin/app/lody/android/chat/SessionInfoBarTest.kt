@@ -34,8 +34,15 @@ class SessionInfoBarTest {
         assertEquals(listOf(Action.FixCi), actions(session(pr = pr(ci = "e"))))
     }
 
-    @Test fun draftAndFinishedPrsOfferOnlyPublishing() {
-        assertEquals(listOf(Action.CommitAndPush), actions(session(dirty = true, pr = pr("draft", ci = "f"))))
+    @Test fun aCleanPassingPrOffersMergeEvenBehindPublishing() {
+        assertEquals(listOf(Action.Merge), actions(session(pr = pr(merge = "c"))))
+        assertEquals(listOf(Action.CommitAndPush, Action.Merge), actions(session(unpushed = true, pr = pr(ci = "s", merge = "c"))))
+        assertEquals(emptyList<Action>(), actions(session(pr = pr(ci = "p", merge = "c"))))
+        assertEquals(emptyList<Action>(), actions(session(pr = pr(merge = "b"))))
+    }
+
+    @Test fun draftAndFinishedPrsOfferPublishingAndReadiness() {
+        assertEquals(listOf(Action.CommitAndPush, Action.ReadyForReview), actions(session(dirty = true, pr = pr("draft", ci = "f"))))
         assertEquals(emptyList<Action>(), actions(session(dirty = true, pr = pr("merged"))))
     }
 

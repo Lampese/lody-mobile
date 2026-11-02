@@ -167,4 +167,26 @@
     <string name="bar_copy_branch">Copy branch name</string>
     <string name="bar_branch_copied">Branch name copied</string>
     <string name="bar_machine">Computer</string>
+    <string name="bar_action_ready_for_review">Ready for review</string>
+    <string name="bar_action_merge">Merge</string>
+    <string name="bar_merge_message">Merging cannot be undone. Choose how to merge.</string>
+    <string name="bar_merge_merge">Create a merge commit</string>
+    <string name="bar_merge_squash">Squash and merge</string>
+    <string name="bar_merge_rebase">Rebase and merge</string>
+    <string name="bar_merge_merge_desc">All commits from this branch will be added to the base branch.</string>
+    <string name="bar_merge_squash_desc">The commits from this branch will be combined into a single commit.</string>
+    <string name="bar_merge_rebase_desc">The commits will be rebased and added to the base branch.</string>
+    <string name="bar_merge_pending">Merging…</string>
+    <string name="bar_merge_done">Pull request merged</string>
+    <string name="bar_merge_error">Failed to merge</string>
+    <string name="bar_ready_pending">Waiting for GitHub…</string>
+    <string name="bar_ready_done">Marked ready for review</string>
+    <string name="bar_ready_error">Failed to mark as ready for review</string>
+    <string name="bar_error_not_mergeable">Merging is blocked — required reviews, failing checks, or the branch is behind.</string>
+    <string name="bar_error_head_changed">The pull request has new commits. Review them, then merge again.</string>
+    <string name="bar_error_authorization_required">Connect GitHub for this workspace on the web first.</string>
+    <string name="bar_error_merge_unknown">The merge result is unknown. Check the pull request on GitHub before trying again.</string>
+    <string name="bar_error_ready_unknown">The result is unknown. Check the pull request on GitHub before trying again.</string>
+    <string name="bar_error_not_open">This pull request is no longer open.</string>
+    <string name="bar_error_forbidden">You do not have permission to change this pull request.</string>
 </resources>

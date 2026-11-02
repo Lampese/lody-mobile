@@ -151,6 +151,51 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         }
     }
     val bar = session?.let { SessionInfoBar.of(it, context.repository, busy = running || !canSend) }
+    // Merge / Ready for review go straight to GitHub, one at a time, never retried.
+    var merging by remember(id) { mutableStateOf(false) }
+    var writing by remember(id) { mutableStateOf(false) }
+    val prefs = remember { appContext.getSharedPreferences("lody.chat", android.content.Context.MODE_PRIVATE) }
+    val writeTexts = WriteTexts(
+        stringResource(R.string.bar_merge_pending), stringResource(R.string.bar_merge_done), stringResource(R.string.bar_merge_error),
+        stringResource(R.string.bar_ready_pending), stringResource(R.string.bar_ready_done), stringResource(R.string.bar_ready_error),
+        WriteErrors.associateWith { code -> stringResource(writeErrorText(code)) },
+    )
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val writePullRequest: (String?) -> Unit = write@{ method ->
+        val pr = bar?.pullRequest ?: return@write
+        if (writing) return@write
+        writing = true
+        coroutines.launch {
+            snackbar.showSnackbar(if (method != null) writeTexts.mergePending else writeTexts.readyPending)
+        }
+        coroutines.launch {
+            val message = try {
+                if (method != null) repository.mergePullRequest(scope, pr.repository, pr.number, method)
+                else repository.markReady(scope, pr.repository, pr.number)
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                if (method != null) writeTexts.mergeDone else writeTexts.readyDone
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject)
+                (error as? GitHubWriteFailure)?.code?.let { writeTexts.errors[it] }
+                    ?: if (method != null) writeTexts.mergeError else writeTexts.readyError
+            } finally { writing = false }
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(message)
+        }
+    }
+    if (merging && bar?.pullRequest != null) {
+        MergeSheet(
+            "${bar.pullRequest.repository} #${bar.pullRequest.number}",
+            preferred = prefs.getString("prMergeMethod", "merge") ?: "merge",
+            onDismiss = { merging = false },
+            onMerge = { method ->
+                merging = false
+                prefs.edit().putString("prMergeMethod", method).apply()
+                writePullRequest(method)
+            },
+        )
+    }
     val prompts = SessionInfoBar.Prompts(
         stringResource(R.string.bar_prompt_createPrOrigin), stringResource(R.string.bar_prompt_createDraftPrOrigin),
         stringResource(R.string.bar_prompt_createPr), stringResource(R.string.bar_prompt_createDraftPr),
@@ -201,8 +246,13 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 ChatActionBar(
                     bar, context.machineName, context.machineKind,
                     onAction = { action ->
-                        // Only while still offered, so a menu left open cannot send for a state that moved on.
-                        if (action in bar.actions) sendText(bar.prompt(action, prompts))
+                        // Only while still offered, so a menu left open cannot act for a state that moved on.
+                        when {
+                            action !in bar.actions -> Unit
+                            action == SessionInfoBar.Action.Merge -> merging = true
+                            action == SessionInfoBar.Action.ReadyForReview -> writePullRequest(null)
+                            else -> sendText(bar.prompt(action, prompts))
+                        }
                     },
                     onCopied = { coroutines.launch { snackbar.showSnackbar(it) } },
                 )
@@ -601,6 +651,8 @@ private fun actionTitle(action: SessionInfoBar.Action): String = stringResource(
         SessionInfoBar.Action.CommitAndPush -> R.string.bar_action_commit_and_push
         SessionInfoBar.Action.ResolveConflicts -> R.string.bar_action_resolve_conflicts
         SessionInfoBar.Action.FixCi -> R.string.bar_action_fix_ci_errors
+    SessionInfoBar.Action.ReadyForReview -> R.string.bar_action_ready_for_review
+    SessionInfoBar.Action.Merge -> R.string.bar_action_merge
     },
 )
 
@@ -610,4 +662,64 @@ private fun actionIcon(action: SessionInfoBar.Action): ImageVector = when (actio
     SessionInfoBar.Action.CommitAndPush -> LodyIcons.Send
     SessionInfoBar.Action.ResolveConflicts -> LodyIcons.Merge
     SessionInfoBar.Action.FixCi -> LodyIcons.Check
+    SessionInfoBar.Action.ReadyForReview -> LodyIcons.Eye
+    SessionInfoBar.Action.Merge -> LodyIcons.Merge
+}
+
+private class WriteTexts(
+    val mergePending: String, val mergeDone: String, val mergeError: String,
+    val readyPending: String, val readyDone: String, val readyError: String,
+    val errors: Map<String, String>,
+)
+
+private val WriteErrors = listOf("not_mergeable", "head_changed", "authorization_required", "merge_unknown", "ready_unknown", "not_open", "forbidden")
+
+private fun writeErrorText(code: String): Int = when (code) {
+    "not_mergeable" -> R.string.bar_error_not_mergeable
+    "head_changed" -> R.string.bar_error_head_changed
+    "authorization_required" -> R.string.bar_error_authorization_required
+    "merge_unknown" -> R.string.bar_error_merge_unknown
+    "ready_unknown" -> R.string.bar_error_ready_unknown
+    "not_open" -> R.string.bar_error_not_open
+    else -> R.string.bar_error_forbidden
+}
+
+/**
+ * Merging cannot be undone, so choosing the method is also the confirmation: a native sheet
+ * with web's three methods and their descriptions, the last one used first.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MergeSheet(title: String, preferred: String, onDismiss: () -> Unit, onMerge: (String) -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val methods = listOf(
+        Triple("merge", R.string.bar_merge_merge, R.string.bar_merge_merge_desc),
+        Triple("squash", R.string.bar_merge_squash, R.string.bar_merge_squash_desc),
+        Triple("rebase", R.string.bar_merge_rebase, R.string.bar_merge_rebase_desc),
+    ).sortedByDescending { it.first == preferred }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.bgBase) {
+        Column(Modifier.padding(bottom = LodySpacing.lg)) {
+            Text(title, style = type.headline, color = colors.textPrimary, modifier = Modifier.padding(horizontal = LodySpacing.lg))
+            Text(stringResource(R.string.bar_merge_message), style = type.footnote, color = colors.textSecondary,
+                modifier = Modifier.padding(horizontal = LodySpacing.lg, vertical = LodySpacing.xs))
+            for ((method, label, description) in methods) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = LodySize.listRow)
+                        .clickable(role = Role.Button) { onMerge(method) }
+                        .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+                ) {
+                    Icon(LodyIcons.Merge, contentDescription = null, tint = if (method == preferred) colors.prMerged else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(label), style = type.body, color = colors.textPrimary)
+                        Text(stringResource(description), style = type.footnote, color = colors.textSecondary)
+                    }
+                }
+            }
+        }
+    }
 }

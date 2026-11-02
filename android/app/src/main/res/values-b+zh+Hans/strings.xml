@@ -166,4 +166,26 @@
     <string name="bar_copy_branch">拷贝分支名</string>
     <string name="bar_branch_copied">已拷贝分支名</string>
     <string name="bar_machine">电脑</string>
+    <string name="bar_action_ready_for_review">标记为可审阅</string>
+    <string name="bar_action_merge">合并</string>
+    <string name="bar_merge_message">合并后无法撤销。请选择合并方式。</string>
+    <string name="bar_merge_merge">创建合并提交</string>
+    <string name="bar_merge_squash">Squash 并合并</string>
+    <string name="bar_merge_rebase">Rebase 并合并</string>
+    <string name="bar_merge_merge_desc">该分支上的所有提交将被加入到基础分支。</string>
+    <string name="bar_merge_squash_desc">该分支上的所有提交会被合并为一个单独的提交。</string>
+    <string name="bar_merge_rebase_desc">这些提交会被 rebase 到基础分支上。</string>
+    <string name="bar_merge_pending">正在合并…</string>
+    <string name="bar_merge_done">Pull Request 已合并</string>
+    <string name="bar_merge_error">合并失败</string>
+    <string name="bar_ready_pending">等待 GitHub…</string>
+    <string name="bar_ready_done">已标记为可审阅</string>
+    <string name="bar_ready_error">标记为可审阅失败</string>
+    <string name="bar_error_not_mergeable">合并被阻止——可能需要审核、检查未通过或分支落后。</string>
+    <string name="bar_error_head_changed">PR 有新的提交，请先查看再合并。</string>
+    <string name="bar_error_authorization_required">请先在网页端为此工作区连接 GitHub。</string>
+    <string name="bar_error_merge_unknown">合并结果未知，请先到 GitHub 确认，再决定是否重试。</string>
+    <string name="bar_error_ready_unknown">结果未知，请先到 GitHub 确认，再决定是否重试。</string>
+    <string name="bar_error_not_open">这个 PR 已不是打开状态。</string>
+    <string name="bar_error_forbidden">你没有修改这个 PR 的权限。</string>
 </resources>

@@ -2,8 +2,9 @@ import Foundation
 
 /// Web `SessionInfoBar` (the action bar above the composer), reduced to what the catalog carries:
 /// the session's computer, its repository context (PR, CI, branch, ±diff) and the repository
-/// actions, ranked like `resolveSessionInfoBarGitHubActionIds`. Goal, schedule and merge stay
-/// on web: the catalog has no goal or schedule, and merging needs a GitHub write grant.
+/// actions, ranked like `resolveSessionInfoBarGitHubActionIds`. Merge and Ready for review run
+/// directly against GitHub with the workspace's brokered write grant (`GitHubPullRequests`); the
+/// rest send an agent prompt. Goal and schedule stay on web: the catalog carries neither.
 struct SessionInfoBar: Equatable {
   enum Action: String, CaseIterable {
     case createPr = "create-pr"
@@ -11,6 +12,11 @@ struct SessionInfoBar: Equatable {
     case commitAndPush = "commit-and-push"
     case resolveConflicts = "resolve-conflicts"
     case fixCi = "fix-ci-errors"
+    case readyForReview = "ready-for-review"
+    case merge
+
+    /// Direct GitHub writes rather than agent prompts.
+    var direct: Bool { self == .merge || self == .readyForReview }
   }
 
   var repository = ""
@@ -44,9 +50,13 @@ struct SessionInfoBar: Equatable {
     if ["merged", "closed"].contains(pullRequest.status) { return [] }
     // Unpublished work outranks everything: the PR head is not the author's latest work.
     var actions: [Action] = dirty || session.workspaceUnpushed ? [.commitAndPush] : []
-    if pullRequest.status == "draft" { return actions }
+    // A draft has no merge gate to clear; readiness is the user's call.
+    if pullRequest.status == "draft" { return actions + [.readyForReview] }
     if pullRequest.merge == "d" { actions.append(.resolveConflicts) }
     if ["f", "e"].contains(pullRequest.ci ?? "") { actions.append(.fixCi) }
+    // Web `deriveSessionPullRequestReadiness`: GitHub reports clean, CI passed or absent. A demoted
+    // merge stays in the menu so readiness is reachable on sessions that rank Commit & Push first.
+    if pullRequest.merge == "c" && [nil, "s"].contains(pullRequest.ci) { actions.append(.merge) }
     return actions
   }
 
@@ -71,6 +81,8 @@ struct SessionInfoBar: Equatable {
     case .fixCi:
       guard let pullRequest else { return "" }
       return String(format: text("fixCi"), repository, pullRequest.number, pullRequestURL, branch.isEmpty ? "-" : branch)
+    case .readyForReview, .merge:
+      return ""
     }
   }
 

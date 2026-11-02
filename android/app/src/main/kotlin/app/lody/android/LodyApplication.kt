@@ -18,6 +18,7 @@ open class LodyApplication : Application() {
     lateinit var cloud: CatalogRepository
         private set
     lateinit var creation: app.lody.android.create.CreationService
+    lateinit var pullRequests: app.lody.android.chat.PullRequestWriter
         private set
     private var prepared: Pair<RuntimeScope, ShortLivedGrant>? = null
     protected open fun createRuntime(scope: RuntimeScope): CloudRuntime {
@@ -39,6 +40,13 @@ open class LodyApplication : Application() {
         val branches = app.lody.android.create.GitHubBranches()
         creation = app.lody.android.create.CreateSessionRepository(runtimeOwner, cache) { scope, repo, page ->
             account.withVerifiedAccount(scope) { token -> branches.load(token, scope.workspaceId, repo, page) }
+        }
+        val writes = app.lody.android.chat.GitHubPullRequestWrites()
+        pullRequests = app.lody.android.chat.PullRequestWriter { scope, repo, number, method ->
+            account.withVerifiedAccount(scope) { credential ->
+                if (method != null) writes.merge(credential, scope.workspaceId, repo, number, method)
+                else writes.markReady(credential, scope.workspaceId, repo, number)
+            }
         }
         account = AccountController(CloudAuthHttp(OkHttpAuthTransport()), KeystoreCredentialStore(this), applicationScope, cache) {
             prepared = null

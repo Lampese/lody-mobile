@@ -10,12 +10,12 @@ import Foundation
           repo.range(of: #"^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$"#, options: .regularExpression) != nil,
           ![".", ".."].contains(repo.components(separatedBy: "/").last ?? ""),
           let number = args["number"] as? Int, number > 0,
-          let operation = args["operation"] as? String, ["read", "comment"].contains(operation)
+          let operation = args["operation"] as? String, ["read", "comment", "merge", "ready"].contains(operation)
     else { throw failure("invalid_request") }
     guard let credential = try AuthKeychain.read(), !credential.isEmpty else { throw failure("unauthorized") }
-    let writing = operation == "comment"
+    let writing = operation != "read"
     let body = (args["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-    if writing && (body.isEmpty || body.count > 65536) { throw failure("invalid_comment") }
+    if operation == "comment" && (body.isEmpty || body.count > 65536) { throw failure("invalid_comment") }
     let auth = try await request("https://backend.lody.ai/api/auth/convex/token", token: credential)
     guard let jwt = auth["token"] as? String else { throw failure("unauthorized") }
     try checkIdentity(credential)
@@ -28,6 +28,9 @@ import Foundation
           value["success"] as? Bool == true, let token = value["token"] as? String, !token.isEmpty
     else { throw failure("authorization_required") }
     let base = "https://api.github.com/repos/\(repo)"
+    if operation == "merge" || operation == "ready" {
+      return try await transition(operation, base: base, number: number, method: args["method"] as? String, token: token, credential: credential)
+    }
     if writing {
       // A transport failure may follow a successful write. Never replay it.
       _ = try await request("\(base)/issues/\(number)/comments", token: token, body: ["body": body], mutation: true)
@@ -82,6 +85,38 @@ import Foundation
     return String(decoding: try JSONSerialization.data(withJSONObject: result), as: UTF8.self)
   }
 
+  /// Web `useGitHubPrDetails` merge / ready for review, with the workspace's brokered write grant.
+  /// Merge pins the head just read, so commits pushed meanwhile make GitHub refuse instead of
+  /// landing unseen work. Neither is retried: a lost response may follow a completed change.
+  private static func transition(_ operation: String, base: String, number: Int, method: String?, token: String, credential: String) async throws -> String {
+    let pr = try await request("\(base)/pulls/\(number)", token: token)
+    try checkIdentity(credential)
+    guard pr["state"] as? String == "open", pr["merged"] as? Bool != true else { throw failure("not_open") }
+    let draft = pr["draft"] as? Bool == true
+    if operation == "merge" {
+      guard let method, ["merge", "squash", "rebase"].contains(method) else { throw failure("invalid_request") }
+      guard !draft else { throw failure("not_mergeable") }
+      guard let sha = (pr["head"] as? [String: Any])?["sha"] as? String,
+            sha.range(of: #"^[0-9a-fA-F]{7,64}$"#, options: .regularExpression) != nil
+      else { throw failure("invalid_response") }
+      let result = try await request("\(base)/pulls/\(number)/merge", token: token,
+        body: ["merge_method": method, "sha": sha], method: "PUT", unknown: "merge_unknown")
+      try checkIdentity(credential)
+      guard result["merged"] as? Bool == true else { throw failure("not_mergeable") }
+      return #"{"merged":true}"#
+    }
+    guard draft else { return #"{"ready":true}"# }
+    guard let node = pr["node_id"] as? String, !node.isEmpty else { throw failure("invalid_response") }
+    let result = try await request("https://api.github.com/graphql", token: token, body: [
+      "query": "mutation MarkReady($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { isDraft } } }",
+      "variables": ["id": node],
+    ], unknown: "ready_unknown")
+    try checkIdentity(credential)
+    // GraphQL reports application errors with a 200.
+    if let errors = result["errors"] as? [Any], !errors.isEmpty { throw failure("request_failed") }
+    return #"{"ready":true}"#
+  }
+
   private static func checkIdentity(_ credential: String) throws {
     guard try AuthKeychain.read() == credential else { throw failure("unauthorized") }
     try Task.checkCancellation()
@@ -93,28 +128,35 @@ import Foundation
     let value = error as NSError
     return value.domain == "LodyKit.GitHubPullRequests" ? value.localizedDescription : "unavailable"
   }
-  private static func request(_ address: String, token: String, body: [String: Any]? = nil, mutation: Bool = false) async throws -> [String: Any] {
+  /// [unknown] marks a parsed write: its transport failure or 5xx is an unknown outcome, never "failed".
+  private static func request(_ address: String, token: String, body: [String: Any]? = nil, mutation: Bool = false,
+                              method: String = "POST", unknown: String? = nil) async throws -> [String: Any] {
+    let unknownCode = unknown ?? (mutation ? "comment_unknown" : nil)
     var request = URLRequest(url: URL(string: address)!, timeoutInterval: 20)
     request.cachePolicy = .reloadIgnoringLocalCacheData
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
     if address.hasPrefix("https://api.github.com/") { request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version") }
     if let body {
-      request.httpMethod = "POST"
+      request.httpMethod = method
       request.setValue("application/json", forHTTPHeaderField: "Content-Type")
       request.httpBody = try JSONSerialization.data(withJSONObject: body)
     }
     let data: Data
     let response: URLResponse
     do { (data, response) = try await URLSession.shared.data(for: request) }
-    catch { throw failure(mutation ? "comment_unknown" : "unavailable") }
-    guard let response = response as? HTTPURLResponse else { throw failure(mutation ? "comment_unknown" : "unavailable") }
+    catch { throw failure(unknownCode ?? "unavailable") }
+    guard let response = response as? HTTPURLResponse else { throw failure(unknownCode ?? "unavailable") }
     if response.statusCode == 401 { throw failure("unauthorized") }
     if response.statusCode == 403 { throw failure("forbidden") }
     if response.statusCode == 404 { throw failure("not_found") }
     if response.statusCode == 429 { throw failure("rate_limited") }
+    // Merge: 405 not mergeable, 409 the head moved since it was read.
+    if response.statusCode == 405 { throw failure("not_mergeable") }
+    if response.statusCode == 409 { throw failure("head_changed") }
     guard (200..<300).contains(response.statusCode) else {
-      throw failure(mutation && response.statusCode >= 500 ? "comment_unknown" : "request_failed")
+      if response.statusCode >= 500, let unknownCode { throw failure(unknownCode) }
+      throw failure("request_failed")
     }
     if mutation { return [:] }
     guard data.count <= 8 * 1024 * 1024 else { throw failure("response_limit") }

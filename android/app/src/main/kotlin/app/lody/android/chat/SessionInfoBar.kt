@@ -6,8 +6,9 @@ import app.lody.android.runtime.CatalogSession
 /**
  * Web `SessionInfoBar` (the action bar above the composer), reduced to what the catalog carries:
  * the repository context (PR, CI, branch, ±diff) and the repository actions, ranked like
- * `resolveSessionInfoBarGitHubActionIds`. Goal, schedule and merge stay on web: the catalog has
- * no goal or schedule, and merging needs a GitHub write grant. iOS: `SessionInfoBar`.
+ * `resolveSessionInfoBarGitHubActionIds`. Merge and Ready for review write to GitHub directly
+ * with the workspace's brokered grant ([GitHubPullRequestWrites]); the rest send an agent prompt.
+ * Goal and schedule stay on web: the catalog carries neither. iOS: `SessionInfoBar`.
  */
 data class SessionInfoBar(
     val repository: String,
@@ -18,7 +19,12 @@ data class SessionInfoBar(
     /** Priority order: the first is the bar's one text button, the rest hang off its menu. */
     val actions: List<Action>,
 ) {
-    enum class Action { CreatePr, CreateDraftPr, CommitAndPush, ResolveConflicts, FixCi }
+    enum class Action {
+        CreatePr, CreateDraftPr, CommitAndPush, ResolveConflicts, FixCi, ReadyForReview, Merge;
+
+        /** Direct GitHub writes rather than agent prompts. */
+        val direct: Boolean get() = this == Merge || this == ReadyForReview
+    }
 
     val hasContext: Boolean get() = repository.isNotEmpty() || branch.isNotEmpty() || added + removed > 0 || pullRequest != null
 
@@ -46,6 +52,7 @@ data class SessionInfoBar(
         Action.CommitAndPush -> prompts.commitAndPush
         Action.ResolveConflicts -> pullRequest?.let { prompts.resolveConflicts.format(repository, "#${it.number}", pullRequestUrl) }.orEmpty()
         Action.FixCi -> pullRequest?.let { prompts.fixCi.format(repository, it.number, pullRequestUrl, branch.ifEmpty { "-" }) }.orEmpty()
+        Action.ReadyForReview, Action.Merge -> ""
     }
 
     companion object {
@@ -71,9 +78,13 @@ data class SessionInfoBar(
             // Unpublished work outranks everything: the PR head is not the author's latest work.
             val actions = mutableListOf<Action>()
             if (dirty || session.workspaceUnpushed) actions += Action.CommitAndPush
-            if (pr.status == "draft") return actions
+            // A draft has no merge gate to clear; readiness is the user's call.
+            if (pr.status == "draft") return actions + Action.ReadyForReview
             if (pr.merge == "d") actions += Action.ResolveConflicts
             if (pr.ci == "f" || pr.ci == "e") actions += Action.FixCi
+            // Web `deriveSessionPullRequestReadiness`: GitHub reports clean, CI passed or absent. A
+            // demoted merge stays in the menu so readiness is reachable behind Commit & Push.
+            if (pr.merge == "c" && (pr.ci == null || pr.ci == "s")) actions += Action.Merge
             return actions
         }
     }
