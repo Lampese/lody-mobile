@@ -134,4 +134,8 @@
     <string name="create_search_branches">搜索分支</string>
     <string name="create_more_branches">更多分支…</string>
     <string name="create_mode_auto">Auto</string>
+    <string name="chat_working">工作中…</string>
+    <string name="chat_finished_working">已完成工作</string>
+    <string name="chat_scroll_latest">滚动到最新</string>
+    <string name="chat_attach_unavailable">Android 暂不支持附件</string>
 </resources>

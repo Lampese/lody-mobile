@@ -276,8 +276,8 @@ enum ChatWorkDuration {
 /// so the vertical indicator remains on the screen edge.
 enum ChatReadingColumn {
   static let maximumWidth: CGFloat = 800
-  /// Tighter than other pages: web's mobile conversation runs close to the edges.
-  static let cellMargin: CGFloat = 12
+  /// Web's mobile conversation inset.
+  static let cellMargin: CGFloat = 16
   static let sectionTop: CGFloat = 4
   static let sectionBottom: CGFloat = 4
 

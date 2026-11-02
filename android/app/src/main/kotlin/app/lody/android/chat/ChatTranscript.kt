@@ -1,6 +1,9 @@
 package app.lody.android.chat
 
 import androidx.compose.foundation.background
+import app.lody.android.designsystem.LodyWorkingGrid
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -65,8 +68,17 @@ sealed interface ChatEntry {
     val id: String
 
     data class User(override val id: String, val text: String, val who: TurnIdentity, val delivery: Delivery = Delivery.Sent) : ChatEntry
-    /** [worked] is "Worked for 8s" once the turn finished; empty while streaming. */
-    data class Assistant(override val id: String, val markdown: MarkdownBlocks, val who: TurnIdentity, val worked: String = "") : ChatEntry
+    /**
+     * Web shows no identity on an agent turn: it opens with the process line ("Finished
+     * working" / "Working…"). [worked] ("Worked for 8s") is its accessibility detail.
+     */
+    data class Assistant(
+        override val id: String,
+        val markdown: MarkdownBlocks,
+        val who: TurnIdentity,
+        val worked: String = "",
+        val working: Boolean = false,
+    ) : ChatEntry
 }
 
 /**
@@ -103,6 +115,7 @@ fun ChatTranscript(
             when (entry) {
                 is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry) }
                 is ChatEntry.Assistant -> {
+                    item(key = "${entry.id}#process", contentType = "process") { ProcessLine(entry.working, entry.worked) }
                     itemsIndexed(
                         entry.markdown.blocks,
                         key = { index, _ -> "${entry.id}#$index" },
@@ -115,21 +128,19 @@ fun ChatTranscript(
                                 .padding(bottom = LodySpacing.md),
                         )
                     }
-                    // The agent's identity closes its answer, as iOS's meta row: mark, name · model,
-                    // time, and "Worked for …" once finished.
-                    item(key = "${entry.id}#who", contentType = "agent-footer") { AgentFooter(entry.who, entry.worked) }
+                    item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }
         }
     }
 }
 
-/** Narrower than the screen inset (web's mobile conversation runs close to the edges). */
-val TranscriptMargin = LodySpacing.md
+/** Web's mobile conversation inset. */
+val TranscriptMargin = LodySpacing.lg
 
 /**
- * Web's mobile user turn: name, time and delivery above a right-aligned bubble, with the
- * sender's avatar beside it.
+ * Web's mobile user turn: the delivery mark, time and sender name right-aligned above a large
+ * rounded bubble, with the sender's avatar beside the bubble's top.
  */
 @Composable
 private fun UserTurn(entry: ChatEntry.User) {
@@ -137,19 +148,20 @@ private fun UserTurn(entry: ChatEntry.User) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = TranscriptMargin, vertical = LodySpacing.md),
+            .padding(horizontal = TranscriptMargin)
+            .padding(top = LodySpacing.lg, bottom = LodySpacing.xl),
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm, Alignment.End),
         verticalAlignment = Alignment.Top,
     ) {
-        Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+        Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+            Row(
+                Modifier.height(UserHeaderHeight).padding(end = LodySpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+            ) {
                 DeliveryMark(entry.delivery)
-                Text(
-                    listOf(entry.who.name, entry.who.time).filter { it.isNotEmpty() }.joinToString("  ·  "),
-                    style = LodyTheme.typography.caption,
-                    color = colors.textTertiary,
-                    maxLines = 1,
-                )
+                if (entry.who.time.isNotEmpty()) Text(entry.who.time, style = LodyTheme.typography.footnote, color = colors.textTertiary, maxLines = 1)
+                Text(entry.who.name, style = LodyTheme.typography.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(
                 entry.text,
@@ -157,11 +169,38 @@ private fun UserTurn(entry: ChatEntry.User) {
                 color = colors.textPrimary,
                 modifier = Modifier
                     .widthIn(max = LodyLayout.readableMaxWidth)
-                    .background(colors.fillSecondary, RoundedCornerShape(LodyRadius.xl))
-                    .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.md),
+                    .background(colors.fillSecondary, RoundedCornerShape(UserBubbleRadius))
+                    .padding(horizontal = LodySpacing.xl, vertical = LodySpacing.lg),
             )
         }
-        Avatar(entry.who.image, entry.who.name, LodySize.avatarMd, Modifier.padding(top = LodySpacing.lg))
+        // Beside the bubble's top: past the header line and the gap under it.
+        Avatar(entry.who.image, entry.who.name, UserAvatarSize, Modifier.padding(top = UserHeaderHeight + LodySpacing.xs))
+    }
+}
+
+private val UserHeaderHeight = LodySpacing.xl
+private val UserAvatarSize = LodySize.avatarLg - LodySpacing.xs
+private val UserBubbleRadius = LodySpacing.xl
+
+/**
+ * The line that opens an agent turn: web's "Finished working ›" (which opens the process) or the
+ * working grid while it streams. Android has no process sheet yet, so it carries no chevron.
+ */
+@Composable
+private fun ProcessLine(working: Boolean, worked: String) {
+    val colors = LodyTheme.colors
+    val label = stringResource(if (working) R.string.chat_working else R.string.chat_finished_working)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = TranscriptMargin)
+            .padding(top = LodySpacing.sm, bottom = LodySpacing.md)
+            .semantics { contentDescription = listOf(label, worked).filter { it.isNotEmpty() }.joinToString(", ") },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        if (working) LodyWorkingGrid()
+        Text(label, style = LodyTheme.typography.body, color = colors.textTertiary)
     }
 }
 
@@ -186,24 +225,6 @@ private fun DeliveryMark(delivery: Delivery) {
         Delivery.Failed -> Icon(LodyIcons.Alert, contentDescription = label, tint = colors.dangerDefault, modifier = Modifier.size(size))
         Delivery.Queued -> Icon(LodyIcons.StateWaiting, contentDescription = label, tint = colors.iconTertiary, modifier = Modifier.size(size))
         Delivery.Sent -> Box(mark.padding(LodySpacing.xxs).border(1.dp, colors.iconTertiary, CircleShape))
-    }
-}
-
-/** The agent's identity after its answer: mark, name (· model), time, and how long it worked. */
-@Composable
-private fun AgentFooter(who: TurnIdentity, worked: String) {
-    val colors = LodyTheme.colors
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = TranscriptMargin).padding(bottom = LodySpacing.lg),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-    ) {
-        Box(Modifier.size(LodySize.avatarMd).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-        }
-        Text(who.name, style = LodyTheme.typography.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-        val meta = listOf(who.time, worked).filter { it.isNotEmpty() }.joinToString("  ·  ")
-        if (meta.isNotEmpty()) Text(meta, style = LodyTheme.typography.caption, color = colors.textTertiary, maxLines = 1)
     }
 }
 

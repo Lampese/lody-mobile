@@ -135,4 +135,8 @@
     <string name="create_search_branches">Search branches</string>
     <string name="create_more_branches">More branches…</string>
     <string name="create_mode_auto">Auto</string>
+    <string name="chat_working">Working…</string>
+    <string name="chat_finished_working">Finished working</string>
+    <string name="chat_scroll_latest">Scroll to latest</string>
+    <string name="chat_attach_unavailable">Attachments aren’t available on Android yet</string>
 </resources>

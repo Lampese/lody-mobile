@@ -1,14 +1,20 @@
-// A conversation, after web's mobile session page (checked by driving its Storybook stories):
-// a header with the title and project / branch; user turns as right-aligned bubbles with the
-// sender's avatar, name, time and delivery mark; agent turns with the agent's mark, name and
-// time, a full-width answer and "Worked for …"; a floating composer at the bottom. The
-// transcript runs closer to the edges than other pages. iOS counterpart: SessionController.
+// A conversation, after web's mobile session page as it runs in the app: a floating header (round
+// back button, title, repo) over the transcript; user turns as large right-aligned bubbles with
+// the delivery mark, time and sender above and the avatar beside; agent turns open with the
+// process line and run full width; a round scroll-to-latest button; a bordered composer card
+// (+, the run-config chip, send). The action bar above the composer is not built yet.
+// iOS counterpart: SessionController.
 
 package app.lody.android.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -87,6 +93,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                 flowOf(MessageText(message.text, message.streaming)).renderMarkdown(repair).first(),
                                 TurnIdentity(message.model?.let { "$agentName · $it" } ?: agentName, time = turnTime(message.timestamp)),
                                 worked(message, workedFormat),
+                                working = message.streaming,
                             )
                         }.also { rendered[message.id] = message to it }
                     }
@@ -106,6 +113,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val session = context.session
     val canSend = status == "live" && session?.cliType != null && session.agentType != null
     val failedText = stringResource(R.string.chat_send_failed)
+    val attachText = stringResource(R.string.chat_attach_unavailable)
     val snackbar = remember { SnackbarHostState() }
     val send = send@{
         val text = prompt.trim()
@@ -131,38 +139,100 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
 
     val colors = LodyTheme.colors
+    val listState = rememberLazyListState()
+    val atLatest by remember { derivedStateOf { !listState.canScrollForward } }
+    val headerHeight = LodySize.controlLg + LodySpacing.md
     Scaffold(
         containerColor = colors.bgBase,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(context.title, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (context.subtitle.isNotEmpty()) {
-                            Text(context.subtitle, style = LodyTheme.typography.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(LodyIcons.Back, stringResource(R.string.chat_back), tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md)) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.bgBase, scrolledContainerColor = colors.bgBase),
-            )
-        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding().navigationBarsPadding()) {
-            if (status == "offline") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = TranscriptMargin), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.chat_offline), style = LodyTheme.typography.footnote, color = colors.textSecondary, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { retry++ }) { Text(stringResource(R.string.chat_retry), color = colors.accentFg) }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + headerHeight
+                if (all.isEmpty()) {
+                    Box(Modifier.fillMaxSize().padding(top = top), contentAlignment = Alignment.Center) {
+                        Text(stringResource(if (status == "live") R.string.chat_empty else if (status == "offline") R.string.chat_offline else R.string.chat_loading), style = LodyTheme.typography.body, color = colors.textSecondary)
+                    }
+                } else {
+                    // The transcript scrolls under the floating header.
+                    ChatTranscript(all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = LodySpacing.md), state = listState)
+                }
+                ChatHeader(context.title, context.subtitle, onBack)
+                if (status == "offline") {
+                    Row(
+                        Modifier.align(Alignment.TopCenter).padding(top = top).padding(horizontal = TranscriptMargin).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.chat_offline), style = LodyTheme.typography.footnote, color = colors.textSecondary, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { retry++ }) { Text(stringResource(R.string.chat_retry), color = colors.accentFg) }
+                    }
+                }
+                // Web's round "scroll to latest" button, shown once the reader has scrolled up.
+                if (!atLatest && all.isNotEmpty()) {
+                    val label = stringResource(R.string.chat_scroll_latest)
+                    RoundButton(
+                        LodyIcons.Expand, label,
+                        Modifier.align(Alignment.BottomEnd).padding(end = TranscriptMargin, bottom = LodySpacing.md),
+                    ) { coroutines.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0), Int.MAX_VALUE) } }
                 }
             }
-            if (all.isEmpty()) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(if (status == "live") R.string.chat_empty else if (status == "offline") R.string.chat_offline else R.string.chat_loading), style = LodyTheme.typography.body, color = colors.textSecondary)
-                }
-            } else ChatTranscript(all, Modifier.weight(1f), contentPadding = PaddingValues(vertical = LodySpacing.md))
-            ChatComposer(prompt, onPromptChange = { if (it.length <= 32000) prompt = it }, enabled = canSend, onSend = send)
+            ChatComposer(
+                prompt,
+                onPromptChange = { if (it.length <= 32000) prompt = it },
+                enabled = canSend,
+                model = session?.modelName,
+                onAttach = { coroutines.launch { snackbar.showSnackbar(attachText) } },
+                onSend = send,
+            )
         }
+    }
+}
+
+/** Web's floating header: a round back button, then the title over the repository line. */
+@Composable
+private fun BoxScope.ChatHeader(title: String, subtitle: String, onBack: () -> Unit) {
+    val colors = LodyTheme.colors
+    Row(
+        Modifier
+            .align(Alignment.TopStart)
+            .fillMaxWidth()
+            // The page colour fades out under the header so the transcript reads beneath it.
+            .background(Brush.verticalGradient(0f to colors.bgBase, 0.7f to colors.bgBase.copy(alpha = 0.85f), 1f to colors.bgBase.copy(alpha = 0f)))
+            .statusBarsPadding()
+            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+    ) {
+        RoundButton(LodyIcons.Back, stringResource(R.string.chat_back), onClick = onBack)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                    Icon(LodyIcons.Github, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                    Text(subtitle, style = LodyTheme.typography.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+/** Web's round glass-like control (header back, scroll to latest). */
+@Composable
+private fun RoundButton(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val colors = LodyTheme.colors
+    Box(
+        modifier
+            .size(LodySize.controlLg)
+            .dropShadow(CircleShape, LodyElevations.sm.shadow())
+            .clip(CircleShape)
+            .background(colors.bgOverlay)
+            .border(0.5.dp, colors.borderSubtle, CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
     }
 }
 
@@ -205,23 +275,26 @@ private fun turnTime(timestamp: String?): String {
     return zoned.format(DateTimeFormatter.ofPattern(pattern))
 }
 
-/** The new-session page's composer, for a conversation: + and send around the prompt. */
+/**
+ * Web's mobile composer card: the prompt, then + and the run-config chip (agent mark + model)
+ * leading and send trailing. One line at rest, two while editing.
+ */
 @Composable
-private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
+private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabled: Boolean, model: String?, onAttach: () -> Unit, onSend: () -> Unit) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
-    val shape = RoundedCornerShape(LodyRadius.xl)
+    val shape = RoundedCornerShape(LodySpacing.xl)
     val placeholder = stringResource(if (enabled) R.string.chat_composer_placeholder else R.string.chat_composer_unavailable)
     var focused by remember { mutableStateOf(false) }
     Column(
         Modifier
-            .padding(horizontal = TranscriptMargin, vertical = LodySpacing.sm)
+            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm)
             .fillMaxWidth()
-            .dropShadow(shape, LodyElevations.md.shadow())
             .clip(shape)
-            .background(colors.bgOverlay, shape)
+            .background(colors.bgRaised, shape)
+            .border(0.5.dp, colors.borderSubtle, shape)
             .animateContentSize()
-            .padding(LodySpacing.sm),
+            .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.sm),
     ) {
         BasicTextField(
             value = prompt,
@@ -234,7 +307,7 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
             modifier = Modifier
                 .fillMaxWidth()
                 .onFocusChanged { focused = it.isFocused }
-                .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs)
+                .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm)
                 .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
                 Box {
@@ -244,19 +317,33 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
             },
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
+            val attach = stringResource(R.string.create_attach)
+            IconButton(onClick = onAttach, modifier = Modifier.semantics { contentDescription = attach }) {
+                Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+            }
+            if (model != null) {
+                Row(
+                    Modifier.weight(1f, fill = false).padding(horizontal = LodySpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                ) {
+                    Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+                    Text(model, style = type.subhead, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             Spacer(Modifier.weight(1f))
             val ready = enabled && prompt.isNotBlank()
             val send = stringResource(R.string.create_send)
             Box(
                 Modifier
-                    .size(LodySize.controlSm)
+                    .size(LodySize.controlLg - LodySpacing.xs)
                     .clip(CircleShape)
                     .background(if (ready) colors.accentSolid else colors.fillSecondary)
                     .clickable(enabled = ready, role = Role.Button, onClick = onSend)
                     .semantics { contentDescription = send },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+                Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.md))
             }
         }
     }

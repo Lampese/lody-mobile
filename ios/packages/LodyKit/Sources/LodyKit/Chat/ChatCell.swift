@@ -207,8 +207,8 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   private let authorLabel = UILabel()
   private let authorAvatar = UIImageView()
   private var authorPhoto: URL?
-  static let avatarSize: CGFloat = 28
-  static let avatarSlot: CGFloat = avatarSize + 8
+  static let avatarSize: CGFloat = 36
+  static let avatarSlot: CGFloat = avatarSize + 10
   static let authorHeader: CGFloat = 22
   var onInteraction: (() -> Void)?
   var canEdit: (() -> Bool)?
@@ -256,7 +256,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
       view.isHidden = true
       contentView.addSubview(view)
     }
-    authorLabel.font = .dynamic(of: 12)
+    authorLabel.font = .dynamic(of: 13)
     authorLabel.textColor = .tertiaryLabel
     authorLabel.textAlignment = .right
     authorMark.contentMode = .scaleAspectFit
@@ -279,7 +279,8 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     accessibilityValue = nil
     guard shown else { return }
     let who = ChatAuthors.identity(row.author)
-    authorLabel.text = [who.name, row.authorTime].filter { !$0.isEmpty }.joined(separator: "  ·  ")
+    // Web's order: delivery mark, time, then the sender.
+    authorLabel.text = [row.authorTime, who.name].filter { !$0.isEmpty }.joined(separator: "  ")
     let marks: [String: (String, UIColor)] = [
       "seen": ("checkmark.circle", .lodyAccent), "queued": ("clock", .tertiaryLabel),
       "sending": ("circle.dotted", .tertiaryLabel), "sent": ("circle", .tertiaryLabel),
