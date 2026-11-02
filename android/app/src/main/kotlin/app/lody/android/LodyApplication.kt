@@ -36,7 +36,10 @@ open class LodyApplication : Application() {
         super.onCreate()
         runtimeOwner = RuntimeOwner(::createRuntime, Dispatchers.Main.immediate)
         val cache = AtomicCatalogStore(this)
-        creation = app.lody.android.create.CreateSessionRepository(runtimeOwner, cache)
+        val branches = app.lody.android.create.GitHubBranches()
+        creation = app.lody.android.create.CreateSessionRepository(runtimeOwner, cache) { scope, repo, page ->
+            account.withVerifiedAccount(scope) { token -> branches.load(token, scope.workspaceId, repo, page) }
+        }
         account = AccountController(CloudAuthHttp(OkHttpAuthTransport()), KeystoreCredentialStore(this), applicationScope, cache) {
             prepared = null
             cloud.disconnect()

@@ -34,7 +34,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import java.util.UUID
 
 import androidx.compose.animation.AnimatedVisibility
@@ -120,13 +119,20 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val scope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.create_extras_unavailable)
     val notice = { scope.launch { snackbar.showSnackbar(unavailable) }; Unit }
-    var options by remember(runtimeScope, target.projectId, target.chat, target.machineId) { mutableStateOf<CreationOptions?>(null) }
-    var optionsFresh by remember(runtimeScope, target.projectId, target.chat, target.machineId) { mutableStateOf(false) }
+    var options by remember(runtimeScope) { mutableStateOf<CreationOptions?>(null) }
+    var targetChosen by remember(runtimeScope) { mutableStateOf(false) }
+    var optionsFresh by remember(runtimeScope) { mutableStateOf(false) }
     var agentId by rememberSaveable { mutableStateOf<String?>(null) }
     var modelId by rememberSaveable { mutableStateOf<String?>(null) }
     var modeId by rememberSaveable { mutableStateOf<String?>(null) }
     var effort by rememberSaveable { mutableStateOf<String?>(null) }
-    var branch by rememberSaveable { mutableStateOf("") }
+    val branchRepo = target.projectId.orEmpty().removePrefix("github:")
+    var branches by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(BranchState()) }
+    var branchLoading by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(false) }
+    var branchFailed by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(false) }
+    var branchPage by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(1) }
+    var branchAttempt by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(0) }
+    val branch = branches.selected
     val sessionId = rememberSaveable { UUID.randomUUID().toString() }
     val turnId = rememberSaveable { UUID.randomUUID().toString() }
     var attempted by rememberSaveable { mutableStateOf(false) }
@@ -137,22 +143,46 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val capability = options?.capability(agent)
     val github = CreateSessionModel.isGithub(target.projectId) && !target.chat
     val canSend = optionsFresh && agent != null && !attempted && !busy && (!github || branch.isNotBlank())
-    val waitingText = stringResource(if (options == null) R.string.create_waiting_agents else R.string.create_no_online_agents)
+    val waitingText = stringResource(R.string.create_agent)
     val unknownText = stringResource(R.string.create_result_unknown)
     val rejectedText = stringResource(R.string.create_result_rejected)
-    LaunchedEffect(runtimeScope, target.projectId, target.chat, target.machineId) {
+    LaunchedEffect(runtimeScope, target.machineId) {
+        agentId = null; modelId = null; modeId = null; effort = null
+    }
+    LaunchedEffect(runtimeScope) {
         optionsFresh = false
-        options = null; agentId = null; modelId = null; modeId = null; effort = null; branch = ""
-        val projectId = target.projectId.takeUnless { target.chat }
-        try { options = repository.cachedOptions(runtimeScope, projectId) }
+        options = null; agentId = null; modelId = null; modeId = null; effort = null
+        try { options = repository.cachedOptions(runtimeScope, null) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { /* A missing/corrupt cache is a normal cold start. */ }
-        while (true) {
-            try { options = repository.options(runtimeScope, projectId); optionsFresh = true }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { optionsFresh = false }
-            delay(5000)
+        // One complete workspace refresh on entry; cached options stay visible while it runs.
+        try {
+            val loaded = repository.options(runtimeScope, null)
+            options = loaded; optionsFresh = true
+            target = CreateSessionModel.withInitialAvailability(target, loaded, explicitlySelected = targetChosen)
+            if (loaded.agents.isNotEmpty()) targetChosen = true
         }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { optionsFresh = false }
+    }
+    LaunchedEffect(runtimeScope, target.projectId, target.chat, branchPage, branchAttempt) {
+        if (!github) return@LaunchedEffect
+        branchLoading = true
+        branchFailed = false
+        if (branchPage == 1 && branches.page == null) {
+            try { branches = branches.restore(repository.cachedBranches(runtimeScope, branchRepo)) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { }
+        }
+        try {
+            val loaded = repository.branches(runtimeScope, branchRepo, branchPage)
+            branches = branches.accept(loaded, branchPage)
+            try { repository.cacheBranches(runtimeScope, branchRepo, branches.page!!) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { branchFailed = true }
+        finally { branchLoading = false }
     }
     BackHandler(enabled = busy) { }
     val send = {
@@ -207,10 +237,18 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                         .padding(horizontal = LodyLayout.screenPaddingX),
                     verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
-                    ContextPanel(catalog, target, onChange = { if (!attempted) target = it })
-                    // GitHub branches are typed (Android does not list them yet), on a plain line.
-                    if (github) BranchLine(branch, enabled = !attempted) { branch = it }
-                    if (agent == null && !attempted) Text(waitingText, style = LodyTheme.typography.footnote, color = colors.textSecondary, modifier = Modifier.padding(horizontal = LodySpacing.xs))
+                    ContextPanel(catalog, target, onChange = { if (!attempted) { targetChosen = true; target = it } })
+                    if (github) BranchLine(branches, branchLoading, branchFailed, enabled = !attempted,
+                        onChange = { name ->
+                            branches = branches.select(name)
+                            val selectedRepo = branchRepo
+                            scope.launch {
+                                try { repository.selectBranch(runtimeScope, selectedRepo, name) }
+                                catch (cancelled: CancellationException) { throw cancelled }
+                                catch (_: Exception) { }
+                            }
+                        },
+                        onMore = { if (!branchLoading) { if (!branchFailed) branchPage = branches.page?.nextPage ?: 1; branchAttempt++ } })
                     if (attempted) {
                         Text(if (busy) stringResource(R.string.create_sending) else outcome ?: unknownText, style = LodyTheme.typography.footnote, color = colors.textSecondary)
                         if (!busy && outcome != rejectedText) TextButton(onClick = { onCreated(sessionId, prompt.take(200)) }) { Text(stringResource(R.string.create_open_result)) }
@@ -228,7 +266,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 enabled = canSend,
                 agentReady = agent != null,
                 face = listOfNotNull(modelName ?: agent?.name, effort),
-                mode = modeName,
+                mode = modeId,
+                modeLabel = modeName,
                 waiting = waitingText,
             )
         }
@@ -237,11 +276,11 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         ModalBottomSheet(onDismissRequest = { runConfig = false }, containerColor = colors.bgBase) {
             RunConfigSheet(
                 rows = buildList {
-                    if (agents.size > 1) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, icon = LodyIcons.Agent) }))
+                    if (agents.isNotEmpty()) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, icon = LodyIcons.Agent) }))
                     capability?.models?.takeIf { it.isNotEmpty() }?.let { models ->
                         add(RunConfigRow(MODEL, stringResource(R.string.create_model), models.map { PickerOption(it.id, it.name, it.id == modelId) }))
                     }
-                    capability?.efforts?.get(modelId)?.takeIf { it.isNotEmpty() }?.let { efforts ->
+                    capability?.effortsFor(modelId)?.takeIf { it.isNotEmpty() }?.let { efforts ->
                         add(RunConfigRow(EFFORT, stringResource(R.string.create_effort), efforts.map { PickerOption(it, it, it == effort) }))
                     }
                     capability?.modes?.takeIf { it.isNotEmpty() }?.let { modes ->
@@ -507,33 +546,43 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
-/** The GitHub branch as a plain line: branch mark and the typed name. */
+/** Cached choices stay interactive while the next snapshot loads. */
 @Composable
-private fun BranchLine(branch: String, enabled: Boolean, onChange: (String) -> Unit) {
+private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, enabled: Boolean, onChange: (String) -> Unit, onMore: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val colors = LodyTheme.colors
-    val type = LodyTheme.typography
-    val placeholder = stringResource(R.string.create_branch_name)
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).padding(horizontal = LodySpacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
-    ) {
-        Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
-        BasicTextField(
-            value = branch,
-            onValueChange = onChange,
-            enabled = enabled,
-            singleLine = true,
-            textStyle = type.body.copy(color = colors.textPrimary),
-            cursorBrush = SolidColor(colors.accentDefault),
-            modifier = Modifier.weight(1f).semantics { contentDescription = placeholder },
-            decorationBox = { inner ->
-                Box {
-                    if (branch.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder)
-                    inner()
+    Column {
+        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { open = !open }
+            .padding(horizontal = LodySpacing.xs), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
+            Icon(LodyIcons.Branch, null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+            Text(state.selected.ifEmpty { stringResource(R.string.create_branch_name) }, style = LodyTheme.typography.body,
+                color = if (state.selected.isEmpty()) colors.textPlaceholder else colors.textPrimary, modifier = Modifier.weight(1f))
+            if (loading && state.page == null) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm))
+            else PopupIndicator()
+        }
+        if (open) {
+            BasicTextField(value = query, onValueChange = { query = it }, singleLine = true,
+                textStyle = LodyTheme.typography.body.copy(color = colors.textPrimary),
+                modifier = Modifier.fillMaxWidth().padding(LodySpacing.sm),
+                decorationBox = { field -> Box { if (query.isEmpty()) Text(stringResource(R.string.create_search_branches), style = LodyTheme.typography.body, color = colors.textPlaceholder); field() } })
+            LazyColumn(Modifier.heightIn(max = LodySize.controlMd * 6)) {
+              items(state.page?.names.orEmpty().filter { it.contains(query.trim(), ignoreCase = true) }, key = { it }) { name ->
+                Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { onChange(name); open = false }
+                    .padding(horizontal = LodySpacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                    Text(name, style = LodyTheme.typography.body, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    if (name == state.selected) Icon(LodyIcons.Check, null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm))
                 }
-            },
-        )
+            }
+            }
+            if (failed || state.page?.nextPage != null || (loading && state.page == null)) {
+                TextButton(onClick = onMore, enabled = enabled && !loading) {
+                    if (loading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm))
+                    else Text(stringResource(if (failed) R.string.chat_retry else R.string.create_more_branches))
+                }
+            }
+        }
     }
 }
 
@@ -594,7 +643,7 @@ private val RunConfigLabelWidth = LodySize.controlLg * 2
 /**
  * Web's mobile composer on a floating surface (Android has no Liquid Glass; the Home tab bar's
  * overlay + shadow stands in): prompt, then + and the run-config chip leading, send trailing.
- * No @ button, as web and iOS. One line at rest; two while editing.
+ * No @ button, as web and iOS. One line at rest; three while editing.
  */
 @Composable
 private fun Composer(
@@ -607,6 +656,7 @@ private fun Composer(
     agentReady: Boolean,
     face: List<String>,
     mode: String?,
+    modeLabel: String?,
     waiting: String,
 ) {
     val colors = LodyTheme.colors
@@ -629,7 +679,7 @@ private fun Composer(
             onValueChange = onPromptChange,
             textStyle = type.body.copy(color = colors.textPrimary),
             cursorBrush = SolidColor(colors.accentDefault),
-            minLines = if (focused) 2 else 1,
+            minLines = if (focused) 3 else 1,
             maxLines = 10,
             modifier = Modifier
                 .fillMaxWidth()
@@ -665,13 +715,22 @@ private fun Composer(
                             if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
                             withStyle(SpanStyle(color = colors.textPrimary)) { append(part) }
                         }
-                        if (mode != null) {
-                            withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
-                            withStyle(SpanStyle(color = colors.textSecondary)) { append(mode) }
-                        }
+
                     }
                 }
-                Text(label, style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(label, style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                val warning = mode in listOf("agent-full-access", "danger-full-access", "dontAsk", "bypassPermissions", "yolo", "always-approve")
+                val modeIcon = when {
+                    warning -> LodyIcons.PermissionWarning
+                    mode == "agent" || mode == "default" -> LodyIcons.PermissionDefault
+                    mode == "read-only" -> LodyIcons.Eye
+                    mode == "acceptEdits" -> LodyIcons.Edit
+                    mode == "plan" -> LodyIcons.PermissionPlan
+                    else -> null
+                }
+                if (modeIcon != null) Icon(modeIcon, contentDescription = modeLabel, tint = if (warning) colors.warningDefault else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                if (mode == "auto" || mode == "agent-auto-review") Text(stringResource(R.string.create_mode_auto), style = type.caption, color = colors.textSecondary)
+
             }
             Spacer(Modifier.weight(1f))
             val ready = enabled && prompt.isNotBlank()

@@ -63,4 +63,13 @@ class CreateSessionModelTest {
         assertEquals(CreateSessionModel.MachineKind.Laptop, kind("unknown"))
         assertEquals(CreateSessionModel.MachineKind.Laptop, kind(null))
     }
+    @Test fun initialAvailabilityUsesAnOnlineComputerWithoutMovingLocalProjects() {
+        val options = app.lody.android.runtime.CreationOptions(listOf(app.lody.android.runtime.CreationAgent("a", "Codex", "m2", "builtin", "codex")), emptyList())
+        val github = CreateTarget(projectId = "github:lody/web", machineId = "m1")
+        assertEquals("m2", CreateSessionModel.withInitialAvailability(github, options).machineId)
+        val local = CreateTarget(projectId = "m1:local:a", machineId = "m1")
+        assertEquals(local, CreateSessionModel.withInitialAvailability(local, options))
+        assertEquals(github, CreateSessionModel.withInitialAvailability(github, options.copy(agents = emptyList())))
+        assertEquals(github, CreateSessionModel.withInitialAvailability(github, options, explicitlySelected = true))
+    }
 }

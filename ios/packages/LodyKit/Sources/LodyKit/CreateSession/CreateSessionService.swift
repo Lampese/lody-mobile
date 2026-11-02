@@ -12,6 +12,13 @@ struct CreateSessionService {
   var persistShare = true
   var cachedOptions: (_ userId: String, _ workspaceId: String, _ projectId: String?) async -> CreationOptions? = { _, _, _ in nil }
 
+  var cachedBranches: (_ userId: String, _ workspaceId: String, _ repo: String) async -> CreateBranches? = { _, _, _ in nil }
+  var persistBranches: (_ userId: String, _ workspaceId: String, _ repo: String, _ branches: CreateBranches) -> Void = { _, _, _, _ in }
+
+  static func branchesKey(userId: String, workspaceId: String, repo: String) -> String {
+    "creation-branches:v1:" + CreateJSON.encode([userId, workspaceId, repo])
+  }
+
   static func optionsKey(userId: String, workspaceId: String, projectId: String?) -> String {
     "creation-options:v1:" + CreateJSON.encode([userId, workspaceId, projectId ?? ""])
   }
@@ -20,6 +27,7 @@ struct CreateSessionService {
 
   static var live: CreateSessionService {
     var branchAttempts: [String: Int] = [:]
+    let branchCacheGeneration = LocalStore.shared.generation
     return CreateSessionService(
       options: { workspaceId, projectId in
         var payload: [String: Any] = ["workspaceId": workspaceId]
@@ -71,6 +79,19 @@ struct CreateSessionService {
           LocalStore.queue.async { continuation.resume(returning: (try? LocalStore.shared.read(key)) ?? nil) }
         }
         return raw.flatMap { CreateJSON.decode(CreationOptions.self, $0) }
+      },
+      cachedBranches: { userId, workspaceId, repo in
+        let key = branchesKey(userId: userId, workspaceId: workspaceId, repo: repo)
+        let raw: String? = await withCheckedContinuation { continuation in
+          LocalStore.queue.async { continuation.resume(returning: (try? LocalStore.shared.read(key)) ?? nil) }
+        }
+        return raw.flatMap { CreateJSON.decode(CreateBranches.self, $0) }
+      },
+      persistBranches: { userId, workspaceId, repo, branches in
+        let key = branchesKey(userId: userId, workspaceId: workspaceId, repo: repo)
+        let value = CreateJSON.encode(branches)
+        guard value.utf8.count <= 1024 * 1024 else { return }
+        LocalStore.queue.async { try? LocalStore.shared.write(key, value, generation: branchCacheGeneration) }
       }
     )
   }

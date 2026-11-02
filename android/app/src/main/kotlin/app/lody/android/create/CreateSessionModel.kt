@@ -16,6 +16,13 @@ data class CreateTarget(
 )
 
 object CreateSessionModel {
+    /** Only resolve the initial automatic choice; never move an explicit choice or a local project. */
+    fun withInitialAvailability(target: CreateTarget, options: app.lody.android.runtime.CreationOptions, explicitlySelected: Boolean = false): CreateTarget {
+        if (explicitlySelected || (!target.chat && !isGithub(target.projectId))) return target
+        if (options.agents.any { it.machineId == target.machineId }) return target
+        return options.agents.firstOrNull()?.let { target.copy(machineId = it.machineId) } ?: target
+    }
+
     fun isGithub(projectId: String?) = projectId?.startsWith("github:") == true
     fun isChat(projectId: String) = projectId.endsWith(":unassigned")
 

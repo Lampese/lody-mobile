@@ -5,7 +5,7 @@ export function adaptCreationRuntime(source) {
  const key='const key = `${machineId}:${cliType}:${agentType}`;';
  const capability='capabilities.set(key, {\n          machineId,';
  if(!source.includes(key) || !source.includes(capability))throw Error('creation_capability_adapter_drift');
- source=source.replace(key, "const configId = typeof row.key[1] === 'string' ? row.key[1] : '';\n        const key = configId ? `${machineId}:config:${configId}` : `${machineId}:${cliType}:${agentType}`;")
+ source=source.replace(key, "const configId = row.key.length === 2 && typeof row.key[1] === 'string' ? row.key[1] : '';\n        const key = configId ? `${machineId}:config:${configId}` : `${machineId}:${cliType}:${agentType}`;")
   .replace(capability,capability+"\n          ...(configId ? {agentConfigId:configId} : {}),");
  return source.replace(anchor,"kind: 'local',\n      useWorktree: args.useWorktree === true,\n      localProjectId:");
 }

@@ -19,8 +19,16 @@ class CreateSessionProbeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val result = intent.getStringExtra("result") ?: "accepted"
+        val branchMode = intent.getStringExtra("branches")
         var calls = 0
         val service = object : CreationService {
+            override suspend fun cachedBranches(scope: RuntimeScope, repo: String) =
+                if (branchMode == "cold") null else BranchCache(BranchPage(listOf("main", "feature/cached"), "main"), "feature/cached")
+            override suspend fun branches(scope: RuntimeScope, repo: String, page: Int): BranchPage {
+                delay(12000)
+                check(branchMode != "failed") { "fixture_offline" }
+                return BranchPage(listOf("main", "feature/cached", "feature/refreshed"), "main")
+            }
             override suspend fun options(scope: RuntimeScope, projectId: String?) = CreationOptions(
                 listOf(CreationAgent("agent", "Fixture assistant", "machine", "builtin", "fixture")),
                 listOf(CreationCapability("machine", "builtin", "fixture", listOf(CreationChoice("model", "Fixture model")), listOf(CreationChoice("auto", "Automatic")), mapOf("model" to listOf("low", "high")))),
@@ -32,7 +40,7 @@ class CreateSessionProbeActivity : ComponentActivity() {
                 return CreationReceipt(request.sessionId, result)
             }
         }
-        val catalog = CatalogSnapshot(1, emptyList(), emptyList(), listOf("machine"), mapOf("machine" to "Fixture computer"))
+        val catalog = CatalogSnapshot(1, if (branchMode == null) emptyList() else listOf(CatalogProject("github:Fixture/Repo", "", "Fixture/Repo", "")), emptyList(), listOf("machine"), mapOf("machine" to "Fixture computer"))
         setContent {
             LodyTheme {
                 var receipt by remember { mutableStateOf<String?>(null) }

@@ -288,7 +288,6 @@ final class InboxChrome {
       })
     }
     return UIMenu(
-      title: String(localized: "inbox.settings.section.view", bundle: .lody),
       children: [
         UIMenu(title: String(localized: "home.view.scope", bundle: .lody), options: [.displayInline, .singleSelection], children: [scopes]),
         UIMenu(title: String(localized: "home.view.grouping", bundle: .lody), options: [.displayInline, .singleSelection], children: [groupings]),

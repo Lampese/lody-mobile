@@ -169,13 +169,13 @@ enum CreateSessionContext {
   /// No project first; then recent projects usable on the chosen computer (its local projects
   /// and any GitHub project) and More projects…, or for search every usable project.
   private static func projectOptions(_ form: CreateSessionForm, recent: Bool) -> [CreateOption] {
-    let chat = CreateOption(id: chatOption, title: text("create.context.chat"), glyph: .symbol("circle.slash"), selected: form.chat)
+    let chat = CreateOption(id: chatOption, title: text("create.context.chat"), glyph: .symbol("circle.slash"), selected: form.current.chat)
     let shown = recent ? recentProjects(form) : usableProjects(form)
     var options = [chat] + shown.map { project in
       CreateOption(
         id: project.id, title: project.name,
         subtitle: CreateProjectPicker.isGithub(project.id) ? "GitHub" : abbreviated(project.rootPath),
-        glyph: projectGlyph(project.id), selected: !form.chat && project.id == form.project.projectId,
+        glyph: projectGlyph(project.id), selected: !form.current.chat && project.id == form.current.projectId,
         searchText: project.rootPath)
     }
     if recent { options.append(CreateOption(id: moreOption, title: text("create.context.moreProjects"), glyph: .symbol("ellipsis"))) }
@@ -194,7 +194,7 @@ enum CreateSessionContext {
   /// `form.projects` is ordered by latest activity; the selected project always stays listed.
   static func recentProjects(_ form: CreateSessionForm) -> [CreateProject] {
     var recent = Array(usableProjects(form).prefix(recentLimit))
-    if !form.chat, let current = form.projects.first(where: { $0.id == form.project.projectId }), !recent.contains(where: { $0.id == current.id }) {
+    if !form.current.chat, let current = form.projects.first(where: { $0.id == form.current.projectId }), !recent.contains(where: { $0.id == current.id }) {
       recent.insert(current, at: 0)
     }
     return recent
@@ -204,14 +204,14 @@ enum CreateSessionContext {
   static func allMachines(_ form: CreateSessionForm) -> [(id: String, name: String)] {
     var seen = Set<String>()
     let known = form.machineNames.sorted { $0.value.localizedCompare($1.value) == .orderedAscending }.map { (id: $0.key, name: $0.value) }
-    return (form.chatPage.machines + form.project.machines + known).filter { seen.insert($0.id).inserted }
+    return (form.current.machines + known).filter { seen.insert($0.id).inserted }
   }
 
-  /// Computers with an assistant online, read from the chat options (which cover every
+  /// Computers with an assistant online, read from the full options snapshot (covering every
   /// computer); nil while unknown, so nothing is disabled on a guess.
   private static func onlineMachines(_ form: CreateSessionForm) -> Set<String>? {
-    guard form.chatPage.options != nil else { return nil }
-    return Set((form.chatPage.machines + form.project.machines).map(\.id))
+    guard form.current.options != nil else { return nil }
+    return Set(form.current.machines.map(\.id))
   }
 
   // MARK: Run configuration
@@ -230,7 +230,7 @@ enum CreateSessionContext {
       let current = capability.models.first { $0.id == page.choice.modelId }
       rows.append(CreatePicker(
         id: "model", glyph: .symbol("cpu"), title: current?.name ?? text("model.default"), placeholder: current == nil,
-        options: capability.models.map { CreateOption(id: $0.id, title: $0.name, subtitle: $0.description ?? "", selected: $0.id == page.choice.modelId) },
+        options: capability.models.map { CreateOption(id: $0.id, title: $0.name, selected: $0.id == page.choice.modelId) },
         searchPlaceholder: text("create.context.searchModels")))
     }
     let efforts = CreateLogic.effortsFor(capability, modelId: page.choice.modelId)

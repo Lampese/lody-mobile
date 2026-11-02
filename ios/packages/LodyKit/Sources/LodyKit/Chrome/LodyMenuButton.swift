@@ -1,6 +1,6 @@
 import UIKit
 
-struct LodyMenuItem {
+struct LodyMenuItem: Equatable {
   var id: String = ""
   var title: String = ""
   var symbol: String = ""
@@ -103,7 +103,7 @@ final class LodyMenuButton: UIView {
         LodyListPhoto.load(url) { [weak self] loaded in
           guard let self else { return }
           self.loadingPhotos.remove(url)
-          if loaded != nil { self.setItems(self.items) }
+          if loaded != nil, self.itemsContainPhoto(url) { self.rebuildMenu() }
         }
       }
     }
@@ -112,7 +112,20 @@ final class LodyMenuButton: UIView {
   }
 
   func setItems(_ value: [LodyMenuItem]) {
+    guard items != value else { return }
     items = value
+    rebuildMenu()
+  }
+
+  private func itemsContainPhoto(_ url: URL) -> Bool {
+    func contains(_ item: LodyMenuItem) -> Bool {
+      LodyListPhoto.url(item.photo) == url || item.children.contains(where: contains)
+    }
+    return items.contains(where: contains)
+  }
+
+  private func rebuildMenu() {
+    let value = items
     func action(_ item: LodyMenuItem, state: UIMenuElement.State = .off) -> UIAction {
       let result = UIAction(
         title: item.title,

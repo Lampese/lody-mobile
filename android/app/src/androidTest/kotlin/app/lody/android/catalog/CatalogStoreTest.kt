@@ -13,6 +13,25 @@ class CatalogStoreTest {
  private val account = Account("account", "Fixture", listOf(Workspace("w", "Work"), Workspace("other", "Other")))
  private val scope = RuntimeScope("account", "w")
  private val saved = SavedCatalog(CatalogSnapshot(99, listOf(CatalogProject("p", "m", "项目 🌙", "/fixture")), listOf(CatalogSession("s", "m", "p", "hello", "idle", false, true, "2026")), listOf("m")), 1234)
+ @Test fun branchesRestoreSelectionAcrossInstancesWithoutCrossingWorkspace() = runBlocking {
+  val store = AtomicCatalogStore(context, "branches-test")
+  val page = app.lody.android.create.BranchPage(listOf("main", "feature"), "main")
+  try {
+   store.clear(); store.saveAccount(account)
+   store.selectBranch(scope, "Owner/Repo", "feature") // A tap can race the first disk write.
+   store.writeBranches(scope, "Owner/Repo", page)
+   val reopened = AtomicCatalogStore(context, "branches-test")
+   assertEquals("feature", reopened.readBranches(scope, "Owner/Repo")!!.selected)
+   assertEquals(page, reopened.readBranches(scope, "Owner/Repo")!!.page)
+   assertNull(reopened.readBranches(RuntimeScope("account", "other"), "Owner/Repo"))
+   assertNull(reopened.readBranches(scope, "Other/Repo"))
+   reopened.saveAccount(account.copy(workspaces = listOf(Workspace("other", "Other"))))
+   reopened.saveAccount(account)
+   assertNull(reopened.readBranches(scope, "Owner/Repo"))
+   reopened.writeBranches(scope, "Owner/Repo", page); reopened.clear()
+   assertNull(store.readBranches(scope, "Owner/Repo"))
+  } finally { store.clear() }
+ }
  @Test fun creationOptionsPersistAcrossInstancesAndRespectScopeAndLogout() = runBlocking {
   val store = AtomicCatalogStore(context, "options-test")
   val agent = CreationAgent("provider", "Assistant", "m", "acp", "codex")

@@ -252,7 +252,7 @@ final class CreateBranchController: CreateListController {
   var onPick: ((String) -> Void)?
   var onMore: (() -> Void)?
   private let repo: String
-  private var page = CreateSessionPage(chat: false)
+  private var page = CreateSessionSelection()
   private var cachedOnly = false
   private var query = ""
 
@@ -271,7 +271,7 @@ final class CreateBranchController: CreateListController {
     render()
   }
 
-  func update(_ page: CreateSessionPage, cachedOnly: Bool) {
+  func update(_ page: CreateSessionSelection, cachedOnly: Bool) {
     self.page = page
     self.cachedOnly = cachedOnly
     if isViewLoaded { render() }

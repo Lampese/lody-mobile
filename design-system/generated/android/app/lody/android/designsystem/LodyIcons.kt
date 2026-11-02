@@ -584,6 +584,30 @@ object LodyIcons {
         )
     }
 
+    val PermissionWarning: ImageVector by lazy {
+        lodyIcon(
+            "PermissionWarning",
+            "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+            "M12 8v4",
+            "M12 16h.01",
+        )
+    }
+
+    val PermissionPlan: ImageVector by lazy {
+        lodyIcon(
+            "PermissionPlan",
+            "m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z",
+            "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z",
+        )
+    }
+
+    val PermissionDefault: ImageVector by lazy {
+        lodyIcon(
+            "PermissionDefault",
+            "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+        )
+    }
+
     val all: List<Pair<String, ImageVector>> by lazy {
         listOf(
             "inbox" to Inbox,
@@ -651,6 +675,9 @@ object LodyIcons {
             "sun" to Sun,
             "moon" to Moon,
             "logOut" to LogOut,
+            "permissionWarning" to PermissionWarning,
+            "permissionPlan" to PermissionPlan,
+            "permissionDefault" to PermissionDefault,
         )
     }
 }

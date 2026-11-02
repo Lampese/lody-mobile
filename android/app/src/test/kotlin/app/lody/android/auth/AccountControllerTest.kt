@@ -6,6 +6,14 @@ import org.junit.Assert.*
 import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AccountControllerTest {
+ @Test fun branchReadCannotPublishAcrossLogout()=runTest {
+  val controller=AccountController(Api(),Store(Credential("saved")),backgroundScope)
+  controller.restore().join()
+  val late=CompletableDeferred<String>()
+  val result=async { try { controller.withVerifiedAccount(RuntimeScope("user","workspace")) { late.await() } } catch(e:AuthFailure) { e.code } }
+  runCurrent();controller.logout().join();late.complete("stale branches")
+  assertEquals("account_changed",result.await())
+ }
  private class Store(var saved:Credential?=null):CredentialStore {
   override suspend fun read()=saved
   override suspend fun write(credential:Credential){saved=credential}

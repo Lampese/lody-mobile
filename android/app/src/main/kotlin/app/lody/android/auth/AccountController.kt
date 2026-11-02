@@ -98,6 +98,16 @@ class AccountController(private val api: CloudAuthApi, private val store: Creden
         if (epoch != identity || credential !== token) throw AuthFailure("account_changed")
         return result
     }
+    internal suspend fun <T> withVerifiedAccount(scope: RuntimeScope, block: suspend (Credential) -> T): T {
+        val identity = epoch
+        val token = credential ?: throw AuthFailure("account_changed")
+        val account = state.value.account
+        if (!state.value.verified || account?.id != scope.accountId || account.workspaces.none { it.id == scope.workspaceId }) throw AuthFailure("account_changed")
+        val result = block(token)
+        currentCoroutineContext().ensureActive()
+        if (epoch != identity || credential !== token) throw AuthFailure("account_changed")
+        return result
+    }
     private suspend fun clearLocal() { try { store.clear() } finally { context?.clear() } }
     private suspend fun <T> cache(block: suspend () -> T): T? = try { block() }
     catch (cancelled: CancellationException) { throw cancelled }

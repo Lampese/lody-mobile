@@ -71,6 +71,9 @@ public enum LodyIcon: String, CaseIterable, Sendable {
     case sun = "lody.icon.sun"
     case moon = "lody.icon.moon"
     case logOut = "lody.icon.logOut"
+    case permissionWarning = "lody.icon.permissionWarning"
+    case permissionPlan = "lody.icon.permissionPlan"
+    case permissionDefault = "lody.icon.permissionDefault"
 
     public var image: Image { Image(rawValue, bundle: .module) }
     public var uiImage: UIImage? { UIImage(named: rawValue, in: .module, with: nil) }

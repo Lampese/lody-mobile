@@ -6,9 +6,10 @@ import UIKit
 @MainActor
 final class CreateSessionController: UIViewController {
   var form = CreateSessionForm()
-  var loadCachedOptions: ((_ projectId: String?) async -> CreationOptions?)?
-  var loadOptions: ((_ projectId: String?) async throws -> CreationOptions)?
+  var loadCachedOptions: (() async -> CreationOptions?)?
+  var loadOptions: (() async throws -> CreationOptions)?
   var loadRepositories: (() async throws -> [CreateProject])?
+  var loadCachedBranches: ((_ repo: String) async -> CreateBranches?)?
   var loadBranches: ((_ repo: String, _ page: Int) async throws -> CreateBranches)?
   var onBranches: ((String, CreateBranches) -> Void)?
   private var branchTask: Task<Void, Never>?
@@ -34,10 +35,11 @@ final class CreateSessionController: UIViewController {
   private weak var runConfigSheet: UIViewController?
   private let signedOutLabel = UILabel()
   private lazy var hostHeight = host.heightAnchor.constraint(equalToConstant: 64)
-  private var loads: [Bool: Task<Void, Never>] = [:]
-  private var retryTimer: Timer?
-
-  isolated deinit { retryTimer?.invalidate(); branchTask?.cancel() }
+  private var optionsTask: Task<Void, Never>?
+  isolated deinit {
+    branchTask?.cancel()
+    optionsTask?.cancel()
+  }
 
   init(composer: ChatComposerView, host: UIView) {
     self.composer = composer
@@ -68,7 +70,7 @@ final class CreateSessionController: UIViewController {
     panelState.onPick = { [weak self] id, option in self?.optionPicked(id, option) }
     panelState.onWorktree = { [weak self] on in
       guard let self, !self.sending else { return }
-      self.form.project.worktree = on
+      self.form.current.worktree = on
       self.changed(prefs: false)
     }
     composer.onRunConfig = { [weak self] in self?.presentRunConfig() }
@@ -88,7 +90,7 @@ final class CreateSessionController: UIViewController {
 
     host.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(host)
-    let keyboard = host.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor)
+    let keyboard = host.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -LodySpacing.sm)
     keyboard.priority = .defaultHigh
     NSLayoutConstraint.activate([
       host.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -108,20 +110,9 @@ final class CreateSessionController: UIViewController {
     composer.setInputIdentifier("create-session-input")
     composer.setComposerState(CreateJSON.encode(["placeholder": String(localized: "create.composer.placeholder", bundle: .lody)]))
     render()
-    load(chat: false)
+    // One workspace-wide snapshot; cached options render before the complete runtime response.
+    load()
     fetchBranches()
-    if !form.locked { load(chat: true) }
-    if !form.deferUnresolved {
-      retryTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-        MainActor.assumeIsolated {
-          guard let self, self.viewIfLoaded?.window != nil, !self.sending else { return }
-          for chat in [false, true] where !chat || !self.form.locked {
-            let page = chat ? self.form.chatPage : self.form.project
-            if !page.loading && page.needsOptions { self.load(chat: chat) }
-          }
-        }
-      }
-    }
   }
 
   func setComposerHeight(_ height: CGFloat) {
@@ -163,17 +154,19 @@ final class CreateSessionController: UIViewController {
     guard !sending else { return render() }
     switch (id, option) {
     case ("project", CreateSessionContext.chatOption):
-      guard !form.chat else { return }
-      form.switchPage(chat: true)
+      guard !form.current.chat else { return }
+      form.selectProject(nil)
+      branchTask?.cancel()
+      branchPicker = nil
       changed()
     case ("project", CreateSessionContext.moreOption):
       pickProject()
     case ("branch", CreateSessionContext.loadMoreOption):
       fetchBranches()
     case ("branch", _):
-      guard form.project.branches?.names.contains(option) == true else { return }
-      form.project.branch = option
-      changed(prefs: false)
+      guard form.current.branches?.names.contains(option) == true else { return }
+      form.selectBranch(option)
+      changed()
     case ("model", _):
       composerOptionChanged(["modelId": option, "effort": form.current.choice.effort ?? ""])
     case ("effort", _):
@@ -182,7 +175,6 @@ final class CreateSessionController: UIViewController {
       composerOptionChanged(["permissionId": option])
     case ("project", _):
       guard let project = form.projects.first(where: { $0.id == option }) else { return pickProject() }
-      if form.chat { form.switchPage(chat: false) }
       apply(project)
     case ("machine", _):
       pickMachine(option)
@@ -234,41 +226,30 @@ final class CreateSessionController: UIViewController {
     onSelection?(form)
   }
 
-  func load(chat: Bool) {
+  func load() {
     guard !sending else { return }
-    var page = chat ? form.chatPage : form.project
-    if !chat && page.projectId.isEmpty { return }
-    page.loading = true
-    if chat { form.chatPage = page } else { form.project = page }
+    form.current.loading = true
     render()
-    let projectId = chat ? nil : page.projectId
-    loads[chat]?.cancel()
-    loads[chat] = Task { [weak self] in
+    optionsTask?.cancel()
+    optionsTask = Task { [weak self] in
       do {
-        if let self, (chat ? self.form.chatPage : self.form.project).options == nil,
-          let cached = await self.loadCachedOptions?(projectId) {
-          guard !Task.isCancelled, (chat ? nil : self.form.project.projectId) == projectId else { return }
-          self.form.applyCachedOptions(cached, chat: chat)
+        if let self, self.form.current.options == nil, let cached = await self.loadCachedOptions?() {
+          guard !Task.isCancelled else { return }
+          self.form.applyCachedOptions(cached)
           self.changed(prefs: false)
         }
-        guard let options = try await self?.loadOptions?(projectId) else { return }
-        guard let self, !Task.isCancelled, (chat ? nil : self.form.project.projectId) == projectId else { return }
-        self.form.applyOptions(options, chat: chat)
+        guard let options = try await self?.loadOptions?() else { return }
+        guard let self, !Task.isCancelled else { return }
+        self.form.applyOptions(options)
         self.changed(prefs: false)
       } catch is CancellationError {
         return
       } catch {
         guard let self, !Task.isCancelled else { return }
-        self.form.failOptions(chat: chat)
+        self.form.failOptions()
         self.changed(prefs: false)
       }
     }
-  }
-
-  func refreshOptions() {
-    guard isViewLoaded, !sending, !form.deferUnresolved else { return }
-    load(chat: false)
-    if !form.locked { load(chat: true) }
   }
 
   private func rowPressed(_ id: String) {
@@ -277,8 +258,8 @@ final class CreateSessionController: UIViewController {
     switch id {
     case "project": pickProject()
     case "machine", "agent":
-      guard !page.failed, page.options != nil, !page.machines.isEmpty else { return load(chat: form.chat) }
-      if id == "agent" && page.agents.isEmpty { return load(chat: form.chat) }
+      guard !page.failed, page.options != nil, !page.machines.isEmpty else { return load() }
+      if id == "agent" && page.agents.isEmpty { return load() }
       id == "machine" ? pickMachine() : pickAgent()
     case "model": pickModel()
     case "branch": pickBranch()
@@ -292,24 +273,22 @@ final class CreateSessionController: UIViewController {
 
   private func pickProject() {
     let picker = CreateProjectPickerController(
-      projects: form.projects, machineNames: form.machineNames, selectedId: form.project.projectId,
+      projects: form.projects, machineNames: form.machineNames, selectedId: form.current.projectId,
       loadRepositories: loadRepositories, browse: browseProject)
     picker.onPick = { [weak self, weak picker] project in
       guard let self else { return }
       picker?.navigationController?.popViewController(animated: true)
-      if self.form.chat { self.form.switchPage(chat: false) }
       self.apply(project)
     }
     push(picker)
   }
 
   private func apply(_ project: CreateProject) {
-    let changedProject = project.id != form.project.projectId
+    let changedProject = project.id != form.current.projectId
     form.selectProject(project)
     if changedProject {
       branchTask?.cancel()
       branchPicker = nil
-      load(chat: false)
       fetchBranches()
     }
     changed(prefs: false)
@@ -326,8 +305,10 @@ final class CreateSessionController: UIViewController {
     if let next = form.projects.first(where: { $0.machineId == id && !CreateProjectPicker.isGithub($0.id) }) {
       apply(next)
     } else {
-      form.switchPage(chat: true)
+      form.selectProject(nil)
       form.selectMachine(id)
+      branchTask?.cancel()
+      branchPicker = nil
       changed()
     }
   }
@@ -377,26 +358,33 @@ final class CreateSessionController: UIViewController {
   }
 
   func fetchBranches() {
-    guard form.project.github, !form.project.branchesLoading, let loadBranches else { return }
-    if form.project.branches != nil && (form.project.branches?.nextPage == nil || form.deferUnresolved) { return }
-    let projectId = form.project.projectId
+    guard form.current.github, !form.current.branchesLoading, let loadBranches else { return }
+    if !form.current.branchesStale && form.current.branches != nil && (form.current.branches?.nextPage == nil || form.deferUnresolved) { return }
+    let projectId = form.current.projectId
     let repo = String(projectId.dropFirst(7))
-    let page = form.project.branches?.nextPage ?? 1
-    form.project.branchesLoading = true
-    form.project.branchesFailed = false
+    let page = form.current.branchesStale ? 1 : (form.current.branches?.nextPage ?? 1)
+    form.current.branchesLoading = true
+    form.current.branchesFailed = false
     render()
     updateBranchPicker()
     branchTask?.cancel()
     branchTask = Task { [weak self] in
+      if page == 1, let cached = await self?.loadCachedBranches?(repo) {
+        guard let self, !Task.isCancelled, self.form.current.projectId == projectId else { return }
+        self.form.applyCachedBranches(cached)
+        self.form.current.branchesLoading = true
+        self.changed(prefs: false)
+        self.updateBranchPicker()
+      }
       do {
         let value = try await loadBranches(repo, page)
-        guard let self, !Task.isCancelled, self.form.project.projectId == projectId else { return }
-        self.form.applyBranches(value)
-        if let branches = self.form.project.branches { self.onBranches?(repo, branches) }
+        guard let self, !Task.isCancelled, self.form.current.projectId == projectId else { return }
+        self.form.applyBranches(value, replacing: page == 1)
+        if let branches = self.form.current.branches { self.onBranches?(repo, branches) }
       } catch {
-        guard let self, !Task.isCancelled, self.form.project.projectId == projectId else { return }
-        self.form.project.branchesLoading = false
-        self.form.project.branchesFailed = true
+        guard let self, !Task.isCancelled, self.form.current.projectId == projectId else { return }
+        self.form.current.branchesLoading = false
+        self.form.current.branchesFailed = true
       }
       self?.changed(prefs: false)
       self?.updateBranchPicker()
@@ -404,18 +392,18 @@ final class CreateSessionController: UIViewController {
   }
 
   private func updateBranchPicker() {
-    branchPicker?.update(form.project, cachedOnly: form.deferUnresolved)
+    branchPicker?.update(form.current, cachedOnly: form.deferUnresolved)
   }
 
   private func pickBranch() {
-    let projectId = form.project.projectId
+    let projectId = form.current.projectId
     let picker = CreateBranchController(repo: String(projectId.dropFirst(7)))
     picker.onMore = { [weak self] in self?.fetchBranches() }
     picker.onPick = { [weak self] name in
-      guard let self, self.form.project.projectId == projectId,
-        self.form.project.branches?.names.contains(name) == true else { return }
-      self.form.project.branch = name
-      self.changed(prefs: false)
+      guard let self, self.form.current.projectId == projectId,
+        self.form.current.branches?.names.contains(name) == true else { return }
+      self.form.selectBranch(name)
+      self.changed()
     }
     branchPicker = picker
     updateBranchPicker()

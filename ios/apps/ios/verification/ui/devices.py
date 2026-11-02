@@ -1,4 +1,4 @@
-"""Offline device liveness, per-session status and recovery without closing the creation sheet."""
+"""Offline device liveness, per-session status and one-shot creation loading."""
 import json
 from pathlib import Path
 import sqlite3
@@ -122,7 +122,6 @@ if 'devices-pad' not in str(ui.output):
     presence([])
     ui.open_case('create-recovery')
     ui.element('create-session-input')
-    label(catalog.text('create.devices.failed'))
     send_enabled(False)
     capture_creation('create-load-failed')
     focus_creation()
@@ -130,31 +129,15 @@ if 'devices-pad' not in str(ui.output):
     draft = ui.element('create-session-input')['AXValue']
     assert 'keep this draft' in draft.lower() and 'with edits' in draft.lower(), 'Typing did not edit the creation draft'
     seed('ui-device-options-error', False)
-    label(catalog.text('create.devices.projectOffline'))
-    draft_intact(draft)
-    capture_creation('create-offline-draft')
-    presence(['mini'])
-    label(catalog.text('create.devices.projectOffline'))
-    send_enabled(False)
     presence(['ui', 'mini'])
-    label('Fixture Agent')
-    send_enabled(True)
-    draft_intact(draft)
-    capture_creation('create-recovered')
-    presence([])
-    label(catalog.text('create.devices.projectOffline'))
+    # Cross the removed retry interval. A creation page reads once, even after a failure;
+    # changing the backing fixture must not silently replace the current form.
+    time.sleep(6)
     send_enabled(False)
-    tap_label(catalog.text('create.type.chat'))
-    ui.element('machine')
-    label(catalog.text('create.devices.selectedOffline'))
+    assert not any(i.get('AXLabel') == 'Fixture Agent' for i in ui.state()), 'Creation unexpectedly polled options'
     draft_intact(draft)
-    capture_creation('chat-create-offline')
-    presence(['ui'])
-    label('Fixture Agent')
-    send_enabled(True)
-    draft_intact(draft)
-    capture_creation('chat-create-recovered')
+    capture_creation('create-no-polling')
     tap_label(catalog.text('accessibility.closeSheet', title=catalog.text('create.title')))
 
 (ui.output / 'device-events.json').write_text(json.dumps(events, indent=2))
-print('PASS: device counts, unknown/offline distinction, per-session status and same-sheet recovery preserve drafts and attachments. Offline service fixture; no cloud request or message sent. Visual review required.')
+print('PASS: device counts, unknown/offline distinction, per-session status and one-shot creation preserves drafts and attachments. Offline service fixture; no cloud request or message sent. Visual review required.')

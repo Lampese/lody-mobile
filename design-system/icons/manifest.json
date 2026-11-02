@@ -66,6 +66,9 @@
     "info": "info",
     "sun": "sun",
     "moon": "moon",
-    "logOut": "log-out"
+    "logOut": "log-out",
+    "permissionWarning": "shield-alert",
+    "permissionPlan": "compass",
+    "permissionDefault": "shield"
   }
 }

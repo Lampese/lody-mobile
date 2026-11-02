@@ -63,8 +63,8 @@ final class ShareViewController: UIViewController {
     state.deferUnresolved = true
     state.open(projectId: nil, context: nil)
     form.form = state
-    form.loadOptions = { projectId in
-      guard let options = ShareStore.options(projectId ?? CreateLogic.chatTarget) else { throw CocoaError(.fileNoSuchFile) }
+    form.loadOptions = {
+      guard let options = ShareStore.options(CreateLogic.chatTarget) else { throw CocoaError(.fileNoSuchFile) }
       return options
     }
     form.loadBranches = { repo, _ in

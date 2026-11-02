@@ -43,3 +43,22 @@ test('runtime projection preserves capabilities for providers of one agent type'
  const rows=['a','b'].map(id=>({key:['acpCapability',id],value:{cliType:'builtin',agentType:'codex',models:[{modelId:id,name:id}],fetchedAt:1}}));
  const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,'a');assert.equal(result.capabilities[1].models[0].id,'b');
 });
+
+test('legacy capability keys preserve all builtin agent types',async()=>{
+ const {readFile}=await import('node:fs/promises'),{adaptCreationRuntime}=await import('../src/creation-adapter.mjs'),{transform}=await import('esbuild'),vm=await import('node:vm');
+ const source=adaptCreationRuntime(await readFile(new URL('../vendor/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8'));
+ const code=(await transform(source.slice(source.indexOf('export function creationOptions('),source.indexOf('const attempted =')).replace('export function','function'),{loader:'ts'})).code;
+ const context={crypto,projectRows:()=>({projects:[]}),isThoughtLevel:()=>false,validConfigValue:()=>false};vm.runInNewContext(code+';globalThis.options=creationOptions',context);
+ const rows=['grok','codex'].map(id=>({key:['acpCapability','builtin',id],value:{cliType:'builtin',agentType:id,models:[{modelId:id,name:id}],fetchedAt:1}}));
+ const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,undefined);assert.equal(result.capabilities[0].agentType,'grok');assert.equal(result.capabilities[1].models[0].id,'codex');
+});
+
+test('thought-level choices validate and send without a per-model catalog',async()=>{
+ let sent;
+ const capability={machineId:'m',agentConfigId:'a',models:[],reasoningEfforts:{},configOptions:[{id:'thinking',type:'select',category:'thought_level',options:[{id:'high'}]}],reasoningEffortConfigId:'thinking'};
+ const runtime={creationOptions:()=>({agents:[{id:'a',machineId:'m'}],capabilities:[capability]}),createSession:async()=>({state:'created'}),ensureSession:async()=>{}};
+ const commands=createCommands(runtime,async value=>{sent=value;return {state:'accepted'}},()=>({userId:'u',workspaceId:'w'}));
+ await assert.rejects(commands.createAndSend({...input,effort:'invented'}),/invalid_effort/);
+ assert.equal((await commands.createAndSend({...input,effort:'high'})).state,'accepted');
+ assert.equal(sent.reasoningEffort,'high');assert.equal(sent.reasoningEffortConfigId,'thinking');
+});

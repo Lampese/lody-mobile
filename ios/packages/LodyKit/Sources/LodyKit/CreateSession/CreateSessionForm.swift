@@ -1,8 +1,8 @@
 import LodyCore
 import Foundation
 
-struct CreateSessionPage: Equatable {
-  let chat: Bool
+struct CreateSessionSelection: Equatable {
+  var chat: Bool { projectId.isEmpty }
   var projectId = ""
   var options: CreationOptions?
   var machineId = ""
@@ -10,6 +10,7 @@ struct CreateSessionPage: Equatable {
   var choice = ModelChoice()
   var branch = ""
   var branches: CreateBranches?
+  var branchesStale = false
   var branchesLoading = false
   var branchesFailed = false
   /// Local projects only: start the session in a new git worktree (web's workdir mode). GitHub
@@ -22,8 +23,7 @@ struct CreateSessionPage: Equatable {
   var github: Bool { !chat && projectId.hasPrefix("github:") }
   var local: Bool { !chat && !projectId.isEmpty && !github }
 
-  // Local projects expose only their owning machine; GitHub projects and chats
-  // can choose among the machines returned by the runtime.
+  // The workspace snapshot covers every machine; the selected project determines the target.
   var machines: [(id: String, name: String)] {
     var seen = Set<String>()
     return (options?.agents ?? []).compactMap { agent in
@@ -34,7 +34,6 @@ struct CreateSessionPage: Equatable {
     if machineId.isEmpty { return machines.first }
     return machines.first { $0.id == machineId }
   }
-  var needsOptions: Bool { failed || options == nil || agent == nil }
   var unavailableMessage: String? {
     if failed { return String(localized: "create.devices.failed", bundle: .lody) }
     if options?.availability == "unknown" { return String(localized: "devices.unknown", bundle: .lody) }
@@ -79,80 +78,102 @@ struct CreateSessionForm {
   // Share Extension: a selection without cached options is sent and finished in the app.
   var deferUnresolved = false
   var signedOut = false
-  var chat = false
-  var project = CreateSessionPage(chat: false)
-  var chatPage = CreateSessionPage(chat: true)
-
-  var current: CreateSessionPage {
-    get { chat ? chatPage : project }
-    set { if chat { chatPage = newValue } else { project = newValue } }
-  }
+  var current = CreateSessionSelection()
 
   var prefsTarget: String { current.target }
 
   mutating func open(projectId: String?, context: String?) {
-    chat = context == "chat"
-    locked = projectId != nil && !chat
-    project.projectId = projectId
+    let selected = context == "chat" ? nil : (projectId
       ?? CreateLogic.rememberedProject(prefs, projects)
-      ?? projects.first?.id
-      ?? ""
-    if !locked { chatPage.loading = true }
-    if project.projectId.isEmpty { project.loading = false }
+      ?? projects.first?.id)
+    locked = projectId != nil && context != "chat"
+    current = CreateSessionSelection(projectId: selected ?? "")
+    if current.local { current.machineId = projects.first { $0.id == selected }?.machineId ?? "" }
   }
 
-  mutating func applyCachedOptions(_ options: CreationOptions, chat: Bool) {
-    applyOptions(options, chat: chat)
+  mutating func applyCachedOptions(_ options: CreationOptions) {
+    applyOptions(options)
     // Cache is for display only; live validation still controls Send.
-    if chat { chatPage.loading = true } else { project.loading = true }
+    current.loading = true
   }
 
-  mutating func applyOptions(_ options: CreationOptions, chat: Bool) {
-    var page = chat ? chatPage : project
-    let previous = page
-    page.options = options
-    page.loading = false
-    page.failed = false
-    let restored = CreateLogic.restoreSelection(prefs, target: page.target, options: options)
-    page.machineId = restored.machineId
-    page.agentKey = restored.agentKey
-    page.choice = restored.choice
-    // Refreshing availability must never silently move a draft to another computer.
-    if previous.options != nil && !previous.machineId.isEmpty {
-      page.machineId = previous.machineId
-      page.agentKey = previous.agentKey
-      page.choice = previous.choice
-      if let agent = page.agent {
-        page.choice = CreateLogic.rememberedModelChoice(
-          prefs, agentKey: agent.key, capability: page.capability, modelId: previous.choice.modelId)
+  mutating func applyOptions(_ options: CreationOptions) {
+    let previous = current
+    current.options = options
+    current.loading = false
+    current.failed = false
+    let restored = CreateLogic.restoreSelection(prefs, target: current.target, options: options)
+    current.machineId = restored.machineId
+    current.agentKey = restored.agentKey
+    current.choice = restored.choice
+    // Preserve a computer picked while loading, including before the cache arrives.
+    if !previous.machineId.isEmpty {
+      current.machineId = previous.machineId
+      current.agentKey = previous.agentKey
+      if previous.agentKey.isEmpty {
+        if current.agents.contains(where: { $0.key == restored.agentKey }) {
+          current.agentKey = restored.agentKey
+          current.choice = restored.choice
+          return
+        }
+        current.agentKey = current.agents.first?.key ?? ""
+      }
+      current.choice = previous.choice
+      if let agent = current.agent {
+        current.choice = CreateLogic.rememberedModelChoice(
+          prefs, agentKey: agent.key, capability: current.capability, modelId: previous.choice.modelId)
       }
     }
-    if chat { chatPage = page } else { project = page }
   }
 
-  mutating func failOptions(chat: Bool) {
-    if chat {
-      chatPage.loading = false
-      chatPage.failed = true
-    } else {
-      project.loading = false
-      project.failed = true
-    }
+  mutating func failOptions() {
+    current.loading = false
+    current.failed = true
   }
 
-  mutating func selectProject(_ picked: CreateProject) {
-    if !projects.contains(where: { $0.id == picked.id }) { projects.append(picked) }
-    guard picked.id != project.projectId else { return }
-    project = CreateSessionPage(chat: false, projectId: picked.id)
+  /// One form and one workspace-wide options snapshot; changing project only changes selection.
+  mutating func selectProject(_ picked: CreateProject?) {
+    if let picked, !projects.contains(where: { $0.id == picked.id }) { projects.append(picked) }
+    let id = picked?.id ?? ""
+    guard id != current.projectId else { return }
+    current.projectId = id
+    current.branch = ""
+    current.branches = nil
+    current.branchesStale = false
+    current.branchesLoading = false
+    current.branchesFailed = false
+    current.worktree = false
+    if current.local, let picked, picked.machineId != current.machineId { selectMachine(picked.machineId) }
+    var value = prefs ?? CreatePrefs()
+    value.context = current.chat ? "chat" : "project"
+    if let picked { value.projectId = picked.id }
+    prefs = value
+    updateChoice(current.choice)
   }
 
-  mutating func applyBranches(_ value: CreateBranches) {
-    if project.branches == nil { project.branches = value }
-    else { project.branches?.append(value) }
-    project.branchesLoading = false
-    project.branchesFailed = false
-    if project.branch.isEmpty, let name = project.branches?.defaultBranch,
-      project.branches?.names.contains(name) == true { project.branch = name }
+  mutating func applyCachedBranches(_ value: CreateBranches) {
+    applyBranches(value)
+    current.branchesStale = true
+  }
+
+  mutating func selectBranch(_ name: String) {
+    guard current.branches?.names.contains(name) == true else { return }
+    current.branch = name
+    if prefs == nil { prefs = CreatePrefs() }
+    if prefs?.branches == nil { prefs?.branches = [:] }
+    prefs?.branches?[current.projectId] = name
+  }
+
+  mutating func applyBranches(_ value: CreateBranches, replacing: Bool = false) {
+    if current.branches == nil || replacing { current.branches = value }
+    else { current.branches?.append(value) }
+    current.branchesStale = false
+    current.branchesLoading = false
+    current.branchesFailed = false
+    if current.branch.isEmpty, let remembered = prefs?.branches?[current.projectId],
+      current.branches?.names.contains(remembered) == true { current.branch = remembered }
+    if current.branch.isEmpty, let name = current.branches?.defaultBranch,
+      current.branches?.names.contains(name) == true { current.branch = name }
   }
 
   mutating func selectMachine(_ id: String) {
@@ -180,14 +201,7 @@ struct CreateSessionForm {
     guard let agent = current.agent else { return }
     prefs = CreateLogic.withSelection(prefs, target: prefsTarget, selection: ProjectPrefs(
       modelId: next.modelId, effort: next.effort, modeId: next.modeId, configOptionValues: next.configOptionValues,
-      machineId: agent.machineId, agentKey: agent.key), chat: chat)
-  }
-
-  mutating func switchPage(chat next: Bool) {
-    chat = next
-    var value = prefs ?? CreatePrefs()
-    value.context = next ? "chat" : "project"
-    prefs = value
+      machineId: agent.machineId, agentKey: agent.key), chat: current.chat)
   }
 
   var canSend: Bool {

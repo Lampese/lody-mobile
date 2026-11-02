@@ -1524,11 +1524,11 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let height = input.sizeThatFits(CGSize(width: max(1, input.bounds.width), height: .greatestFiniteMagnitude)).height
     let overflows = height > ChatMessageContent.maximumCollapsedHeight
     let chrome = mentionHeight.constant + queueHeight.constant + queueGap.constant + quickRepliesHeight.constant + noticeHeight.constant + attachmentTop.constant + attachmentHeight.constant + quotaNoticeHeight.constant + accessoryHeight.constant + formatHeight.constant + grabberHeight.constant + (expanded ? 8 : 16)
-    // Card style rests at one line above its controls and opens to two while editing; the
+    // Card style rests at one line above its controls and opens to three while editing; the
     // glass sheet keeps its taller writing area.
     var minimumHeight: CGFloat = 132
     if cardStyle {
-      let lines: CGFloat = input.isFirstResponder ? 2 : 1
+      let lines: CGFloat = input.isFirstResponder ? 3 : 1
       minimumHeight = topInset + verticalInset + lines * input.font!.lineHeight
     }
     let inlineHeight = expanded ? min(ChatMessageContent.maximumCollapsedHeight, max(minimumHeight, height)) : 48
@@ -1600,12 +1600,33 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       title.append(dot)
       title.append(NSAttributedString(string: composerOptions.effortTitle, attributes: [.foregroundColor: UIColor.label]))
     }
+    var summary = title.string
     if cardStyle, let mode = composerOptions.permissions?.first(where: { $0.id == composerOptions.permissionId }) {
-      // Web dims the mode: it is the least-changed part of the run configuration.
-      title.append(dot)
-      title.append(NSAttributedString(string: mode.title, attributes: [.foregroundColor: UIColor.secondaryLabel]))
+      summary += " · " + mode.title
+      let icon: LodyIcon?
+      var tint = LodyUIColor.textSecondary
+      switch mode.id {
+      case "agent", "default": icon = .permissionDefault
+      case "read-only": icon = .eye
+      case "acceptEdits": icon = .edit
+      case "plan": icon = .permissionPlan
+      case "agent-full-access", "danger-full-access", "dontAsk", "bypassPermissions", "yolo", "always-approve":
+        icon = .permissionWarning
+        tint = LodyUIColor.warningDefault
+      case "auto", "agent-auto-review":
+        icon = nil
+        title.append(dot)
+        title.append(NSAttributedString(string: "Auto", attributes: [.foregroundColor: tint]))
+      default: icon = nil
+      }
+      if let icon {
+        let mark = NSTextAttachment()
+        mark.image = icon.uiImage?.withTintColor(tint, renderingMode: .alwaysOriginal)
+        mark.bounds = CGRect(x: 0, y: font.descender, width: font.lineHeight, height: font.lineHeight)
+        title.append(dot)
+        title.append(NSAttributedString(attachment: mark))
+      }
     }
-    let summary = title.string
     if composerOptions.fast == true {
       let symbol = NSTextAttachment()
       symbol.image = UIImage(systemName: "bolt", withConfiguration: UIImage.SymbolConfiguration(pointSize: font.pointSize, weight: .medium))?

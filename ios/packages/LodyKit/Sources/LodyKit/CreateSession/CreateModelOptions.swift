@@ -92,7 +92,7 @@ enum CreateModelOptions {
         + capability.modes.map { ($0.id, $0.name, $0.description ?? "", $0.id == value.modeId) }
     default:
       rows = [(defaultId, text("model.useDefault"), "", value.modelId == nil)]
-        + capability.models.map { ($0.id, $0.name, $0.description ?? "", $0.id == value.modelId) }
+        + capability.models.map { ($0.id, $0.name, "", $0.id == value.modelId) }
     }
     let footers = ["effort": "model.footer.effort", "mode": "model.footer.mode"]
     return [.group(tab, footer: text(footers[tab] ?? "model.footer.model"), rows.map {

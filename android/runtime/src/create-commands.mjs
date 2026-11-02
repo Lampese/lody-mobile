@@ -1,3 +1,4 @@
+import { effortsFor } from '../vendor/cloud-runtime/src/protocol/capability.ts';
 // Android-only text creation adapter. Shared CRDT persistence and dispatch remain upstream.
 export function createCommands(runtime, sendTurn, identity) {
  const attempted=new Set();
@@ -32,7 +33,7 @@ export function createCommands(runtime, sendTurn, identity) {
    const capability=available.capabilities.find(c=>c.machineId===agent.machineId && c.agentConfigId===agent.id) ?? available.capabilities.find(c=>c.machineId===agent.machineId && !c.agentConfigId && c.cliType===agent.cliType && c.agentType===agent.agentType);
    if(input.modelId && !capability?.models.some(m=>m.id===input.modelId))throw Error('invalid_model');
    if(input.modeId && !capability?.modes.some(m=>m.id===input.modeId))throw Error('invalid_mode');
-   if(input.effort && !capability?.reasoningEfforts?.[input.modelId]?.includes(input.effort))throw Error('invalid_effort');
+   if(input.effort && !effortsFor(capability, input.modelId).includes(input.effort))throw Error('invalid_effort');
    attempted.add(input.sessionId);
    try {
     const result=await runtime.createSession({workspaceId:scope.workspaceId,userId:scope.userId,sessionId:input.sessionId,machineId:agent.machineId,agentConfigId:agent.id,projectId:input.projectId,branch:input.branch,useWorktree:input.worktree===true,title:input.text.trim().slice(0,200)});

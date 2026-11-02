@@ -98,7 +98,6 @@
     <string name="create_pick_project">Choose project</string>
     <string name="create_more_projects">More projects…</string>
     <string name="create_chat_only">No project</string>
-    <string name="create_branch_unavailable">Branches aren’t available on Android yet</string>
     <string name="create_worktree">Run in a worktree</string>
     <string name="create_agent_unavailable">Assistants aren’t available on Android yet</string>
     <string name="create_readonly_note">Android can’t create sessions yet; this page shows the layout.</string>
@@ -109,7 +108,6 @@
     <string name="create_search_projects">Search projects</string>
     <string name="create_run_config">Run configuration</string>
     <string name="create_run_config_unavailable">Assistant unavailable</string>
-    <string name="create_waiting_agents">Waiting for online assistants…</string>
     <string name="create_result_unknown">Delivery is unconfirmed. Check the conversation before starting another one.</string>
     <string name="create_result_rejected">Creation was rejected. Return and check your selection before trying again.</string>
     <string name="create_branch_name">Branch name</string>
@@ -119,7 +117,6 @@
     <string name="create_model">Model</string>
     <string name="create_effort">Reasoning</string>
     <string name="create_mode">Mode</string>
-    <string name="create_no_online_agents">No online assistant on this computer. Choose another computer or start an assistant there.</string>
     <string name="create_extras_unavailable">Attachments and mentions are not available yet.</string>
     <string name="create_search_machines">Search computers</string>
     <string name="create_default">Default</string>
@@ -135,4 +132,7 @@
     <string name="chat_worked_for">Worked for %1$s</string>
     <string name="chat_composer_placeholder">Reply…</string>
     <string name="chat_composer_unavailable">Waiting for the conversation to connect…</string>
+    <string name="create_search_branches">Search branches</string>
+    <string name="create_more_branches">More branches…</string>
+    <string name="create_mode_auto">Auto</string>
 </resources>

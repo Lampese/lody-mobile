@@ -177,6 +177,7 @@ public struct ProjectPrefs: Codable, Equatable, Sendable {
 }
 
 public struct CreatePrefs: Codable, Equatable, Sendable {
+  public var branches: [String: String]?
   public var projectId: String?
   public var context: String?
   public var projects: [String: ProjectPrefs]?

@@ -25,6 +25,14 @@ class CreationJsonTest {
         assertEquals(listOf("low", "high"), options.capabilities.single().efforts["model"])
         assertEquals("auto", options.capabilities.single().modes.single().id)
     }
+    @Test fun thoughtLevelFallbackSurvivesCacheAndHonorsPerModelOverrides() {
+        val options = CreationJson.options(JSONObject("""{"capabilities":[{"machineId":"m","cliType":"builtin","agentType":"grok","reasoningEfforts":{"model":["high"],"off":[]},"configOptions":[{"id":"model","category":"model","currentValue":"model"},{"id":"thinking","type":"select","category":"thought_level","options":[{"id":"low","name":"Low"},{"id":"high","name":"High"}]}]}]}"""))
+        val capability = options.capabilities.single()
+        assertEquals(listOf("high"), capability.effortsFor(null))
+        assertEquals(listOf("low", "high"), capability.effortsFor("other"))
+        assertEquals(emptyList<String>(), capability.effortsFor("off"))
+        assertEquals(options, CreationJson.options(CreationJson.encodeOptions(options)))
+    }
     @Test fun creationPayloadKeepsStableIdsAndExplicitSelectionsWithoutIdentity() {
         val request = CreateRequest("session", "turn", null, "m", "a", "中文", null, true, "model", "auto", "high")
         val json = CreationJson.request(request)

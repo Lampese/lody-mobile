@@ -1,6 +1,8 @@
 package app.lody.android.catalog
 
 import app.lody.android.create.CreationOptionsStore
+import app.lody.android.create.BranchCache
+import app.lody.android.create.BranchPage
 import android.content.Context
 import android.util.AtomicFile
 import app.lody.android.auth.*
@@ -78,6 +80,36 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
             ?.sortedByDescending { it.lastModified() }?.drop(16)?.forEach { AtomicFile(it).delete() }
         Unit
     }
+    private fun branchFile(scope: RuntimeScope, repo: String): File {
+        val key = JSONArray(listOf(scope.accountId, scope.workspaceId, repo)).toString()
+        val digest = MessageDigest.getInstance("SHA-256").digest(key.toByteArray())
+        return File(directory, "branches-" + digest.joinToString("") { "%02x".format(it) } + ".json")
+    }
+    override suspend fun readBranches(scope: RuntimeScope, repo: String): BranchCache? = io {
+        if (!owns(scope)) return@io null
+        val data = load(branchFile(scope, repo), 1024 * 1024) ?: return@io null
+        try {
+            require(data.getString("account") == scope.accountId && data.getString("workspace") == scope.workspaceId && data.getString("repo") == repo)
+            val names = data.getJSONArray("names").let { a -> (0 until a.length()).map { a.getString(it) } }
+            BranchCache(BranchPage(names, data.optString("default").takeIf { it.isNotEmpty() }, data.optInt("next").takeIf { it > 0 }), data.optString("selected"))
+        } catch (_: Exception) { null }
+    }
+    override suspend fun writeBranches(scope: RuntimeScope, repo: String, page: BranchPage) = io {
+        require(owns(scope)) { "cache_scope_changed" }
+        val file = branchFile(scope, repo)
+        val selected = load(file, 1024 * 1024)?.optString("selected").orEmpty()
+        save(file, JSONObject().put("account", scope.accountId).put("workspace", scope.workspaceId).put("repo", repo)
+            .put("names", JSONArray(page.names)).put("default", page.defaultBranch).put("next", page.nextPage).put("selected", selected), 1024 * 1024)
+        directory.listFiles()?.filter { it.name.startsWith("branches-") }?.sortedByDescending { it.lastModified() }?.drop(16)?.forEach { AtomicFile(it).delete() }
+        Unit
+    }
+    override suspend fun selectBranch(scope: RuntimeScope, repo: String, name: String) = io {
+        require(owns(scope)) { "cache_scope_changed" }
+        val file = branchFile(scope, repo)
+        val data = load(file, 1024 * 1024) ?: JSONObject().put("account", scope.accountId).put("workspace", scope.workspaceId)
+            .put("repo", repo).put("names", JSONArray())
+        save(file, data.put("selected", name), 1024 * 1024)
+    }
     override suspend fun readContext(): AccountContext? = io { context() }
     override suspend fun saveAccount(account: Account) = io {
         val previous = context()
@@ -85,7 +117,7 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
         previous?.account?.workspaces?.filter { old -> account.id != previous.account.id || account.workspaces.none { it.id == old.id } }?.forEach {
             AtomicFile(catalogFile(RuntimeScope(previous.account.id, it.id))).delete()
         }
-        directory.listFiles()?.filter { it.name.startsWith("options-") && it.name.endsWith(".json") }?.forEach { file ->
+        directory.listFiles()?.filter { (it.name.startsWith("options-") || it.name.startsWith("branches-")) && it.name.endsWith(".json") }?.forEach { file ->
             val cached = load(file)
             if (cached == null || cached.optString("account") != account.id || account.workspaces.none { it.id == cached.optString("workspace") }) AtomicFile(file).delete()
         }
@@ -120,7 +152,7 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
         val target = catalogFile(scope)
         save(target, data)
         // Bound disk use to eight recently updated workspace projections (<=64 MiB).
-        directory.listFiles()?.filter { it.name.endsWith(".json") && !it.name.startsWith("options-") && it != accountFile && it != target }
+        directory.listFiles()?.filter { it.name.endsWith(".json") && !it.name.startsWith("options-") && !it.name.startsWith("branches-") && it != accountFile && it != target }
             ?.sortedByDescending { it.lastModified() }?.drop(7)?.forEach { AtomicFile(it).delete() }
         Unit
     }

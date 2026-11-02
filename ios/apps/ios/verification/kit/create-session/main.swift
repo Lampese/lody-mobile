@@ -31,11 +31,11 @@ do {
 do {
   var form = CreateSessionForm(projects: [CreateProject(id: "p1", machineId: "m1", name: "P")], prefs: CreatePrefs(context: "chat"))
   form.open(projectId: nil, context: nil)
-  check(!form.chat && !form.locked, "project page opens by default")
+  check(!form.current.chat && !form.locked, "project page opens by default")
   form.open(projectId: "p1", context: nil)
   check(form.locked, "an explicit project locks the sheet")
   form.open(projectId: nil, context: "chat")
-  check(form.chat && !form.locked, "chat context")
+  check(form.current.chat && !form.locked, "chat context")
 }
 
 // Remembered agent and model per project, dropping choices the machine no longer offers.
@@ -140,12 +140,12 @@ do {
   var form = CreateSessionForm(userId: "u", workspaceId: "w", projects: [github])
   form.open(projectId: nil, context: nil)
   check(form.draft(sessionId: "s1") == nil, "no draft before options")
-  form.applyOptions(options, chat: false)
-  form.project.branch = " main "
+  form.applyOptions(options)
+  form.current.branch = " main "
   let draft = form.draft(sessionId: "s1")
   check(draft?.projectId == github.id && draft?.branch == "main" && draft?.agent == codex, "github draft")
-  form.switchPage(chat: true)
-  form.applyOptions(options, chat: true)
+  form.selectProject(nil)
+  form.applyOptions(options)
   let chat = form.draft(sessionId: "s2")
   check(chat?.projectId == nil && chat?.branch == nil && chat?.projectName == "", "chat draft")
   check(form.prefs?.context == "chat", "page switch remembered")
@@ -154,24 +154,24 @@ do {
 do {
   var form = CreateSessionForm(userId: "u", workspaceId: "w")
   form.open(projectId: nil, context: "chat")
-  form.failOptions(chat: true)
-  check(!form.canSend && form.current.needsOptions, "failed options keep a recovery path")
+  form.failOptions()
+  check(!form.canSend && form.current.failed, "failed options disable sending")
   var empty = options
   empty.agents = []
   empty.availability = "offline"
-  form.applyOptions(empty, chat: true)
-  check(!form.canSend && form.current.needsOptions, "empty successful response also retries")
-  form.applyOptions(options, chat: true)
+  form.applyOptions(empty)
+  check(!form.canSend && form.current.agent == nil, "empty successful response disables sending")
+  form.applyOptions(options)
   check(form.canSend, "device return restores sending without reopening")
   let selected = form.current.agent!
   let choice = form.current.choice
   var different = options
   different.agents = options.agents.filter { $0.machineId != selected.machineId }
-  form.applyOptions(different, chat: true)
+  form.applyOptions(different)
   check(!form.canSend && form.current.machineId == selected.machineId, "never move a draft to another device automatically")
-  form.applyOptions(options, chat: true)
+  form.applyOptions(options)
   check(form.canSend && form.current.agent == selected && form.current.choice == choice, "selected device and configuration return")
-  form.failOptions(chat: true)
+  form.failOptions()
   check(!form.canSend, "a failed refresh must not enable sending with stale options")
   form.deferUnresolved = true
   check(form.canSend, "Share Extension can still defer unresolved selection to the app")
@@ -191,7 +191,7 @@ do {
   check(CreateLogic.withPermissionMode(capability, next, value: "removed") == next, "unsupported permission is ignored")
   var form = CreateSessionForm(userId: "u", workspaceId: "w")
   form.open(projectId: nil, context: "chat")
-  form.applyOptions(CreationOptions(sessionId: "s", agents: [codex], capabilities: [capability]), chat: true)
+  form.applyOptions(CreationOptions(sessionId: "s", agents: [codex], capabilities: [capability]))
   form.updateChoice(next)
   check(form.draft(sessionId: "s")?.choice.configOptionValues?["permission_mode"] == .string("auto"), "permission enters first-turn draft")
   check(CreateLogic.rememberedModelChoice(roundTrip(form.prefs), agentKey: codex.key, capability: capability, modelId: "a").configOptionValues?["permission_mode"] == .string("auto"), "permission restores from persisted prefs")
@@ -210,36 +210,103 @@ do {
 do {
   var form = CreateSessionForm(userId: "u", workspaceId: "w")
   form.selectProject(CreateProject(id: "github:Owner/Repo", machineId: "", name: "Repo"))
-  form.applyOptions(options, chat: false)
+  form.applyOptions(options)
   check(!form.canSend && form.draft(sessionId: "s") == nil, "GitHub must have an existing base branch before sending")
   form.applyBranches(CreateBranches(names: ["trunk", "develop"], defaultBranch: "trunk", nextPage: 2))
-  check(form.canSend && form.project.branch == "trunk", "repository default is selected without typing")
-  form.project.branch = "develop"
+  check(form.canSend && form.current.branch == "trunk", "repository default is selected without typing")
+  form.current.branch = "develop"
   form.applyBranches(CreateBranches(names: ["feature/Search", "develop"]))
-  check(form.project.branch == "develop", "pagination never replaces an explicit choice")
-  check(form.project.branches?.matching(" SEARCH ") == ["feature/Search"], "search matches later pages case-insensitively")
-  check(form.project.branches?.matching("").first == "trunk", "default sorts first")
-  check(form.project.branches?.names.count == 3 && form.project.branches?.nextPage == nil, "pages deduplicate and terminate")
+  check(form.current.branch == "develop", "pagination never replaces an explicit choice")
+  check(form.current.branches?.matching(" SEARCH ") == ["feature/Search"], "search matches later pages case-insensitively")
+  check(form.current.branches?.matching("").first == "trunk", "default sorts first")
+  check(form.current.branches?.names.count == 3 && form.current.branches?.nextPage == nil, "pages deduplicate and terminate")
   form.selectMachine("m2")
-  check(form.project.branch == "develop" && form.draft(sessionId: "s")?.branch == "develop", "changing machines keeps selected GitHub branch in the draft")
+  check(form.current.branch == "develop" && form.draft(sessionId: "s")?.branch == "develop", "changing machines keeps selected GitHub branch in the draft")
   form.selectProject(CreateProject(id: "github:Owner/Empty", machineId: "", name: "Empty"))
-  form.applyOptions(options, chat: false)
+  form.applyOptions(options)
   form.applyBranches(CreateBranches(names: []))
-  check(form.project.branch.isEmpty && !form.canSend, "new empty repository cannot reuse previous branch")
+  check(form.current.branch.isEmpty && !form.canSend, "new empty repository cannot reuse previous branch")
   form.deferUnresolved = true
   check(form.canSend && form.draft(sessionId: "s") == nil, "offline share defers unresolved branch to the app")
+}
+
+// A computer picked before the one-shot response must survive cache and live hydration.
+do {
+  var form = CreateSessionForm(userId: "u", workspaceId: "w")
+  form.open(projectId: nil, context: "chat")
+  form.selectMachine("m2")
+  form.applyCachedOptions(options)
+  check(form.current.machineId == "m2" && form.current.agent == claude, "cache must not replace the explicitly picked computer")
+  form.selectModel("opus")
+  form.applyOptions(options)
+  check(form.current.machineId == "m2" && form.current.choice.modelId == "opus", "live options preserve choices made while loading")
 }
 
 // Cached choices are displayable while live availability is still unverified.
 do {
   var form = CreateSessionForm(userId: "u", workspaceId: "w", projects: [])
   form.open(projectId: nil, context: "chat")
-  form.applyCachedOptions(options, chat: true)
-  check(form.chatPage.options == options, "complete cached options restored")
+  form.applyCachedOptions(options)
+  check(form.current.options == options, "complete cached options restored")
   check(CreateJSON.decode(CreationOptions.self, CreateJSON.encode(options)) == options, "providers and complete capability lists survive persistence")
   check(!form.canSend, "cached options cannot authorize sending")
-  form.failOptions(chat: true)
-  check(form.chatPage.options == options && !form.canSend, "failed refresh retains cached choices")
-  form.applyOptions(options, chat: true)
+  form.failOptions()
+  check(form.current.options == options && !form.canSend, "failed refresh retains cached choices")
+  form.applyOptions(options)
   check(form.canSend, "live options unlock sending")
+}
+
+
+do {
+  var form = CreateSessionForm(userId: "u", workspaceId: "w")
+  let repo = CreateProject(id: "github:Owner/Repo", machineId: "", name: "Repo")
+  form.selectProject(repo)
+  form.applyBranches(CreateBranches(names: ["main", "feature"], defaultBranch: "main"))
+  form.selectBranch("feature")
+  let saved = roundTrip(form.prefs)
+  var reopened = CreateSessionForm(userId: "u", workspaceId: "w", prefs: saved)
+  reopened.selectProject(repo)
+  reopened.applyCachedBranches(CreateBranches(names: ["main", "feature"], defaultBranch: "main"))
+  check(reopened.current.branchesStale, "cached complete lists still need a first-page refresh")
+  check(reopened.current.branch == "feature", "cached branch list restores last choice")
+  reopened.selectBranch("main")
+  reopened.applyBranches(CreateBranches(names: ["main", "new"], defaultBranch: "new", nextPage: 2), replacing: true)
+  check(!reopened.current.branchesStale, "successful refresh clears stale state")
+  check(reopened.current.branch == "main", "background refresh preserves user's new choice")
+  check(reopened.current.branches?.names == ["main", "new"], "refresh replaces stale first page instead of retaining deleted branches")
+  reopened.applyBranches(CreateBranches(names: ["later"]))
+  check(reopened.current.branches?.names.contains("later") == true, "fresh pagination still appends")
+  reopened.selectProject(CreateProject(id: "github:Other/Repo", machineId: "", name: "Other"))
+  reopened.applyBranches(CreateBranches(names: ["trunk"], defaultBranch: "trunk"))
+  check(reopened.current.branch == "trunk", "branch preferences are scoped by repository")
+}
+
+// An empty cache must not prevent the one live response from selecting an available agent.
+do {
+  var form = CreateSessionForm(userId: "u", workspaceId: "w")
+  form.open(projectId: nil, context: "chat")
+  form.selectMachine("m2")
+  form.applyCachedOptions(CreationOptions(sessionId: "cached", agents: [], capabilities: []))
+  form.applyOptions(options)
+  check(form.current.agent == claude && form.canSend, "the one live response fills an agent missing from cache")
+}
+
+// Selecting a project or No project reuses one complete workspace snapshot.
+do {
+  let local = CreateProject(id: "m2:local:repo", machineId: "m2", name: "Repo", rootPath: "/repo")
+  let github = CreateProject(id: "github:Owner/Repo", machineId: "", name: "Owner/Repo")
+  var form = CreateSessionForm(userId: "u", workspaceId: "w", projects: [local, github])
+  form.open(projectId: nil, context: "chat")
+  form.applyOptions(options)
+  form.selectProject(local)
+  check(form.current.options == options && !form.current.loading, "project selection reuses the full snapshot")
+  check(form.current.machineId == "m2" && form.current.agent == claude, "local project selects its owning computer")
+  form.selectModel("opus")
+  form.selectProject(github)
+  form.applyBranches(CreateBranches(names: ["main"], defaultBranch: "main"))
+  form.selectProject(nil)
+  check(form.current.chat && form.current.options == options, "No project is the same form and snapshot")
+  check(form.current.branch.isEmpty && form.current.branches == nil, "No project drops repository-only state")
+  check(form.current.choice.modelId == "opus" && form.current.agent == claude, "project changes preserve the active run configuration")
+  check(form.draft(sessionId: "one")?.projectId == nil && form.canSend, "No project creates a chat without another options request")
 }

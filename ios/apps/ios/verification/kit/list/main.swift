@@ -191,15 +191,7 @@ struct LodyListRow {
   var filePath = ""
 }
 
-extension UIColor {
-  static let lodyBackground = UIColor.systemBackground
-}
 
-// Layout-only harness: project status colors are outside this check.
-func lodyTint(_ value: String) -> UIColor? {
-  precondition(value.isEmpty)
-  return nil
-}
 
 @MainActor func laidOutSessionRow(_ content: LodySessionRowContent) -> LodySessionRowView {
   laidOut(LodySessionRowView(content))
@@ -758,3 +750,25 @@ assert(LodyFlatRows.separatorLeading(textLeading: 46, isLast: false) == 46, "Hai
 assert(LodyFlatRows.separatorLeading(textLeading: 46, isLast: true) == nil, "The last row of a section has no hairline")
 assert(LodyFlatRows.minHeight(hasSubtitle: false) == 44 && LodyFlatRows.minHeight(hasSubtitle: true) == 52, "Flat rows keep 44 / 52 pt minimums")
 print("PASS: flat system rows place icons on the rail and hairlines under the text column")
+
+// Catalog updates must not replace an unchanged, potentially presented menu.
+let stableMenu = LodyMenuButton()
+let nativeMenuButton = stableMenu.subviews.compactMap { $0 as? UIButton }.first!
+var workspaceChoice = LodyMenuItem(id: "workspace", title: "Workspace", selected: true)
+stableMenu.setItems([workspaceChoice])
+let originalMenu = nativeMenuButton.menu!
+for _ in 0..<10 { stableMenu.setItems([workspaceChoice]) }
+assert(nativeMenuButton.menu === originalMenu, "Unchanged updates must preserve the presented menu")
+workspaceChoice.title = "Renamed workspace"
+stableMenu.setItems([workspaceChoice])
+assert(nativeMenuButton.menu !== originalMenu, "Changed menu content must still update")
+
+var devicesMenu = LodyMenuItem(id: "devices", title: "Devices", children: [LodyMenuItem(id: "device", title: "Offline")])
+stableMenu.setItems([workspaceChoice, devicesMenu])
+let offlineMenu = nativeMenuButton.menu!
+devicesMenu.children[0].title = "Online"
+stableMenu.setItems([workspaceChoice, devicesMenu])
+assert(nativeMenuButton.menu !== offlineMenu, "Nested device changes must still refresh")
+let onlineMenu = nativeMenuButton.menu!
+stableMenu.setItems([workspaceChoice, devicesMenu])
+assert(nativeMenuButton.menu === onlineMenu, "Nested equal values must preserve the menu")

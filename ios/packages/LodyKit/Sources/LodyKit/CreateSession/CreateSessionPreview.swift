@@ -3,41 +3,13 @@ import UIKit
 
 @MainActor
 final class CreateSessionPreviewController: CreateSessionHostController {
-  private let scenario: String
-  private var polling: Task<Void, Never>?
-  private var presence = ""
-
   init(scenario: String) {
-    self.scenario = scenario
     let fixture = CreateSessionFixture(scenario: scenario)
     super.init(params: fixture.params, service: fixture.service())
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
-
-  override var refreshNotifications: [Notification.Name] { [] }
-
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    guard scenario == "create-recovery" else { return }
-    polling = Task { [weak self] in
-      while !Task.isCancelled {
-        let raw = await CreateSessionFixture.read("ui-device-presence") ?? ""
-        self?.presenceChanged(raw)
-        try? await Task.sleep(for: .milliseconds(500))
-      }
-    }
-  }
-
-  isolated deinit { polling?.cancel() }
-
-  private func presenceChanged(_ raw: String) {
-    presence = raw
-    refreshIfNeeded()
-  }
-
-  override func currentRefreshKey() -> String { presence }
 }
 
 @MainActor

@@ -102,9 +102,12 @@ export function creationOptions(
         if (!agentType || !cliType) continue;
         // Rows are keyed by agent config (`['acpCapability', configId]`, web's
         // `machineFlockKeys.acpCapability`): two ACP providers of one agent type
-        // offer different models, so never merge them by type. Legacy rows
-        // without a config id still fall back to the type key.
-        const configId = typeof row.key[1] === 'string' ? row.key[1] : '';
+        // offer different models, so never merge them by type. Legacy
+        // ['acpCapability', cliType, agentType] rows fall back to the type key.
+        const configId =
+          row.key.length === 2 && typeof row.key[1] === 'string'
+            ? row.key[1]
+            : '';
         const key = configId
           ? `${machineId}:config:${configId}`
           : `${machineId}:${cliType}:${agentType}`;

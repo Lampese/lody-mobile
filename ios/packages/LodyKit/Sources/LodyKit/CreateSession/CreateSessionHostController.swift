@@ -47,8 +47,6 @@ class CreateSessionHostController: UIViewController {
   private let controller: CreateSessionController
   private let navigation: UINavigationController
   private var mentions: MentionCatalogStore?
-  private var observers: [NSObjectProtocol] = []
-  private var refreshKey = ""
   private var created: Any?
   private var opening = false
   var onCreated: (@MainActor ([String: Any]) async throws -> Void)?
@@ -65,8 +63,6 @@ class CreateSessionHostController: UIViewController {
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
-
-  isolated deinit { observers.forEach(NotificationCenter.default.removeObserver) }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -127,26 +123,32 @@ class CreateSessionHostController: UIViewController {
       self?.submit(draft, payload)
     }
     let workspaceId = params.workspaceId
-    controller.loadCachedOptions = { [weak self] projectId in
+    controller.loadCachedOptions = { [weak self] in
       guard let self else { return nil }
-      return await service.cachedOptions(params.userId, workspaceId, projectId)
+      return await service.cachedOptions(params.userId, workspaceId, nil)
     }
-    controller.loadOptions = { [weak self] projectId in
+    controller.loadOptions = { [weak self] in
       guard let self else { throw CancellationError() }
-      let options = try await service.options(workspaceId, projectId)
-      if service.persistShare { try? ShareStore.writeOptions(options, target: projectId ?? CreateLogic.chatTarget) }
+      let options = try await service.options(workspaceId, nil)
+      if service.persistShare { try? ShareStore.writeOptions(options, target: CreateLogic.chatTarget) }
       return options
     }
     controller.loadRepositories = { [weak self] in
       guard let self else { throw CancellationError() }
       return try await service.repositories(workspaceId).compactMap(CreateSessionService.githubProject)
     }
+    controller.loadCachedBranches = { [weak self, params] repo in
+      guard let self else { return nil }
+      return await service.cachedBranches(params.userId, params.workspaceId, repo)
+    }
     controller.loadBranches = { [weak self] repo, page in
       guard let self else { throw CancellationError() }
       return try await service.branches(workspaceId, repo, page)
     }
     controller.onBranches = { [weak self, params] repo, branches in
-      guard self?.service.persistShare == true else { return }
+      guard let self else { return }
+      service.persistBranches(params.userId, params.workspaceId, repo, branches)
+      guard service.persistShare else { return }
       try? ShareStore.writeBranches(branches, repo: repo, userId: params.userId, workspaceId: params.workspaceId)
     }
     controller.browseProject = { await DirectoryController.browse(workspaceId: workspaceId) }
@@ -160,30 +162,6 @@ class CreateSessionHostController: UIViewController {
     controller.form.open(projectId: params.projectId, context: params.context)
     if let text = params.initialText, !text.isEmpty { input.composer.setInitialDraft(text) }
     if let attachments = params.initialAttachmentsJSON, !attachments.isEmpty { input.composer.setInitialAttachments(attachments) }
-    refreshKey = currentRefreshKey()
-    for name in refreshNotifications {
-      observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-        MainActor.assumeIsolated { self?.refreshIfNeeded() }
-      })
-    }
-  }
-
-  var refreshNotifications: [Notification.Name] { [.lodyCatalogDidChange] }
-
-  func currentRefreshKey() -> String {
-    let state = (try? JSONSerialization.jsonObject(with: Data(CatalogSession.published.json.utf8))) as? [String: Any]
-    let catalog = (try? JSONSerialization.jsonObject(with: Data(CatalogSession.published.raw.utf8))) as? [String: Any]
-    let parts: [Any] = [state?["presence"] ?? NSNull(), catalog?["machineIds"] ?? NSNull(), catalog?["agentUsage"] ?? NSNull()]
-    let data = (try? JSONSerialization.data(withJSONObject: parts, options: .sortedKeys)) ?? Data()
-    return String(decoding: data, as: UTF8.self)
-  }
-
-  func refreshIfNeeded() {
-    guard navigation.parent != nil else { return }
-    let next = currentRefreshKey()
-    guard next != refreshKey else { return }
-    refreshKey = next
-    controller.refreshOptions()
   }
 
   private func selectionChanged(_ form: CreateSessionForm) {
