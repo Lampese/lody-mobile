@@ -84,7 +84,7 @@ class HomeActivity : ComponentActivity() {
                     val workspace = catalog.workspace
                     val id = selectedId
                     if (id != null && workspace != null) {
-                        ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, selectedTitle, onBack = { selectedId = null })
+                        ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, chatContext(catalog, id, selectedTitle, user), onBack = { selectedId = null })
                     } else if (creating && workspace != null) {
                         // Like web, new session is its own full screen over Home; back returns.
                         BackHandler { creating = false }
@@ -202,4 +202,13 @@ private fun PrimaryButton(label: String, enabled: Boolean, onClick: () -> Unit) 
     ) {
         Text(label, style = LodyTheme.typography.subhead, color = if (enabled) colors.textOnAccent else colors.textDisabled)
     }
+}
+
+/** The conversation's header and sending context from the catalog (title, project · branch). */
+private fun chatContext(catalog: CatalogState, id: String, title: String, user: app.lody.android.auth.Account): app.lody.android.chat.ChatContext {
+    val snapshot = catalog.snapshot
+    val session = snapshot?.sessions?.firstOrNull { it.id == id }
+    val project = snapshot?.projects?.firstOrNull { it.id == session?.projectId && !it.id.endsWith(":unassigned") }
+    val subtitle = listOfNotNull(project?.name, session?.branchName).joinToString(" · ")
+    return app.lody.android.chat.ChatContext(session?.title?.ifBlank { null } ?: title, subtitle, session, user)
 }

@@ -90,7 +90,6 @@
     <string name="chat_empty">还没有文本消息</string>
     <string name="chat_offline">无法载入消息</string>
     <string name="chat_retry">重试</string>
-    <string name="chat_read_only">只读</string>
 
     <!-- New session -->
     <string name="create_title">新建会话</string>
@@ -123,4 +122,16 @@
     <string name="create_extras_unavailable">附件和引用暂未接入。</string>
     <string name="create_search_machines">搜索电脑</string>
     <string name="create_default">默认</string>
+
+    <!-- Conversation -->
+    <string name="chat_delivery_sending">发送中</string>
+    <string name="chat_delivery_sent">已发送</string>
+    <string name="chat_delivery_queued">已排队</string>
+    <string name="chat_delivery_seen">已读</string>
+    <string name="chat_delivery_failed">未发送</string>
+    <string name="chat_send_failed">消息未发送</string>
+    <string name="chat_member">成员</string>
+    <string name="chat_worked_for">工作了 %1$s</string>
+    <string name="chat_composer_placeholder">回复…</string>
+    <string name="chat_composer_unavailable">正在连接对话…</string>
 </resources>

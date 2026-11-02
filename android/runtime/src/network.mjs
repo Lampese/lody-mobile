@@ -15,4 +15,4 @@ const cloud=cloudCommands(runtime,access,stopSessions);
 let identity;
 const connect=cloud.connect;cloud.connect=(workspaceId,gateway,userId)=>{const result=connect(workspaceId,gateway,userId);identity={workspaceId,userId};return result;};
 globalThis.androidDispatch=createDispatcher(core,emit,{...cloud,...createCommands(runtime,sendTurn,()=>identity)});
-emit({type:'hostReady',protocol:HOST_PROTOCOL,capabilities:[...CORE_CAPABILITIES,'connect','grant','watchSession','closeSession','creationOptions','createAndSend']});
+emit({type:'hostReady',protocol:HOST_PROTOCOL,capabilities:[...CORE_CAPABILITIES,'connect','grant','watchSession','closeSession','creationOptions','createAndSend','sendText']});

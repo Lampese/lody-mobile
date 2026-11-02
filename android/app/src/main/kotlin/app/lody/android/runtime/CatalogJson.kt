@@ -17,6 +17,10 @@ object CatalogJson {
         openedBySessionId = json.optText("openedBySessionId"),
         openedByRootSessionId = json.optText("openedByRootSessionId"),
         parentSessionId = json.optText("parentSessionId"),
+        cliType = json.optText("cliType"),
+        agentType = json.optText("agentType"),
+        resume = json.optText("resume"),
+        modelName = json.optJSONObject("lastModel")?.let { it.optText("name") ?: it.optText("modelId") },
         lastMessageAt = json.optMillis("lastMessageAt"),
         lastReadAt = json.optMillis("lastReadAt"),
         awaitingUserSince = json.optMillis("awaitingUserSince"),
@@ -46,6 +50,10 @@ object CatalogJson {
         session.openedBySessionId?.let { put("openedBySessionId", it) }
         session.openedByRootSessionId?.let { put("openedByRootSessionId", it) }
         session.parentSessionId?.let { put("parentSessionId", it) }
+        session.cliType?.let { put("cliType", it) }
+        session.agentType?.let { put("agentType", it) }
+        session.resume?.let { put("resume", it) }
+        session.modelName?.let { put("lastModel", JSONObject().put("name", it)) }
         session.lastMessageAt?.let { put("lastMessageAt", it) }
         session.lastReadAt?.let { put("lastReadAt", it) }
         session.awaitingUserSince?.let { put("awaitingUserSince", it) }

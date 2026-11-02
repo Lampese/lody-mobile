@@ -91,7 +91,6 @@
     <string name="chat_empty">No text messages yet</string>
     <string name="chat_offline">Messages unavailable</string>
     <string name="chat_retry">Retry</string>
-    <string name="chat_read_only">Read only</string>
 
     <!-- New session -->
     <string name="create_title">New session</string>
@@ -124,4 +123,16 @@
     <string name="create_extras_unavailable">Attachments and mentions are not available yet.</string>
     <string name="create_search_machines">Search computers</string>
     <string name="create_default">Default</string>
+
+    <!-- Conversation -->
+    <string name="chat_delivery_sending">Sending</string>
+    <string name="chat_delivery_sent">Sent</string>
+    <string name="chat_delivery_queued">Queued</string>
+    <string name="chat_delivery_seen">Read</string>
+    <string name="chat_delivery_failed">Not sent</string>
+    <string name="chat_send_failed">The message was not sent</string>
+    <string name="chat_member">Member</string>
+    <string name="chat_worked_for">Worked for %1$s</string>
+    <string name="chat_composer_placeholder">Reply…</string>
+    <string name="chat_composer_unavailable">Waiting for the conversation to connect…</string>
 </resources>

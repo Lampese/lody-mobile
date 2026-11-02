@@ -1,6 +1,24 @@
 package app.lody.android.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import app.lody.android.R
+import app.lody.android.designsystem.LodyIconSize
+import app.lody.android.designsystem.LodyIcons
+import app.lody.android.designsystem.LodySize
+import app.lody.android.home.Avatar
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,12 +54,19 @@ import app.lody.android.designsystem.LodyRadius
 import app.lody.android.designsystem.LodySpacing
 import app.lody.android.designsystem.LodyTheme
 
+/** Who wrote a turn and when, for its header: avatar (or agent mark), name, time. */
+data class TurnIdentity(val name: String, val image: String? = null, val time: String = "")
+
+/** A user turn's delivery as web's `UserMessageSendStatus` shows it. */
+enum class Delivery { Sending, Sent, Queued, Seen, Failed }
+
 /** A transcript entry. Assistant replies render as Markdown blocks; user turns as plain text. */
 sealed interface ChatEntry {
     val id: String
 
-    data class User(override val id: String, val text: String) : ChatEntry
-    data class Assistant(override val id: String, val markdown: MarkdownBlocks) : ChatEntry
+    data class User(override val id: String, val text: String, val who: TurnIdentity, val delivery: Delivery = Delivery.Sent) : ChatEntry
+    /** [worked] is "Worked for 8s" once the turn finished; empty while streaming. */
+    data class Assistant(override val id: String, val markdown: MarkdownBlocks, val who: TurnIdentity, val worked: String = "") : ChatEntry
 }
 
 /**
@@ -66,7 +91,7 @@ fun ChatTranscript(
     val tail = entries.lastOrNull()
     val tailSize = when (tail) {
         is ChatEntry.Assistant -> tail.markdown.blocks.size to (tail.markdown.blocks.lastOrNull()?.length ?: 0)
-        is ChatEntry.User -> 1 to tail.text.length
+        is ChatEntry.User -> 1 to tail.text.length + tail.delivery.ordinal
         null -> 0 to 0
     }
     LaunchedEffect(entries.size, tailSize) {
@@ -76,42 +101,116 @@ fun ChatTranscript(
     LazyColumn(modifier, state = state, contentPadding = contentPadding) {
         entries.forEach { entry ->
             when (entry) {
-                is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry.text) }
-                is ChatEntry.Assistant -> itemsIndexed(
-                    entry.markdown.blocks,
-                    key = { index, _ -> "${entry.id}#$index" },
-                    contentType = { _, _ -> "markdown" },
-                ) { _, block ->
-                    MarkdownBlock(
-                        block,
-                        Modifier
-                            .padding(horizontal = LodyLayout.screenPaddingX)
-                            .padding(bottom = LodySpacing.md),
-                    )
+                is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry) }
+                is ChatEntry.Assistant -> {
+                    item(key = "${entry.id}#who", contentType = "agent-header") { AgentHeader(entry.who) }
+                    itemsIndexed(
+                        entry.markdown.blocks,
+                        key = { index, _ -> "${entry.id}#$index" },
+                        contentType = { _, _ -> "markdown" },
+                    ) { _, block ->
+                        MarkdownBlock(
+                            block,
+                            Modifier
+                                .padding(horizontal = TranscriptMargin)
+                                .padding(bottom = LodySpacing.md),
+                        )
+                    }
+                    if (entry.worked.isNotEmpty()) {
+                        item(key = "${entry.id}#worked", contentType = "worked") {
+                            Text(
+                                entry.worked,
+                                style = LodyTheme.typography.caption,
+                                color = LodyTheme.colors.textTertiary,
+                                modifier = Modifier.padding(horizontal = TranscriptMargin).padding(bottom = LodySpacing.lg),
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/** Narrower than the screen inset (web's mobile conversation runs close to the edges). */
+val TranscriptMargin = LodySpacing.md
+
+/**
+ * Web's mobile user turn: name, time and delivery above a right-aligned bubble, with the
+ * sender's avatar beside it.
+ */
 @Composable
-private fun UserTurn(text: String) {
+private fun UserTurn(entry: ChatEntry.User) {
     val colors = LodyTheme.colors
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.md),
-        contentAlignment = Alignment.CenterEnd,
+            .padding(horizontal = TranscriptMargin, vertical = LodySpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm, Alignment.End),
+        verticalAlignment = Alignment.Top,
     ) {
-        Text(
-            text,
-            style = LodyTheme.typography.reading,
-            color = colors.textPrimary,
-            modifier = Modifier
-                .widthIn(max = LodyLayout.readableMaxWidth)
-                .background(colors.fillSecondary, RoundedCornerShape(LodyRadius.lg))
-                .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
-        )
+        Column(Modifier.weight(1f, fill = false), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                DeliveryMark(entry.delivery)
+                Text(
+                    listOf(entry.who.name, entry.who.time).filter { it.isNotEmpty() }.joinToString("  ·  "),
+                    style = LodyTheme.typography.caption,
+                    color = colors.textTertiary,
+                    maxLines = 1,
+                )
+            }
+            Text(
+                entry.text,
+                style = LodyTheme.typography.reading,
+                color = colors.textPrimary,
+                modifier = Modifier
+                    .widthIn(max = LodyLayout.readableMaxWidth)
+                    .background(colors.fillSecondary, RoundedCornerShape(LodyRadius.xl))
+                    .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.md),
+            )
+        }
+        Avatar(entry.who.image, entry.who.name, LodySize.avatarMd, Modifier.padding(top = LodySpacing.lg))
+    }
+}
+
+/** Web's delivery mark: a check once the agent picked the turn up, an open circle before. */
+@Composable
+private fun DeliveryMark(delivery: Delivery) {
+    val colors = LodyTheme.colors
+    val size = LodyIconSize.sm
+    val label = stringResource(
+        when (delivery) {
+            Delivery.Sending -> R.string.chat_delivery_sending
+            Delivery.Sent -> R.string.chat_delivery_sent
+            Delivery.Queued -> R.string.chat_delivery_queued
+            Delivery.Seen -> R.string.chat_delivery_seen
+            Delivery.Failed -> R.string.chat_delivery_failed
+        },
+    )
+    val mark = Modifier.size(size).semantics { contentDescription = label }
+    when (delivery) {
+        Delivery.Sending -> CircularProgressIndicator(mark.padding(LodySpacing.xxs), color = colors.iconTertiary, strokeWidth = 1.5.dp)
+        Delivery.Seen -> Icon(LodyIcons.StateDone, contentDescription = label, tint = colors.accentDefault, modifier = Modifier.size(size))
+        Delivery.Failed -> Icon(LodyIcons.Alert, contentDescription = label, tint = colors.dangerDefault, modifier = Modifier.size(size))
+        Delivery.Queued -> Icon(LodyIcons.StateWaiting, contentDescription = label, tint = colors.iconTertiary, modifier = Modifier.size(size))
+        Delivery.Sent -> Box(mark.padding(LodySpacing.xxs).border(1.dp, colors.iconTertiary, CircleShape))
+    }
+}
+
+/** The agent's identity above its answer: mark, name (model), time. */
+@Composable
+private fun AgentHeader(who: TurnIdentity) {
+    val colors = LodyTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = TranscriptMargin).padding(top = LodySpacing.md, bottom = LodySpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        Box(Modifier.size(LodySize.avatarMd).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+        }
+        Text(who.name, style = LodyTheme.typography.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (who.time.isNotEmpty()) Text(who.time, style = LodyTheme.typography.caption, color = colors.textTertiary, maxLines = 1)
     }
 }
 

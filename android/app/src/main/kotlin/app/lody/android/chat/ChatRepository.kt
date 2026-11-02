@@ -6,6 +6,10 @@ import kotlinx.coroutines.flow.*
 
 /** A screen subscription uses the app's existing workspace lease; it never creates a runtime. */
 class ChatRepository(private val owner: RuntimeOwner) {
+    /** Sends one text turn on the scope's lease. Never retried: an uncertain write is `unknown`. */
+    suspend fun send(scope: RuntimeScope, request: SendTextRequest): RuntimeResult.Sent =
+        owner.use(scope) { it.execute(RuntimeCommand.SendText(request)) as RuntimeResult.Sent }
+
     fun observe(scope: RuntimeScope, id: String): Flow<SessionSnapshot> = channelFlow {
         var latest = SessionSnapshot(id, "syncing", emptyList())
         suspend fun status(value: String) { latest = latest.copy(status = value); send(latest) }

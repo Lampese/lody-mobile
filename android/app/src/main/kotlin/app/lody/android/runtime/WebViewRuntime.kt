@@ -38,6 +38,16 @@ open class WebViewRuntime internal constructor(
             val value = call("createAndSend", JSONArray().put(CreationJson.request(command.request)), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Created(CreationReceipt(value.getString("sessionId"), value.getString("state")))
         }
+        is RuntimeCommand.SendText -> {
+            val request = command.request
+            val payload = JSONObject()
+                .put("sessionId", request.sessionId).put("turnId", request.turnId).put("text", request.text)
+                .put("machineId", request.machineId).put("cliType", request.cliType).put("agentType", request.agentType)
+                .put("queue", request.queue)
+            request.resume?.let { payload.put("resume", it) }
+            val value = call("sendText", JSONArray().put(payload), CommandDeadline.WRITE) as JSONObject
+            RuntimeResult.Sent(value.optString("state", "unknown"), value.optString("reason").ifBlank { null })
+        }
         is RuntimeCommand.WatchSession -> {
             call("watchSession", JSONArray().put(command.id), CommandDeadline.QUERY)
             RuntimeResult.Accepted

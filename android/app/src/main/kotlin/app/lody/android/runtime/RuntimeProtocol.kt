@@ -26,7 +26,18 @@ internal object RuntimeProtocol {
                         else -> null
                     }
                 }.joinToString("\n\n")
-                if (text.isBlank()) null else SessionMessage(entry.text("id"), role, text, role == "assistant" && !entry.optBoolean("finished", true))
+                if (text.isBlank()) null else SessionMessage(
+                    id = entry.text("id"),
+                    role = role,
+                    text = text,
+                    streaming = role == "assistant" && !entry.optBoolean("finished", true),
+                    timestamp = (entry.opt("timestamp") as? String)?.takeIf { it.isNotBlank() },
+                    status = entry.optString("status"),
+                    userId = (entry.opt("userId") as? String)?.takeIf { it.isNotBlank() },
+                    startedAt = (entry.opt("startedAt") as? Number)?.toLong(),
+                    endedAt = (entry.opt("endedAt") as? Number)?.toLong(),
+                    model = entry.optJSONObject("modelInfo")?.let { info -> info.optString("name").ifBlank { info.optString("modelId") }.ifBlank { null } },
+                )
             }
             RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries))
         }

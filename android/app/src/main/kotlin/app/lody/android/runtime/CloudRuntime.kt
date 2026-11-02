@@ -20,6 +20,7 @@ data class RuntimeScope(val accountId: String, val workspaceId: String) {
 sealed interface RuntimeCommand {
     data class GetCreationOptions(val projectId: String?) : RuntimeCommand
     data class CreateAndSend(val request: CreateRequest) : RuntimeCommand
+    data class SendText(val request: SendTextRequest) : RuntimeCommand
     data class WatchSession(val id: String) : RuntimeCommand
     data class CloseSession(val id: String) : RuntimeCommand
     data object Ping : RuntimeCommand
@@ -28,6 +29,8 @@ sealed interface RuntimeCommand {
 sealed interface RuntimeResult {
     data class Options(val value: CreationOptions) : RuntimeResult
     data class Created(val value: CreationReceipt) : RuntimeResult
+    /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
+    data class Sent(val state: String, val reason: String? = null) : RuntimeResult
     data object Accepted : RuntimeResult
     data class Pong(val healthy: Boolean) : RuntimeResult
     data class Schema(val machineIds: Set<String>, val creationTrials: Map<String, String>) : RuntimeResult
@@ -49,6 +52,12 @@ data class CatalogSession(
     val openedBySessionId: String? = null,
     val openedByRootSessionId: String? = null,
     val parentSessionId: String? = null,
+    /** The assistant the session runs, needed to send a turn. */
+    val cliType: String? = null,
+    val agentType: String? = null,
+    val resume: String? = null,
+    /** The last model's display name, for the agent's header. */
+    val modelName: String? = null,
 )
 /** Read projection, never a CRDT replica. Optional feature-specific fields come later. */
 /** [machineNames] is optional display data (computer id to name); empty from older caches. */
@@ -61,7 +70,35 @@ data class CatalogSnapshot(
     /** Computer id to OS (`darwin` / `win32` / `linux`), for its icon. */
     val machineOs: Map<String, String> = emptyMap(),
 )
-data class SessionMessage(val id: String, val role: String, val text: String, val streaming: Boolean)
+/**
+ * One transcript turn. [timestamp] is ISO-8601; [status] is upstream's (`seen` once the agent
+ * picked a user turn up, `pending` / `queued` before); [userId] is a user turn's sender;
+ * [startedAt] / [endedAt] (epoch ms) time an agent turn; [model] names its model.
+ */
+data class SessionMessage(
+    val id: String,
+    val role: String,
+    val text: String,
+    val streaming: Boolean,
+    val timestamp: String? = null,
+    val status: String = "",
+    val userId: String? = null,
+    val startedAt: Long? = null,
+    val endedAt: Long? = null,
+    val model: String? = null,
+)
+
+/** A text turn in an existing conversation; [turnId] is stable so a retry can never duplicate it. */
+data class SendTextRequest(
+    val sessionId: String,
+    val turnId: String,
+    val text: String,
+    val machineId: String,
+    val cliType: String,
+    val agentType: String,
+    val resume: String? = null,
+    val queue: Boolean = false,
+)
 data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>)
 sealed interface RuntimeEvent {
     data class SessionUpdated(val snapshot: SessionSnapshot) : RuntimeEvent

@@ -24,3 +24,12 @@ export function adaptCatalogMachineOs(source) {
   .replace(assign, `${assign}      if (text(value.os)) machineOs[machineId] = text(value.os);\n`)
   .replace(result, '    machineNames,\n    machineOs,\n    machineSimulators,\n');
 }
+
+// Conversation rows show who sent each user turn (avatar + name). Upstream session entries keep
+// `userId` on the turn; project it into the entry summary at bundle time, as upstream does.
+export function adaptEntryAuthor(source) {
+ if (source.includes('userId: entry?.userId')) return source;
+ const anchor = '    userTurnId: entry?.userTurnId,\n    items: summarizedItems,\n';
+ if (source.split(anchor).length !== 2) throw Error('Review upstream session entry projection');
+ return source.replace(anchor, '    userTurnId: entry?.userTurnId,\n    userId: typeof entry?.userId === \'string\' ? entry.userId : undefined,\n    items: summarizedItems,\n');
+}

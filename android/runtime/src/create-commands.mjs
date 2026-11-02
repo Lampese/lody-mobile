@@ -8,6 +8,20 @@ export function createCommands(runtime, sendTurn, identity) {
  }
  return {
   creationOptions:options,
+  // A text turn in an existing conversation. The stable turn id lets upstream reject a
+  // duplicate; nothing here retries, and an uncertain write reports `unknown`.
+  async sendText(input,signal) {
+   signal?.throwIfAborted();
+   if(!input || !uuid.test(input.turnId) || typeof input.sessionId!=='string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(input.sessionId) || typeof input.text!=='string' || !input.text.trim() || input.text.length>32000)throw Error('invalid_send');
+   for(const key of ['machineId','cliType','agentType'])if(typeof input[key]!=='string' || !input[key])throw Error('invalid_send');
+   const scope=identity();if(!scope?.userId)throw Error('not_connected');
+   try {
+    await runtime.ensureSession({sessionId:input.sessionId});
+    signal?.throwIfAborted();
+    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:input.machineId,userId:scope.userId,text:input.text,cliType:input.cliType,agentType:input.agentType,...(input.resume?{resume:input.resume}:{}),...(input.queue?{queue:true}:{})});
+    return {state:sent.state,reason:sent.reason};
+   } catch {return {state:'unknown'};}
+  },
   async createAndSend(input,signal) {
    signal?.throwIfAborted();
    if(!input || !uuid.test(input.sessionId) || !uuid.test(input.turnId) || typeof input.text!=='string' || !input.text.trim() || input.text.length>32000)throw Error('invalid_creation');
