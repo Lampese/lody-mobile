@@ -26,8 +26,13 @@ object CatalogJson {
     )
 
     /** Optional `machineNames` object; non-string or empty names are skipped. */
-    fun machineNames(json: JSONObject): Map<String, String> {
-        val names = json.optJSONObject("machineNames") ?: return emptyMap()
+    fun machineNames(json: JSONObject): Map<String, String> = stringMap(json, "machineNames")
+
+    /** Optional `machineOs` object (computer id to OS). */
+    fun machineOs(json: JSONObject): Map<String, String> = stringMap(json, "machineOs")
+
+    private fun stringMap(json: JSONObject, key: String): Map<String, String> {
+        val names = json.optJSONObject(key) ?: return emptyMap()
         return names.keys().asSequence().mapNotNull { id -> names.optText(id)?.let { id to it } }.toMap()
     }
 

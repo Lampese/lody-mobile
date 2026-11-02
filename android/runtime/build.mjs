@@ -1,7 +1,7 @@
 import { verifySnapshot } from './snapshot.mjs';
 import { adaptCreationRuntime } from './src/creation-adapter.mjs';
 import { adaptCatalogBudget } from './src/catalog-budget.mjs';
-import { adaptCatalogOwner } from './src/catalog-owner.mjs';
+import { adaptCatalogMachineOs, adaptCatalogOwner } from './src/catalog-owner.mjs';
 import { buildMarkdownRepair } from './src/markdown-repair.mjs';
 await verifySnapshot();
 import { build } from 'esbuild';
@@ -19,7 +19,7 @@ for (const variant of Object.keys(documents)) {
     plugins:[{name:'android-create-worktree',setup(b){b.onLoad({filter:/vendor\/cloud-runtime\/src\/runtime\/create-session\.ts$/},async(args)=>({contents:adaptCreationRuntime(await readFile(args.path,'utf8')),loader:'ts'}));}},{name:'android-catalog-budget',setup(b){
       b.onLoad({filter:/vendor\/cloud-runtime\/src\/runtime\/index\.ts$/},async(args)=>({contents:adaptCatalogBudget(await readFile(args.path,'utf8')),loader:'ts'}));
     }},{name:'android-catalog-owner',setup(b){
-      b.onLoad({filter:/vendor\/cloud-runtime\/src\/protocol\/catalog\.ts$/},async(args)=>({contents:adaptCatalogOwner(await readFile(args.path,'utf8')),loader:'ts'}));
+      b.onLoad({filter:/vendor\/cloud-runtime\/src\/protocol\/catalog\.ts$/},async(args)=>({contents:adaptCatalogMachineOs(adaptCatalogOwner(await readFile(args.path,'utf8'))),loader:'ts'}));
     }},{name:'inline-loro-wasm',setup(b){b.onResolve({filter:/^loro-crdt$/},()=>b.resolve('loro-crdt/base64',{resolveDir:root,kind:'import-statement'}));}}]});
   const dir=path.join(output,variant==='network'?'main':variant,'runtime');await mkdir(dir,{recursive:true});
   const script=result.outputFiles[0].text.replaceAll('</script','<\\/script');

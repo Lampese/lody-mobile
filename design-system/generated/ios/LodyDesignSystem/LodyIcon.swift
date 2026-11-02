@@ -49,6 +49,8 @@ public enum LodyIcon: String, CaseIterable, Sendable {
     case sparkles = "lody.icon.sparkles"
     case terminal = "lody.icon.terminal"
     case machine = "lody.icon.machine"
+    case desktop = "lody.icon.desktop"
+    case server = "lody.icon.server"
     case cloud = "lody.icon.cloud"
     case branch = "lody.icon.branch"
     case commit = "lody.icon.commit"

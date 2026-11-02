@@ -122,4 +122,6 @@
     <string name="create_mode">Mode</string>
     <string name="create_no_online_agents">No online assistant on this computer. Choose another computer or start an assistant there.</string>
     <string name="create_extras_unavailable">Attachments and mentions are not available yet.</string>
+    <string name="create_search_machines">Search computers</string>
+    <string name="create_default">Default</string>
 </resources>

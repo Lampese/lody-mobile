@@ -373,6 +373,25 @@ object LodyIcons {
         )
     }
 
+    val Desktop: ImageVector by lazy {
+        lodyIcon(
+            "Desktop",
+            "M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2Z",
+            "M8 21L16 21",
+            "M12 17L12 21",
+        )
+    }
+
+    val Server: ImageVector by lazy {
+        lodyIcon(
+            "Server",
+            "M4 2h16a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2Z",
+            "M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2Z",
+            "M6 6L6.01 6",
+            "M6 18L6.01 18",
+        )
+    }
+
     val Cloud: ImageVector by lazy {
         lodyIcon(
             "Cloud",
@@ -610,6 +629,8 @@ object LodyIcons {
             "sparkles" to Sparkles,
             "terminal" to Terminal,
             "machine" to Machine,
+            "desktop" to Desktop,
+            "server" to Server,
             "cloud" to Cloud,
             "branch" to Branch,
             "commit" to Commit,

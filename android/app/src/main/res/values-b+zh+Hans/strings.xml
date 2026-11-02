@@ -121,4 +121,6 @@
     <string name="create_mode">模式</string>
     <string name="create_no_online_agents">此电脑没有在线助手，请切换电脑或在该电脑上启动助手。</string>
     <string name="create_extras_unavailable">附件和引用暂未接入。</string>
+    <string name="create_search_machines">搜索电脑</string>
+    <string name="create_default">默认</string>
 </resources>

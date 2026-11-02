@@ -47,4 +47,20 @@ class CreateSessionModelTest {
         assertTrue(chat.chat)
         assertEquals("m1", chat.machineId)
     }
+
+    @Test
+    fun machineKindFollowsOsAndMacName() {
+        val machines = snapshot.copy(
+            machineIds = listOf("mb", "imac", "win", "box", "unknown"),
+            machineNames = mapOf("mb" to "zx-MacBook-Pro", "imac" to "Studio iMac", "win" to "Desk", "box" to "build"),
+            machineOs = mapOf("mb" to "darwin", "imac" to "darwin", "win" to "win32", "box" to "linux"),
+        )
+        fun kind(id: String?) = CreateSessionModel.machineKind(machines, id)
+        assertEquals(CreateSessionModel.MachineKind.Laptop, kind("mb"))
+        assertEquals(CreateSessionModel.MachineKind.Desktop, kind("imac"))
+        assertEquals(CreateSessionModel.MachineKind.Desktop, kind("win"))
+        assertEquals(CreateSessionModel.MachineKind.Server, kind("box"))
+        assertEquals(CreateSessionModel.MachineKind.Laptop, kind("unknown"))
+        assertEquals(CreateSessionModel.MachineKind.Laptop, kind(null))
+    }
 }

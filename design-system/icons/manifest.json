@@ -45,6 +45,8 @@
     "sparkles": "sparkles",
     "terminal": "terminal",
     "machine": "laptop",
+    "desktop": "monitor",
+    "server": "server",
     "cloud": "cloud",
     "branch": "git-branch",
     "commit": "git-commit-horizontal",

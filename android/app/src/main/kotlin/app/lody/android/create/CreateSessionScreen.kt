@@ -4,12 +4,29 @@
 // `mobile-run-config-sheet.tsx`), checked by driving its Storybook stories: computer and project
 // are full-width cards whose options expand in place right below them (one open at a time, the
 // project list searchable); then the worktree chip for local projects or the branch line for
-// GitHub projects; then the composer card (+, @, the run-config chip, send). The assistant lives
-// in the run-config chip's sheet, not on the page.
+// GitHub projects; then the composer (+, the run-config chip, send; no @, as web and iOS). The
+// assistant lives in the run-config chip's sheet, not on the page. Styled like iOS: no fills on
+// lines or lists, lists aligned with their line, computers with OS icons.
 //
 // Text creation and dispatch use the same workspace lease as the catalog.
 
 package app.lody.android.create
+
+import app.lody.android.designsystem.shadow
+
+import app.lody.android.designsystem.LodyElevations
+
+import androidx.compose.ui.draw.dropShadow
+
+import androidx.compose.ui.text.withStyle
+
+import androidx.compose.ui.text.buildAnnotatedString
+
+import androidx.compose.ui.text.SpanStyle
+
+import androidx.compose.ui.focus.onFocusChanged
+
+import androidx.compose.animation.animateContentSize
 
 import app.lody.android.runtime.*
 import androidx.compose.runtime.LaunchedEffect
@@ -188,36 +205,69 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState(), reverseScrolling = true)
                         .padding(horizontal = LodyLayout.screenPaddingX),
-                    verticalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
                     ContextPanel(catalog, target, onChange = { if (!attempted) target = it })
-                    if (github) OutlinedTextField(value = branch, onValueChange = { branch = it }, enabled = !attempted, label = { Text(stringResource(R.string.create_branch_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    if (agent == null && !attempted) Text(waitingText, style = LodyTheme.typography.footnote, color = colors.textSecondary)
+                    // GitHub branches are typed (Android does not list them yet), on a plain line.
+                    if (github) BranchLine(branch, enabled = !attempted) { branch = it }
+                    if (agent == null && !attempted) Text(waitingText, style = LodyTheme.typography.footnote, color = colors.textSecondary, modifier = Modifier.padding(horizontal = LodySpacing.xs))
                     if (attempted) {
                         Text(if (busy) stringResource(R.string.create_sending) else outcome ?: unknownText, style = LodyTheme.typography.footnote, color = colors.textSecondary)
                         if (!busy && outcome != rejectedText) TextButton(onClick = { onCreated(sessionId, prompt.take(200)) }) { Text(stringResource(R.string.create_open_result)) }
                     }
                 }
             }
-            Composer(prompt, onPromptChange = { if (!attempted && it.length <= 32000) prompt = it }, onAttach = notice, onMention = notice, onRunConfig = { if (!attempted) runConfig = true }, onSend = send, enabled = canSend, configLabel = listOfNotNull(agent?.name, modelId, effort, modeId).joinToString(" · ").ifBlank { waitingText })
+            val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name
+            val modeName = capability?.modes?.firstOrNull { it.id == modeId }?.name
+            Composer(
+                prompt,
+                onPromptChange = { if (!attempted && it.length <= 32000) prompt = it },
+                onAttach = notice,
+                onRunConfig = { if (!attempted) runConfig = true },
+                onSend = send,
+                enabled = canSend,
+                agentReady = agent != null,
+                face = listOfNotNull(modelName ?: agent?.name, effort),
+                mode = modeName,
+                waiting = waitingText,
+            )
         }
     }
     if (runConfig) {
         ModalBottomSheet(onDismissRequest = { runConfig = false }, containerColor = colors.bgBase) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LodyLayout.screenPaddingX)) {
-                Text(stringResource(R.string.create_run_config), style = LodyTheme.typography.headline)
-                ConfigChoices(stringResource(R.string.create_agent), agents.map { CreationChoice(it.id, it.name) }, agent?.id) { agentId = it; modelId = null; modeId = null; effort = null }
-                ConfigChoices(stringResource(R.string.create_model), capability?.models.orEmpty(), modelId) { modelId = it; effort = null }
-                ConfigChoices(stringResource(R.string.create_effort), capability?.efforts?.get(modelId).orEmpty().map { CreationChoice(it, it) }, effort) { effort = it }
-                ConfigChoices(stringResource(R.string.create_mode), capability?.modes.orEmpty(), modeId) { modeId = it }
+            RunConfigSheet(
+                rows = buildList {
+                    if (agents.size > 1) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, icon = LodyIcons.Agent) }))
+                    capability?.models?.takeIf { it.isNotEmpty() }?.let { models ->
+                        add(RunConfigRow(MODEL, stringResource(R.string.create_model), models.map { PickerOption(it.id, it.name, it.id == modelId) }))
+                    }
+                    capability?.efforts?.get(modelId)?.takeIf { it.isNotEmpty() }?.let { efforts ->
+                        add(RunConfigRow(EFFORT, stringResource(R.string.create_effort), efforts.map { PickerOption(it, it, it == effort) }))
+                    }
+                    capability?.modes?.takeIf { it.isNotEmpty() }?.let { modes ->
+                        add(RunConfigRow(MODE, stringResource(R.string.create_mode), modes.map { PickerOption(it.id, it.name, it.id == modeId) }))
+                    }
+                },
+                defaultLabel = stringResource(R.string.create_default),
+            ) { row, id ->
+                when (row) {
+                    AGENT -> { agentId = id; modelId = null; modeId = null; effort = null }
+                    MODEL -> { modelId = id; effort = null }
+                    EFFORT -> effort = id
+                    MODE -> modeId = id
+                }
             }
         }
     }
 }
 
+private const val AGENT = "agent"
+private const val MODEL = "model"
+private const val EFFORT = "effort"
+private const val MODE = "mode"
+
 @Composable
 private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChange: (CreateTarget) -> Unit) {
-    val colors = LodyTheme.colors
     // One list open at a time, as web's picker coordinator.
     var open by remember { mutableStateOf<String?>(null) }
     val toggle = { id: String -> open = if (open == id) null else id }
@@ -225,14 +275,14 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChang
     val machines = CreateSessionModel.machines(catalog)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
     PickerCard(
-        id = MACHINE,
-        icon = LodyIcons.Machine,
+        icon = machineIcon(catalog, target.machineId),
         title = machineName ?: stringResource(R.string.create_pick_machine),
         placeholder = machineName == null,
-        options = if (CreateSessionModel.machineChoosable(catalog)) machines.map { (id, name) -> PickerOption(id, name, selected = id == target.machineId) } else emptyList(),
+        options = if (CreateSessionModel.machineChoosable(catalog)) machines.map { (id, name) -> PickerOption(id, name, selected = id == target.machineId, icon = machineIcon(catalog, id)) } else emptyList(),
         open = open == MACHINE,
         onToggle = { toggle(MACHINE) },
         onPick = { open = null; onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
+        searchPlaceholder = stringResource(R.string.create_search_machines),
     )
 
     val projects = CreateSessionModel.projects(catalog)
@@ -241,7 +291,6 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChang
     val chatOption = PickerOption(CHAT, chatLabel, selected = target.chat, icon = LodyIcons.Close)
     val usable = projects.filter { CreateSessionModel.isGithub(it.id) || target.machineId == null || it.machineId == target.machineId }
     PickerCard(
-        id = PROJECT,
         icon = when {
             target.chat -> LodyIcons.Close
             CreateSessionModel.isGithub(project?.id) -> LodyIcons.Github
@@ -258,7 +307,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChang
         onToggle = { toggle(PROJECT) },
         onPick = { id ->
             when (id) {
-                MORE -> Unit // The search field below lists every project; More keeps the list open.
+                MORE -> Unit // More expands the list to every project in place.
                 CHAT -> { open = null; onChange(CreateSessionModel.chat(catalog, target)) }
                 else -> { open = null; onChange(CreateSessionModel.select(catalog, target, id)) }
             }
@@ -268,7 +317,13 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChang
 
     val local = !target.chat && project != null && !CreateSessionModel.isGithub(project.id)
     if (local) WorktreeChip(target.worktree) { onChange(target.copy(worktree = it)) }
+}
 
+/** iOS draws SF Symbols by OS; Android uses the matching Lucide marks. */
+private fun machineIcon(catalog: CatalogSnapshot, id: String?): ImageVector = when (CreateSessionModel.machineKind(catalog, id)) {
+    CreateSessionModel.MachineKind.Laptop -> LodyIcons.Machine
+    CreateSessionModel.MachineKind.Desktop -> LodyIcons.Desktop
+    CreateSessionModel.MachineKind.Server -> LodyIcons.Server
 }
 
 private const val MACHINE = "machine"
@@ -292,10 +347,13 @@ private fun CatalogProject.option(target: CreateTarget) = PickerOption(
     icon = if (CreateSessionModel.isGithub(id)) LodyIcons.Github else LodyIcons.Folder,
 )
 
-/** A full-width filled card; its options expand in place right below it (web's inline picker). */
+/**
+ * A plain full-width line (no fill, as iOS); its options expand in place right below it. The
+ * panel is bottom-anchored, so the list is revealed from its top edge and moves up with the
+ * layout instead of sliding against it.
+ */
 @Composable
 private fun PickerCard(
-    id: String,
     icon: ImageVector,
     title: String,
     placeholder: Boolean,
@@ -308,17 +366,15 @@ private fun PickerCard(
     expandAllOn: String? = null,
 ) {
     val colors = LodyTheme.colors
-    val shape = RoundedCornerShape(LodyRadius.xl)
-    Column(verticalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+    Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = LodySize.controlLg)
-                .clip(shape)
-                .background(colors.fillTertiary, shape)
+                .clip(RoundedCornerShape(LodyRadius.md))
                 .clickable(enabled = options.isNotEmpty(), role = Role.Button, onClick = onToggle)
                 .semantics { contentDescription = title }
-                .padding(horizontal = LodySpacing.lg),
+                .padding(horizontal = LodySpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
         ) {
@@ -331,21 +387,29 @@ private fun PickerCard(
                 overflow = TextOverflow.MiddleEllipsis,
                 modifier = Modifier.weight(1f),
             )
-            // The pop-up indicator (⌃⌄), drawn as a stacked up / down pair.
-            if (options.isNotEmpty()) {
-                Column {
-                    Icon(LodyIcons.Collapse, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
-                    Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
-                }
-            }
+            if (options.isNotEmpty()) PopupIndicator()
         }
-        AnimatedVisibility(open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        AnimatedVisibility(
+            open,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+        ) {
             OptionList(options, searchOptions, searchPlaceholder, onPick, expandAllOn)
         }
     }
 }
 
-/** The expanded options: optional search, then rows with a check on the selected one. */
+/** The pop-up indicator (⌃⌄), drawn as a stacked up / down pair. */
+@Composable
+private fun PopupIndicator() {
+    val tint = LodyTheme.colors.iconTertiary
+    Column {
+        Icon(LodyIcons.Collapse, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.xs))
+        Icon(LodyIcons.Expand, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.xs))
+    }
+}
+
+/** The expanded options, aligned with the line (no indent or surface): search, then rows. */
 @Composable
 private fun OptionList(
     options: List<PickerOption>,
@@ -356,7 +420,6 @@ private fun OptionList(
 ) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
-    val shape = RoundedCornerShape(LodyRadius.xl)
     var query by remember { mutableStateOf("") }
     var all by remember { mutableStateOf(false) }
     val term = query.trim()
@@ -365,20 +428,14 @@ private fun OptionList(
         all && searchOptions != null -> searchOptions
         else -> options
     }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(colors.bgRaised, shape)
-            .border(0.5.dp, colors.borderSubtle, shape),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         if (searchOptions != null || options.size > 8) {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).padding(horizontal = LodySpacing.lg),
+                Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).padding(horizontal = LodySpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
             ) {
-                Icon(LodyIcons.Search, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+                Icon(LodyIcons.Search, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.md))
                 BasicTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -394,7 +451,6 @@ private fun OptionList(
                     },
                 )
             }
-            HorizontalDivider(thickness = 0.5.dp, color = colors.borderSubtle)
         }
         LazyColumn(Modifier.heightIn(max = 280.dp)) {
             items(shown, key = { it.id }) { option ->
@@ -402,10 +458,10 @@ private fun OptionList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = LodySize.listRow)
-                        .background(if (option.selected) colors.fillTertiary else Color.Transparent)
+                        .clip(RoundedCornerShape(LodyRadius.md))
                         .clickable(role = Role.Button) { if (option.id == expandAllOn) all = true; onPick(option.id) }
                         .semantics { selected = option.selected }
-                        .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.xs),
+                        .padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
                 ) {
@@ -423,19 +479,17 @@ private fun OptionList(
     }
 }
 
-/** Web's worktree chip: a checkbox and the word, toggling the local project's worktree mode. */
+/** Web's worktree chip as iOS draws it: a checkbox and the word, no fill. */
 @Composable
 private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
     val colors = LodyTheme.colors
-    val shape = RoundedCornerShape(LodyRadius.md)
     Row(
         modifier = Modifier
             .heightIn(min = LodySize.controlMd)
-            .clip(shape)
-            .background(colors.fillTertiary, shape)
+            .clip(RoundedCornerShape(LodyRadius.md))
             .clickable(role = Role.Checkbox) { onChange(!on) }
             .semantics { selected = on }
-            .padding(horizontal = LodySpacing.md),
+            .padding(horizontal = LodySpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
     ) {
@@ -453,41 +507,121 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
+/** The GitHub branch as a plain line: branch mark and the typed name. */
 @Composable
-private fun ConfigChoices(label: String, choices: List<CreationChoice>, selected: String?, onSelect: (String) -> Unit) {
-    if (choices.isEmpty()) return
-    Text(label, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textSecondary)
-    choices.forEach { choice ->
-        TextButton(onClick = { onSelect(choice.id) }, modifier = Modifier.fillMaxWidth()) {
-            Text(choice.name, modifier = Modifier.weight(1f), color = LodyTheme.colors.textPrimary)
-            if (choice.id == selected) Icon(LodyIcons.Check, contentDescription = null, tint = LodyTheme.colors.accentFg)
+private fun BranchLine(branch: String, enabled: Boolean, onChange: (String) -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val placeholder = stringResource(R.string.create_branch_name)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).padding(horizontal = LodySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+    ) {
+        Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+        BasicTextField(
+            value = branch,
+            onValueChange = onChange,
+            enabled = enabled,
+            singleLine = true,
+            textStyle = type.body.copy(color = colors.textPrimary),
+            cursorBrush = SolidColor(colors.accentDefault),
+            modifier = Modifier.weight(1f).semantics { contentDescription = placeholder },
+            decorationBox = { inner ->
+                Box {
+                    if (branch.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder)
+                    inner()
+                }
+            },
+        )
+    }
+}
+
+private data class RunConfigRow(val id: String, val label: String, val options: List<PickerOption>)
+
+/** Web's run-config sheet as iOS draws it: label + value rows whose options expand in place. */
+@Composable
+private fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPick: (String, String) -> Unit) {
+    val colors = LodyTheme.colors
+    var open by remember { mutableStateOf<String?>(null) }
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = LodyLayout.screenPaddingX).padding(bottom = LodySpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+    ) {
+        Text(
+            stringResource(R.string.create_run_config),
+            style = LodyTheme.typography.headline,
+            color = colors.textPrimary,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = LodySpacing.sm),
+        )
+        rows.forEach { row ->
+            val current = row.options.firstOrNull { it.selected }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = LodySize.controlLg)
+                    .clip(RoundedCornerShape(LodyRadius.md))
+                    .clickable(role = Role.Button) { open = if (open == row.id) null else row.id }
+                    .padding(horizontal = LodySpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+            ) {
+                Text(row.label, style = LodyTheme.typography.subhead, color = colors.textSecondary, modifier = Modifier.widthIn(min = RunConfigLabelWidth))
+                current?.icon?.let { Icon(it, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm)) }
+                Text(
+                    current?.title ?: defaultLabel,
+                    style = LodyTheme.typography.body,
+                    color = if (current == null) colors.textTertiary else colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                PopupIndicator()
+            }
+            AnimatedVisibility(
+                open == row.id,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            ) {
+                OptionList(row.options, null, "", { id -> open = null; onPick(row.id, id) }, null)
+            }
         }
     }
 }
 
-/** Web's mobile composer: prompt in a card; +, @ and the run-config chip leading, send trailing. */
+private val RunConfigLabelWidth = LodySize.controlLg * 2
+
+/**
+ * Web's mobile composer on a floating surface (Android has no Liquid Glass; the Home tab bar's
+ * overlay + shadow stands in): prompt, then + and the run-config chip leading, send trailing.
+ * No @ button, as web and iOS. One line at rest; two while editing.
+ */
 @Composable
 private fun Composer(
     prompt: String,
     onPromptChange: (String) -> Unit,
     onAttach: () -> Unit,
-    onMention: () -> Unit,
     onRunConfig: () -> Unit,
     onSend: () -> Unit,
     enabled: Boolean,
-    configLabel: String,
+    agentReady: Boolean,
+    face: List<String>,
+    mode: String?,
+    waiting: String,
 ) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val shape = RoundedCornerShape(LodyRadius.xl)
     val placeholder = stringResource(R.string.create_composer_placeholder)
+    var focused by remember { mutableStateOf(false) }
     Column(
         Modifier
             .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.sm)
             .fillMaxWidth()
+            .dropShadow(shape, LodyElevations.md.shadow())
             .clip(shape)
-            .background(colors.bgRaised, shape)
-            .border(0.5.dp, colors.borderSubtle, shape)
+            .background(colors.bgOverlay, shape)
+            .animateContentSize()
             .padding(LodySpacing.sm),
     ) {
         BasicTextField(
@@ -495,10 +629,11 @@ private fun Composer(
             onValueChange = onPromptChange,
             textStyle = type.body.copy(color = colors.textPrimary),
             cursorBrush = SolidColor(colors.accentDefault),
-            minLines = 2,
+            minLines = if (focused) 2 else 1,
             maxLines = 10,
             modifier = Modifier
                 .fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused }
                 .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs)
                 .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
@@ -510,8 +645,7 @@ private fun Composer(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             ComposerButton(LodyIcons.Plus, stringResource(R.string.create_attach), onAttach)
-            ComposerButton(LodyIcons.AtSign, stringResource(R.string.create_mention), onMention)
-            // The run-config chip reflects the selected assistant and capability choices.
+            // The run-config chip: assistant mark + model · effort · mode (mode dimmed), as iOS.
             Row(
                 Modifier
                     .weight(1f, fill = false)
@@ -520,10 +654,24 @@ private fun Composer(
                     .clickable(role = Role.Button, onClick = onRunConfig)
                     .padding(horizontal = LodySpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
             ) {
                 Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                Text(configLabel, style = type.subhead, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val label = buildAnnotatedString {
+                    if (!agentReady || face.isEmpty()) {
+                        withStyle(SpanStyle(color = colors.textTertiary)) { append(waiting) }
+                    } else {
+                        face.forEachIndexed { index, part ->
+                            if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
+                            withStyle(SpanStyle(color = colors.textPrimary)) { append(part) }
+                        }
+                        if (mode != null) {
+                            withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
+                            withStyle(SpanStyle(color = colors.textSecondary)) { append(mode) }
+                        }
+                    }
+                }
+                Text(label, style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.weight(1f))
             val ready = enabled && prompt.isNotBlank()

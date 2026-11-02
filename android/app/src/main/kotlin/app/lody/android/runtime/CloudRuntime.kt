@@ -58,6 +58,8 @@ data class CatalogSnapshot(
     val sessions: List<CatalogSession>,
     val machineIds: List<String>,
     val machineNames: Map<String, String> = emptyMap(),
+    /** Computer id to OS (`darwin` / `win32` / `linux`), for its icon. */
+    val machineOs: Map<String, String> = emptyMap(),
 )
 data class SessionMessage(val id: String, val role: String, val text: String, val streaming: Boolean)
 data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>)

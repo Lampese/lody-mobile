@@ -76,4 +76,18 @@ object CreateSessionModel {
         val current = snapshot.projects.firstOrNull { it.id == target.projectId && !target.chat }
         return if (current == null || recent.any { it.id == current.id }) recent else listOf(current) + recent
     }
+
+    /** The computer's icon kind, by OS and (for Macs) name; iOS `CreateSessionContext.machineGlyph`. */
+    enum class MachineKind { Laptop, Desktop, Server }
+
+    fun machineKind(snapshot: CatalogSnapshot, id: String?): MachineKind {
+        if (id == null) return MachineKind.Laptop
+        val name = snapshot.machineNames[id].orEmpty().lowercase()
+        return when (snapshot.machineOs[id]) {
+            "darwin" -> if (listOf("imac", "mini", "studio", "mac pro").any { it in name }) MachineKind.Desktop else MachineKind.Laptop
+            "win32" -> MachineKind.Desktop
+            "linux" -> MachineKind.Server
+            else -> MachineKind.Laptop
+        }
+    }
 }
