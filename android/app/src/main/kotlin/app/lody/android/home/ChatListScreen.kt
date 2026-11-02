@@ -769,32 +769,35 @@ private fun ChatRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LodySize.listRow)
-            .drawBehind { if (nested || expanded == true) drawTree(treeColor, nested, chat.lastChild, expanded == true, chat.attention != null) }
+            .drawBehind { if (nested || expanded == true) drawTree(treeColor, nested, chat.lastChild, expanded == true) }
             .clickable(onClick = onClick)
             .padding(end = LodyLayout.screenPaddingX)
             .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The status slot spans the gutter and centres on the whole row; empty when idle. A nested
-        // row's slot (and so its title) steps in one level.
-        if (expanded != null) {
-            val label = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
-            val angle by animateFloatAsState(if (expanded) 0f else -90f, LodySpring.snappy(), label = "disclosure")
-            Box(
-                Modifier
-                    .width(LodyLayout.childIndent)
-                    .heightIn(min = LodySize.listRow)
-                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = label, onClick = onToggle)
-                    .semantics { stateDescription = label },
-                contentAlignment = Alignment.Center,
-            ) {
-                Glyph(LodyIcons.Expand, colors.iconTertiary, LodyIconSize.sm, Modifier.rotate(angle))
-            }
-        } else {
-            Box(Modifier.padding(start = if (nested) TreeLevel else 0.dp).width(LodyLayout.childIndent), contentAlignment = Alignment.Center) {
-                chat.attention?.let { AttentionGlyph(it) }
+        // Two columns, each with one job: the status column (centred in the gutter, the same place
+        // on every row, nested or not) and the tree column just before the title (the opener's
+        // chevron, trunk and elbows). iOS counterpart: `ChatRowContent` / `TreeLines`.
+        Box(Modifier.width(LodyLayout.childIndent).heightIn(min = LodySize.listRow)) {
+            Box(Modifier.align(Alignment.Center)) { chat.attention?.let { AttentionGlyph(it) } }
+            if (expanded != null) {
+                val label = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
+                val angle by animateFloatAsState(if (expanded) 0f else -90f, LodySpring.snappy(), label = "disclosure")
+                Box(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(TreeChevronSlot)
+                        .heightIn(min = LodySize.listRow)
+                        .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = label, onClick = onToggle)
+                        .semantics { stateDescription = label },
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Glyph(LodyIcons.Expand, colors.iconTertiary, TreeChevron, Modifier.padding(end = LodySpacing.xxs).rotate(angle))
+                }
             }
         }
+        // A nested title steps in one level past the elbow.
+        if (nested) Spacer(Modifier.width(TreeLevel))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -805,8 +808,6 @@ private fun ChatRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                // An opener's own mark (or, folded, its family's) sits before the age.
-                if (expanded != null) chat.attention?.let { Box(Modifier.padding(start = LodySpacing.sm)) { AttentionGlyph(it) } }
                 if (pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
                 chat.activityAt?.let { at ->
                     Text(
@@ -843,26 +844,30 @@ private fun ChatRow(
 private val TreeLevel = LodySpacing.lg
 
 /**
- * Web's opened-by tree connectors (`session-row-leading-slot.tsx`) in the mobile gutter: a trunk
- * down the parent's status-mark column, from below its mark through each nested row (stopping at
- * the last one's centre), and an elbow into the nested row's own mark, or toward its title when
- * it has none. Rows sit edge to edge, so each draws only its own height and the pieces join.
+ * Web's opened-by tree connectors in the tree column: a trunk from below the opener's chevron
+ * through each nested row (stopping at the last one's centre), and an elbow into the nested
+ * row's title. Status marks keep their own column. Rows sit edge to edge, so each draws only its
+ * own height and the pieces join.
  */
-private fun DrawScope.drawTree(color: Color, nested: Boolean, lastChild: Boolean, parent: Boolean, marked: Boolean) {
-    val x = (LodyLayout.childIndent / 2).toPx()
+private fun DrawScope.drawTree(color: Color, nested: Boolean, lastChild: Boolean, parent: Boolean) {
+    val x = TreeTrunkX.toPx()
     val mid = size.height / 2
     val stroke = 1.dp.toPx()
     if (parent) {
-        // Below the opener's chevron.
-        drawLine(color, Offset(x, mid + (LodyIconSize.sm / 2 + LodySpacing.xxs).toPx()), Offset(x, size.height), stroke)
+        // Starts below the opener's chevron.
+        drawLine(color, Offset(x, mid + (TreeChevron / 2 + LodySpacing.xxs).toPx()), Offset(x, size.height), stroke)
     }
     if (nested) {
         drawLine(color, Offset(x, 0f), Offset(x, if (lastChild) mid else size.height), stroke)
-        val end = if (marked) TreeLevel + LodyLayout.childIndent / 2 - LodyIconSize.md / 2 + LodySpacing.xxs
-        else LodyLayout.childIndent + TreeLevel - LodySpacing.sm
-        drawLine(color, Offset(x, mid), Offset(end.toPx(), mid), stroke)
+        // The elbow runs into its own title, stopping just short of the text.
+        drawLine(color, Offset(x, mid), Offset((LodyLayout.childIndent + TreeLevel - LodySpacing.xs).toPx(), mid), stroke)
     }
 }
+
+/** The tree column sits just before the titles, right of the status column. */
+private val TreeChevron = LodyIconSize.xs
+private val TreeTrunkX = LodyLayout.childIndent - TreeChevron / 2 - LodySpacing.xxs
+private val TreeChevronSlot = LodySpacing.xl
 
 private val PrStatuses = setOf("open", "merged", "closed", "draft")
 

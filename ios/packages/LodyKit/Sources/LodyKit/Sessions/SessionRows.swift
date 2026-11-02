@@ -101,6 +101,8 @@ enum SessionRows {
         var item = row(child)
         item.parentId = group.session.id
         item.lastChild = index == group.children.count - 1
+        // A child almost always shares its opener's project: show it only when it differs.
+        if item.place == parent.place { item.place = "" }
         return item
       }
     }

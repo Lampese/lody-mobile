@@ -247,7 +247,11 @@ object ChatListModel {
         return order.flatMap { id ->
             val kids = children.getValue(id)
             listOf(byId.getValue(id).copy(treeParent = kids.isNotEmpty(), nestedUnder = null, lastChild = false)) +
-                kids.mapIndexed { index, kid -> kid.copy(nestedUnder = id, lastChild = index == kids.lastIndex, treeParent = false) }
+                kids.mapIndexed { index, kid ->
+                    // A child almost always shares its opener's project: show it only when it differs.
+                    val place = kid.place.takeUnless { it == byId.getValue(id).place }.orEmpty()
+                    kid.copy(nestedUnder = id, lastChild = index == kids.lastIndex, treeParent = false, place = place)
+                }
         }
     }
 

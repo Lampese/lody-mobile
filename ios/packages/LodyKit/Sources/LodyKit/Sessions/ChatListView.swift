@@ -544,8 +544,8 @@ extension Notification.Name {
 private struct ChatRowContent: View {
   let row: LodyListRow
   let details: ChatRowDetails
-  /// Set on a row with nested chats: whether they are shown. Its status slot then holds the
-  /// disclosure (web's opener chevron) and its status mark moves inline, before the age.
+  /// Set on a row with nested chats: whether they are shown. Its chevron sits in the tree
+  /// column, where the trunk starts; the status mark stays in the status column.
   var expanded: Bool?
   var onToggle: () -> Void = {}
 
@@ -558,8 +558,6 @@ private struct ChatRowContent: View {
 
   private var attention: Attention? { Attention(tint: row.imageTint, unread: row.unread) }
   private var nested: Bool { !row.parentId.isEmpty }
-  /// An opener's own mark (or, folded, its family's) sits before the age.
-  private var inlineAttention: Attention? { expanded != nil ? attention : nil }
 
   /// Search results keep their match snippet in place of the detail line.
   private var snippet: String? {
@@ -568,26 +566,30 @@ private struct ChatRowContent: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: 0) {
-      // The status slot, centred on the whole row; a nested row's slot steps in one level.
-      if let expanded {
-        Button(action: onToggle) {
-          Glyph(icon: .expand, size: LodyIconSize.sm, color: LodyColor.iconTertiary)
-            .rotationEffect(.degrees(expanded ? 0 : -90))
-            .animation(LodySpring.snappy, value: expanded)
-            .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-            .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-      } else {
+      // Two columns, each with one job: the status column (same place on every row, nested or
+      // not) and the tree column just before the title (the opener's chevron, trunk, elbows).
+      ZStack(alignment: .leading) {
         ZStack {
           if let attention { AttentionGlyph(attention: attention) }
         }
         .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-        .padding(.leading, nested ? TreeLines.level : 0)
-        .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX + (nested ? TreeLines.level : 0), alignment: .leading)
+        if let expanded {
+          Button(action: onToggle) {
+            Glyph(icon: .expand, size: TreeLines.chevron, color: LodyColor.iconTertiary)
+              .rotationEffect(.degrees(expanded ? 0 : -90))
+              .animation(LodySpring.snappy, value: expanded)
+              .frame(width: TreeLines.chevron, height: TreeLines.chevron)
+              .padding(.leading, TreeLines.trunkX - LodyLayout.screenPaddingX - TreeLines.chevron / 2)
+              .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
+              .frame(maxHeight: .infinity)
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+        }
       }
+      .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
+      // A nested title steps in one level past the elbow.
+      if nested { Color.clear.frame(width: TreeLines.level, height: 1) }
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
           Text(row.title)
@@ -596,9 +598,8 @@ private struct ChatRowContent: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
           // The text inside sets the stack's baseline, so the PR mark centres on the age.
-          if inlineAttention != nil || inlinePullRequest != nil || !row.value.isEmpty {
+          if inlinePullRequest != nil || !row.value.isEmpty {
             HStack(spacing: LodySpacing.xs) {
-              if let inlineAttention { AttentionGlyph(attention: inlineAttention) }
               inlinePullRequest?.glyph
               if !row.value.isEmpty {
                 Text(row.value)
@@ -622,7 +623,7 @@ private struct ChatRowContent: View {
     .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
     .background {
       if nested || expanded == true {
-        TreeLines(nested: nested, lastChild: row.lastChild, parent: expanded == true, marked: attention != nil)
+        TreeLines(nested: nested, lastChild: row.lastChild, parent: expanded == true)
       }
     }
     .accessibilityElement(children: .ignore)
@@ -662,32 +663,32 @@ private struct ChatRowContent: View {
 /// its title when it has none. Rows sit edge to edge, so each draws only its own height and the
 /// pieces read as one line.
 private struct TreeLines: View {
-  /// One nesting level: how far a nested row's mark and title step in.
+  /// One nesting level: how far a nested row's title steps in.
   static let level = LodySpacing.lg
+  static let chevron = LodyIconSize.xs
+  /// The tree column's line, just before the titles (and right of the status column).
+  static let trunkX = LodyLayout.childIndent - chevron / 2 - LodySpacing.xxs
 
   let nested: Bool
   let lastChild: Bool
   let parent: Bool
-  let marked: Bool
 
   var body: some View {
     Canvas { context, size in
-      let x = LodyLayout.screenPaddingX + LodyIconSize.md / 2
+      let x = Self.trunkX
       let mid = size.height / 2
       var path = Path()
       if parent {
-        // Below the opener's chevron.
-        path.move(to: CGPoint(x: x, y: mid + LodyIconSize.sm / 2 + LodySpacing.xxs))
+        // Starts below the opener's chevron.
+        path.move(to: CGPoint(x: x, y: mid + Self.chevron / 2 + LodySpacing.xxs))
         path.addLine(to: CGPoint(x: x, y: size.height))
       }
       if nested {
         path.move(to: CGPoint(x: x, y: 0))
         path.addLine(to: CGPoint(x: x, y: lastChild ? mid : size.height))
-        let end = marked
-          ? LodyLayout.screenPaddingX + Self.level + LodySpacing.xxs
-          : LodyLayout.childIndent + Self.level - LodySpacing.sm
+        // The elbow runs into its own title, stopping just short of the text.
         path.move(to: CGPoint(x: x, y: mid))
-        path.addLine(to: CGPoint(x: end, y: mid))
+        path.addLine(to: CGPoint(x: LodyLayout.childIndent + Self.level - LodySpacing.xs, y: mid))
       }
       context.stroke(path, with: .color(LodyColor.borderDefault), lineWidth: 1)
     }
