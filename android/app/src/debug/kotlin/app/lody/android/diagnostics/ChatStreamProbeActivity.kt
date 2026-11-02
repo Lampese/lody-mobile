@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import app.lody.android.chat.TurnIdentity
 import app.lody.android.chat.ChatEntry
 import app.lody.android.chat.ChatTranscript
 import app.lody.android.chat.MarkdownBlocks
@@ -195,8 +196,8 @@ private fun ProbeScreen(fixture: String, quickJs: MarkdownRepair) {
         }
         ChatTranscript(
             entries = listOf(
-                ChatEntry.User("user", "为什么移动端刷新一直停在 Syncing？给出修复方案。"),
-                ChatEntry.Assistant("reply-$run", markdown),
+                ChatEntry.User("user", "为什么移动端刷新一直停在 Syncing？给出修复方案。", TurnIdentity("User")),
+                ChatEntry.Assistant("reply-$run", markdown, TurnIdentity("Assistant")),
             ),
             modifier = Modifier.weight(1f).navigationBarsPadding(),
             contentPadding = PaddingValues(vertical = LodySpacing.md),
