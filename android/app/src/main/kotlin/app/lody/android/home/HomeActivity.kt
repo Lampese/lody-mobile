@@ -210,5 +210,12 @@ private fun chatContext(catalog: CatalogState, id: String, title: String, user: 
     val session = snapshot?.sessions?.firstOrNull { it.id == id }
     val project = snapshot?.projects?.firstOrNull { it.id == session?.projectId && !it.id.endsWith(":unassigned") }
     val subtitle = listOfNotNull(project?.name, session?.branchName).joinToString(" · ")
-    return app.lody.android.chat.ChatContext(session?.title?.ifBlank { null } ?: title, subtitle, session, user)
+    val repository = project?.repoFullName ?: session?.projectId?.removePrefix("github:")?.takeIf { session.projectId.startsWith("github:") }
+    return app.lody.android.chat.ChatContext(
+        session?.title?.ifBlank { null } ?: title, subtitle, session, user,
+        repository = repository.orEmpty(),
+        machineName = session?.let { snapshot?.machineNames?.get(it.machineId) }.orEmpty(),
+        machineKind = snapshot?.let { app.lody.android.create.CreateSessionModel.machineKind(it, session?.machineId) }
+            ?: app.lody.android.create.CreateSessionModel.MachineKind.Laptop,
+    )
 }

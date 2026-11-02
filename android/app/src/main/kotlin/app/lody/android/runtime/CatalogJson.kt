@@ -27,6 +27,10 @@ object CatalogJson {
         pullRequests = json.optJSONArray("pullRequests")?.let { array ->
             (0 until array.length()).mapNotNull { index -> array.optJSONObject(index)?.let(::pullRequest) }
         }.orEmpty(),
+        diffAdded = json.optJSONObject("diff")?.optCount("add") ?: 0,
+        diffRemoved = json.optJSONObject("diff")?.optCount("del") ?: 0,
+        workspaceDirty = json.opt("workspaceDirty") == true,
+        workspaceUnpushed = json.opt("workspaceUnpushed") == true,
     )
 
     /** Optional `machineNames` object; non-string or empty names are skipped. */
@@ -59,19 +63,30 @@ object CatalogJson {
         session.awaitingUserSince?.let { put("awaitingUserSince", it) }
         if (session.pullRequests.isNotEmpty()) {
             put("pullRequests", JSONArray(session.pullRequests.map { pr ->
-                JSONObject().put("repository", pr.repository).put("number", pr.number).put("status", pr.status).apply { pr.ci?.let { put("ci", it) } }
+                JSONObject().put("repository", pr.repository).put("number", pr.number).put("status", pr.status).apply {
+                    pr.ci?.let { put("ci", it) }
+                    pr.url?.let { put("url", it) }
+                    pr.merge?.let { put("merge", it) }
+                }
             }))
         }
+        if (session.diffAdded > 0 || session.diffRemoved > 0) put("diff", JSONObject().put("add", session.diffAdded).put("del", session.diffRemoved))
+        if (session.workspaceDirty) put("workspaceDirty", true)
+        if (session.workspaceUnpushed) put("workspaceUnpushed", true)
     }
 
     private fun pullRequest(json: JSONObject): CatalogPullRequest? {
         val repository = json.optText("repository") ?: return null
         val status = json.optText("status") ?: return null
         val number = (json.opt("number") as? Number)?.toInt() ?: return null
-        return CatalogPullRequest(repository, number, status, json.optText("ci"))
+        val url = json.optText("url")?.takeIf { it.startsWith("https://github.com/") }
+        return CatalogPullRequest(repository, number, status, json.optText("ci"), url, json.optText("merge"))
     }
 
     private fun JSONObject.optText(key: String): String? = (opt(key) as? String)?.takeIf { it.isNotEmpty() }
+
+    private fun JSONObject.optCount(key: String): Int? =
+        (opt(key) as? Number)?.toDouble()?.takeIf { it.isFinite() && it >= 0 && it <= Int.MAX_VALUE }?.toInt()
 
     private fun JSONObject.optMillis(key: String): Long? =
         (opt(key) as? Number)?.toDouble()?.takeIf { it.isFinite() && it >= 0 }?.toLong()

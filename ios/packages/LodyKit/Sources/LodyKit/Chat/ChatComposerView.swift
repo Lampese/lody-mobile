@@ -18,6 +18,7 @@ private struct ChatComposerState: Decodable {
   var mentionItems: [ChatMentionItem]?
   var quickReplies: [ChatQuickReply]?
   var preview: ChatPreviewChip?
+  var infoBar: [ChatInfoChip]?
   var editable = true
   var canSend = false
   var sending = false
@@ -853,6 +854,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       self.submit()
     }
     quickRepliesView.onPreview = { [weak self] in self?.onPreview?($0) }
+    quickRepliesView.onInfo = { [weak self] in self?.onPreview?("bar:" + $0) }
     quickRepliesView.onTasksPress = { [weak self] in self?.onTasksPress?() }
     composer.contentView.addSubview(notice)
     composer.contentView.addSubview(quotaNotice)
@@ -1469,9 +1471,11 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let context = connection.isEmpty ? state.preview : nil
     let typing = !input.text.isEmpty
     let showsReplies = !typing && !expanded
-    let showsRow = context != nil || taskCount > 0 || (!replies.isEmpty && showsReplies)
+    // The action bar stays while typing; expanded editing gives the row to the editor.
+    let info = expanded ? [] : (state.infoBar ?? [])
+    let showsRow = !info.isEmpty || context != nil || taskCount > 0 || (!replies.isEmpty && showsReplies)
     let reservesQuickReplies = showsRow
-    quickRepliesView.render(replies, context: context, showsReplies: showsReplies, compact: typing, visible: showsRow, animated: reservesQuickReplies, taskCount: taskCount)
+    quickRepliesView.render(replies, context: context, showsReplies: showsReplies, compact: typing, visible: showsRow, animated: reservesQuickReplies, taskCount: taskCount, info: info)
     quickRepliesHeight.constant = reservesQuickReplies ? ChatQuickRepliesView.chipHeight : 0
     let queueFloats = reservesQuickReplies && queueHeight.constant > 0
     queueGap.constant = queueFloats ? 8 : 0

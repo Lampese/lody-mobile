@@ -13,12 +13,30 @@ struct ChatPreviewChip: Decodable, Equatable {
     let title: String
     let symbol: String
     var destructive: Bool?
+    var subtitle: String?
+    var disabled: Bool?
   }
   let label: String
   let symbol: String
   let state: String
   let accessibilityLabel: String
   var actions: [Action]?
+}
+
+/// One item of the session action bar (web `SessionInfoBar`) leading the chip row: a glass
+/// capsule, icon-only without a label. [tint] names a semantic colour; [prominent] makes it the
+/// filled primary action. With [actions] it carries a native menu, opened by a tap unless [tap]
+/// keeps the tap for the chip itself (then the menu opens on a long press).
+struct ChatInfoChip: Decodable, Equatable {
+  let id: String
+  var label: String?
+  let symbol: String
+  var tint: String?
+  var prominent: Bool?
+  var tap: Bool?
+  let accessibilityLabel: String
+  var menuTitle: String?
+  var actions: [ChatPreviewChip.Action]?
 }
 
 struct ChatContextChipContent: View, Equatable {
@@ -126,6 +144,11 @@ final class ChatQuickRepliesView: UIScrollView {
   private lazy var separatorWidth = separator.widthAnchor.constraint(equalToConstant: 1)
   private var contextChip: ChatContextChipButton?
   private var tasksChip: ChatContextChipButton?
+  /// The action bar's chips lead the row, then this separator, then preview / tasks / replies.
+  private var infoChips: [ChatInfoChip] = []
+  private var infoButtons: [UIButton] = []
+  private let infoSeparator = UIView()
+  private lazy var infoSeparatorWidth = infoSeparator.widthAnchor.constraint(equalToConstant: 1)
   private var rendered: [ChatQuickReply] = []
   private var renderedActions: [ChatPreviewChip.Action]?
   private var buttons: [UIButton] = []
@@ -136,8 +159,10 @@ final class ChatQuickRepliesView: UIScrollView {
     let compact: Bool
     let visible: Bool
     let taskCount: Int
+    let info: [ChatInfoChip]
   }
   private var content: Content?
+  var onInfo: ((String) -> Void)?
   var onSelect: ((String) -> Void)?
   var onPreview: ((String) -> Void)?
   var onTasksPress: (() -> Void)?
@@ -157,6 +182,11 @@ final class ChatQuickRepliesView: UIScrollView {
     separator.isHidden = true
     separator.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([separatorWidth, separator.heightAnchor.constraint(equalToConstant: 20)])
+    infoSeparator.backgroundColor = .separator
+    infoSeparator.isHidden = true
+    infoSeparator.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([infoSeparatorWidth, infoSeparator.heightAnchor.constraint(equalToConstant: 20)])
+    stack.addArrangedSubview(infoSeparator)
     stack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(stack)
     NSLayoutConstraint.activate([
@@ -170,14 +200,14 @@ final class ChatQuickRepliesView: UIScrollView {
 
   required init?(coder: NSCoder) { fatalError() }
 
-  func render(_ items: [ChatQuickReply], context: ChatPreviewChip?, showsReplies: Bool, compact: Bool, visible: Bool, animated: Bool = false, taskCount: Int = 0) {
-    let next = Content(items: items, context: context, showsReplies: showsReplies, compact: compact, visible: visible, taskCount: taskCount)
+  func render(_ items: [ChatQuickReply], context: ChatPreviewChip?, showsReplies: Bool, compact: Bool, visible: Bool, animated: Bool = false, taskCount: Int = 0, info: [ChatInfoChip] = []) {
+    let next = Content(items: items, context: context, showsReplies: showsReplies, compact: compact, visible: visible, taskCount: taskCount, info: info)
     guard next != content else { return }
     // Mount at the final geometry during navigation. Only a row that already
     // has content on screen can morph; unrelated composer echoes are no-ops.
-    let hadContent = !rendered.isEmpty || contextChip != nil || tasksChip != nil
+    let hadContent = !rendered.isEmpty || contextChip != nil || tasksChip != nil || !infoButtons.isEmpty
     content = next
-    let showsRow = visible && (context != nil || taskCount > 0 || (showsReplies && !items.isEmpty))
+    let showsRow = visible && (!info.isEmpty || context != nil || taskCount > 0 || (showsReplies && !items.isEmpty))
     let visibilityChanged = isUserInteractionEnabled != showsRow
     let motion = animated && hadContent && window != nil && bounds.height > 0 && !isTransitioning && !UIAccessibility.isReduceMotionEnabled
     if motion { layoutIfNeeded() }
@@ -202,9 +232,9 @@ final class ChatQuickRepliesView: UIScrollView {
     if items != rendered {
       rendered = items
       contentOffset = .zero
-      retiring = stack.arrangedSubviews.filter { $0 is UIButton && $0 !== contextChip && $0 !== tasksChip }
+      retiring = stack.arrangedSubviews.filter { $0 is UIButton && $0 !== contextChip && $0 !== tasksChip && !isInfo($0) }
       retiring.forEach { $0.isUserInteractionEnabled = false }
-      buttons.removeAll { $0 !== contextChip && $0 !== tasksChip }
+      buttons.removeAll { $0 !== contextChip && $0 !== tasksChip && !isInfo($0) }
       UIView.performWithoutAnimation {
         for item in items {
           let button = chip(item)
@@ -215,6 +245,7 @@ final class ChatQuickRepliesView: UIScrollView {
       }
       if !swaps { retiring.forEach { $0.removeFromSuperview() } }
     }
+    if info != infoChips { updateInfo(info) }
     if let context { updateContext(context, compact: compact, motion: motion) }
     if taskCount > 0 {
       let chip = tasksChip ?? makeTasksChip()
@@ -227,7 +258,11 @@ final class ChatQuickRepliesView: UIScrollView {
       self.show(self.contextChip, context != nil)
       self.show(self.tasksChip, taskCount > 0)
       self.show(self.separator, context != nil && (taskCount > 0 || (repliesShown && !items.isEmpty)))
-      for button in self.buttons where button !== self.contextChip && button !== self.tasksChip { self.show(button, repliesShown) }
+      self.show(self.infoSeparator, !info.isEmpty && (context != nil || taskCount > 0 || (repliesShown && !items.isEmpty)))
+      for button in self.infoButtons { self.show(button, true) }
+      for button in self.buttons where button !== self.contextChip && button !== self.tasksChip && !self.isInfo(button) {
+        self.show(button, repliesShown)
+      }
       for view in retiring where view.superview != nil { self.show(view, false) }
       if contextAppears { self.contentOffset.x = 0 }
       self.layoutIfNeeded()
@@ -288,8 +323,8 @@ final class ChatQuickRepliesView: UIScrollView {
     chip.alpha = 0
     chip.setContentHuggingPriority(.required, for: .horizontal)
     chip.addAction(UIAction { [weak self] _ in self?.onPreview?("open") }, for: .touchUpInside)
-    stack.insertArrangedSubview(chip, at: 0)
-    stack.insertArrangedSubview(separator, at: 1)
+    stack.insertArrangedSubview(chip, at: afterInfo)
+    stack.insertArrangedSubview(separator, at: afterInfo + 1)
     separatorWidth.constant = 1 / max(1, traitCollection.displayScale)
     buttons.insert(chip, at: 0)
     contextChip = chip
@@ -302,10 +337,98 @@ final class ChatQuickRepliesView: UIScrollView {
     chip.isHidden = true
     chip.alpha = 0
     chip.addAction(UIAction { [weak self] _ in self?.onTasksPress?() }, for: .touchUpInside)
-    stack.insertArrangedSubview(chip, at: contextChip == nil ? 0 : 2)
+    stack.insertArrangedSubview(chip, at: contextChip == nil ? afterInfo : afterInfo + 2)
     buttons.append(chip)
     tasksChip = chip
     return chip
+  }
+
+  private func isInfo(_ view: UIView) -> Bool { infoButtons.contains { $0 === view } }
+
+  private var afterInfo: Int { (stack.arrangedSubviews.firstIndex(of: infoSeparator) ?? -1) + 1 }
+
+  private func updateInfo(_ info: [ChatInfoChip]) {
+    infoChips = info
+    let retired = infoButtons
+    buttons.removeAll { button in retired.contains { $0 === button } }
+    UIView.performWithoutAnimation {
+      retired.forEach { $0.removeFromSuperview() }
+      infoButtons = info.enumerated().map { index, chip in
+        let button = infoButton(chip)
+        stack.insertArrangedSubview(button, at: index)
+        return button
+      }
+      infoSeparatorWidth.constant = 1 / max(1, traitCollection.displayScale)
+      stack.layoutIfNeeded()
+    }
+    buttons.insert(contentsOf: infoButtons, at: 0)
+  }
+
+  /// Native glass capsules: menus are system `UIMenu`s (with their own haptics, previews and
+  /// accessibility), the primary action is the prominent tinted glass.
+  private func infoButton(_ chip: ChatInfoChip) -> UIButton {
+    let prominent = chip.prominent == true
+    var configuration = prominent ? UIButton.Configuration.prominentGlass() : UIButton.Configuration.glass()
+    configuration.cornerStyle = .capsule
+    let label = chip.label ?? ""
+    configuration.contentInsets = label.isEmpty ? .zero : NSDirectionalEdgeInsets(top: 8, leading: 10, bottom: 8, trailing: 12)
+    configuration.image = UIImage(systemName: chip.symbol)
+    configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(textStyle: .subheadline, scale: .medium)
+    configuration.imagePadding = 6
+    if !label.isEmpty { configuration.title = label }
+    configuration.titleLineBreakMode = .byTruncatingMiddle
+    configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+      var outgoing = incoming
+      outgoing.font = UIFont.preferredFont(forTextStyle: .subheadline).withWeight(.semibold)
+      return outgoing
+    }
+    let tint = Self.tint(chip.tint)
+    if prominent { configuration.baseForegroundColor = .white } else { configuration.baseForegroundColor = tint }
+    let button = UIButton(configuration: configuration)
+    if prominent { button.tintColor = tint }
+    button.accessibilityIdentifier = "session-bar:\(chip.id)"
+    button.accessibilityLabel = chip.accessibilityLabel
+    button.isHidden = true
+    button.alpha = 0
+    if let actions = chip.actions, !actions.isEmpty {
+      button.menu = UIMenu(title: chip.menuTitle ?? "", children: actions.map { action in
+        let item = UIAction(
+          title: action.title, subtitle: action.subtitle, image: UIImage(systemName: action.symbol),
+          attributes: action.disabled == true ? .disabled : (action.destructive == true ? .destructive : [])
+        ) { [weak self] _ in self?.onInfo?(chip.id + ":" + action.id) }
+        return item
+      })
+      button.showsMenuAsPrimaryAction = chip.tap != true
+    }
+    if chip.tap == true || (chip.actions ?? []).isEmpty {
+      button.addAction(UIAction { [weak self] _ in
+        if prominent { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        self?.onInfo?(chip.id)
+      }, for: .touchUpInside)
+    }
+    button.setContentHuggingPriority(.required, for: .horizontal)
+    button.setContentCompressionResistancePriority(.required, for: .horizontal)
+    button.translatesAutoresizingMaskIntoConstraints = false
+    var constraints = [button.heightAnchor.constraint(equalToConstant: Self.chipHeight)]
+    if label.isEmpty {
+      constraints.append(button.widthAnchor.constraint(equalToConstant: Self.chipHeight))
+    } else {
+      constraints.append(button.widthAnchor.constraint(lessThanOrEqualToConstant: 240))
+    }
+    NSLayoutConstraint.activate(constraints)
+    return button
+  }
+
+  private static func tint(_ name: String?) -> UIColor {
+    switch name {
+    case "green": .systemGreen
+    case "purple": .systemPurple
+    case "red": .systemRed
+    case "orange": .systemOrange
+    case "secondary": .secondaryLabel
+    case "label": .label
+    default: .systemBlue
+    }
   }
 
   override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {

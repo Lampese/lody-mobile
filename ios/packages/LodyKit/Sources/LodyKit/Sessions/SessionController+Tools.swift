@@ -87,7 +87,7 @@ extension SessionController {
     return PullRequestController(store: store)
   }
 
-  private func openPullRequest(_ reference: SessionPullRequest) {
+  func openPullRequest(_ reference: SessionPullRequest) {
     let state = source.state
     let page = pullRequestPage(reference, state)
     page.investigate = { [weak self] text in
@@ -132,6 +132,7 @@ extension SessionController {
   }
 
   func contextAction(_ action: String) {
+    if action.hasPrefix("bar:") { infoBarAction(String(action.dropFirst(4))); return }
     // The floating simulator uses these actions independently of the composer chip.
     if action == "expand" { openSimulator(); return }
     if action == "close" { simulator?.hidePreview(); return }

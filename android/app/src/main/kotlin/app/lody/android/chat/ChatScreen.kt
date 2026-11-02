@@ -2,8 +2,8 @@
 // back button, title, repo) over the transcript; user turns as large right-aligned bubbles with
 // the delivery mark, time and sender above and the avatar beside; agent turns open with the
 // process line and run full width; a round scroll-to-latest button; a bordered composer card
-// (+, the run-config chip, send). The action bar above the composer is not built yet.
-// iOS counterpart: SessionController.
+// (+, the run-config chip, send) under the action bar (web `SessionInfoBar`: computer, repository
+// context, repository actions). iOS counterpart: SessionController.
 
 package app.lody.android.chat
 
@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +55,10 @@ data class ChatContext(
     val subtitle: String = "",
     val session: CatalogSession? = null,
     val me: Account? = null,
+    /** The GitHub repository (`owner/name`) the session works in; empty without one. */
+    val repository: String = "",
+    val machineName: String = "",
+    val machineKind: app.lody.android.create.CreateSessionModel.MachineKind = app.lody.android.create.CreateSessionModel.MachineKind.Laptop,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,16 +121,16 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val failedText = stringResource(R.string.chat_send_failed)
     val attachText = stringResource(R.string.chat_attach_unavailable)
     val snackbar = remember { SnackbarHostState() }
-    val send = send@{
-        val text = prompt.trim()
-        if (!canSend || text.isEmpty() || session == null) return@send
+    val running = session?.status in RunningStatuses || pending.any { it.delivery == Delivery.Sending }
+    // One send path for typed turns and the action bar's prompts: optimistic bubble, never resent.
+    val sendText: (String) -> Unit = sendText@{ text ->
+        if (!canSend || text.isEmpty() || session == null) return@sendText
         val turnId = UUID.randomUUID().toString()
         outgoing = outgoing + Outgoing(turnId, text, Instant.now().toString(), Delivery.Sending)
-        prompt = ""
         coroutines.launch {
-            val running = session.status in setOf("running", "initializing", "processing", "in_progress", "queued")
+            val queue = session.status in RunningStatuses
             val result = try {
-                repository.send(scope, SendTextRequest(id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = running)).state
+                repository.send(scope, SendTextRequest(id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = queue)).state
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { "unknown" }
             val delivery = when (result) {
@@ -137,6 +143,20 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         }
         Unit
     }
+    val send = {
+        val text = prompt.trim()
+        if (canSend && text.isNotEmpty()) {
+            sendText(text)
+            prompt = ""
+        }
+    }
+    val bar = session?.let { SessionInfoBar.of(it, context.repository, busy = running || !canSend) }
+    val prompts = SessionInfoBar.Prompts(
+        stringResource(R.string.bar_prompt_createPrOrigin), stringResource(R.string.bar_prompt_createDraftPrOrigin),
+        stringResource(R.string.bar_prompt_createPr), stringResource(R.string.bar_prompt_createDraftPr),
+        stringResource(R.string.bar_prompt_prBranchUpkeep), stringResource(R.string.bar_prompt_commitAndPush),
+        stringResource(R.string.bar_prompt_resolveConflicts), stringResource(R.string.bar_prompt_fixCi),
+    )
 
     val colors = LodyTheme.colors
     val listState = rememberLazyListState()
@@ -177,6 +197,16 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     ) { coroutines.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0), Int.MAX_VALUE) } }
                 }
             }
+            if (bar != null) {
+                ChatActionBar(
+                    bar, context.machineName, context.machineKind,
+                    onAction = { action ->
+                        // Only while still offered, so a menu left open cannot send for a state that moved on.
+                        if (action in bar.actions) sendText(bar.prompt(action, prompts))
+                    },
+                    onCopied = { coroutines.launch { snackbar.showSnackbar(it) } },
+                )
+            }
             ChatComposer(
                 prompt,
                 onPromptChange = { if (it.length <= 32000) prompt = it },
@@ -188,6 +218,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         }
     }
 }
+
+private val RunningStatuses = setOf("running", "initializing", "processing", "in_progress", "queued")
 
 /** Web's floating header: a round back button, then the title over the repository line. */
 @Composable
@@ -347,4 +379,235 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
             }
         }
     }
+}
+
+/**
+ * Web `SessionInfoBar` above the composer, with native menus: the computer (icon; its menu names
+ * it), the repository context (PR / branch, CI, ±diff; its menu opens the PR or copies the
+ * branch) and the repository actions as one accent split button — the top action, then a chevron
+ * whose menu holds the rest. iOS counterpart: `SessionController+InfoBar`.
+ */
+@Composable
+private fun ChatActionBar(
+    bar: SessionInfoBar,
+    machine: String,
+    machineKind: app.lody.android.create.CreateSessionModel.MachineKind,
+    onAction: (SessionInfoBar.Action) -> Unit,
+    onCopied: (String) -> Unit,
+) {
+    if (machine.isEmpty() && !bar.hasContext && bar.actions.isEmpty()) return
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = LodySpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        if (machine.isNotEmpty()) MachineChip(machine, machineKind)
+        if (bar.hasContext) ContextChip(bar, onCopied)
+        if (bar.actions.isNotEmpty()) ActionSplit(bar.actions, onAction)
+    }
+}
+
+/** A raised pill in the bar; its 48 dp touch target does not grow the pill. */
+@Composable
+private fun BarChip(label: String, onClick: () -> Unit, content: @Composable RowScope.() -> Unit) {
+    val colors = LodyTheme.colors
+    Row(
+        Modifier
+            .minimumInteractiveComponentSize()
+            .height(LodySize.controlSm)
+            .clip(CircleShape)
+            .background(colors.bgRaised)
+            .border(0.5.dp, colors.borderSubtle, CircleShape)
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics { contentDescription = label }
+            .padding(horizontal = LodySpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+        content = content,
+    )
+}
+
+@Composable
+private fun MachineChip(name: String, kind: app.lody.android.create.CreateSessionModel.MachineKind) {
+    val colors = LodyTheme.colors
+    var open by remember { mutableStateOf(false) }
+    val icon = when (kind) {
+        app.lody.android.create.CreateSessionModel.MachineKind.Laptop -> LodyIcons.Machine
+        app.lody.android.create.CreateSessionModel.MachineKind.Desktop -> LodyIcons.Desktop
+        app.lody.android.create.CreateSessionModel.MachineKind.Server -> LodyIcons.Server
+    }
+    Box {
+        BarChip("${stringResource(R.string.bar_machine)}, $name", onClick = { open = true }) {
+            Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(name, style = LodyTheme.typography.body, color = colors.textPrimary) },
+                leadingIcon = { Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
+                onClick = { open = false },
+                enabled = false,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContextChip(bar: SessionInfoBar, onCopied: (String) -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var open by remember { mutableStateOf(false) }
+    val pr = bar.pullRequest
+    val (icon, tint) = when (pr?.status) {
+        null -> LodyIcons.Branch to colors.iconSecondary
+        "merged" -> LodyIcons.Merge to colors.prMerged
+        "closed" -> LodyIcons.PullRequestClosed to colors.prClosed
+        "draft" -> LodyIcons.PullRequestDraft to colors.prDraft
+        else -> LodyIcons.PullRequest to colors.prOpen
+    }
+    val ci = pr?.ci?.takeIf { pr.status == "open" || pr.status == "draft" }
+    val verdict = when (ci) {
+        "f" -> stringResource(R.string.bar_ci_f) to colors.dangerDefault
+        "e" -> stringResource(R.string.bar_ci_e) to colors.dangerDefault
+        "p" -> stringResource(R.string.bar_ci_p) to colors.warningDefault
+        else -> null
+    }
+    val label = pr?.let { "#${it.number}" } ?: bar.branch.ifEmpty { bar.repository }
+    val copied = stringResource(R.string.bar_branch_copied)
+    val description = listOf(bar.repository, bar.branch, label, verdict?.first.orEmpty()).filter { it.isNotEmpty() }.distinct().joinToString(", ")
+    Box {
+        BarChip(description, onClick = { open = true }) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.sm))
+            Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.widthIn(max = 160.dp))
+            verdict?.let { (text, color) -> Text(text, style = type.footnote, color = color, maxLines = 1) }
+            if (bar.added + bar.removed > 0) {
+                Text("+${bar.added}", style = type.footnote.copy(fontFeatureSettings = "tnum"), color = colors.diffAddedText)
+                Text("−${bar.removed}", style = type.footnote.copy(fontFeatureSettings = "tnum"), color = colors.diffRemovedText)
+            }
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            if (pr != null) {
+                val state = stringResource(
+                    when (pr.status) {
+                        "merged" -> R.string.home_pr_merged
+                        "closed" -> R.string.home_pr_closed
+                        "draft" -> R.string.home_pr_draft
+                        else -> R.string.home_pr_open
+                    },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("${pr.repository} #${pr.number}", style = type.body, color = colors.textPrimary)
+                            Text(listOfNotNull(state, verdict?.first, if (pr.merge == "d") stringResource(R.string.bar_conflicts) else null).joinToString(" · "), style = type.footnote, color = colors.textSecondary)
+                        }
+                    },
+                    leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.md)) },
+                    trailingIcon = { Icon(LodyIcons.ExternalLink, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm)) },
+                    onClick = { open = false; uri.openUri(bar.pullRequestUrl) },
+                )
+            }
+            if (bar.branch.isNotEmpty()) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(stringResource(R.string.bar_copy_branch), style = type.body, color = colors.textPrimary)
+                            Text(bar.branch, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                        }
+                    },
+                    leadingIcon = { Icon(LodyIcons.Copy, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
+                    onClick = {
+                        open = false
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(bar.branch))
+                        onCopied(copied)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Web's primary action + chevron as one accent surface with a soft internal divider: the top
+ * action sends on tap (with a confirm haptic); the chevron's menu holds the rest in priority order.
+ */
+@Composable
+private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (SessionInfoBar.Action) -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var open by remember { mutableStateOf(false) }
+    val first = actions.first()
+    val more = stringResource(R.string.bar_more)
+    Box(Modifier.minimumInteractiveComponentSize()) {
+        Row(
+            Modifier.height(LodySize.controlSm).clip(CircleShape).background(colors.accentSolid),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val title = actionTitle(first)
+            Row(
+                Modifier
+                    .fillMaxHeight()
+                    .clickable(role = Role.Button) {
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                        onAction(first)
+                    }
+                    .padding(start = LodySpacing.md, end = if (actions.size > 1) LodySpacing.sm else LodySpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+            ) {
+                Icon(actionIcon(first), contentDescription = null, tint = colors.textOnAccent, modifier = Modifier.size(LodyIconSize.sm))
+                Text(title, style = type.subhead, color = colors.textOnAccent, maxLines = 1)
+            }
+            if (actions.size > 1) {
+                Box(Modifier.width(1.dp).height(LodyIconSize.md).background(colors.textOnAccent.copy(alpha = 0.3f)))
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .clickable(role = Role.Button, onClickLabel = more) { open = true }
+                        .semantics { contentDescription = more }
+                        .padding(horizontal = LodySpacing.sm),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(LodyIcons.Expand, contentDescription = null, tint = colors.textOnAccent, modifier = Modifier.size(LodyIconSize.sm))
+                }
+            }
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            for (action in actions.drop(1)) {
+                DropdownMenuItem(
+                    text = { Text(actionTitle(action), style = type.body, color = colors.textPrimary) },
+                    leadingIcon = { Icon(actionIcon(action), contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
+                    onClick = {
+                        open = false
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                        onAction(action)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun actionTitle(action: SessionInfoBar.Action): String = stringResource(
+    when (action) {
+        SessionInfoBar.Action.CreatePr -> R.string.bar_action_create_pr
+        SessionInfoBar.Action.CreateDraftPr -> R.string.bar_action_create_draft_pr
+        SessionInfoBar.Action.CommitAndPush -> R.string.bar_action_commit_and_push
+        SessionInfoBar.Action.ResolveConflicts -> R.string.bar_action_resolve_conflicts
+        SessionInfoBar.Action.FixCi -> R.string.bar_action_fix_ci_errors
+    },
+)
+
+private fun actionIcon(action: SessionInfoBar.Action): ImageVector = when (action) {
+    SessionInfoBar.Action.CreatePr -> LodyIcons.PullRequest
+    SessionInfoBar.Action.CreateDraftPr -> LodyIcons.PullRequestDraft
+    SessionInfoBar.Action.CommitAndPush -> LodyIcons.Send
+    SessionInfoBar.Action.ResolveConflicts -> LodyIcons.Merge
+    SessionInfoBar.Action.FixCi -> LodyIcons.Check
 }

@@ -145,4 +145,26 @@
     <string name="chat_finished_working">Finished working</string>
     <string name="chat_scroll_latest">Scroll to latest</string>
     <string name="chat_attach_unavailable">Attachments aren’t available on Android yet</string>
+    <string name="bar_action_create_pr">Create PR</string>
+    <string name="bar_action_create_draft_pr">Create Draft PR</string>
+    <string name="bar_action_commit_and_push">Commit &amp; Push</string>
+    <string name="bar_action_resolve_conflicts">Resolve Conflicts</string>
+    <string name="bar_action_fix_ci_errors">Fix CI Errors</string>
+    <string name="bar_more">More actions</string>
+    <string name="bar_ci_s">CI passed</string>
+    <string name="bar_ci_f">CI failed</string>
+    <string name="bar_ci_e">CI error</string>
+    <string name="bar_ci_p">CI running</string>
+    <string name="bar_conflicts">Has conflicts</string>
+    <string name="bar_prompt_createPrOrigin">(Sent by the **Create PR** button in Lody.)</string>
+    <string name="bar_prompt_createDraftPrOrigin">(Sent by the **Create Draft PR** button in Lody.)</string>
+    <string name="bar_prompt_createPr">Create a PR for the current worktree (a regular PR, not a draft). Use `gh` from the current PATH. `gh` signs in with the GitHub login saved on this machine, which sandboxed commands usually cannot read, so run the `gh` commands that talk to GitHub outside the sandbox (request approval if your tool requires it). Ask the user to log in only if authentication still fails there. Verify that the pushed commit matches the PR head, then report the PR URL.</string>
+    <string name="bar_prompt_createDraftPr">Create a draft PR for the current worktree. Use `gh` from the current PATH. `gh` signs in with the GitHub login saved on this machine, which sandboxed commands usually cannot read, so run the `gh` commands that talk to GitHub outside the sandbox (request approval if your tool requires it). Ask the user to log in only if authentication still fails there. Verify that the pushed commit matches the PR head, then report the PR URL.</string>
+    <string name="bar_prompt_prBranchUpkeep">After the PR exists, keep it current: at the end of every turn in this conversation, commit any outstanding changes and push them to the PR branch before you finish, so the PR head always matches your latest work. Treat this as the default rather than something to ask about each time. Skip it only when the user interrupts you or asks for something that overrides it — in that case say so instead of pushing silently.</string>
+    <string name="bar_prompt_commitAndPush">Publish the current branch: commit anything uncommitted, then push to the remote branch.\n\nInstructions:\n- Generate a concise, descriptive commit message based on the changes\n- Stage all changes (git add -A)\n- Commit with the generated message\n- If the working tree is already clean, skip the commit — the branch may simply\n  hold commits that were never pushed\n- Push to the current branch, and report it if the push fails</string>
+    <string name="bar_prompt_resolveConflicts">Resolve the merge conflicts for %1$s pull request %2$s against its base branch.\nPR: %3$s\n\nInspect the pull request and repository instructions first. Choose the merge or rebase workflow that matches this repository’s conventions, preserve the intent of both sides, run the relevant checks, and push the resolved branch.</string>
+    <string name="bar_prompt_fixCi">Fix the failing CI checks for %1$s pull request #%2$d.\n\nInspect the complete GitHub Actions/check logs yourself before changing code. Read the repository instructions, identify the root cause, implement the smallest correct fix, run the relevant checks locally, then commit and push the fix to the PR branch.\n\nCurrent PR snapshot:\n- URL: %3$s\n- Head: %4$s\n\nFailed checks: list the failing checks of the PR head from GitHub yourself.</string>
+    <string name="bar_copy_branch">Copy branch name</string>
+    <string name="bar_branch_copied">Branch name copied</string>
+    <string name="bar_machine">Computer</string>
 </resources>

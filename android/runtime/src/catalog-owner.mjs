@@ -33,3 +33,25 @@ export function adaptEntryAuthor(source) {
  if (source.split(anchor).length !== 2) throw Error('Review upstream session entry projection');
  return source.replace(anchor, '    userTurnId: entry?.userTurnId,\n    userId: typeof entry?.userId === \'string\' ? entry.userId : undefined,\n    items: summarizedItems,\n');
 }
+
+// The conversation action bar (web `SessionInfoBar`) ranks Commit & Push / Create PR from the
+// session's git state, as upstream `packages/cloud-runtime` now projects it. Same rule.
+export function adaptCatalogGitState(source) {
+ if (source.includes('workspaceDirty')) return source;
+ const anchor = '      diff: diffOf(value.diffStats),\n';
+ if (source.split(anchor).length !== 2) throw Error('Review upstream catalog git projection');
+ return source.replace(anchor, `${anchor}      workspaceDirty: value.workspaceDirty === true || undefined,\n      workspaceUnpushed: value.workspaceUnpushed === true || undefined,\n`);
+}
+
+// Resolve Conflicts needs each PR's GitHub merge state (`pullRequestState[url].m`), which
+// upstream now projects beside the CI verdict as `merge`.
+export function adaptPullRequestMerge(source) {
+ if (source.includes('mergeState')) return source;
+ const state = '        : undefined;\n    const ci =\n';
+ const result = 'return [{ url, repository: match[1], number, status: raw.status, ci }];';
+ for (const anchor of [state, result])
+  if (source.split(anchor).length !== 2) throw Error('Review upstream pull request projection');
+ return source
+  .replace(state, `        : undefined;\n    const mergeState =\n      states && typeof states === 'object'\n        ? (states as Record<string, { m?: unknown }>)[raw.url]?.m\n        : undefined;\n    const merge =\n      typeof mergeState === 'string' && ['c', 'b', 'd', 'h', 'u'].includes(mergeState)\n        ? mergeState\n        : undefined;\n    const ci =\n`)
+  .replace(result, 'return [{ url, repository: match[1], number, status: raw.status, ci, merge }];');
+}

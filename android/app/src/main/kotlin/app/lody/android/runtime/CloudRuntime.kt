@@ -40,7 +40,11 @@ data class RuntimeFault(val code: String, val category: RuntimeErrorCategory)
 class RuntimeException(val fault: RuntimeFault) : Exception(fault.code)
 
 data class CatalogProject(val id: String, val machineId: String, val name: String, val rootPath: String, val repoFullName: String? = null)
-data class CatalogPullRequest(val repository: String, val number: Int, val status: String, val ci: String? = null)
+/** [ci] is the web CI verdict code, [merge] GitHub's merge state (`c` clean, `d` conflicts, …); [url] opens it. */
+data class CatalogPullRequest(
+    val repository: String, val number: Int, val status: String, val ci: String? = null,
+    val url: String? = null, val merge: String? = null,
+)
 /** Required identity / state fields first; the rest are optional display fields (times in epoch ms). */
 data class CatalogSession(
     val id: String, val machineId: String, val projectId: String, val title: String, val status: String, val archived: Boolean, val pinned: Boolean, val createdAt: String,
@@ -58,6 +62,11 @@ data class CatalogSession(
     val resume: String? = null,
     /** The last model's display name, for the agent's header. */
     val modelName: String? = null,
+    /** Working tree vs base (`diffStats.allChange`) and git publish state, for the action bar. */
+    val diffAdded: Int = 0,
+    val diffRemoved: Int = 0,
+    val workspaceDirty: Boolean = false,
+    val workspaceUnpushed: Boolean = false,
 )
 /** Read projection, never a CRDT replica. Optional feature-specific fields come later. */
 /** [machineNames] is optional display data (computer id to name); empty from older caches. */

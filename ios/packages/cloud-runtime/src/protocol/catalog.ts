@@ -191,6 +191,8 @@ export function projectRows(
         value.pullRequestState,
       ),
       diff: diffOf(value.diffStats),
+      workspaceDirty: value.workspaceDirty === true || undefined,
+      workspaceUnpushed: value.workspaceUnpushed === true || undefined,
     });
     if (localId || repo) {
       const githubRepo = repo || text(project.githubRepoFullName);

@@ -34,6 +34,9 @@ export type Session = {
   iosSimulatorPreviewRequestId?: string;
   pullRequests?: import('./pull-request').PullRequestReference[];
   diff?: { add: number; del: number };
+  /** Uncommitted changes / local commits the remote lacks; drive the action bar's Commit & Push. */
+  workspaceDirty?: boolean;
+  workspaceUnpushed?: boolean;
 };
 export type Catalog = {
   agentUsage?: Record<string, import('./agent-usage.ts').AgentUsage>;

@@ -5,6 +5,9 @@ struct SessionPullRequest: Decodable, Equatable, Sendable {
   var number: Int
   var status: String
   var ci: String?
+  var url: String? = nil
+  /// GitHub merge state: `c` clean, `b` blocked, `d` conflicts, `h` behind, `u` unstable.
+  var merge: String? = nil
 }
 
 struct SessionItem: Equatable, Sendable {
@@ -36,6 +39,9 @@ struct SessionItem: Equatable, Sendable {
   var resume: String?
   var pullRequests: [SessionPullRequest] = []
   var iosSimulatorPreviewRequestId: String?
+  /// Uncommitted changes / local commits the remote lacks (the action bar's Commit & Push).
+  var workspaceDirty = false
+  var workspaceUnpushed = false
 
   var activityAt: Double { lastMessageAt ?? SessionItem.parse(createdAt) }
 
@@ -51,6 +57,7 @@ extension SessionItem: Decodable {
     case id, title, status, archived, pinned, projectId, createdAt, openedBySessionId, openedByRootSessionId
     case parentSessionId, lastMessageAt, lastReadAt, awaitingUserSince, branchName, lastModel, diff, machineId
     case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId, userId, agentConfigId
+    case workspaceDirty, workspaceUnpushed
   }
 
   private struct Model: Decodable {
@@ -89,6 +96,8 @@ extension SessionItem: Decodable {
     resume = present(value(.resume))
     pullRequests = value(.pullRequests) ?? []
     iosSimulatorPreviewRequestId = present(value(.iosSimulatorPreviewRequestId))
+    workspaceDirty = value(.workspaceDirty) ?? false
+    workspaceUnpushed = value(.workspaceUnpushed) ?? false
     modelNeverRan = values.contains(.lastModel) && ((try? values.decodeNil(forKey: .lastModel)) ?? false)
     if let model: Model = value(.lastModel) {
       modelName = [model.name, model.modelId].compactMap { $0 }.first { !$0.isEmpty } ?? ""

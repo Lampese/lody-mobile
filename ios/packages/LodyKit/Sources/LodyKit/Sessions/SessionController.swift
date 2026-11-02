@@ -37,6 +37,7 @@ class SessionController: UIViewController {
   var editCheck = ""
   var quotaEntry = "pending"
   var rendered: [String: String] = [:]
+  var infoBar: SessionInfoBar?
   private let initialChoice: ModelChoice?
   private var observers: [NSObjectProtocol] = []
   private var findToken = 0
