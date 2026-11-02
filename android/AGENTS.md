@@ -50,7 +50,7 @@
 
 ## Conversation
 
-- `chat/ChatScreen` follows web's mobile session page: header with title and project · branch; user turns are right-aligned bubbles with the sender's avatar, name, time and delivery mark (web `UserMessageSendStatus`: open circle sent, check read, clock queued); agent turns carry the agent mark, name (· model) and time, the full-width answer and "Worked for …". The transcript uses `TranscriptMargin` (12 dp), tighter than other pages. Senders other than the signed-in user show as Member until the member list is loaded.
+- `chat/ChatScreen` follows web's mobile session page: header with title and project · branch; user turns are right-aligned bubbles with the sender's avatar, name, time and delivery mark (web `UserMessageSendStatus`: open circle sent, check read, clock queued); agent turns end with the agent's identity, as iOS's meta row: mark, name (· model), time and "Worked for …". The transcript uses `TranscriptMargin` (12 dp), tighter than other pages. Senders other than the signed-in user show as Member until the member list is loaded.
 - Sending is live (no read-only label): `ChatRepository.send` runs the `sendText` runtime command (Android adapter over upstream `sendTurn`) with a fresh stable turn id; running sessions queue. An optimistic bubble shows until the transcript carries the turn id; `not_sent` marks it failed, an uncertain result stays sent, and nothing is resent automatically. The catalog supplies the session's machine, cliType, agentType and resume; the session entry summary gains `userId` at bundle time (`adaptEntryAuthor`).
 
 ## Chat transcript (spike)

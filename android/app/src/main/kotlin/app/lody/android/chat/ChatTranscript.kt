@@ -103,7 +103,6 @@ fun ChatTranscript(
             when (entry) {
                 is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry) }
                 is ChatEntry.Assistant -> {
-                    item(key = "${entry.id}#who", contentType = "agent-header") { AgentHeader(entry.who) }
                     itemsIndexed(
                         entry.markdown.blocks,
                         key = { index, _ -> "${entry.id}#$index" },
@@ -116,16 +115,9 @@ fun ChatTranscript(
                                 .padding(bottom = LodySpacing.md),
                         )
                     }
-                    if (entry.worked.isNotEmpty()) {
-                        item(key = "${entry.id}#worked", contentType = "worked") {
-                            Text(
-                                entry.worked,
-                                style = LodyTheme.typography.caption,
-                                color = LodyTheme.colors.textTertiary,
-                                modifier = Modifier.padding(horizontal = TranscriptMargin).padding(bottom = LodySpacing.lg),
-                            )
-                        }
-                    }
+                    // The agent's identity closes its answer, as iOS's meta row: mark, name · model,
+                    // time, and "Worked for …" once finished.
+                    item(key = "${entry.id}#who", contentType = "agent-footer") { AgentFooter(entry.who, entry.worked) }
                 }
             }
         }
@@ -197,12 +189,12 @@ private fun DeliveryMark(delivery: Delivery) {
     }
 }
 
-/** The agent's identity above its answer: mark, name (model), time. */
+/** The agent's identity after its answer: mark, name (· model), time, and how long it worked. */
 @Composable
-private fun AgentHeader(who: TurnIdentity) {
+private fun AgentFooter(who: TurnIdentity, worked: String) {
     val colors = LodyTheme.colors
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = TranscriptMargin).padding(top = LodySpacing.md, bottom = LodySpacing.sm),
+        Modifier.fillMaxWidth().padding(horizontal = TranscriptMargin).padding(bottom = LodySpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
     ) {
@@ -210,7 +202,8 @@ private fun AgentHeader(who: TurnIdentity) {
             Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
         }
         Text(who.name, style = LodyTheme.typography.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-        if (who.time.isNotEmpty()) Text(who.time, style = LodyTheme.typography.caption, color = colors.textTertiary, maxLines = 1)
+        val meta = listOf(who.time, worked).filter { it.isNotEmpty() }.joinToString("  ·  ")
+        if (meta.isNotEmpty()) Text(meta, style = LodyTheme.typography.caption, color = colors.textTertiary, maxLines = 1)
     }
 }
 

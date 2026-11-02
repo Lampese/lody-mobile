@@ -36,6 +36,8 @@ struct ChatEntry: Decodable {
   var tokenUsage: ChatTurnUsage? = nil
   var modelInfo: ModelInfo? = nil
   var userTurnId: String? = nil
+  /// A user turn's sender, for its avatar and name.
+  var userId: String? = nil
   var executionId: String? = nil
   var executionFinished: Bool? = nil
   var steerCount: Int? = nil
@@ -142,6 +144,42 @@ struct ChatRow: Equatable {
   var shines: Bool { running && kind != "duration" }
   /// `only` / `first` / `middle` / `last` for consecutive file rows in one group.
   var group = ""
+  /// A user turn's first row: its sender's user id (`ChatAuthors.unknownSender` when the turn
+  /// predates the field or is a local send), when, and whether the agent picked it up
+  /// (`seen` / `sent` / `queued` / `sending`), drawn above the bubble with the avatar beside it.
+  var author = ""
+  var authorImage = ""
+  var authorTime = ""
+  var readState = ""
+}
+
+/// The signed-in user names and pictures their own turns; others show as a member until the
+/// workspace member list is loaded.
+enum ChatAuthors {
+  /// Turns without a recorded sender: older history, and this device's own sends.
+  static let unknownSender = "-"
+
+  @MainActor static func identity(_ userId: String) -> (name: String, image: String) {
+    let user = AuthSession.shared.snapshot.account?.user
+    if let user, userId == unknownSender || userId == user.id { return (user.name, user.image ?? "") }
+    return (String(localized: "native.chat.member", bundle: .lody), "")
+  }
+
+  static func time(_ timestamp: String?) -> String {
+    guard let timestamp,
+      let date = (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(timestamp)) ?? (try? Date.ISO8601FormatStyle().parse(timestamp))
+    else { return "" }
+    if Calendar.current.isDateInToday(date) { return date.formatted(date: .omitted, time: .shortened) }
+    return date.formatted(.dateTime.month(.defaultDigits).day().hour().minute())
+  }
+
+  static func readState(_ status: String) -> String {
+    switch status {
+    case "seen", "completed", "done": "seen"
+    case "queued": "queued"
+    default: "sent"
+    }
+  }
 }
 
 enum ChatMetaTime {
@@ -238,7 +276,8 @@ enum ChatWorkDuration {
 /// so the vertical indicator remains on the screen edge.
 enum ChatReadingColumn {
   static let maximumWidth: CGFloat = 800
-  static let cellMargin: CGFloat = 16
+  /// Tighter than other pages: web's mobile conversation runs close to the edges.
+  static let cellMargin: CGFloat = 12
   static let sectionTop: CGFloat = 4
   static let sectionBottom: CGFloat = 4
 
@@ -414,6 +453,12 @@ struct ChatTranscript {
         let text = entry.items.compactMap { $0.type == "text" ? $0.text : nil }.joined(separator: "\n\n")
         if !text.isEmpty {
           result.append(ChatRow(id: entry.id + (result.isEmpty ? ":user" : ":user-text"), entryID: entry.id, kind: "user", text: text))
+        }
+        // The turn's first bubble carries its sender, time and read state (web's header).
+        if let first = result.firstIndex(where: { $0.kind == "user" }) {
+          result[first].author = entry.userId ?? ChatAuthors.unknownSender
+          result[first].authorTime = ChatAuthors.time(entry.timestamp)
+          result[first].readState = ChatAuthors.readState(entry.status)
         }
         if let delivery = entry.delivery, delivery != "accepted" {
           let key = "native.chat.message.guide." + delivery
@@ -785,7 +830,12 @@ extension ChatPendingSend {
       }
       let body = text
       if !body.isEmpty {
-        result.append(ChatRow(id: id + (result.isEmpty ? ":user" : ":user-text"), entryID: id, kind: "user", text: body))
+        var row = ChatRow(id: id + (result.isEmpty ? ":user" : ":user-text"), entryID: id, kind: "user", text: body)
+        // A local send in flight is the signed-in user's own turn.
+        row.author = ChatAuthors.unknownSender
+        row.authorTime = ChatAuthors.time(Date().ISO8601Format())
+        row.readState = "sending"
+        result.append(row)
       }
     }
     if failed == true {

@@ -202,6 +202,14 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   let processChevron = UIImageView()
   let processTree = CAShapeLayer()
   var row: ChatRow?
+  /// A user turn's header (read mark, name · time) and the sender's avatar beside the bubble.
+  private let authorMark = UIImageView()
+  private let authorLabel = UILabel()
+  private let authorAvatar = UIImageView()
+  private var authorPhoto: URL?
+  static let avatarSize: CGFloat = 28
+  static let avatarSlot: CGFloat = avatarSize + 8
+  static let authorHeader: CGFloat = 22
   var onInteraction: (() -> Void)?
   var canEdit: (() -> Bool)?
   var onEdit: (() -> Void)?
@@ -248,8 +256,48 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
       view.isHidden = true
       contentView.addSubview(view)
     }
+    authorLabel.font = .dynamic(of: 12)
+    authorLabel.textColor = .tertiaryLabel
+    authorLabel.textAlignment = .right
+    authorMark.contentMode = .scaleAspectFit
+    authorAvatar.contentMode = .scaleAspectFill
+    authorAvatar.clipsToBounds = true
+    authorAvatar.layer.cornerRadius = Self.avatarSize / 2
+    for view in [authorMark, authorLabel, authorAvatar] as [UIView] {
+      view.isAccessibilityElement = false
+      view.isHidden = true
+      contentView.addSubview(view)
+    }
     isAccessibilityElement = true
     contentView.addInteraction(UIContextMenuInteraction(delegate: self))
+  }
+
+  /// Web's user-turn header: a check once the agent picked the turn up, an open circle before.
+  private func applyAuthor(_ row: ChatRow) {
+    let shown = row.kind == "user" && !row.author.isEmpty
+    for view in [authorMark, authorLabel, authorAvatar] as [UIView] { view.isHidden = !shown }
+    accessibilityValue = nil
+    guard shown else { return }
+    let who = ChatAuthors.identity(row.author)
+    authorLabel.text = [who.name, row.authorTime].filter { !$0.isEmpty }.joined(separator: "  ·  ")
+    let marks: [String: (String, UIColor)] = [
+      "seen": ("checkmark.circle", .lodyAccent), "queued": ("clock", .tertiaryLabel),
+      "sending": ("circle.dotted", .tertiaryLabel), "sent": ("circle", .tertiaryLabel),
+    ]
+    let mark = marks[row.readState] ?? marks["sent"]!
+    authorMark.image = UIImage(systemName: mark.0, withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .regular))
+    authorMark.tintColor = mark.1
+    let monogram = LodyListPhoto.monogram(String(who.name.prefix(1)).uppercased(), side: Self.avatarSize)
+    authorPhoto = LodyListPhoto.url(who.image)
+    authorAvatar.image = monogram
+    if let url = authorPhoto {
+      if let cached = LodyListPhoto.image(for: url, ready: { [weak self] image in
+        guard let self, self.authorPhoto == url else { return }
+        self.authorAvatar.image = image
+      }) { authorAvatar.image = cached }
+    }
+    let state = String(localized: String.LocalizationValue("native.chat.read." + row.readState), bundle: .lody)
+    accessibilityValue = [who.name, row.authorTime, state].filter { !$0.isEmpty }.joined(separator: ", ")
   }
   required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
   func configure(_ row: ChatRow, text: NSAttributedString) {
@@ -264,6 +312,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     bubble.isHidden = row.kind != "user"
     applyLeadingMark(for: row, previousSymbol: previousSymbol, sameRow: sameRow)
     applyProcess(row)
+    applyAuthor(row)
     accessibilityIdentifier = row.id
     accessibilityLabel = row.kind == "duration"
       ? [row.text, row.detail].filter { !$0.isEmpty }.joined(separator: ", ")
@@ -460,7 +509,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
 
   static func rowExtra(for row: ChatRow, previousKind: String? = nil) -> CGFloat {
     if row.kind == "delivery" { return 0 }
-    if row.kind == "user" { return 44 }
+    if row.kind == "user" { return 44 + (row.author.isEmpty ? 0 : authorHeader) }
     if row.kind == "duration" { return ChatRowPadding.content + ChatRowPadding.durationBottom }
     return ChatRowPadding.top(kind: row.kind, previousKind: previousKind) + ChatRowPadding.content
   }
@@ -492,7 +541,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     return CGRect(x: 2, y: textY, width: 20, height: min(textHeight, 20))
   }
   static func textWidth(_ row: ChatRow, width: CGFloat) -> CGFloat {
-    if row.kind == "user" { return max(1, width * 0.84 - 26) }
+    if row.kind == "user" { return max(1, width * 0.84 - 26 - avatarSlot) }
     if row.kind == "delivery" { return max(1, width * 0.84) }
     if row.kind == "summary" && row.actionable { return max(1, width - leading(row) - chevronSlot) }
     return max(1, width - leading(row))
@@ -514,7 +563,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
       return
     }
     if row.kind == "user" {
-      let size = label.sizeThatFits(CGSize(width: width * 0.84 - 26, height: .greatestFiniteMagnitude))
+      let size = label.sizeThatFits(CGSize(width: width * 0.84 - 26 - Self.avatarSlot, height: .greatestFiniteMagnitude))
       expandable = size.height + 20 > ChatMessageContent.maximumCollapsedHeight
       messageContent.expandable = expandable
       messageContent.expanded = expanded
@@ -526,10 +575,19 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
       messageContent.disclosure.isAccessibilityElement = false
       accessibilityTraits = expandable ? .button : .staticText
       let disclosureKey = expanded ? "native.chat.message.collapse" : "native.chat.message.expand"
-      accessibilityValue = expandable ? String(localized: String.LocalizationValue(disclosureKey), bundle: .lody) : nil
+      if expandable { accessibilityValue = String(localized: String.LocalizationValue(disclosureKey), bundle: .lody) }
       let height = ChatMessageContent.height(textHeight: size.height, limit: collapsedHeight, expanded: expanded)
-      let bubbleWidth = expandable ? width * 0.84 : size.width + 26
-      messageContent.frame = CGRect(x: width - bubbleWidth, y: ChatRowPadding.content, width: bubbleWidth, height: height)
+      let bubbleWidth = expandable ? width * 0.84 - Self.avatarSlot : size.width + 26
+      // Every bubble of a turn leaves the avatar column free; the first also has the header.
+      let header = row.author.isEmpty ? 0 : Self.authorHeader
+      let bubbleRight = width - Self.avatarSlot
+      messageContent.frame = CGRect(x: bubbleRight - bubbleWidth, y: ChatRowPadding.content + header, width: bubbleWidth, height: height)
+      if !row.author.isEmpty {
+        authorAvatar.frame = CGRect(x: width - Self.avatarSize, y: messageContent.frame.minY, width: Self.avatarSize, height: Self.avatarSize)
+        let labelWidth = min(bubbleRight - 16, authorLabel.sizeThatFits(CGSize(width: bubbleRight, height: header)).width)
+        authorLabel.frame = CGRect(x: bubbleRight - labelWidth, y: ChatRowPadding.content, width: labelWidth, height: header - 4)
+        authorMark.frame = CGRect(x: authorLabel.frame.minX - 18, y: authorLabel.frame.midY - 7, width: 14, height: 14)
+      }
       messageContent.setNeedsLayout()
       messageContent.layoutIfNeeded()
     } else {
