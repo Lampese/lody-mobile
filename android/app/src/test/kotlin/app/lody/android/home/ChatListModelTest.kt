@@ -221,6 +221,7 @@ class ChatListModelTest {
         // Children drop a project that repeats their opener's; the top-level Tab keeps it.
         assertEquals(listOf("zed", "", "", "zed"), zed.map { it.place })
         assertTrue(zed[0].treeParent)
+        assertEquals(listOf(2, 0, 0, 0), zed.map { it.childCount })
         // An opener in another group (#3 opened by #2, different project) stays top-level.
         val other = opened.copy(sessions = opened.sessions.map { if (it.id == "3") it.copy(openedBySessionId = "2") else it })
         assertNull(ChatListModel.byProject(other).first { it.header == HomeSection.Header.Project("Alpha") }.chats.single().nestedUnder)

@@ -29,6 +29,12 @@
     <!-- Home: grouping -->
     <string name="home_tree_expand">展开子对话</string>
     <string name="home_tree_collapse">收起子对话</string>
+    <string name="home_tree_expanded">已展开</string>
+    <string name="home_tree_collapsed">已收起</string>
+    <plurals name="home_tree_count">
+        <item quantity="one">%1$d 个子对话</item>
+        <item quantity="other">%1$d 个子对话</item>
+    </plurals>
     <string name="home_view_scope">范围</string>
     <string name="home_scope_mine">我的任务</string>
     <string name="home_scope_team">团队任务</string>

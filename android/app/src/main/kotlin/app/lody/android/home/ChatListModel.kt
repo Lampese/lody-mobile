@@ -34,8 +34,10 @@ data class ChatItem(
     /** Set by [ChatListModel.nest]: shown nested under this row id. */
     val nestedUnder: String? = null,
     val lastChild: Boolean = false,
-    /** Has nested rows right below it; the tree trunk starts here. */
+    /** Has nested rows right below it (the family toggle's row). */
     val treeParent: Boolean = false,
+    /** How many rows are nested under this one; the family toggle's count. */
+    val childCount: Int = 0,
 ) {
     val unread: Boolean get() = attention == ChatAttention.Unread
 }
@@ -246,11 +248,11 @@ object ChatListModel {
         }
         return order.flatMap { id ->
             val kids = children.getValue(id)
-            listOf(byId.getValue(id).copy(treeParent = kids.isNotEmpty(), nestedUnder = null, lastChild = false)) +
+            listOf(byId.getValue(id).copy(treeParent = kids.isNotEmpty(), childCount = kids.size, nestedUnder = null, lastChild = false)) +
                 kids.mapIndexed { index, kid ->
                     // A child almost always shares its opener's project: show it only when it differs.
                     val place = kid.place.takeUnless { it == byId.getValue(id).place }.orEmpty()
-                    kid.copy(nestedUnder = id, lastChild = index == kids.lastIndex, treeParent = false, place = place)
+                    kid.copy(nestedUnder = id, lastChild = index == kids.lastIndex, treeParent = false, childCount = 0, place = place)
                 }
         }
     }

@@ -47,6 +47,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,11 +72,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import app.lody.android.designsystem.LodySpring
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -92,8 +90,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -744,8 +745,8 @@ private fun SectionTitle(text: String) {
  * Line 1: status slot, title, age. Line 2 (only when an enabled detail has a value): repo or folder
  * mark + project, branch, and the PR mark trailing. iOS counterpart: `ChatRowContent`.
  *
- * [expanded] is set on a row with nested chats: whether they are shown. Its status slot then
- * holds the disclosure (web's opener chevron) and its status mark moves inline, before the age.
+ * [expanded] is set on a row with nested chats: whether they are shown. Line 1 then carries the
+ * family toggle ("4 ›") before the age; hierarchy is shown by indent alone, without tree lines.
  */
 @Composable
 private fun ChatRow(
@@ -764,39 +765,20 @@ private fun ChatRow(
     // A PR mark alone stays on the title line, before the age; it is always the trailing mark of its line.
     val twoLine = place != null || branch != null
     val nested = chat.nestedUnder != null
-    val treeColor = colors.borderDefault
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LodySize.listRow)
-            .drawBehind { if (nested || expanded == true) drawTree(treeColor, nested, chat.lastChild, expanded == true) }
             .clickable(onClick = onClick)
             .padding(end = LodyLayout.screenPaddingX)
             .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Two columns, each with one job: the status column (centred in the gutter, the same place
-        // on every row, nested or not) and the tree column just before the title (the opener's
-        // chevron, trunk and elbows). iOS counterpart: `ChatRowContent` / `TreeLines`.
-        Box(Modifier.width(LodyLayout.childIndent).heightIn(min = LodySize.listRow)) {
-            Box(Modifier.align(Alignment.Center)) { chat.attention?.let { AttentionGlyph(it) } }
-            if (expanded != null) {
-                val label = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
-                val angle by animateFloatAsState(if (expanded) 0f else -90f, LodySpring.snappy(), label = "disclosure")
-                Box(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(TreeChevronSlot)
-                        .heightIn(min = LodySize.listRow)
-                        .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = label, onClick = onToggle)
-                        .semantics { stateDescription = label },
-                    contentAlignment = Alignment.CenterEnd,
-                ) {
-                    Glyph(LodyIcons.Expand, colors.iconTertiary, TreeChevron, Modifier.padding(end = LodySpacing.xxs).rotate(angle))
-                }
-            }
+        // The status column: the same place on every row, nested or not. iOS: `ChatRowContent`.
+        Box(Modifier.width(LodyLayout.childIndent).heightIn(min = LodySize.listRow), contentAlignment = Alignment.Center) {
+            chat.attention?.let { AttentionGlyph(it) }
         }
-        // A nested title steps in one level past the elbow.
+        // A nested title steps in one level.
         if (nested) Spacer(Modifier.width(TreeLevel))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -809,6 +791,9 @@ private fun ChatRow(
                     modifier = Modifier.weight(1f),
                 )
                 if (pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
+                if (expanded != null) {
+                    FamilyToggle(chat.childCount, expanded, onToggle, Modifier.padding(start = if (pr != null && !twoLine) LodySpacing.xs else LodySpacing.sm))
+                }
                 chat.activityAt?.let { at ->
                     Text(
                         ageText(at, now),
@@ -816,7 +801,7 @@ private fun ChatRow(
                         color = colors.textTertiary,
                         maxLines = 1,
                         textAlign = TextAlign.End,
-                        modifier = Modifier.padding(start = if (pr != null && !twoLine) LodySpacing.xs else LodySpacing.sm),
+                        modifier = Modifier.padding(start = if ((pr != null && !twoLine) || expanded != null) LodySpacing.xs else LodySpacing.sm),
                     )
                 }
             }
@@ -840,34 +825,40 @@ private fun ChatRow(
     }
 }
 
-/** One nesting level: how far a nested row's mark and title step in (iOS `TreeLines.level`). */
+/** One nesting level: how far a nested row's title steps in (iOS `ChatRowContent.childLevel`). */
 private val TreeLevel = LodySpacing.lg
 
 /**
- * Web's opened-by tree connectors in the tree column: a trunk from below the opener's chevron
- * through each nested row (stopping at the last one's centre), and an elbow into the nested
- * row's title. Status marks keep their own column. Rows sit edge to edge, so each draws only its
- * own height and the pieces join.
+ * The opener's family toggle: plain child count plus a small chevron that turns down when the
+ * family is shown. The count never changes with the state. 44 dp touch target without growing
+ * the row; one spoken description ("4 opened chats, expanded"). iOS: `ChatRowContent.familyToggle`.
  */
-private fun DrawScope.drawTree(color: Color, nested: Boolean, lastChild: Boolean, parent: Boolean) {
-    val x = TreeTrunkX.toPx()
-    val mid = size.height / 2
-    val stroke = 1.dp.toPx()
-    if (parent) {
-        // Starts below the opener's chevron.
-        drawLine(color, Offset(x, mid + (TreeChevron / 2 + LodySpacing.xxs).toPx()), Offset(x, size.height), stroke)
-    }
-    if (nested) {
-        drawLine(color, Offset(x, 0f), Offset(x, if (lastChild) mid else size.height), stroke)
-        // The elbow runs into its own title, stopping just short of the text.
-        drawLine(color, Offset(x, mid), Offset((LodyLayout.childIndent + TreeLevel - LodySpacing.xs).toPx(), mid), stroke)
+@Composable
+private fun FamilyToggle(count: Int, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = LodyTheme.colors
+    val action = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
+    val description = pluralStringResource(R.plurals.home_tree_count, count, count) + ", " +
+        stringResource(if (expanded) R.string.home_tree_expanded else R.string.home_tree_collapsed)
+    val angle by animateFloatAsState(if (expanded) 90f else 0f, LodySpring.snappy(), label = "family")
+    Row(
+        modifier
+            .minimumInteractiveComponentSize()
+            .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = action, onClick = onToggle)
+            .clearAndSetSemantics { contentDescription = description; role = Role.Button; onClick(action) { onToggle(); true } },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xxs),
+    ) {
+        Text(
+            count.toString(),
+            style = LodyTheme.typography.footnote.copy(fontFeatureSettings = "tnum"),
+            color = colors.textTertiary,
+            maxLines = 1,
+        )
+        Glyph(LodyIcons.Forward, colors.iconTertiary, FamilyChevron, Modifier.rotate(angle))
     }
 }
 
-/** The tree column sits just before the titles, right of the status column. */
-private val TreeChevron = LodyIconSize.xs
-private val TreeTrunkX = LodyLayout.childIndent - TreeChevron / 2 - LodySpacing.xxs
-private val TreeChevronSlot = LodySpacing.xl
+private val FamilyChevron = 10.dp
 
 private val PrStatuses = setOf("open", "merged", "closed", "draft")
 

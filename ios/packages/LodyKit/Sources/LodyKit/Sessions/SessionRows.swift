@@ -94,6 +94,7 @@ enum SessionRows {
       }.first
       let status = urgent.map(row) ?? parent
       parent.treeParent = true
+      parent.childCount = group.children.count
       parent.collapsedValue = String.localizedStringWithFormat(String(localized: "inbox.session.children", bundle: .lody), group.children.count)
       parent.collapsedBadge = status.badge
       parent.collapsedImageTint = status.imageTint

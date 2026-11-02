@@ -29,6 +29,12 @@
     <!-- Home: grouping -->
     <string name="home_tree_expand">Show opened chats</string>
     <string name="home_tree_collapse">Hide opened chats</string>
+    <string name="home_tree_expanded">Expanded</string>
+    <string name="home_tree_collapsed">Collapsed</string>
+    <plurals name="home_tree_count">
+        <item quantity="one">%1$d opened chat</item>
+        <item quantity="other">%1$d opened chats</item>
+    </plurals>
     <string name="home_view_scope">Show</string>
     <string name="home_scope_mine">My tasks</string>
     <string name="home_scope_team">Team tasks</string>

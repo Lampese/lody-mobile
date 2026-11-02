@@ -242,7 +242,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
     a.title == b.title && a.subtitle == b.subtitle && a.unread == b.unread && a.imageTint == b.imageTint
       && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus && a.prCI == b.prCI
-      && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.lastChild == b.lastChild && a.treeParent == b.treeParent && a.highlight == b.highlight && ea == eb
+      && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.lastChild == b.lastChild && a.treeParent == b.treeParent && a.childCount == b.childCount && a.highlight == b.highlight && ea == eb
   }
 
   private func updatePlaceholder() {
@@ -544,8 +544,8 @@ extension Notification.Name {
 private struct ChatRowContent: View {
   let row: LodyListRow
   let details: ChatRowDetails
-  /// Set on a row with nested chats: whether they are shown. Its chevron sits in the tree
-  /// column, where the trunk starts; the status mark stays in the status column.
+  /// Set on a row with nested chats: whether they are shown. Its "4 ›" toggle sits before the
+  /// age; the status mark stays in the status column.
   var expanded: Bool?
   var onToggle: () -> Void = {}
 
@@ -566,30 +566,14 @@ private struct ChatRowContent: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: 0) {
-      // Two columns, each with one job: the status column (same place on every row, nested or
-      // not) and the tree column just before the title (the opener's chevron, trunk, elbows).
-      ZStack(alignment: .leading) {
-        ZStack {
-          if let attention { AttentionGlyph(attention: attention) }
-        }
-        .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-        if let expanded {
-          Button(action: onToggle) {
-            Glyph(icon: .expand, size: TreeLines.chevron, color: LodyColor.iconTertiary)
-              .rotationEffect(.degrees(expanded ? 0 : -90))
-              .animation(LodySpring.snappy, value: expanded)
-              .frame(width: TreeLines.chevron, height: TreeLines.chevron)
-              .padding(.leading, TreeLines.trunkX - LodyLayout.screenPaddingX - TreeLines.chevron / 2)
-              .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
-              .frame(maxHeight: .infinity)
-              .contentShape(Rectangle())
-          }
-          .buttonStyle(.plain)
-        }
+      // The status column: the same place on every row, nested or not.
+      ZStack {
+        if let attention { AttentionGlyph(attention: attention) }
       }
+      .frame(width: LodyIconSize.md, height: LodyIconSize.md)
       .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
-      // A nested title steps in one level past the elbow.
-      if nested { Color.clear.frame(width: TreeLines.level, height: 1) }
+      // Hierarchy is the indent alone (Mail threads, Reminders subtasks): no lines, same type size.
+      if nested { Color.clear.frame(width: Self.childLevel, height: 1) }
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
           Text(row.title)
@@ -598,9 +582,10 @@ private struct ChatRowContent: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
           // The text inside sets the stack's baseline, so the PR mark centres on the age.
-          if inlinePullRequest != nil || !row.value.isEmpty {
+          if inlinePullRequest != nil || expanded != nil || !row.value.isEmpty {
             HStack(spacing: LodySpacing.xs) {
               inlinePullRequest?.glyph
+              if let expanded { familyToggle(expanded) }
               if !row.value.isEmpty {
                 Text(row.value)
                   .lodyTextStyle(.footnote)
@@ -621,15 +606,10 @@ private struct ChatRowContent: View {
     .padding(.horizontal, LodyLayout.screenPaddingX)
     .padding(.vertical, snippet != nil || hasDetailLine ? LodySpacing.sm : 0)
     .frame(maxWidth: .infinity, minHeight: LodySize.listRow, alignment: .leading)
-    .background {
-      if nested || expanded == true {
-        TreeLines(nested: nested, lastChild: row.lastChild, parent: expanded == true)
-      }
-    }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.title)
     .accessibilityValue(
-      [row.badge, project, branch, pullRequest?.label ?? "", row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", ")
+      [row.badge, project, branch, pullRequest?.label ?? "", familyLabel, row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", ")
     )
     .accessibilityAddTraits(.isButton)
     .accessibilityActions {
@@ -637,6 +617,42 @@ private struct ChatRowContent: View {
         Button(String(localized: String.LocalizationValue(expanded ? "home.tree.collapse" : "home.tree.expand"), bundle: .lody), action: onToggle)
       }
     }
+  }
+
+  /// "4 个子对话，已展开" for VoiceOver; the toggle itself is an accessibility action.
+  private var familyLabel: String {
+    guard let expanded else { return "" }
+    let count = String.localizedStringWithFormat(String(localized: "home.tree.count", bundle: .lody), row.childCount)
+    let state = String(localized: String.LocalizationValue(expanded ? "home.tree.expanded" : "home.tree.collapsed"), bundle: .lody)
+    return count + ", " + state
+  }
+
+  /// One nesting level: how far a child's title steps in.
+  static let childLevel = LodySpacing.lg
+
+  /// Mail's thread count: "4 ›" in the age's colour, no chip; the chevron turns down when the
+  /// family is open, the number never changes. A 44 pt target around the small mark.
+  private func familyToggle(_ expanded: Bool) -> some View {
+    Button(action: onToggle) {
+      HStack(spacing: LodySpacing.xxs) {
+        Text("\(row.childCount)")
+          .lodyTextStyle(.footnote)
+          .foregroundStyle(LodyColor.textTertiary)
+          .monospacedDigit()
+        Image(systemName: "chevron.right")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(LodyColor.iconTertiary)
+          .rotationEffect(.degrees(expanded ? 90 : 0))
+          .animation(LodySpring.snappy, value: expanded)
+      }
+      .padding(.horizontal, LodySpacing.md)
+      .padding(.vertical, LodySpacing.md)
+      .contentShape(Rectangle())
+      .padding(.horizontal, -LodySpacing.md)
+      .padding(.vertical, -LodySpacing.md)
+    }
+    .buttonStyle(.plain)
+    .accessibilityHidden(true)
   }
 
   private var detailLine: some View {
@@ -662,40 +678,6 @@ private struct ChatRowContent: View {
 /// (stopping at the last one's centre), and an elbow into the nested row's own mark, or toward
 /// its title when it has none. Rows sit edge to edge, so each draws only its own height and the
 /// pieces read as one line.
-private struct TreeLines: View {
-  /// One nesting level: how far a nested row's title steps in.
-  static let level = LodySpacing.lg
-  static let chevron = LodyIconSize.xs
-  /// The tree column's line, just before the titles (and right of the status column).
-  static let trunkX = LodyLayout.childIndent - chevron / 2 - LodySpacing.xxs
-
-  let nested: Bool
-  let lastChild: Bool
-  let parent: Bool
-
-  var body: some View {
-    Canvas { context, size in
-      let x = Self.trunkX
-      let mid = size.height / 2
-      var path = Path()
-      if parent {
-        // Starts below the opener's chevron.
-        path.move(to: CGPoint(x: x, y: mid + Self.chevron / 2 + LodySpacing.xxs))
-        path.addLine(to: CGPoint(x: x, y: size.height))
-      }
-      if nested {
-        path.move(to: CGPoint(x: x, y: 0))
-        path.addLine(to: CGPoint(x: x, y: lastChild ? mid : size.height))
-        // The elbow runs into its own title, stopping just short of the text.
-        path.move(to: CGPoint(x: x, y: mid))
-        path.addLine(to: CGPoint(x: LodyLayout.childIndent + Self.level - LodySpacing.xs, y: mid))
-      }
-      context.stroke(path, with: .color(LodyColor.borderDefault), lineWidth: 1)
-    }
-    .accessibilityHidden(true)
-  }
-}
-
 /// The web `SessionPrIcon` states: open, merged, closed, draft.
 private struct PullRequestMark {
   let icon: LodyIcon
