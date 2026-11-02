@@ -47,7 +47,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,7 +74,11 @@ import app.lody.android.designsystem.LodySpring
 import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
@@ -745,8 +748,8 @@ private fun SectionTitle(text: String) {
  * Line 1: status slot, title, age. Line 2 (only when an enabled detail has a value): repo or folder
  * mark + project, branch, and the PR mark trailing. iOS counterpart: `ChatRowContent`.
  *
- * [expanded] is set on a row with nested chats: whether they are shown. Line 1 then carries the
- * family toggle ("4 ›") before the age; hierarchy is shown by indent alone, without tree lines.
+ * [expanded] is set on a row with nested chats: whether they are shown. A "⌄ 4 opened chats" line
+ * below the row heads the family. Nested rows read one size down and hang off one rail.
  */
 @Composable
 private fun ChatRow(
@@ -765,100 +768,130 @@ private fun ChatRow(
     // A PR mark alone stays on the title line, before the age; it is always the trailing mark of its line.
     val twoLine = place != null || branch != null
     val nested = chat.nestedUnder != null
-    Row(
-        modifier = Modifier
+    val rail = colors.borderDefault
+    Column(
+        Modifier
             .fillMaxWidth()
-            .heightIn(min = LodySize.listRow)
-            .clickable(onClick = onClick)
-            .padding(end = LodyLayout.screenPaddingX)
-            .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .drawBehind { if (nested) drawRail(rail, chat.lastChild) },
     ) {
-        // The status column: the same place on every row, nested or not. iOS: `ChatRowContent`.
-        Box(Modifier.width(LodyLayout.childIndent).heightIn(min = LodySize.listRow), contentAlignment = Alignment.Center) {
-            chat.attention?.let { AttentionGlyph(it) }
-        }
-        // A nested title steps in one level.
-        if (nested) Spacer(Modifier.width(TreeLevel))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    chat.title,
-                    style = if (chat.unread) type.bodyEmphasis else type.body,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
-                if (expanded != null) {
-                    FamilyToggle(chat.childCount, expanded, onToggle, Modifier.padding(start = if (pr != null && !twoLine) LodySpacing.xs else LodySpacing.sm))
-                }
-                chat.activityAt?.let { at ->
-                    Text(
-                        ageText(at, now),
-                        style = type.footnote.copy(fontFeatureSettings = "tnum"),
-                        color = colors.textTertiary,
-                        maxLines = 1,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.padding(start = if ((pr != null && !twoLine) || expanded != null) LodySpacing.xs else LodySpacing.sm),
-                    )
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = if (nested) LodySize.controlMd else LodySize.listRow)
+                .clickable(onClick = onClick)
+                .padding(end = LodyLayout.screenPaddingX)
+                .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The status column: the same place on every row, nested or not. iOS: `ChatRowContent`.
+            Box(Modifier.width(LodyLayout.childIndent).heightIn(min = if (nested) LodySize.controlMd else LodySize.listRow), contentAlignment = Alignment.Center) {
+                chat.attention?.let { AttentionGlyph(it) }
             }
-            if (twoLine) {
+            // A nested title steps in past the rail.
+            if (nested) Spacer(Modifier.width(TreeLevel))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Project and branch share the leading space so the PR mark stays pinned trailing.
-                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
-                        if (place != null) {
-                            Glyph(if (chat.placeIsRepo) LodyIcons.Github else LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
-                            Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                        }
-                        if (branch != null) {
-                            Glyph(LodyIcons.Branch, colors.iconTertiary, LodyIconSize.sm, Modifier.padding(start = if (place != null) LodySpacing.xs else 0.dp))
-                            Text(branch, style = type.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
-                        }
+                    Text(
+                        chat.title,
+                        style = when {
+                            nested -> type.callout.copy(fontWeight = if (chat.unread) type.bodyEmphasis.fontWeight else type.callout.fontWeight)
+                            chat.unread -> type.bodyEmphasis
+                            else -> type.body
+                        },
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
+                    chat.activityAt?.let { at ->
+                        Text(
+                            ageText(at, now),
+                            style = type.footnote.copy(fontFeatureSettings = "tnum"),
+                            color = colors.textTertiary,
+                            maxLines = 1,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.padding(start = if (pr != null && !twoLine) LodySpacing.xs else LodySpacing.sm),
+                        )
                     }
-                    if (pr != null) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
+                }
+                if (twoLine) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Project and branch share the leading space so the PR mark stays pinned trailing.
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                            if (place != null) {
+                                Glyph(if (chat.placeIsRepo) LodyIcons.Github else LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
+                                Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            }
+                            if (branch != null) {
+                                Glyph(LodyIcons.Branch, colors.iconTertiary, LodyIconSize.sm, Modifier.padding(start = if (place != null) LodySpacing.xs else 0.dp))
+                                Text(branch, style = type.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
+                            }
+                        }
+                        if (pr != null) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
+                    }
                 }
             }
         }
+        if (expanded != null) FamilyToggle(chat.childCount, expanded, onToggle)
     }
 }
+
+/** The family chevron sits at the opener's title edge; the rail runs down its centre (iOS `ChatRowContent`). */
+private val FamilyChevron = LodyIconSize.xs
+private val RailWidth = 2.dp
+private val RailX = LodyLayout.childIndent + FamilyChevron / 2
 
 /** One nesting level: how far a nested row's title steps in (iOS `ChatRowContent.childLevel`). */
 private val TreeLevel = LodySpacing.lg
 
 /**
- * The opener's family toggle: plain child count plus a small chevron that turns down when the
- * family is shown. The count never changes with the state. 44 dp touch target without growing
- * the row; one spoken description ("4 opened chats, expanded"). iOS: `ChatRowContent.familyToggle`.
+ * Children hang off one continuous rail under the opener's chevron. Rows sit edge to edge, so
+ * each draws its own height and the pieces join; the last stops short with a round end.
  */
-@Composable
-private fun FamilyToggle(count: Int, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = LodyTheme.colors
-    val action = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
-    val description = pluralStringResource(R.plurals.home_tree_count, count, count) + ", " +
-        stringResource(if (expanded) R.string.home_tree_expanded else R.string.home_tree_collapsed)
-    val angle by animateFloatAsState(if (expanded) 90f else 0f, LodySpring.snappy(), label = "family")
-    Row(
-        modifier
-            .minimumInteractiveComponentSize()
-            .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = action, onClick = onToggle)
-            .clearAndSetSemantics { contentDescription = description; role = Role.Button; onClick(action) { onToggle(); true } },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xxs),
-    ) {
-        Text(
-            count.toString(),
-            style = LodyTheme.typography.footnote.copy(fontFeatureSettings = "tnum"),
-            color = colors.textTertiary,
-            maxLines = 1,
-        )
-        Glyph(LodyIcons.Forward, colors.iconTertiary, FamilyChevron, Modifier.rotate(angle))
-    }
+private fun DrawScope.drawRail(color: Color, last: Boolean) {
+    val width = RailWidth.toPx()
+    val bottom = if (last) size.height - LodySpacing.sm.toPx() else size.height
+    drawRoundRect(
+        color,
+        topLeft = Offset(RailX.toPx() - width / 2, 0f),
+        size = Size(width, bottom),
+        cornerRadius = if (last) CornerRadius(width / 2) else CornerRadius.Zero,
+    )
 }
 
-private val FamilyChevron = 10.dp
+/**
+ * The family's own line under the opener (Slack's "7 replies"): chevron + "7 opened chats",
+ * aligned with the opener's title. Same place folded or open; the chevron turns down when the
+ * family shows and the rail starts beneath it. The whole line is the target, spoken as
+ * "7 opened chats, expanded". iOS: `ChatRowContent.familyToggle`.
+ */
+@Composable
+private fun FamilyToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    val colors = LodyTheme.colors
+    val action = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
+    val label = pluralStringResource(R.plurals.home_tree_count, count, count)
+    val description = label + ", " + stringResource(if (expanded) R.string.home_tree_expanded else R.string.home_tree_collapsed)
+    val angle by animateFloatAsState(if (expanded) 90f else 0f, LodySpring.snappy(), label = "family")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = LodySize.controlSm)
+            .clickable(role = Role.Button, onClickLabel = action, onClick = onToggle)
+            .clearAndSetSemantics { contentDescription = description; role = Role.Button; onClick(action) { onToggle(); true } }
+            .padding(start = LodyLayout.childIndent, end = LodyLayout.screenPaddingX),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+    ) {
+        Glyph(LodyIcons.Forward, colors.iconSecondary, FamilyChevron, Modifier.rotate(angle))
+        Text(
+            label,
+            style = LodyTheme.typography.footnote.copy(fontFeatureSettings = "tnum"),
+            color = colors.textSecondary,
+            maxLines = 1,
+        )
+    }
+}
 
 private val PrStatuses = setOf("open", "merged", "closed", "draft")
 
