@@ -83,6 +83,11 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     LaunchedEffect(scope, id, retry) {
         val repair = QuickJsMarkdownRepair.fromAssets(appContext)
         val rendered = mutableMapOf<String, Pair<SessionMessage, ChatEntry>>()
+        // Prose items keep their Markdown while their text is unchanged, so a streaming turn
+        // re-renders only the item that grows.
+        val proseCache = mutableMapOf<String, Pair<String, MarkdownBlocks>>()
+        // Web shows thoughts only for builtin DSH.
+        val showThoughts = context.session?.cliType == "builtin" && context.session.agentType == "deepseek"
         try {
             repository.observe(scope, id).conflate().collect { snapshot ->
                 status = snapshot.status
@@ -95,16 +100,35 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                 TurnIdentity(senderName(message.userId, context.me, memberLabel), senderImage(message.userId, context.me), turnTime(message.timestamp)),
                                 delivery(message.status),
                             )
-                            else -> ChatEntry.Assistant(
-                                message.id,
-                                flowOf(MessageText(message.text, message.streaming)).renderMarkdown(repair).first(),
-                                TurnIdentity(message.model?.let { "$agentName · $it" } ?: agentName, time = turnTime(message.timestamp)),
-                                worked(message, workedFormat),
-                                working = message.streaming,
-                            )
+                            else -> {
+                                val items = message.items.ifEmpty { listOf(TurnItem.Text(message.id, message.text)) }
+                                val growing = items.lastOrNull { it is TurnItem.Text || it is TurnItem.Thought || it is TurnItem.ProposedPlan }?.id
+                                val prose = items.mapNotNull { item ->
+                                    val text = when (item) {
+                                        is TurnItem.Text -> item.text
+                                        is TurnItem.Thought -> item.text
+                                        is TurnItem.ProposedPlan -> item.markdown
+                                        else -> return@mapNotNull null
+                                    }
+                                    val streaming = message.streaming && item.id == growing
+                                    val cacheKey = "${message.id}:${item.id}"
+                                    val cached = proseCache[cacheKey]?.takeIf { it.first == text && !streaming }?.second
+                                    item.id to (cached ?: flowOf(MessageText(text, streaming)).renderMarkdown(repair).first()
+                                        .also { proseCache[cacheKey] = text to it })
+                                }.toMap()
+                                ChatEntry.Assistant(
+                                    message.id,
+                                    TurnLayout.build(message.id, items, finished = !message.streaming, showThoughts),
+                                    prose,
+                                    TurnIdentity(message.model?.let { "$agentName · $it" } ?: agentName, time = turnTime(message.timestamp)),
+                                    worked(message, workedFormat),
+                                    working = message.streaming,
+                                )
+                            }
                         }.also { rendered[message.id] = message to it }
                     }
                     rendered.keys.retainAll(snapshot.messages.map { it.id }.toSet())
+                    proseCache.keys.retainAll { key -> snapshot.messages.any { key.startsWith(it.id + ":") } }
                     next
                 }
                 if (snapshot.messages.any { it.streaming }) delay(33)

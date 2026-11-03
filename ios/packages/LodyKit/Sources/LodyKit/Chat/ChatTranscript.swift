@@ -467,7 +467,12 @@ struct ChatTranscript {
         }
         return result
       }
-      let finalText = entry.items.lastIndex { $0.type == "text" && !($0.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+      let answer = ChatTranscript.answerRun(entry.items)
+      // Web folds a finished turn only when something answers it below the fold; a cancelled or
+      // tool-only turn stays expanded.
+      let folds = entry.finished && entry.items.indices.contains { index in
+        answer.contains(index) || entry.items[index].type == "proposed_plan" || entry.items[index].isAttachment || entry.items[index].isChatFailure
+      }
       var visible: [Int] = []
       var groups: [Int: [Int]] = [:]
       if entry.role != "assistant" {
@@ -480,15 +485,15 @@ struct ChatTranscript {
           let end = entry.items.indices.dropFirst(start + 1).first { entry.items[$0].type == "text" || entry.items[$0].type == "proposed_plan" || entry.items[$0].isAttachment } ?? entry.items.endIndex
           visible = Array(start..<end).filter { entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].isChatFailure && !entry.items[$0].hidesFromTranscript }
         } else {
-          visible = entry.items.indices.filter { $0 != finalText && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].hidesFromTranscript }
+          visible = entry.items.indices.filter { !answer.contains($0) && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].hidesFromTranscript }
         }
-      } else if entry.finished {
+      } else if folds {
         let process = entry.items.indices.filter {
-          $0 != finalText && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].isChatFailure && entry.items[$0].type != "subagent_task"
+          !answer.contains($0) && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].isChatFailure && entry.items[$0].type != "subagent_task"
         }
         if let first = process.first { groups[first] = process }
         visible = process.first.map { [$0] } ?? []
-        if let finalText { visible.append(finalText) }
+        visible.append(contentsOf: answer)
         visible.append(contentsOf: entry.items.indices.filter {
           entry.items[$0].type == "proposed_plan" || entry.items[$0].isAttachment || entry.items[$0].isChatFailure
             || (entry.items[$0].type == "subagent_task" && !entry.items[$0].hidesFromTranscript)
@@ -500,7 +505,9 @@ struct ChatTranscript {
             if !entry.items[index].hidesFromTranscript { visible.append(index) }
             continue
           }
-          if entry.items[index].type == "text" || entry.items[index].type == "proposed_plan" || entry.items[index].isAttachment || entry.items[index].isChatFailure {
+          // DSH thoughts (the only ones left in the transcript) read inline, apart from tool groups.
+          if entry.items[index].type == "text" || entry.items[index].type == "thought" || entry.items[index].type == "proposed_plan"
+            || entry.items[index].isAttachment || entry.items[index].isChatFailure {
             visible.append(index)
           } else if let previous = visible.last, groups[previous] != nil {
             groups[previous]!.append(index)
@@ -531,7 +538,7 @@ struct ChatTranscript {
             running: entry.isRunning,
             workDurationMs: duration
           )
-          if entry.finished, let first = groups.keys.min(), let indices = groups[first] {
+          if folds, let first = groups.keys.min(), let indices = groups[first] {
             let process = indices.map { entry.items[$0] }
             row.detail = ChatProcessSummary.title(items: process, running: false, includesThought: false)
             row.actionable = true
@@ -669,6 +676,23 @@ struct ChatTranscript {
 }
 
 extension ChatTranscript {
+  /// Web `getFinalTextRunStart`: the answer is the final contiguous run of text before the
+  /// never-folded tail (plans, attachments, failures, sub-tasks, plan approvals), not just the
+  /// last text item. Empty when the turn ends in work.
+  static func answerRun(_ items: [ChatItem]) -> [Int] {
+    func neverFolded(_ item: ChatItem) -> Bool {
+      item.type == "proposed_plan" || item.type == "plan" || item.isAttachment || item.isChatFailure
+        || item.type == "subagent_task" || (item.type == "tool_call" && item.kind == "switch_mode")
+    }
+    func prose(_ item: ChatItem) -> Bool { item.type == "text" && !(item.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var index = items.count - 1
+    while index >= 0 && neverFolded(items[index]) { index -= 1 }
+    guard index >= 0, prose(items[index]) else { return [] }
+    var start = index
+    while start > 0 && items[start - 1].type == "text" { start -= 1 }
+    return (start...index).filter { prose(items[$0]) }
+  }
+
   static func hangSubagents(_ rows: [ChatRow]) -> [ChatRow] {
     var tasks = rows.filter { $0.kind == "subagent_task" }
     var result = rows.filter { $0.kind != "subagent_task" }

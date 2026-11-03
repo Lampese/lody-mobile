@@ -37,6 +37,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import app.lody.android.runtime.TurnItem
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -69,16 +73,28 @@ sealed interface ChatEntry {
 
     data class User(override val id: String, val text: String, val who: TurnIdentity, val delivery: Delivery = Delivery.Sent) : ChatEntry
     /**
-     * Web shows no identity on an agent turn: it opens with the process line ("Finished
-     * working" / "Working…"). [worked] ("Worked for 8s") is its accessibility detail.
+     * An agent turn laid out like web's: prose, thought / tool groups, and for a finished turn
+     * the "Worked for …" fold above its answer ([TurnLayout]). [prose] holds each prose item's
+     * Markdown blocks (answer text, DSH thoughts, proposed plans) by item id. Web shows no
+     * identity on an agent turn; [worked] ("Worked for 8s") labels the fold.
      */
     data class Assistant(
         override val id: String,
-        val markdown: MarkdownBlocks,
+        val layout: TurnLayout.Layout,
+        val prose: Map<String, MarkdownBlocks>,
         val who: TurnIdentity,
         val worked: String = "",
         val working: Boolean = false,
-    ) : ChatEntry
+    ) : ChatEntry {
+        companion object {
+            /** A turn that is only prose (the stream probe, older projections). */
+            fun prose(id: String, markdown: MarkdownBlocks, who: TurnIdentity, working: Boolean = false) = Assistant(
+                id,
+                TurnLayout.build(id, listOf(TurnItem.Text(id, "")), finished = !working, showThoughts = false),
+                mapOf(id to markdown), who, working = working,
+            )
+        }
+    }
 }
 
 /**
@@ -102,9 +118,16 @@ fun ChatTranscript(
     }
     val tail = entries.lastOrNull()
     val tailSize = when (tail) {
-        is ChatEntry.Assistant -> tail.markdown.blocks.size to (tail.markdown.blocks.lastOrNull()?.length ?: 0)
+        is ChatEntry.Assistant -> tail.layout.blocks.size to tail.prose.values.sumOf { it.blocks.size + (it.blocks.lastOrNull()?.length ?: 0) }
         is ChatEntry.User -> 1 to tail.text.length + tail.delivery.ordinal
         null -> 0 to 0
+    }
+    // Disclosure state for the screen's life: worked folds and activity groups, by key.
+    val open = remember { mutableStateMapOf<String, Boolean>() }
+    val haptics = LocalHapticFeedback.current
+    val toggle: (String, Boolean) -> Unit = { key, value ->
+        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+        open[key] = value
     }
     LaunchedEffect(entries.size, tailSize) {
         val last = state.layoutInfo.totalItemsCount - 1
@@ -115,18 +138,24 @@ fun ChatTranscript(
             when (entry) {
                 is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry) }
                 is ChatEntry.Assistant -> {
-                    item(key = "${entry.id}#process", contentType = "process") { ProcessLine(entry.working, entry.worked) }
-                    itemsIndexed(
-                        entry.markdown.blocks,
-                        key = { index, _ -> "${entry.id}#$index" },
-                        contentType = { _, _ -> "markdown" },
-                    ) { _, block ->
-                        MarkdownBlock(
-                            block,
-                            Modifier
-                                .padding(horizontal = TranscriptMargin)
-                                .padding(bottom = LodySpacing.md),
-                        )
+                    val layout = entry.layout
+                    if (layout.folded) {
+                        val key = "${entry.id}#worked"
+                        val expanded = open[key] ?: false
+                        item(key = key, contentType = "disclosure") {
+                            Disclosure(
+                                entry.worked.ifEmpty { stringResource(R.string.chat_finished_working) },
+                                expanded,
+                                Modifier.animateItem(),
+                            ) { toggle(key, it) }
+                        }
+                        if (expanded) turnBlocks(entry, layout.folding, open, toggle)
+                    }
+                    turnBlocks(entry, layout.visible, open, toggle)
+                    if (entry.working) {
+                        val last = layout.blocks.lastOrNull()
+                        val thinking = last is TurnLayout.Activity && last.items.lastOrNull() is TurnItem.Thought
+                        item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
@@ -182,28 +211,6 @@ private val UserHeaderHeight = LodySpacing.xl
 private val UserAvatarSize = LodySize.avatarLg - LodySpacing.xs
 private val UserBubbleRadius = LodySpacing.xl
 
-/**
- * The line that opens an agent turn: web's "Finished working ›" (which opens the process) or the
- * working grid while it streams. Android has no process sheet yet, so it carries no chevron.
- */
-@Composable
-private fun ProcessLine(working: Boolean, worked: String) {
-    val colors = LodyTheme.colors
-    val label = stringResource(if (working) R.string.chat_working else R.string.chat_finished_working)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = TranscriptMargin)
-            .padding(top = LodySpacing.sm, bottom = LodySpacing.md)
-            .semantics { contentDescription = listOf(label, worked).filter { it.isNotEmpty() }.joinToString(", ") },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-    ) {
-        if (working) LodyWorkingGrid()
-        Text(label, style = LodyTheme.typography.body, color = colors.textTertiary)
-    }
-}
-
 /** Web's delivery mark: a check once the agent picked the turn up, an open circle before. */
 @Composable
 private fun DeliveryMark(delivery: Delivery) {
@@ -234,7 +241,7 @@ private fun DeliveryMark(delivery: Delivery) {
  * back to the loading state.
  */
 @Composable
-fun MarkdownBlock(text: String, modifier: Modifier = Modifier) {
+fun MarkdownBlock(text: String, modifier: Modifier = Modifier, secondary: Boolean = false) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val state = rememberMarkdownState(content = text, retainState = true)
@@ -242,7 +249,8 @@ fun MarkdownBlock(text: String, modifier: Modifier = Modifier) {
         markdownState = state,
         modifier = modifier.fillMaxWidth(),
         colors = markdownColor(
-            text = colors.textPrimary,
+            // DSH thought prose: answer typography in secondary ink.
+            text = if (secondary) colors.textSecondary else colors.textPrimary,
             codeBackground = colors.codeBg,
             inlineCodeBackground = colors.codeInlineBg,
             dividerColor = colors.borderSubtle,

@@ -67,7 +67,14 @@ extension LodyChatView {
     }
   }
 
-  private func receiveEntries(_ entries: [ChatEntry]) {
+  private func receiveEntries(_ received: [ChatEntry]) {
+    // Web shows reasoning only for builtin DSH; other providers' thoughts and `think` steps
+    // never reach the transcript.
+    let entries = showsThoughts ? received : received.map { entry in
+      var entry = entry
+      entry.items.removeAll { $0.type == "thought" || ($0.type == "tool_call" && $0.kind == "think") }
+      return entry
+    }
     if let page = messageDetailsPage { page.update(entries.first { $0.id == page.entryId }) }
     streamPerformanceProbe?.receive(entries)
     displayError = nil

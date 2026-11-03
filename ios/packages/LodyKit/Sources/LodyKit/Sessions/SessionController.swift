@@ -162,6 +162,7 @@ class SessionController: UIViewController {
     chat.setAttachmentContext(Self.json(["workspaceId": state.workspaceId, "sessionId": sessionId]))
     let machine = state.catalog.machineNames[session.machineId] ?? ""
     let machineState = state.presence.status(of: session.machineId)
+    chat.showsThoughts = session.cliType == "builtin" && session.agentType == "deepseek"
     chat.setNavigationTitle(session.title)
     chat.setNavigationSubtitle(projectName(session, catalog: state.catalog))
     chat.setNavigationMachine(machine.isEmpty ? String(localized: "session.title.machine", bundle: .lody) : machine)

@@ -190,4 +190,46 @@
     <string name="bar_error_not_open">This pull request is no longer open.</string>
     <string name="bar_error_forbidden">You do not have permission to change this pull request.</string>
     <string name="bar_open_github">Open on GitHub</string>
+    <string name="chat_activity_thought">Thought</string>
+    <string name="chat_activity_thinking">Thinking…</string>
+    <string name="chat_step_ran">Ran</string>
+    <string name="chat_step_running">Running</string>
+    <string name="chat_step_read">Read</string>
+    <string name="chat_step_reading">Reading</string>
+    <string name="chat_step_edited">Edited</string>
+    <string name="chat_step_editing">Editing</string>
+    <string name="chat_step_deleted">Deleted</string>
+    <string name="chat_step_deleting">Deleting</string>
+    <string name="chat_step_moved">Moved</string>
+    <string name="chat_step_moving">Moving</string>
+    <string name="chat_step_searched">Searched</string>
+    <string name="chat_step_searching">Searching</string>
+    <string name="chat_step_fetched">Fetched</string>
+    <string name="chat_step_fetching">Fetching</string>
+    <string name="chat_step_failed">Failed</string>
+    <string name="chat_step_awaiting">Awaiting approval</string>
+    <plurals name="chat_activity_commands">
+        <item quantity="one">Ran %d command</item>
+        <item quantity="other">Ran %d commands</item>
+    </plurals>
+    <plurals name="chat_activity_reads">
+        <item quantity="one">Read %d file</item>
+        <item quantity="other">Read %d files</item>
+    </plurals>
+    <plurals name="chat_activity_edits">
+        <item quantity="one">Edited %d file</item>
+        <item quantity="other">Edited %d files</item>
+    </plurals>
+    <plurals name="chat_activity_searches">
+        <item quantity="one">Ran %d search</item>
+        <item quantity="other">Ran %d searches</item>
+    </plurals>
+    <plurals name="chat_activity_fetches">
+        <item quantity="one">Fetched %d resource</item>
+        <item quantity="other">Fetched %d resources</item>
+    </plurals>
+    <plurals name="chat_activity_tools">
+        <item quantity="one">Called %d tool</item>
+        <item quantity="other">Called %d tools</item>
+    </plurals>
 </resources>

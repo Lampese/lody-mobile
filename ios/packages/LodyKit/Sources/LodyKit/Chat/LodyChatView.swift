@@ -142,6 +142,8 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   private weak var scrollOwner: UIViewController?
   var dataSource: UICollectionViewDiffableDataSource<String, String>!
   var transcript = ChatTranscript()
+  /// Builtin DSH only (web `showThoughts`): its thoughts stay in the transcript.
+  var showsThoughts = false
   var processEntryID = ""
   var processStartID = ""
   var stream = ChatStream()

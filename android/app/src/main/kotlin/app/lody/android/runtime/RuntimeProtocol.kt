@@ -19,14 +19,17 @@ internal object RuntimeProtocol {
             val entries = envelope.getJSONArray("entries").objects().mapNotNull { entry ->
                 val role = entry.text("role")
                 if (role !in setOf("user", "assistant")) return@mapNotNull null
-                val text = entry.getJSONArray("items").objects().mapNotNull { item ->
+                val rawItems = entry.getJSONArray("items").objects()
+                val text = rawItems.mapNotNull { item ->
                     when (item.optString("type")) {
                         "text" -> item.optString("text")
                         "proposed_plan" -> item.optString("markdown").takeUnless { item.optString("status") == "cleared" }
                         else -> null
                     }
                 }.joinToString("\n\n")
-                if (text.isBlank()) null else SessionMessage(
+                val items = rawItems.mapNotNull(::turnItem)
+                // An assistant turn may so far be only steps; a user turn needs its text.
+                if (text.isBlank() && (role == "user" || items.isEmpty())) null else SessionMessage(
                     id = entry.text("id"),
                     role = role,
                     text = text,
@@ -37,6 +40,7 @@ internal object RuntimeProtocol {
                     startedAt = (entry.opt("startedAt") as? Number)?.toLong(),
                     endedAt = (entry.opt("endedAt") as? Number)?.toLong(),
                     model = entry.optJSONObject("modelInfo")?.let { info -> info.optString("name").ifBlank { info.optString("modelId") }.ifBlank { null } },
+                    items = if (role == "assistant") items else emptyList(),
                 )
             }
             RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries))
@@ -66,6 +70,36 @@ internal object RuntimeProtocol {
     fun schema(message: JSONObject): RuntimeResult.Schema {
         val trials = message.getJSONObject("creationOptionsTrial")
         return RuntimeResult.Schema(message.keys().asSequence().filter { it != "creationOptionsTrial" }.toSet(), trials.keys().asSequence().associateWith { trials.text(it) })
+    }
+    /** One upstream `ItemSummary`, leniently: unknown types and malformed fields are dropped. */
+    private fun turnItem(item: JSONObject): TurnItem? {
+        val id = item.optString("itemId").ifEmpty { return null }
+        return when (item.optString("type")) {
+            "text" -> item.optString("text").takeIf { it.isNotBlank() }?.let { TurnItem.Text(id, it) }
+            "thought" -> item.optString("text").takeIf { it.isNotBlank() }?.let { TurnItem.Thought(id, it) }
+            "tool_call" -> TurnItem.Tool(
+                id,
+                kind = item.optString("kind"),
+                title = item.optString("title"),
+                status = item.optString("status"),
+                path = item.optString("path").ifEmpty { null },
+                added = (item.opt("added") as? Number)?.toInt(),
+                removed = (item.opt("removed") as? Number)?.toInt(),
+                awaitingPermission = item.optJSONObject("permission")?.optBoolean("pending") == true,
+            )
+            "proposed_plan" -> item.optString("markdown").takeIf { it.isNotBlank() && item.optString("status") != "cleared" }
+                ?.let { TurnItem.ProposedPlan(id, it) }
+            "plan" -> item.optJSONArray("entries")?.objects()?.map { it.optString("content") to it.optString("status") }
+                ?.takeIf { it.isNotEmpty() }?.let { TurnItem.Checklist(id, it) }
+            "system_notice" -> {
+                val name = item.optString("name")
+                val message = item.optJSONObject("meta")?.optString("message").orEmpty()
+                // Agent warnings and unnamed placeholders are not part of the conversation (iOS too).
+                if (name.isEmpty() || name == "agent_warning") null
+                else TurnItem.Notice(id, message.ifBlank { name }, failure = name == "chat_failed")
+            }
+            else -> null
+        }
     }
     private fun JSONObject.text(key: String) = get(key) as String
     private fun JSONObject.nonnegative(key: String): Long {

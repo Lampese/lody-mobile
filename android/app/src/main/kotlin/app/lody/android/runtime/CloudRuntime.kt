@@ -95,7 +95,41 @@ data class SessionMessage(
     val startedAt: Long? = null,
     val endedAt: Long? = null,
     val model: String? = null,
+    /** The turn's items in order (text, thought, tool steps, plans, notices) for the process view. */
+    val items: List<TurnItem> = emptyList(),
 )
+
+/**
+ * One item of a turn, after upstream's session entry summary. Assistant turns render these as
+ * prose, folded thought / tool groups and never-folded plans and notices (web `MessageContent`).
+ */
+sealed interface TurnItem {
+    val id: String
+
+    data class Text(override val id: String, val text: String) : TurnItem
+    /** Reasoning; only builtin DSH shows it (web `showThoughts`). */
+    data class Thought(override val id: String, val text: String) : TurnItem
+    /**
+     * A tool step. [kind] is the ACP kind (`execute`, `read`, `edit`, `search`, `fetch`, `think`,
+     * `switch_mode`, …); [status] `pending` / `in_progress` / `completed` / `failed`.
+     */
+    data class Tool(
+        override val id: String,
+        val kind: String,
+        val title: String,
+        val status: String,
+        val path: String? = null,
+        val added: Int? = null,
+        val removed: Int? = null,
+        val awaitingPermission: Boolean = false,
+    ) : TurnItem
+    /** A proposed plan (Markdown); never folded. */
+    data class ProposedPlan(override val id: String, val markdown: String) : TurnItem
+    /** The agent's checklist (`plan`); never folded. */
+    data class Checklist(override val id: String, val entries: List<Pair<String, String>>) : TurnItem
+    /** A failure or notice the turn ended with; never folded. */
+    data class Notice(override val id: String, val text: String, val failure: Boolean) : TurnItem
+}
 
 /** A text turn in an existing conversation; [turnId] is stable so a retry can never duplicate it. */
 data class SendTextRequest(

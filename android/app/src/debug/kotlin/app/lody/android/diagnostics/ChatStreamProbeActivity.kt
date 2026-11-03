@@ -197,7 +197,7 @@ private fun ProbeScreen(fixture: String, quickJs: MarkdownRepair) {
         ChatTranscript(
             entries = listOf(
                 ChatEntry.User("user", "为什么移动端刷新一直停在 Syncing？给出修复方案。", TurnIdentity("User")),
-                ChatEntry.Assistant("reply-$run", markdown, TurnIdentity("Assistant")),
+                ChatEntry.Assistant.prose("reply-$run", markdown, TurnIdentity("Assistant")),
             ),
             modifier = Modifier.weight(1f).navigationBarsPadding(),
             contentPadding = PaddingValues(vertical = LodySpacing.md),
