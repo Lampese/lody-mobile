@@ -161,7 +161,10 @@ extension LodyChatView {
     paragraph.minimumLineHeight = lineHeight
     paragraph.maximumLineHeight = lineHeight
     let font = ChatCell.messageFont(for: row, compatibleWith: traitCollection)
-    let text = NSAttributedString(string: row.text, attributes: [
+    if row.kind == "tool_call" { paragraph.lineBreakMode = .byTruncatingTail }
+    let displayText = row.kind == "tool_call"
+      ? row.text.components(separatedBy: .newlines).joined(separator: " ") : row.text
+    let text = NSAttributedString(string: displayText, attributes: [
       .font: font,
       .foregroundColor: textColor(for: row),
       .paragraphStyle: paragraph,

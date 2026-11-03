@@ -285,9 +285,9 @@ struct CreateContextPanel: View {
         VStack(alignment: .leading, spacing: LodySpacing.sm) {
           Spacer(minLength: 0)
           ForEach(state.panel.cards) { picker in
-            VStack(spacing: LodySpacing.xs) {
+            VStack(spacing: 0) {
               PickerFace(picker: picker, prominent: true) { toggle(picker.id) }
-              if state.open == picker.id { list(picker) }
+              list(picker)
             }
           }
           if state.panel.worktree != nil || state.panel.branch != nil { branchLine }
@@ -301,7 +301,6 @@ struct CreateContextPanel: View {
         .padding(.horizontal, LodyLayout.screenPaddingX)
         .padding(.bottom, LodySpacing.md)
         .frame(minHeight: geometry.size.height, alignment: .bottom)
-        .animation(.smooth(duration: 0.3), value: state.open)
       }
       .scrollBounceBehavior(.basedOnSize)
       .defaultScrollAnchor(.bottom)
@@ -309,7 +308,7 @@ struct CreateContextPanel: View {
   }
 
   private var branchLine: some View {
-    VStack(alignment: .leading, spacing: LodySpacing.xs) {
+    VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: LodySpacing.md) {
         if let worktree = state.panel.worktree {
           Button { state.onWorktree(!worktree) } label: {
@@ -332,19 +331,52 @@ struct CreateContextPanel: View {
         }
         Spacer(minLength: 0)
       }
-      if let branch = state.panel.branch, state.open == branch.id { list(branch) }
+      if let branch = state.panel.branch { list(branch) }
     }
   }
 
   private func list(_ picker: CreatePicker) -> some View {
-    OptionList(picker: picker) { id in
+    CreateInlineOptions(picker: picker, expanded: state.open == picker.id) { id in
       if id != CreateSessionContext.loadMoreOption { state.open = nil }
       state.onPick(picker.id, id)
     }
-    .transition(.blurReplace)
   }
 
   private func toggle(_ id: String) { state.open = state.open == id ? nil : id }
+}
+
+/// Keep the measured list mounted so its height and the trigger's position interpolate in
+/// the same layout transaction. Clipping prevents options appearing ahead of that movement.
+private struct CreateInlineOptions: View {
+  let picker: CreatePicker
+  let expanded: Bool
+  let onPick: (String) -> Void
+  @State private var contentHeight: CGFloat = 0
+
+  var body: some View {
+    OptionList(picker: picker, onPick: onPick)
+      .fixedSize(horizontal: false, vertical: true)
+      .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+      .padding(.top, LodySpacing.xs)
+      .modifier(CreateOptionsReveal(height: expanded ? contentHeight + LodySpacing.xs : 0))
+      .animation(.smooth(duration: 0.22), value: expanded)
+      .allowsHitTesting(expanded)
+      .accessibilityHidden(!expanded)
+  }
+}
+
+private struct CreateOptionsReveal: AnimatableModifier {
+  nonisolated var height: CGFloat
+  nonisolated var animatableData: CGFloat {
+    get { height }
+    set { height = newValue }
+  }
+
+  func body(content: Content) -> some View {
+    content.frame(height: max(0, height), alignment: .top)
+      .clipped()
+      .transaction { $0.animation = nil }
+  }
 }
 
 /// A picker's closed face: a filled full-width card (computer, project) or a plain line (branch).
@@ -415,8 +447,7 @@ struct OptionList: View {
         ScrollView {
           LazyVStack(spacing: 0) { optionRows }
         }
-        .frame(maxHeight: 280)
-        .fixedSize(horizontal: false, vertical: shown.count < 6)
+        .frame(height: min(280, CGFloat(shown.count) * LodySize.listRow))
       }
     }
   }

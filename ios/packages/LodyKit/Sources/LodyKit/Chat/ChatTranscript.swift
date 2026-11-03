@@ -477,7 +477,12 @@ struct ChatTranscript {
         if flatItems {
           visible = entry.items.indices.filter { !entry.items[$0].hidesFromTranscript }
         } else if !processStartID.isEmpty, let start = entry.items.firstIndex(where: { $0.itemId == processStartID }) {
-          let end = entry.items.indices.dropFirst(start + 1).first { entry.items[$0].type == "text" || entry.items[$0].type == "proposed_plan" || entry.items[$0].isAttachment } ?? entry.items.endIndex
+          let toolGroup = entry.items[start].type == "tool_call" && !folds
+          let end = entry.items.indices.dropFirst(start + 1).first {
+            let item = entry.items[$0]
+            if toolGroup { return item.type != "tool_call" || item.kind == "switch_mode" }
+            return item.type == "text" || item.type == "proposed_plan" || item.isAttachment
+          } ?? entry.items.endIndex
           visible = Array(start..<end).filter { entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].isChatFailure && !entry.items[$0].hidesFromTranscript }
         } else {
           visible = entry.items.indices.filter { !answer.contains($0) && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].hidesFromTranscript }
@@ -495,13 +500,23 @@ struct ChatTranscript {
         })
         visible.sort()
       } else {
-        // A running turn (or one that ended without an answer) shows its work expanded, step by
-        // step — DSH thoughts inline in secondary prose — and folds it into "Worked for …" only
-        // once an answer ends the turn (web: streaming turns stay expanded).
+        // Keep prose and thoughts in place, folding each consecutive run of tools.
+        var toolStart: Int?
         for index in entry.items.indices {
           let item = entry.items[index]
           if item.hidesFromTranscript || (item.type == "tool_call" && item.kind == "think") { continue }
-          visible.append(index)
+          if item.type == "tool_call", item.kind != "switch_mode" {
+            if let start = toolStart {
+              groups[start, default: []].append(index)
+            } else {
+              toolStart = index
+              groups[index] = [index]
+              visible.append(index)
+            }
+          } else {
+            toolStart = nil
+            visible.append(index)
+          }
         }
       }
       var result: [ChatRow] = []
@@ -563,7 +578,7 @@ struct ChatTranscript {
           result.append(ChatRow(id: entry.id + ":process" + (firstGroup ? "" : ":" + entry.items[index].itemId), entryID: entry.id, kind: "summary",
             text: title,
             symbol: ChatProcessSummary.mark(attention: attention),
-            processStartID: entry.finished ? "" : entry.items[index].itemId,
+            processStartID: folds ? "" : entry.items[index].itemId,
             actionable: true, running: running, attention: attention))
           continue
         }

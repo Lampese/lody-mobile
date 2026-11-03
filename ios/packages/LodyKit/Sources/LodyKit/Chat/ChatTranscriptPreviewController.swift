@@ -106,7 +106,7 @@ final class ChatTranscriptPreviewController: UIViewController {
     label.text = [row.text, row.detail].filter { !$0.isEmpty }.joined(separator: " · ")
     label.font = messageFont(for: row)
     label.textColor = secondary ? .secondaryLabel : .label
-    label.numberOfLines = 0
+    label.numberOfLines = row.kind == "tool_call" ? 1 : 0
     label.adjustsFontForContentSizeCategory = true
     label.adjustsFontSizeToFitWidth = false
     label.preferredMaxLayoutWidth = ChatTranscriptPreviewMetrics.textWidth(

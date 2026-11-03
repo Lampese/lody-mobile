@@ -1,6 +1,15 @@
 import ChatKit
 import UIKit
 
+let toolParagraph = NSMutableParagraphStyle()
+toolParagraph.lineBreakMode = .byTruncatingTail
+toolParagraph.minimumLineHeight = 18
+toolParagraph.maximumLineHeight = 18
+let toolText = CKTextView(frame: CGRect(x: 0, y: 0, width: 180, height: 30))
+toolText.setText(NSAttributedString(string: String(repeating: "cat packages/components/source.ts; ", count: 30), attributes: [.font: UIFont.systemFont(ofSize: 15), .paragraphStyle: toolParagraph]))
+precondition(toolText.sizeThatFits(CGSize(width: 180, height: 10000)).height <= 20, "Long tool commands truncate to one line")
+print("Tool command single-line rendering passed")
+
 let mentionText = "#30 @src/app.ts @\"folder/my file.swift\" use /review [Skill Path](/skills/review/SKILL.md)"
 let mentionSource = NSAttributedString(string: mentionText, attributes: [.font: UIFont.systemFont(ofSize: 17)])
 let richMentions = ChatUserMentions.decorate(mentionSource, repository: "Innei/lody-ios", traits: .current)
