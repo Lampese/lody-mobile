@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -509,13 +510,13 @@ private fun Modifier.barCapsule(colors: LodyColors): Modifier = this
 
 /** A tappable cell inside a capsule; the capsule draws the surface. */
 @Composable
-private fun BarCell(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+private fun BarCell(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, content: @Composable RowScope.() -> Unit) {
     Row(
         modifier
             .height(CapsuleHeight)
             .widthIn(min = CapsuleHeight)
             .clip(RoundedCornerShape(percent = 50))
-            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .combinedClickable(role = Role.Button, onClickLabel = label, onClick = onClick, onLongClick = onLongClick)
             .semantics { contentDescription = label }
             .padding(horizontal = LodySpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -587,8 +588,16 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
     val showsContext = pr != null || bar.branch.isNotEmpty() || bar.repository.isNotEmpty()
     val description = listOfNotNull(bar.repository, bar.branch, label, verdict, counts.takeIf { diff })
         .filter { it.isNotEmpty() }.distinct().joinToString(", ")
+    var panel by remember { mutableStateOf(false) }
+    if (panel && pr != null) PullRequestSheet(bar, pr, icon, tint, verdict, onCopied) { panel = false }
     Box(modifier.barCapsule(colors)) {
-        BarCell(description, onClick = { open = true }, Modifier.padding(horizontal = LodySpacing.xs)) {
+        // A PR capsule opens the PR panel on tap and keeps its menu on a long press.
+        BarCell(
+            description,
+            onClick = { if (pr != null) panel = true else open = true },
+            Modifier.padding(horizontal = LodySpacing.xs),
+            onLongClick = if (pr != null) ({ open = true }) else null,
+        ) {
             if (showsContext) {
                 Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.sm))
                 Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis,
@@ -788,6 +797,86 @@ private fun MergeSheet(title: String, preferred: String, onDismiss: () -> Unit, 
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(label), style = type.body, color = colors.textPrimary)
                         Text(stringResource(description), style = type.footnote, color = colors.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The PR panel the context capsule opens: a native bottom sheet with what the catalog knows (state,
+ * CI, conflicts, branch, ±diff), opening the PR on GitHub and copying the branch. iOS opens its
+ * native PR page as a sheet.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PullRequestSheet(
+    bar: SessionInfoBar,
+    pr: CatalogPullRequest,
+    icon: ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    verdict: String?,
+    onCopied: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val copied = stringResource(R.string.bar_branch_copied)
+    val state = stringResource(
+        when (pr.status) {
+            "merged" -> R.string.home_pr_merged
+            "closed" -> R.string.home_pr_closed
+            "draft" -> R.string.home_pr_draft
+            else -> R.string.home_pr_open
+        },
+    )
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.bgBase) {
+        Column(Modifier.padding(horizontal = LodySpacing.lg).padding(bottom = LodySpacing.xl), verticalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.lg))
+                Column(Modifier.weight(1f)) {
+                    Text("${pr.repository} #${pr.number}", style = type.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(state, verdict, if (pr.merge == "d") stringResource(R.string.bar_conflicts) else null).joinToString(" · "),
+                        style = type.footnote, color = colors.textSecondary)
+                }
+            }
+            if (bar.branch.isNotEmpty() || bar.added + bar.removed > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                    Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                    Text(bar.branch, style = type.subhead, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
+                    if (bar.added + bar.removed > 0) {
+                        val style = type.subhead.copy(fontFeatureSettings = "tnum")
+                        Text("+${bar.added}", style = style, color = colors.diffAddedText)
+                        Text("−${bar.removed}", style = style, color = colors.diffRemovedText)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                Button(
+                    onClick = { onDismiss(); uri.openUri(bar.pullRequestUrl) },
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.fillSecondary, contentColor = colors.textPrimary),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(LodyIcons.ExternalLink, contentDescription = null, modifier = Modifier.size(LodyIconSize.sm))
+                    Spacer(Modifier.width(LodySpacing.xs))
+                    Text(stringResource(R.string.bar_open_github), style = type.subhead)
+                }
+                if (bar.branch.isNotEmpty()) {
+                    Button(
+                        onClick = {
+                            clipboard.setText(androidx.compose.ui.text.AnnotatedString(bar.branch))
+                            onCopied(copied)
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.fillSecondary, contentColor = colors.textPrimary),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(LodyIcons.Copy, contentDescription = null, modifier = Modifier.size(LodyIconSize.sm))
+                        Spacer(Modifier.width(LodySpacing.xs))
+                        Text(stringResource(R.string.bar_copy_branch), style = type.subhead)
                     }
                 }
             }

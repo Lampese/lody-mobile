@@ -79,6 +79,7 @@ extension SessionController {
       "label": label, "symbol": symbol, "tint": tint, "actions": actions,
       "accessibilityLabel": description.filter { !$0.isEmpty }.joined(separator: ", "),
       "menuTitle": bar.repository,
+      "tap": bar.pullRequest != nil,
     ]
   }
 

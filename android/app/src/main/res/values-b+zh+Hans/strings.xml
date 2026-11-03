@@ -188,4 +188,5 @@
     <string name="bar_error_ready_unknown">结果未知，请先到 GitHub 确认，再决定是否重试。</string>
     <string name="bar_error_not_open">这个 PR 已不是打开状态。</string>
     <string name="bar_error_forbidden">你没有修改这个 PR 的权限。</string>
+    <string name="bar_open_github">在 GitHub 打开</string>
 </resources>

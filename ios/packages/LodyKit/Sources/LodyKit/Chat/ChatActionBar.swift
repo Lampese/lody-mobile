@@ -38,6 +38,8 @@ struct ChatActionBarState: Decodable, Equatable {
     let accessibilityLabel: String
     var menuTitle: String?
     let actions: [ChatMenuAction]
+    /// With a PR, a tap opens its detail panel; the menu moves to a long press.
+    var tap: Bool?
   }
 
   struct Diff: Decodable, Equatable {
@@ -73,6 +75,7 @@ struct ChatActionBarContent: View {
   var tasks = 0
   var onAction: (String) -> Void = { _ in }
   var onTasks: () -> Void = {}
+  @Environment(\.dynamicTypeSize) private var typeSize
 
   var body: some View {
     GlassEffectContainer(spacing: 8) {
@@ -80,7 +83,14 @@ struct ChatActionBarContent: View {
         row(diffDot: false, folded: false)
         row(diffDot: true, folded: false)
         row(diffDot: true, folded: true)
-        stacked
+        // ViewThatFits shows its last choice when none fits. At ordinary sizes that is still one
+        // row, where the context label truncates as far as needed; only accessibility text sizes
+        // give the action its own line.
+        if typeSize.isAccessibilitySize {
+          stacked
+        } else {
+          row(diffDot: true, folded: true)
+        }
       }
     }
     .font(.subheadline)
@@ -135,6 +145,7 @@ struct ChatActionBarContent: View {
     }
     .padding(.horizontal, 2)
     .glassEffect(.regular, in: .capsule)
+    .fixedSize()
   }
 
   /// One icon stands for the group: a computer in trouble first, then a live resource, then
@@ -161,6 +172,7 @@ struct ChatActionBarContent: View {
     .buttonStyle(.plain)
     .padding(.horizontal, 2)
     .glassEffect(.regular, in: .capsule)
+    .fixedSize()
     .accessibilityLabel(items.map(\.accessibilityLabel).joined(separator: ", "))
     .accessibilityIdentifier("session-bar:environment")
   }
@@ -222,9 +234,8 @@ struct ChatActionBarContent: View {
         subtitle: "+\(diff.added) −\(diff.removed)"
       ), at: 0)
     }
-    return Menu { menu(actions, prefix: "context", title: context?.menuTitle) } label: {
-      HStack(spacing: 6) {
-        if let context {
+    let label = HStack(spacing: 6) {
+      if let context {
           Image(systemName: context.symbol).foregroundStyle(Self.tint(context.tint))
           Text(context.label).lineLimit(1).truncationMode(.middle).foregroundStyle(LodyColor.textPrimary)
             .frame(maxWidth: 140, alignment: .leading).fixedSize(horizontal: !diffDot, vertical: false)
@@ -245,6 +256,13 @@ struct ChatActionBarContent: View {
       .padding(.horizontal, 12)
       .frame(minHeight: ChatActionBarView.rowHeight)
       .contentShape(Capsule())
+    return Group {
+      // A PR capsule opens the PR panel on tap and keeps its menu on a long press.
+      if context?.tap == true {
+        Menu { menu(actions, prefix: "context", title: context?.menuTitle) } label: { label } primaryAction: { onAction("context:pr") }
+      } else {
+        Menu { menu(actions, prefix: "context", title: context?.menuTitle) } label: { label }
+      }
     }
     .buttonStyle(.plain)
     .glassEffect(.regular, in: .capsule)

@@ -83,7 +83,8 @@ extension SessionController {
       guard let self, source.state.key == state.key else { throw OutboxError.scopeExpired }
       chat.composer.appendDraft(Self.json(["id": UUID().uuidString, "text": text]))
     }
-    LodyShell.shared.presentDetail(page, title: "PR #\(reference.number)", from: self, push: true)
+    // A panel over the conversation (sheet with detents; the inspector on iPad), not a push.
+    LodyShell.shared.presentDetail(page, title: "PR #\(reference.number)", from: self)
   }
 
   func updateDetails(_ json: String) { subagentPage?.update(json) }
