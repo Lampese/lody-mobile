@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import app.lody.android.runtime.TurnItem
+import app.lody.android.runtime.StepDetail
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -108,6 +109,8 @@ fun ChatTranscript(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     state: LazyListState = rememberLazyListState(),
+    /** Opens a step's detail; null where there is no runtime (previews, the stream probe). */
+    loadDetail: (suspend (entryId: String, itemId: String) -> StepDetail)? = null,
 ) {
     // Follow mode changes only through the reader's own scrolling: dragging up leaves it,
     // reaching the bottom again re-enters it. Growing content alone never turns it off.
@@ -129,6 +132,14 @@ fun ChatTranscript(
         haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
         open[key] = value
     }
+    val details = remember(loadDetail != null) { StepDetails(loadDetail) }
+    // The task whose run the sheet shows, by id, so a streaming run keeps updating inside it.
+    var shownTask by remember { mutableStateOf<String?>(null) }
+    shownTask?.let { id ->
+        val task = entries.asSequence().filterIsInstance<ChatEntry.Assistant>().flatMap { it.layout.tasks }.firstOrNull { it.id == id }
+        // A task that left the transcript just leaves the sheet closed.
+        if (task != null) TaskSheet(task) { shownTask = null }
+    }
     LaunchedEffect(entries.size, tailSize) {
         val last = state.layoutInfo.totalItemsCount - 1
         if (following && last >= 0) state.scrollToItem(last, Int.MAX_VALUE)
@@ -149,14 +160,16 @@ fun ChatTranscript(
                                 Modifier.animateItem(),
                             ) { toggle(key, it) }
                         }
-                        if (expanded) turnBlocks(entry, layout.folding, open, toggle)
+                        if (expanded) turnBlocks(entry, layout.folding, open, toggle, details)
                     }
-                    turnBlocks(entry, layout.visible, open, toggle)
+                    turnBlocks(entry, layout.visible, open, toggle, details)
                     if (entry.working) {
                         val last = layout.blocks.lastOrNull()
                         val thinking = last is TurnLayout.Activity && last.items.lastOrNull() is TurnItem.Thought
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
+                    // Web: live status precedes the task panel.
+                    taskPanel(entry, open, toggle) { shownTask = it.id }
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }

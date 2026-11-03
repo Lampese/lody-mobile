@@ -71,6 +71,27 @@ internal object RuntimeProtocol {
         val trials = message.getJSONObject("creationOptionsTrial")
         return RuntimeResult.Schema(message.keys().asSequence().filter { it != "creationOptionsTrial" }.toSet(), trials.keys().asSequence().associateWith { trials.text(it) })
     }
+    /** Upstream `itemDetail` blocks (`terminal_command` / `terminal_output` / `diff` / `text` / …), leniently. */
+    fun detail(json: JSONObject): StepDetail {
+        val blocks = json.optJSONArray("blocks")?.objects().orEmpty().mapNotNull { block ->
+            val command = block.optString("command").takeIf { it.isNotBlank() }?.let { text ->
+                val args = block.optJSONArray("args")?.let { array -> (0 until array.length()).map { array.optString(it) } }.orEmpty()
+                (listOf(text) + args).joinToString(" ")
+            }
+            when {
+                block.optString("type") == "diff" -> StepBlock.Diff(block.optString("path"), block.optString("oldText"), block.optString("newText"))
+                command != null -> StepBlock.Command(command, block.optString("cwd").ifBlank { null })
+                block.has("output") -> StepBlock.Output(
+                    block.optString("output"),
+                    block.optJSONObject("exitStatus")?.let { (it.opt("exitCode") as? Number)?.toInt() },
+                )
+                else -> (block.optString("text").ifBlank { block.optJSONObject("content")?.optString("text").orEmpty() })
+                    .takeIf { it.isNotBlank() }?.let { StepBlock.Text(it) }
+            }
+        }
+        return StepDetail(blocks, json.optBoolean("truncated"))
+    }
+
     /** One upstream `ItemSummary`, leniently: unknown types and malformed fields are dropped. */
     private fun turnItem(item: JSONObject): TurnItem? {
         val id = item.optString("itemId").ifEmpty { return null }
@@ -86,11 +107,39 @@ internal object RuntimeProtocol {
                 added = (item.opt("added") as? Number)?.toInt(),
                 removed = (item.opt("removed") as? Number)?.toInt(),
                 awaitingPermission = item.optJSONObject("permission")?.optBoolean("pending") == true,
+                hasDetail = item.optBoolean("hasDetail"),
             )
             "proposed_plan" -> item.optString("markdown").takeIf { it.isNotBlank() && item.optString("status") != "cleared" }
                 ?.let { TurnItem.ProposedPlan(id, it) }
             "plan" -> item.optJSONArray("entries")?.objects()?.map { it.optString("content") to it.optString("status") }
                 ?.takeIf { it.isNotEmpty() }?.let { TurnItem.Checklist(id, it) }
+            "subagent_task" -> {
+                if (item.optBoolean("skipTranscript")) return null
+                val run = item.optJSONObject("run")
+                val steps = run?.optJSONArray("items")?.objects().orEmpty().mapNotNull(::turnItem)
+                // The run's own state can say cancelled or unknown; the legacy status cannot (web).
+                val state = run?.optString("state")?.takeIf { it.isNotBlank() } ?: when (item.optString("status")) {
+                    "in_progress" -> "running"
+                    "" -> "pending"
+                    else -> item.optString("status")
+                }
+                val latest = when (val last = steps.lastOrNull()) {
+                    is TurnItem.Tool -> last.title
+                    is TurnItem.Text -> last.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
+                    is TurnItem.Thought -> ""
+                    else -> ""
+                }.ifBlank { item.optString("lastToolName") }
+                TurnItem.Task(
+                    id,
+                    actor = item.optString("actor"),
+                    description = item.optString("description"),
+                    state = state,
+                    latest = latest.trim(),
+                    result = item.optString("summary").ifBlank { item.optString("error") }.trim(),
+                    background = item.optBoolean("isBackgrounded"),
+                    steps = steps,
+                )
+            }
             "system_notice" -> {
                 val name = item.optString("name")
                 val message = item.optJSONObject("meta")?.optString("message").orEmpty()

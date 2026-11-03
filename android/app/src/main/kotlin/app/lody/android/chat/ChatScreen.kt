@@ -246,7 +246,10 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     }
                 } else {
                     // The transcript scrolls under the floating header.
-                    ChatTranscript(all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = LodySpacing.md), state = listState)
+                    ChatTranscript(
+                        all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = LodySpacing.md), state = listState,
+                        loadDetail = { entryId, itemId -> repository.detail(scope, id, entryId, itemId) },
+                    )
                 }
                 ChatHeader(context.title, context.subtitle, onBack)
                 if (status == "offline") {
@@ -428,17 +431,18 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
             IconButton(onClick = onAttach, modifier = Modifier.semantics { contentDescription = attach }) {
                 Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
             }
-            if (model != null) {
-                Row(
-                    Modifier.weight(1f, fill = false).padding(horizontal = LodySpacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-                ) {
+            // The one flexible slot: the model takes the middle and Send stays on the trailing edge.
+            // (Two weighted children split the free space, which left Send short of the edge.)
+            Row(
+                Modifier.weight(1f).padding(horizontal = LodySpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+            ) {
+                if (model != null) {
                     Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
                     Text(model, style = type.subhead, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Spacer(Modifier.weight(1f))
             val ready = enabled && prompt.isNotBlank()
             val send = stringResource(R.string.create_send)
             Box(

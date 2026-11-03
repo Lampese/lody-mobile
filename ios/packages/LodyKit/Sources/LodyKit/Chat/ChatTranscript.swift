@@ -693,16 +693,36 @@ extension ChatTranscript {
     return (start...index).filter { prose(items[$0]) }
   }
 
+  /// Web's task panel: a turn's background tasks and sub-agents follow its answer as one group,
+  /// headed "Waiting on N tasks" while any runs (rows shown) and "N tasks" once all settled — then
+  /// the rows fold away until the reader opens them (`LodyChatView.expandedTaskGroups`).
   static func hangSubagents(_ rows: [ChatRow]) -> [ChatRow] {
     var tasks = rows.filter { $0.kind == "subagent_task" }
     var result = rows.filter { $0.kind != "subagent_task" }
-    guard !tasks.isEmpty, let process = result.firstIndex(where: { $0.kind == "duration" }) else { return rows }
+    guard let first = tasks.first else { return rows }
+    let running = tasks.filter(\.running).count
+    let background = tasks.allSatisfy { $0.subagent?.background == true }
+    let key: String
+    switch (running > 0, background) {
+    case (true, true): key = "native.chat.tasks.waitingBackground"
+    case (true, false): key = "native.chat.tasks.waiting"
+    case (false, true): key = "native.chat.tasks.countBackground"
+    case (false, false): key = "native.chat.tasks.count"
+    }
+    var header = ChatRow(
+      id: first.entryID + ":tasks", entryID: first.entryID, kind: "summary",
+      text: String.localizedStringWithFormat(String(localized: String.LocalizationValue(key), bundle: .lody), running > 0 ? running : tasks.count),
+      symbol: ChatProcessSummary.mark(attention: tasks.contains(where: \.attention)),
+      actionable: running == 0, running: running > 0, attention: tasks.contains(where: \.attention)
+    )
+    header.treeDown = true
     for index in tasks.indices {
       tasks[index].treeChild = true
       tasks[index].treeLast = index == tasks.count - 1
     }
-    result[process].treeDown = true
-    result.insert(contentsOf: tasks, at: process + 1)
+    // After the answer, before the turn's meta and changed files.
+    let anchor = result.firstIndex { ["meta", "changesHeader", "changes"].contains($0.kind) } ?? result.endIndex
+    result.insert(contentsOf: [header] + tasks, at: anchor)
     return result
   }
 

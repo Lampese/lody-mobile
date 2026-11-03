@@ -51,6 +51,12 @@ extension LodyChatView {
       return
     }
     guard let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id], row.actionable else { return }
+    if row.kind == "summary", row.id.hasSuffix(":tasks") {
+      if !expandedTaskGroups.insert(row.entryID).inserted { expandedTaskGroups.remove(row.entryID) }
+      UISelectionFeedbackGenerator().selectionChanged()
+      applyRows()
+      return
+    }
     if let file = row.file {
       openAttachment(file)
       return

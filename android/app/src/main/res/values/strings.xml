@@ -232,4 +232,29 @@
         <item quantity="one">Called %d tool</item>
         <item quantity="other">Called %d tools</item>
     </plurals>
+    <string name="chat_step_detail_failed">Could not load this step.</string>
+    <string name="chat_step_detail_empty">This step has no details.</string>
+    <string name="chat_step_detail_truncated">Truncated; open on desktop for the rest.</string>
+    <string name="chat_step_exit_code">Exit code %1$d</string>
+    <string name="chat_task_actor">Task</string>
+    <string name="chat_task_cancelled">Cancelled</string>
+    <string name="chat_task_unknown">Status unknown</string>
+    <string name="chat_task_waiting_first">Waiting for the first step…</string>
+    <string name="chat_task_no_steps">No steps were received.</string>
+    <plurals name="chat_tasks_waiting">
+        <item quantity="one">Waiting on %d task</item>
+        <item quantity="other">Waiting on %d tasks</item>
+    </plurals>
+    <plurals name="chat_tasks_waiting_background">
+        <item quantity="one">Waiting on %d background task</item>
+        <item quantity="other">Waiting on %d background tasks</item>
+    </plurals>
+    <plurals name="chat_tasks_count">
+        <item quantity="one">%d task</item>
+        <item quantity="other">%d tasks</item>
+    </plurals>
+    <plurals name="chat_tasks_count_background">
+        <item quantity="one">%d background task</item>
+        <item quantity="other">%d background tasks</item>
+    </plurals>
 </resources>

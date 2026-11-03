@@ -56,6 +56,10 @@ open class WebViewRuntime internal constructor(
             call("closeSession", JSONArray().put(command.id))
             RuntimeResult.Accepted
         }
+        is RuntimeCommand.ItemDetail -> {
+            val value = call("itemDetail", JSONArray().put(command.sessionId).put(command.entryId).put(command.itemId), CommandDeadline.QUERY)
+            RuntimeResult.Detail(RuntimeProtocol.detail(value as JSONObject))
+        }
         RuntimeCommand.Ping -> RuntimeResult.Pong(call("ping") as? Boolean ?: throw RuntimeException(runtimeFault("invalid_ping_reply")))
         RuntimeCommand.InspectSchema -> {
             val value = call("probeSchema", deadline = CommandDeadline.QUERY)

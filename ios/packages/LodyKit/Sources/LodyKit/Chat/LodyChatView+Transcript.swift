@@ -229,6 +229,15 @@ extension LodyChatView {
         return ChatStream.deferringMarkdown(byEntry[row.entryID] ?? [], previous: frozen)
       }
     }
+    // Settled task groups fold to their header until opened; the chevron says which way.
+    let foldedTasks = Set(projected.filter {
+      $0.kind == "summary" && $0.id.hasSuffix(":tasks") && !$0.running && !expandedTaskGroups.contains($0.entryID)
+    }.map(\.entryID))
+    for index in projected.indices where projected[index].kind == "summary" && projected[index].id.hasSuffix(":tasks") && !projected[index].running {
+      projected[index].symbol = foldedTasks.contains(projected[index].entryID) ? "chevron.right" : "chevron.down"
+      projected[index].treeDown = !foldedTasks.contains(projected[index].entryID)
+    }
+    projected.removeAll { $0.kind == "subagent_task" && foldedTasks.contains($0.entryID) }
     for index in projected.indices where projected[index].kind == "proposed_plan" {
       if let state = planDecisionState, state.entryId == projected[index].entryID, state.itemId == projected[index].itemID {
         projected[index].planDecision = state

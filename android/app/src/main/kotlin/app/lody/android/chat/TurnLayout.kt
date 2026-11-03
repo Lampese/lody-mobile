@@ -38,16 +38,24 @@ object TurnLayout {
      * [folded]: the turn shows a "Worked for …" row; [work] holds the block keys it folds, in
      * order, and every other block stays visible below it.
      */
-    data class Layout(val blocks: List<Block>, val work: Set<String>, val folded: Boolean) {
+    data class Layout(
+        val blocks: List<Block>,
+        val work: Set<String>,
+        val folded: Boolean,
+        /** Background tasks and sub-agents: one panel after the turn, outside its blocks (web). */
+        val tasks: List<TurnItem.Task> = emptyList(),
+    ) {
         val visible: List<Block> get() = if (folded) blocks.filter { it.key !in work } else blocks
         val folding: List<Block> get() = if (folded) blocks.filter { it.key in work } else emptyList()
     }
 
     fun build(turnId: String, items: List<TurnItem>, finished: Boolean, showThoughts: Boolean): Layout {
+        val tasks = items.filterIsInstance<TurnItem.Task>()
         val shown = items.filter { item ->
             when (item) {
                 is TurnItem.Thought -> showThoughts
                 is TurnItem.Tool -> item.kind != "think"
+                is TurnItem.Task -> false
                 else -> true
             }
         }
@@ -69,7 +77,7 @@ object TurnLayout {
             }
         }
         flush()
-        if (!finished) return Layout(blocks, emptySet(), folded = false)
+        if (!finished) return Layout(blocks, emptySet(), folded = false, tasks)
 
         val answerStart = finalTextRunStart(shown)
         val collapsible = shown.withIndex().filter { (index, item) ->
@@ -80,7 +88,7 @@ object TurnLayout {
         }.map { it.key }.toSet()
         // Fold only when something stays visible below: otherwise nothing would answer the turn.
         val folded = work.isNotEmpty() && blocks.any { it.key !in work }
-        return Layout(blocks, if (folded) work else emptySet(), folded)
+        return Layout(blocks, if (folded) work else emptySet(), folded, tasks)
     }
 
     /** Thought and tool steps fold into groups; a plan-approval (`switch_mode`) step stays content. */

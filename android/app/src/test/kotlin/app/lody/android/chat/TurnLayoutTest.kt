@@ -47,4 +47,12 @@ class TurnLayoutTest {
         assertEquals(listOf("t:content:2", "t:content:3"), layout.blocks.map { it.key })
         assertFalse("Nothing folds: the approval is never folded and the answer follows it", layout.folded)
     }
+
+    @Test fun tasksLeaveTheTurnBlocksForTheirOwnPanel() {
+        val task = TurnItem.Task("9", "Explore", "map the repo", "running")
+        val layout = TurnLayout.build("t", listOf(tool("1"), text("2"), task), finished = true, showThoughts = false)
+        assertEquals(listOf(task), layout.tasks)
+        assertEquals(listOf("t:content:2"), layout.visible.map { it.key })
+        assertTrue("The answer still ends the turn, so the work folds", layout.folded)
+    }
 }

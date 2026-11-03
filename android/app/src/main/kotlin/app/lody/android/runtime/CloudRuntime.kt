@@ -23,6 +23,8 @@ sealed interface RuntimeCommand {
     data class SendText(val request: SendTextRequest) : RuntimeCommand
     data class WatchSession(val id: String) : RuntimeCommand
     data class CloseSession(val id: String) : RuntimeCommand
+    /** One step's detail from the watched session (command, output, diff). Read only. */
+    data class ItemDetail(val sessionId: String, val entryId: String, val itemId: String) : RuntimeCommand
     data object Ping : RuntimeCommand
     data object InspectSchema : RuntimeCommand
 }
@@ -32,6 +34,7 @@ sealed interface RuntimeResult {
     /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult
     data object Accepted : RuntimeResult
+    data class Detail(val value: StepDetail) : RuntimeResult
     data class Pong(val healthy: Boolean) : RuntimeResult
     data class Schema(val machineIds: Set<String>, val creationTrials: Map<String, String>) : RuntimeResult
 }
@@ -122,6 +125,8 @@ sealed interface TurnItem {
         val added: Int? = null,
         val removed: Int? = null,
         val awaitingPermission: Boolean = false,
+        /** The runtime holds a detail (command, output, diff) to open under the step. */
+        val hasDetail: Boolean = false,
     ) : TurnItem
     /** A proposed plan (Markdown); never folded. */
     data class ProposedPlan(override val id: String, val markdown: String) : TurnItem
@@ -129,6 +134,23 @@ sealed interface TurnItem {
     data class Checklist(override val id: String, val entries: List<Pair<String, String>>) : TurnItem
     /** A failure or notice the turn ended with; never folded. */
     data class Notice(override val id: String, val text: String, val failure: Boolean) : TurnItem
+    /**
+     * A background task or sub-agent run (web `subagent_task`). [state]: `pending` / `running` /
+     * `completed` / `failed` / `cancelled` / `unknown`; [latest] its latest step while it runs;
+     * [steps] its own run's items, for its detail sheet.
+     */
+    data class Task(
+        override val id: String,
+        val actor: String,
+        val description: String,
+        val state: String,
+        val latest: String = "",
+        val result: String = "",
+        val background: Boolean = false,
+        val steps: List<TurnItem> = emptyList(),
+    ) : TurnItem {
+        val running: Boolean get() = state == "pending" || state == "running"
+    }
 }
 
 /** A text turn in an existing conversation; [turnId] is stable so a retry can never duplicate it. */
@@ -162,4 +184,17 @@ class ShortLivedGrant(val token: String, val gatewayBaseUrl: String, val expires
     fun remainingSeconds(nowNanos: Long = System.nanoTime()): Int =
         (expiresIn - ((nowNanos - receivedAtNanos).coerceAtLeast(0) / 1_000_000_000L)).coerceAtLeast(0).toInt()
     override fun toString() = "ShortLivedGrant(token=<redacted>, expiresIn=$expiresIn)"
+}
+
+/**
+ * A tool step's detail, after upstream `itemDetail`: its content blocks in order. [truncated] when
+ * the runtime cut a long detail; the rest stays on desktop.
+ */
+data class StepDetail(val blocks: List<StepBlock>, val truncated: Boolean = false)
+
+sealed interface StepBlock {
+    data class Command(val command: String, val cwd: String? = null) : StepBlock
+    data class Output(val text: String, val exitCode: Int? = null) : StepBlock
+    data class Diff(val path: String, val oldText: String, val newText: String) : StepBlock
+    data class Text(val text: String) : StepBlock
 }

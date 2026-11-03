@@ -127,6 +127,8 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var localAttachments: [String: [ChatMessageAttachment]] = [:]
   var expandedPlans = Set<String>()
   var expandedMessages = Set<String>()
+  /// Settled task groups the reader opened, by entry (a running group is always open).
+  var expandedTaskGroups = Set<String>()
   var expandedAttachments = Set<String>()
   var collapsedMessageHeights: [String: CGFloat] = [:]
   var imageWorkspace = ""

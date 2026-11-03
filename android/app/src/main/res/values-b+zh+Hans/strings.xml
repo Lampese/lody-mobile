@@ -231,4 +231,29 @@
         <item quantity="one">调用了 %d 个工具</item>
         <item quantity="other">调用了 %d 个工具</item>
     </plurals>
+    <string name="chat_step_detail_failed">无法加载这一步。</string>
+    <string name="chat_step_detail_empty">这一步没有详情。</string>
+    <string name="chat_step_detail_truncated">内容过长已截断，完整内容请在桌面端查看。</string>
+    <string name="chat_step_exit_code">退出码 %1$d</string>
+    <string name="chat_task_actor">任务</string>
+    <string name="chat_task_cancelled">已取消</string>
+    <string name="chat_task_unknown">状态未知</string>
+    <string name="chat_task_waiting_first">正在等待第一步…</string>
+    <string name="chat_task_no_steps">没有收到步骤。</string>
+    <plurals name="chat_tasks_waiting">
+        <item quantity="one">正在等待 %d 个任务</item>
+        <item quantity="other">正在等待 %d 个任务</item>
+    </plurals>
+    <plurals name="chat_tasks_waiting_background">
+        <item quantity="one">正在等待 %d 个后台任务</item>
+        <item quantity="other">正在等待 %d 个后台任务</item>
+    </plurals>
+    <plurals name="chat_tasks_count">
+        <item quantity="one">%d 个任务</item>
+        <item quantity="other">%d 个任务</item>
+    </plurals>
+    <plurals name="chat_tasks_count_background">
+        <item quantity="one">%d 个后台任务</item>
+        <item quantity="other">%d 个后台任务</item>
+    </plurals>
 </resources>

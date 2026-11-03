@@ -14,6 +14,10 @@ class ChatRepository(
     private val owner: RuntimeOwner,
     private val pullRequests: PullRequestWriter = PullRequestWriter { _, _, _, _ -> throw GitHubWriteFailure("unavailable") },
 ) {
+    /** One step's detail from the watched session's replica; a read, safe to retry. */
+    suspend fun detail(scope: RuntimeScope, sessionId: String, entryId: String, itemId: String): StepDetail =
+        owner.use(scope) { (it.execute(RuntimeCommand.ItemDetail(sessionId, entryId, itemId)) as RuntimeResult.Detail).value }
+
     /** A direct GitHub write from the action bar; never retried (see [GitHubPullRequestWrites]). */
     suspend fun mergePullRequest(scope: RuntimeScope, repository: String, number: Int, method: String) =
         pullRequests.write(scope, repository, number, method)
