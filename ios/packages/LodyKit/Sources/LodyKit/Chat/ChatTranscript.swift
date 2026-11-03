@@ -495,21 +495,13 @@ struct ChatTranscript {
         })
         visible.sort()
       } else {
+        // A running turn (or one that ended without an answer) shows its work expanded, step by
+        // step — DSH thoughts inline in secondary prose — and folds it into "Worked for …" only
+        // once an answer ends the turn (web: streaming turns stay expanded).
         for index in entry.items.indices {
-          if entry.items[index].type == "subagent_task" {
-            if !entry.items[index].hidesFromTranscript { visible.append(index) }
-            continue
-          }
-          // DSH thoughts (the only ones left in the transcript) read inline, apart from tool groups.
-          if entry.items[index].type == "text" || entry.items[index].type == "thought" || entry.items[index].type == "proposed_plan"
-            || entry.items[index].isAttachment || entry.items[index].isChatFailure {
-            visible.append(index)
-          } else if let previous = visible.last, groups[previous] != nil {
-            groups[previous]!.append(index)
-          } else {
-            groups[index] = [index]
-            visible.append(index)
-          }
+          let item = entry.items[index]
+          if item.hidesFromTranscript || (item.type == "tool_call" && item.kind == "think") { continue }
+          visible.append(index)
         }
       }
       var result: [ChatRow] = []
@@ -537,7 +529,6 @@ struct ChatTranscript {
             let process = indices.map { entry.items[$0] }
             row.detail = ChatProcessSummary.title(items: process, running: false, includesThought: false)
             row.actionable = true
-            row.attention = process.contains { $0.permission?.pending == true || $0.status == "failed" }
             absorbed = first
           } else if !entry.finished, entry.holdOpen != true, entry.executionId == nil,
                     let first = visible.first(where: { entry.items[$0].type != "subagent_task" }),
@@ -548,7 +539,6 @@ struct ChatTranscript {
             row.detail = ChatProcessSummary.title(items: process, running: live)
             row.actionable = true
             row.processStartID = entry.items[first].itemId
-            row.attention = process.contains { $0.permission?.pending == true || $0.status == "failed" }
             absorbed = first
           }
           result.append(row)
@@ -634,6 +624,22 @@ struct ChatTranscript {
         if !row.text.isEmpty { result.append(row) }
       }
       if entry.role == "assistant", entry.finished, !processOnly {
+        // The turn's output card: one row for its changed files (the task row joins it in
+        // `hangSubagents`); the view folds its bounded file list beneath this row.
+        let files = (entry.fileDiffs ?? []).filter { !$0.path.isEmpty }
+        if !files.isEmpty {
+          let add = files.reduce(0) { $0 + ($1.add ?? 0) }
+          let del = files.reduce(0) { $0 + ($1.del ?? 0) }
+          var header = ChatRow(
+            id: entry.id + ":changes", entryID: entry.id, kind: "changesHeader",
+            text: String.localizedStringWithFormat(String(localized: "native.chat.transcript.fileCount", bundle: .lody), files.count),
+            actionable: true,
+            fileDiff: ChatFileDiff(path: "", add: add, del: del, status: nil)
+          )
+          header.group = "only"
+          result.append(header)
+        }
+        // Model, time and the turn's actions always close the turn.
         let model = entry.modelInfo?.title ?? ""
         let finishedAt = ChatMetaTime.label(entry.endedAt, now: now)
         let meta = [model, finishedAt].filter { !$0.isEmpty }.joined(separator: " · ")
@@ -643,26 +649,6 @@ struct ChatTranscript {
             modelId: entry.modelInfo?.modelId, name: entry.modelInfo?.name
           ) ?? ""
           result.append(row)
-        }
-        let files = (entry.fileDiffs ?? []).filter { !$0.path.isEmpty }
-        if !files.isEmpty {
-          let add = files.reduce(0) { $0 + ($1.add ?? 0) }
-          let del = files.reduce(0) { $0 + ($1.del ?? 0) }
-          var header = ChatRow(
-            id: entry.id + ":changes", entryID: entry.id, kind: "changesHeader",
-            text: String.localizedStringWithFormat(String(localized: "native.chat.transcript.fileCount", bundle: .lody), files.count),
-            fileDiff: ChatFileDiff(path: "", add: add, del: del, status: nil)
-          )
-          header.group = "first"
-          result.append(header)
-          for (index, file) in files.enumerated() {
-            var row = ChatRow(
-              id: entry.id + ":changes:" + file.path, entryID: entry.id, kind: "changes",
-              text: file.path, actionable: true, fileDiff: file
-            )
-            row.group = index == files.count - 1 ? "last" : "middle"
-            result.append(row)
-          }
         }
       }
       return result
@@ -688,13 +674,12 @@ extension ChatTranscript {
     return (start...index).filter { prose(items[$0]) }
   }
 
-  /// Web's task panel as one inset card after the turn's answer: a header row ("Waiting on N
-  /// tasks" while any runs, "N tasks" once settled; the newest running task's latest step as its
-  /// detail) and a row per task. `LodyChatView` folds the card to its header by default and opens
-  /// it on tap (`expandedTaskGroups`). Neutral: a failure reads in its own row, never as an
-  /// attention mark on the card.
+  /// Web's task panel, compact: ONE inset card row after the turn's answer ("Waiting on N tasks"
+  /// while any runs, "N tasks" once settled; the newest running task's latest step as its detail).
+  /// The tasks themselves live in the task sheet it opens (`TasksController`), never inline.
+  /// Neutral: no attention mark on the card.
   static func hangSubagents(_ rows: [ChatRow]) -> [ChatRow] {
-    var tasks = rows.filter { $0.kind == "subagent_task" }
+    let tasks = rows.filter { $0.kind == "subagent_task" }
     var result = rows.filter { $0.kind != "subagent_task" }
     guard let first = tasks.first else { return rows }
     let running = tasks.filter(\.running).count
@@ -712,13 +697,13 @@ extension ChatTranscript {
       actionable: true, running: running > 0
     )
     header.detail = tasks.last { $0.running && !($0.subagent?.detail ?? "").isEmpty }?.subagent?.detail ?? ""
-    for index in tasks.indices {
-      tasks[index].attention = false
-      tasks[index].group = index == tasks.count - 1 ? "last" : "middle"
-    }
-    // After the answer, before the turn's meta and changed files.
-    let anchor = result.firstIndex { ["meta", "changesHeader", "changes"].contains($0.kind) } ?? result.endIndex
-    result.insert(contentsOf: [header] + tasks, at: anchor)
+    // The output card: tasks first, then the changed files row when the turn has one; the meta
+    // line stays last.
+    let files = result.firstIndex { $0.kind == "changesHeader" }
+    header.group = files == nil ? "only" : "first"
+    if let files { result[files].group = "last" }
+    let anchor = files ?? result.firstIndex { $0.kind == "meta" } ?? result.endIndex
+    result.insert(header, at: anchor)
     return result
   }
 

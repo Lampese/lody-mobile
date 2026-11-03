@@ -32,7 +32,7 @@ internal object RuntimeProtocol {
                 val items = rawItems.mapNotNull(::turnItem)
                 val files = entry.optJSONArray("fileDiffs")?.objects()?.mapNotNull { file ->
                     val path = file.optString("path").takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                    ChangedFile(path, file.optInt("add"), file.optInt("del"))
+                    FileChange(path, file.optInt("add"), file.optInt("del"))
                 }.orEmpty()
                 // An assistant turn may so far be only steps; a user turn needs its text.
                 if (text.isBlank() && (role == "user" || (items.isEmpty() && files.isEmpty()))) null else SessionMessage(
@@ -145,6 +145,7 @@ internal object RuntimeProtocol {
                     result = item.optString("summary").ifBlank { item.optString("error") }.trim(),
                     background = item.optBoolean("isBackgrounded"),
                     steps = steps,
+                    group = if (item.optString("group") == "tasks") "tasks" else "subagents",
                 )
             }
             "system_notice" -> {

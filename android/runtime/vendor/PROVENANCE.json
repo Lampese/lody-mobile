@@ -1,9 +1,9 @@
 {
   "source": "Lody Mobile ios/packages/cloud-runtime",
-  "commit": "bdb9cb467979e36b9a84b43ad2fd561c47533269",
+  "commit": "216d24ee8163821783f6cbd41604c761fc61ee74",
   "license": "AGPL-3.0-only",
   "path": "ios/packages/cloud-runtime",
-  "note": "Base commit snapshot plus reviewed local capability-refresh and directory Tab changes shared verbatim with ios/packages/cloud-runtime; not yet committed.",
+  "note": "Base commit snapshot plus reviewed local capability-refresh and directory Tab changes shared verbatim with ios/packages/cloud-runtime; recorded in e7df50f.",
   "localSourceFiles": [
     "contract/runtime-contract.json",
     "src/contract/projects.ts",

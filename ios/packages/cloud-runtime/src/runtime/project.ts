@@ -368,6 +368,7 @@ function summarizeItem(
         raw.isBackgrounded == null ? undefined : Boolean(raw.isBackgrounded),
       skipTranscript:
         raw.skipTranscript == null ? undefined : Boolean(raw.skipTranscript),
+      group: taskGroup(raw),
       run: Array.isArray(raw.run?.items)
         ? {
             sessionId: String(raw.run.sessionId ?? raw.taskId ?? itemId),
@@ -648,4 +649,17 @@ export function projectSession(
         })),
     ],
   };
+}
+
+/**
+ * Web `groupOf` (`subagent-task-state.tsx`): a scheduled wakeup is a task; anything with a
+ * subagent type or a run is a subagent; else a shell command, MCP task or monitor is a task and
+ * an unrecognised type stays with the subagents.
+ */
+const NON_AGENT_TASK_TYPES = new Set(['local_bash', 'mcp_task', 'monitor_mcp']);
+function taskGroup(raw: any): 'subagents' | 'tasks' {
+  if (raw?.taskKind === 'scheduled') return 'tasks';
+  if (raw?.subagentType || raw?.run) return 'subagents';
+  const type = raw?.taskType ?? raw?.actor;
+  return typeof type === 'string' && NON_AGENT_TASK_TYPES.has(type) ? 'tasks' : 'subagents';
 }

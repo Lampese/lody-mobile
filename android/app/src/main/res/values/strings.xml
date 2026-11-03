@@ -265,4 +265,11 @@
     <string name="chat_tab_creation_unknown">Creation result is unknown. Tap again to open the conversation.</string>
     <plurals name="chat_directory_tabs"><item quantity="one">%d conversation in this directory</item><item quantity="other">%d conversations in this directory</item></plurals>
     <plurals name="chat_changed_files"><item quantity="one">%d file</item><item quantity="other">%d files</item></plurals>
+    <string name="chat_tasks_subagents">Subagents</string>
+    <string name="chat_tasks_others">Tasks</string>
+    <string name="chat_tasks_back">Back to tasks</string>
+    <plurals name="chat_files_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
 </resources>

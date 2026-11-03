@@ -62,6 +62,8 @@ export type ItemSummary =
       error?: string;
       isBackgrounded?: boolean;
       skipTranscript?: boolean;
+      /** Web `groupOf`: an agent run is a subagent; a command, MCP task, monitor or wakeup a task. */
+      group?: 'subagents' | 'tasks';
       run?: { sessionId: string; state: string; items: ItemSummary[] };
     }
   | { itemId: string; rev: number; type: string };

@@ -9,7 +9,9 @@ extension SessionController {
     }
     chat.onActivityPress = { [weak self] body in
       guard let self, let entryId = body["entryId"] as? String, let itemId = body["itemId"] as? String else { return }
-      if itemId.isEmpty { openProcess(entryId: entryId, startItemId: body["processStartId"] as? String ?? "") }
+      if body["processStartId"] as? String == "__taskSheet__" { openTasks(entryId: entryId) }
+      else if body["processStartId"] as? String == "__turnFiles__" { openTurnFiles(entryId: entryId) }
+      else if itemId.isEmpty { openProcess(entryId: entryId, startItemId: body["processStartId"] as? String ?? "") }
       else { activity(entryId: entryId, itemId: itemId) }
     }
     chat.onFilePress = { [weak self] body in
@@ -62,6 +64,27 @@ extension SessionController {
       page, title: String(localized: String.LocalizationValue(startItemId == "__tasks__" ? "process.tasks" : "process.title"), bundle: .lody),
       detents: [0.6, 1], grabber: true
     )
+  }
+
+  /// A turn's tasks in a near full-screen sheet; a row pushes its run inside the sheet.
+  private func openTasks(entryId: String) {
+    let page = TasksController(entryId: entryId)
+    tasksPage = page
+    page.update(feed?.state.entriesJSON ?? "[]")
+    page.onOpen = { [weak self, weak page] itemId in self?.activity(entryId: entryId, itemId: itemId, from: page) }
+    LodyShell.shared.presentNative(page, title: String(localized: "process.tasks", bundle: .lody), detents: [1], grabber: true)
+  }
+
+  /// A turn's changed files in a near full-screen sheet; a file pushes its diff inside the sheet.
+  private func openTurnFiles(entryId: String) {
+    let page = TurnFilesController(entryId: entryId)
+    page.update(feed?.state.entriesJSON ?? "[]")
+    page.onOpen = { [weak self, weak page] path in
+      guard let self, let page else { return }
+      LodyShell.shared.pushNative("file-diff", title: (path as NSString).lastPathComponent,
+        params: ["sessionId": self.sessionId, "entryId": entryId, "path": path], from: page)
+    }
+    LodyShell.shared.presentNative(page, title: String(localized: "workspaceChanges.title", bundle: .lody), detents: [1], grabber: true)
   }
 
   private func activity(entryId: String, itemId: String, from source: UIViewController? = nil) {

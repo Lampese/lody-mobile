@@ -89,8 +89,6 @@ data class CatalogSnapshot(
  * picked a user turn up, `pending` / `queued` before); [userId] is a user turn's sender;
  * [startedAt] / [endedAt] (epoch ms) time an agent turn; [model] names its model.
  */
-data class ChangedFile(val path: String, val added: Int = 0, val removed: Int = 0)
-
 data class SessionMessage(
     val id: String,
     val role: String,
@@ -104,7 +102,7 @@ data class SessionMessage(
     val model: String? = null,
     /** The turn's items in order (text, thought, tool steps, plans, notices) for the process view. */
     val items: List<TurnItem> = emptyList(),
-    val files: List<ChangedFile> = emptyList(),
+    val files: List<FileChange> = emptyList(),
 )
 
 /**
@@ -153,6 +151,8 @@ sealed interface TurnItem {
         val result: String = "",
         val background: Boolean = false,
         val steps: List<TurnItem> = emptyList(),
+        /** Web `groupOf`, from the runtime: `subagents` (agent runs) or `tasks` (commands, MCP tasks, monitors, wakeups). */
+        val group: String = "subagents",
     ) : TurnItem {
         val running: Boolean get() = state == "pending" || state == "running"
     }
@@ -204,3 +204,6 @@ sealed interface StepBlock {
     data class Diff(val path: String, val oldText: String, val newText: String) : StepBlock
     data class Text(val text: String) : StepBlock
 }
+
+/** One file a turn changed (upstream entry `fileDiffs`). */
+data class FileChange(val path: String, val added: Int, val removed: Int)

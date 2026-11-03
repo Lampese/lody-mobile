@@ -229,27 +229,18 @@ extension LodyChatView {
         return ChatStream.deferringMarkdown(byEntry[row.entryID] ?? [], previous: frozen)
       }
     }
-    let fileGroups = Dictionary(grouping: projected.filter { $0.kind == "changes" }, by: \.entryID)
+    let filesByEntry = Dictionary(transcript.entries.map { ($0.id, ($0.fileDiffs ?? []).filter { !$0.path.isEmpty }) }, uniquingKeysWith: { _, latest in latest })
     projected = projected.flatMap { row -> [ChatRow] in
-      if row.kind == "changes" { return [] }
       guard row.kind == "changesHeader" else { return [row] }
       var header = row
       let expanded = expandedFileGroups.contains(row.entryID)
-      header.group = expanded ? "first" : "only"
-      header.actionable = true
+      if expanded { header.group = row.group == "last" ? "middle" : "first" }
+      header.detail = expanded ? "expanded" : ""
       guard expanded else { return [header] }
       var list = ChatRow(id: row.entryID + ":changes:list", entryID: row.entryID, kind: "changesList", text: "")
-      list.fileDiffs = (fileGroups[row.entryID] ?? []).compactMap(\.fileDiff)
+      list.fileDiffs = filesByEntry[row.entryID] ?? []
       return [header, list]
     }
-    // The task card folds to its header until opened; folded, the header carries the live step.
-    let foldedTasks = Set(projected.filter { $0.kind == "tasksHeader" && !expandedTaskGroups.contains($0.entryID) }.map(\.entryID))
-    for index in projected.indices where projected[index].kind == "tasksHeader" {
-      let folded = foldedTasks.contains(projected[index].entryID)
-      projected[index].group = folded ? "only" : "first"
-      if !folded { projected[index].detail = "" }
-    }
-    projected.removeAll { $0.kind == "subagent_task" && foldedTasks.contains($0.entryID) }
     for index in projected.indices where projected[index].kind == "proposed_plan" {
       if let state = planDecisionState, state.entryId == projected[index].entryID, state.itemId == projected[index].itemID {
         projected[index].planDecision = state

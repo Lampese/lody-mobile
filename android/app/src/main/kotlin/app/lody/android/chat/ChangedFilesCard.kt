@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.pluralStringResource
@@ -21,16 +22,16 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import app.lody.android.R
 import app.lody.android.designsystem.*
-import app.lody.android.runtime.ChangedFile
+import app.lody.android.runtime.FileChange
 
 @Composable
-internal fun ChangedFilesCard(files: List<ChangedFile>, expanded: Boolean, onToggle: (Boolean) -> Unit) {
+internal fun ChangedFilesCard(files: List<FileChange>, expanded: Boolean, joinedTop: Boolean = false, onToggle: (Boolean) -> Unit) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val state = stringResource(if (expanded) R.string.home_tree_expanded else R.string.home_tree_collapsed)
     val rowHeight = LodySize.touchTarget
     Column(Modifier.padding(horizontal = TranscriptMargin).fillMaxWidth()
-        .clip(RoundedCornerShape(LodySpacing.md)).background(colors.fillTertiary)) {
+        .clip(RoundedCornerShape(topStart = if (joinedTop) 0.dp else LodySpacing.md, topEnd = if (joinedTop) 0.dp else LodySpacing.md, bottomStart = LodySpacing.md, bottomEnd = LodySpacing.md)).background(colors.fillTertiary)) {
         Row(Modifier.fillMaxWidth().height(rowHeight).clickable(role = Role.Button) { onToggle(!expanded) }
             .semantics { stateDescription = state }.padding(horizontal = LodySpacing.md),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {

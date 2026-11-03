@@ -21,7 +21,7 @@ class RuntimeProtocolTest {
   val event = JSONObject().put("type", "session").put("sessionId", "s").put("session", body.toString())
   val messages = (RuntimeProtocol.event(event) as RuntimeEvent.SessionUpdated).snapshot.messages
   assertEquals(9, messages.single().files.size)
-  assertEquals(ChangedFile("src/file8.kt", 8, 2), messages.single().files.last())
+  assertEquals(FileChange("src/file8.kt", 8, 2), messages.single().files.last())
  }
  @Test fun sessionProjectionIsNotDropped() {
   val frame=JSONObject().put("type","session").put("sessionId","s").put("session", """{"v":1,"status":"live","entries":[]}""")
