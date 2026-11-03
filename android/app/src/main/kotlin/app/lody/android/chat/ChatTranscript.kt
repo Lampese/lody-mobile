@@ -28,6 +28,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -128,13 +132,37 @@ fun ChatTranscript(
     // Disclosure state for the screen's life: worked folds and activity groups, by key.
     val open = remember { mutableStateMapOf<String, Boolean>() }
     val haptics = LocalHapticFeedback.current
+    // The list's row keys in order, recorded as its content is built, so a toggled row can be
+    // found by index even after the rows around it change.
+    val keys = remember { KeyOrder() }
+    // A toggled disclosure keeps its place on screen: content opens and closes below it. The
+    // list only pins its FIRST visible row by key; when a fold removes that row (reading inside
+    // an open group, then closing it) it falls back to an index and the page jumps.
+    var anchor by remember { mutableStateOf<Anchor?>(null) }
     val toggle: (String, Boolean) -> Unit = { key, value ->
         haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+        val row = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+        if (row != null) anchor = Anchor(key, row.offset, (anchor?.serial ?: 0) + 1)
         open[key] = value
+    }
+    LaunchedEffect(anchor) {
+        val target = anchor ?: return@LaunchedEffect
+        // Wait for the layout that applies the toggle, then put the row back where it was.
+        withFrameNanos { }
+        val index = keys.indexOf(target.key)
+        if (index < 0) return@LaunchedEffect
+        val now = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == target.key }
+        if (now != null) {
+            if (now.offset != target.offset) state.scrollBy((now.offset - target.offset).toFloat())
+        } else {
+            state.scrollToItem(index)
+            state.scrollBy(-target.offset.toFloat())
+        }
     }
     val details = remember(loadDetail != null) { StepDetails(loadDetail) }
     // The task whose run the sheet shows, by id, so a streaming run keeps updating inside it.
     var shownTask by remember { mutableStateOf<String?>(null) }
+    val openTask: (TurnItem.Task) -> Unit = { shownTask = it.id }
     shownTask?.let { id ->
         val task = entries.asSequence().filterIsInstance<ChatEntry.Assistant>().flatMap { it.layout.tasks }.firstOrNull { it.id == id }
         // A task that left the transcript just leaves the sheet closed.
@@ -144,7 +172,49 @@ fun ChatTranscript(
         val last = state.layoutInfo.totalItemsCount - 1
         if (following && last >= 0) state.scrollToItem(last, Int.MAX_VALUE)
     }
-    LazyColumn(modifier, state = state, contentPadding = contentPadding) {
+    LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
+        keys.reset()
+        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTask) }
+    }
+}
+
+/** A toggled row and its offset from the list's top before the toggle; [serial] re-runs equal toggles. */
+private data class Anchor(val key: Any, val offset: Int, val serial: Int)
+
+/** Row keys in list order; rebuilt whenever the list content is. */
+private class KeyOrder {
+    private val keys = ArrayList<Any>()
+    private var index = HashMap<Any, Int>()
+    fun reset() { keys.clear(); index = HashMap() }
+    fun add(key: Any?) { if (key != null) { index[key] = keys.size }; keys += key ?: Unit }
+    fun indexOf(key: Any): Int = index[key] ?: -1
+}
+
+/** Records each row's key on its way into the real scope. */
+private class KeyRecorder(private val scope: LazyListScope, private val keys: KeyOrder) : LazyListScope by scope {
+    override fun item(key: Any?, contentType: Any?, content: @Composable LazyItemScope.() -> Unit) {
+        keys.add(key)
+        scope.item(key, contentType, content)
+    }
+
+    override fun items(
+        count: Int,
+        key: ((index: Int) -> Any)?,
+        contentType: (index: Int) -> Any?,
+        itemContent: @Composable LazyItemScope.(index: Int) -> Unit,
+    ) {
+        repeat(count) { keys.add(key?.invoke(it)) }
+        scope.items(count, key, contentType, itemContent)
+    }
+}
+
+private fun LazyListScope.transcriptRows(
+    entries: List<ChatEntry>,
+    open: Map<String, Boolean>,
+    toggle: (String, Boolean) -> Unit,
+    details: StepDetails,
+    onOpenTask: (TurnItem.Task) -> Unit,
+) {
         entries.forEach { entry ->
             when (entry) {
                 is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry) }
@@ -169,12 +239,11 @@ fun ChatTranscript(
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
                     // Web: live status precedes the task panel.
-                    taskPanel(entry, open, toggle) { shownTask = it.id }
+                    taskPanel(entry, open, toggle, onOpenTask)
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }
         }
-    }
 }
 
 /** Web's mobile conversation inset. */
