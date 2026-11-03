@@ -127,8 +127,6 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var localAttachments: [String: [ChatMessageAttachment]] = [:]
   var expandedPlans = Set<String>()
   var expandedMessages = Set<String>()
-  /// Settled task groups the reader opened, by entry (a running group is always open).
-  var expandedTaskGroups = Set<String>()
   var expandedAttachments = Set<String>()
   var collapsedMessageHeights: [String: CGFloat] = [:]
   var imageWorkspace = ""
@@ -254,8 +252,9 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     cell.accessibilityHint = String(localized: "native.chat.row.openChanges", bundle: .lody)
   }
 
-  /// The task card's header: the same inset card as changed files, a live spinner or the stack
-  /// glyph, the count, the latest step while folded, and a chevron that turns with the fold.
+  /// The task card: the same inset card as changed files, a live spinner or the stack glyph, the
+  /// count, the newest running task's latest step, and a chevron to the task sheet. A state change
+  /// on a visible card cross-fades instead of snapping.
   private let taskHeaderRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
     var content = ChatFileCell.headerContent(for: row.text)
     if !row.running { content.image = UIImage(systemName: "square.stack.3d.up") }
@@ -267,13 +266,15 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       content.secondaryTextProperties.color = .tertiaryLabel
       content.secondaryTextProperties.numberOfLines = 1
     }
-    cell.contentConfiguration = content
+    if cell.window != nil {
+      UIView.transition(with: cell.contentView, duration: 0.25, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+        cell.contentConfiguration = content
+      }
+    } else {
+      cell.contentConfiguration = content
+    }
     cell.apply(group: row.group, selected: false)
-    let folded = row.group == "only"
-    let chevron = UIImageView(image: UIImage(systemName: folded ? "chevron.right" : "chevron.down",
-      withConfiguration: UIImage.SymbolConfiguration(textStyle: .footnote, scale: .small)))
-    chevron.tintColor = .tertiaryLabel
-    var accessories: [UICellAccessory] = [.customView(configuration: .init(customView: chevron, placement: .trailing()))]
+    var accessories: [UICellAccessory] = [.disclosureIndicator()]
     if row.running {
       let spinner = UIActivityIndicatorView(style: .medium)
       spinner.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
@@ -287,42 +288,6 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     cell.isAccessibilityElement = true
     cell.accessibilityIdentifier = row.id
     cell.accessibilityLabel = [row.text, row.detail].filter { !$0.isEmpty }.joined(separator: ", ")
-    cell.accessibilityValue = String(localized: String.LocalizationValue(folded ? "home.tree.collapsed" : "home.tree.expanded"), bundle: .lody)
-    cell.accessibilityTraits = .button
-  }
-
-  /// One task in the card: its state glyph, actor · description, the latest step while it runs or
-  /// how it ended; tapping opens its run.
-  private let taskRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
-    guard let card = row.subagent else { return }
-    var content = UIListContentConfiguration.subtitleCell()
-    content.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
-    let title = NSMutableAttributedString(string: card.actor, attributes: [.foregroundColor: UIColor.label])
-    if !card.description.isEmpty {
-      title.append(NSAttributedString(string: " · " + card.description, attributes: [.foregroundColor: UIColor.secondaryLabel]))
-    }
-    content.attributedText = title
-    content.textProperties.font = .preferredFont(forTextStyle: .footnote)
-    content.textProperties.numberOfLines = 1
-    let symbols = ["completed": "checkmark", "failed": "xmark", "cancelled": "slash.circle"]
-    content.image = UIImage(systemName: symbols[card.status] ?? (row.running ? "circle.dotted" : "circle"))
-    content.imageProperties.tintColor = card.status == "failed" ? .systemRed : .secondaryLabel
-    content.imageProperties.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .footnote, scale: .small)
-    if !card.detail.isEmpty && (row.running || card.status == "failed") {
-      content.secondaryText = card.detail
-      content.secondaryTextProperties.font = .preferredFont(forTextStyle: .caption1)
-      content.secondaryTextProperties.color = card.status == "failed" ? .systemRed : .tertiaryLabel
-      content.secondaryTextProperties.numberOfLines = 1
-    }
-    cell.contentConfiguration = content
-    cell.apply(group: row.group, selected: false)
-    cell.accessories = [.disclosureIndicator()]
-    cell.configurationUpdateHandler = { cell, state in
-      (cell as? ChatFileCell)?.apply(group: row.group, selected: state.isHighlighted || state.isSelected)
-    }
-    cell.isAccessibilityElement = true
-    cell.accessibilityIdentifier = row.id
-    cell.accessibilityLabel = [card.actor, card.description, card.detail].filter { !$0.isEmpty }.joined(separator: ", ")
     cell.accessibilityTraits = .button
   }
 
@@ -430,9 +395,6 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       }
       if row.kind == "tasksHeader" {
         return collection.dequeueConfiguredReusableCell(using: self.taskHeaderRegistration, for: index, item: row)
-      }
-      if row.kind == "subagent_task", !row.group.isEmpty {
-        return collection.dequeueConfiguredReusableCell(using: self.taskRegistration, for: index, item: row)
       }
       if row.kind == "changes" {
         return collection.dequeueConfiguredReusableCell(using: self.fileRegistration, for: index, item: row)

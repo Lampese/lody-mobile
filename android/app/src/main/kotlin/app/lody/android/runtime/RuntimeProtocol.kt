@@ -138,6 +138,7 @@ internal object RuntimeProtocol {
                     result = item.optString("summary").ifBlank { item.optString("error") }.trim(),
                     background = item.optBoolean("isBackgrounded"),
                     steps = steps,
+                    group = if (item.optString("group") == "tasks") "tasks" else "subagents",
                 )
             }
             "system_notice" -> {

@@ -229,14 +229,6 @@ extension LodyChatView {
         return ChatStream.deferringMarkdown(byEntry[row.entryID] ?? [], previous: frozen)
       }
     }
-    // The task card folds to its header until opened; folded, the header carries the live step.
-    let foldedTasks = Set(projected.filter { $0.kind == "tasksHeader" && !expandedTaskGroups.contains($0.entryID) }.map(\.entryID))
-    for index in projected.indices where projected[index].kind == "tasksHeader" {
-      let folded = foldedTasks.contains(projected[index].entryID)
-      projected[index].group = folded ? "only" : "first"
-      if !folded { projected[index].detail = "" }
-    }
-    projected.removeAll { $0.kind == "subagent_task" && foldedTasks.contains($0.entryID) }
     for index in projected.indices where projected[index].kind == "proposed_plan" {
       if let state = planDecisionState, state.entryId == projected[index].entryID, state.itemId == projected[index].itemID {
         projected[index].planDecision = state

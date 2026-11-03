@@ -160,13 +160,13 @@ fun ChatTranscript(
         }
     }
     val details = remember(loadDetail != null) { StepDetails(loadDetail) }
-    // The task whose run the sheet shows, by id, so a streaming run keeps updating inside it.
-    var shownTask by remember { mutableStateOf<String?>(null) }
-    val openTask: (TurnItem.Task) -> Unit = { shownTask = it.id }
-    shownTask?.let { id ->
-        val task = entries.asSequence().filterIsInstance<ChatEntry.Assistant>().flatMap { it.layout.tasks }.firstOrNull { it.id == id }
-        // A task that left the transcript just leaves the sheet closed.
-        if (task != null) TaskSheet(task) { shownTask = null }
+    // The turn whose tasks the sheet shows, by id, so running tasks keep updating inside it.
+    var shownTasks by remember { mutableStateOf<String?>(null) }
+    val openTasks: (String) -> Unit = { shownTasks = it }
+    shownTasks?.let { id ->
+        val tasks = entries.firstOrNull { it.id == id }.let { it as? ChatEntry.Assistant }?.layout?.tasks.orEmpty()
+        // Tasks that left the transcript just leave the sheet closed.
+        if (tasks.isNotEmpty()) TasksSheet(tasks) { shownTasks = null }
     }
     LaunchedEffect(entries.size, tailSize) {
         val last = state.layoutInfo.totalItemsCount - 1
@@ -174,7 +174,7 @@ fun ChatTranscript(
     }
     LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
         keys.reset()
-        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTask) }
+        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks) }
     }
 }
 
@@ -213,7 +213,7 @@ private fun LazyListScope.transcriptRows(
     open: Map<String, Boolean>,
     toggle: (String, Boolean) -> Unit,
     details: StepDetails,
-    onOpenTask: (TurnItem.Task) -> Unit,
+    onOpenTasks: (String) -> Unit,
 ) {
         entries.forEach { entry ->
             when (entry) {
@@ -239,7 +239,7 @@ private fun LazyListScope.transcriptRows(
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
                     // Web: live status precedes the task panel.
-                    taskPanel(entry, open, toggle, onOpenTask)
+                    taskPanel(entry, onOpenTasks)
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }

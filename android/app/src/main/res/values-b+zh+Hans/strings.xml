@@ -256,4 +256,7 @@
         <item quantity="one">%d 个后台任务</item>
         <item quantity="other">%d 个后台任务</item>
     </plurals>
+    <string name="chat_tasks_subagents">子代理</string>
+    <string name="chat_tasks_others">任务</string>
+    <string name="chat_tasks_back">返回任务列表</string>
 </resources>

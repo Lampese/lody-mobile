@@ -148,6 +148,8 @@ sealed interface TurnItem {
         val result: String = "",
         val background: Boolean = false,
         val steps: List<TurnItem> = emptyList(),
+        /** Web `groupOf`, from the runtime: `subagents` (agent runs) or `tasks` (commands, MCP tasks, monitors, wakeups). */
+        val group: String = "subagents",
     ) : TurnItem {
         val running: Boolean get() = state == "pending" || state == "running"
     }

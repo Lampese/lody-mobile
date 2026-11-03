@@ -257,4 +257,7 @@
         <item quantity="one">%d background task</item>
         <item quantity="other">%d background tasks</item>
     </plurals>
+    <string name="chat_tasks_subagents">Subagents</string>
+    <string name="chat_tasks_others">Tasks</string>
+    <string name="chat_tasks_back">Back to tasks</string>
 </resources>

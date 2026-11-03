@@ -28,6 +28,7 @@ class SessionController: UIViewController {
   let simulatorService: SimulatorService?
   let pullRequestPage: @MainActor (SessionPullRequest, SessionListState) -> PullRequestController
   weak var processPage: ProcessController?
+  weak var tasksPage: TasksController?
   var permissionPage: PermissionController?
   var permissionScope: (userId: String, workspaceId: String)?
   var openingFile = false
@@ -195,6 +196,7 @@ class SessionController: UIViewController {
     guard state.entriesJSON != renderedEntries else { return }
     renderedEntries = state.entriesJSON
     processPage?.update(state.entriesJSON)
+    tasksPage?.update(state.entriesJSON)
     updateDetails(state.entriesJSON)
     chat.setEntries(state.entriesJSON)
     chat.scheduleUpdate()

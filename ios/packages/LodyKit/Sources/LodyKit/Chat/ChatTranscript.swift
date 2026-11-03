@@ -693,13 +693,12 @@ extension ChatTranscript {
     return (start...index).filter { prose(items[$0]) }
   }
 
-  /// Web's task panel as one inset card after the turn's answer: a header row ("Waiting on N
-  /// tasks" while any runs, "N tasks" once settled; the newest running task's latest step as its
-  /// detail) and a row per task. `LodyChatView` folds the card to its header by default and opens
-  /// it on tap (`expandedTaskGroups`). Neutral: a failure reads in its own row, never as an
-  /// attention mark on the card.
+  /// Web's task panel, compact: ONE inset card row after the turn's answer ("Waiting on N tasks"
+  /// while any runs, "N tasks" once settled; the newest running task's latest step as its detail).
+  /// The tasks themselves live in the task sheet it opens (`TasksController`), never inline.
+  /// Neutral: no attention mark on the card.
   static func hangSubagents(_ rows: [ChatRow]) -> [ChatRow] {
-    var tasks = rows.filter { $0.kind == "subagent_task" }
+    let tasks = rows.filter { $0.kind == "subagent_task" }
     var result = rows.filter { $0.kind != "subagent_task" }
     guard let first = tasks.first else { return rows }
     let running = tasks.filter(\.running).count
@@ -717,13 +716,10 @@ extension ChatTranscript {
       actionable: true, running: running > 0
     )
     header.detail = tasks.last { $0.running && !($0.subagent?.detail ?? "").isEmpty }?.subagent?.detail ?? ""
-    for index in tasks.indices {
-      tasks[index].attention = false
-      tasks[index].group = index == tasks.count - 1 ? "last" : "middle"
-    }
+    header.group = "only"
     // After the answer, before the turn's meta and changed files.
     let anchor = result.firstIndex { ["meta", "changesHeader", "changes"].contains($0.kind) } ?? result.endIndex
-    result.insert(contentsOf: [header] + tasks, at: anchor)
+    result.insert(header, at: anchor)
     return result
   }
 
