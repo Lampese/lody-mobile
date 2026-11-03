@@ -78,6 +78,28 @@ internal object RuntimeProtocol {
         val trials = message.getJSONObject("creationOptionsTrial")
         return RuntimeResult.Schema(message.keys().asSequence().filter { it != "creationOptionsTrial" }.toSet(), trials.keys().asSequence().associateWith { trials.text(it) })
     }
+    /** Upstream `turnDiff`: `ok` with both sides, or `unavailable` with a reason. */
+    fun diff(json: JSONObject): FileDiff {
+        // A missing side (file added or deleted) is empty text; binary or oversized is no text.
+        fun side(key: String): String? {
+            val side = json.optJSONObject(key) ?: return null
+            return when (side.optString("kind")) {
+                "text" -> side.optString("text")
+                "missing" -> ""
+                else -> null
+            }
+        }
+        val ok = json.optString("status") == "ok"
+        return FileDiff(
+            path = json.optString("path"),
+            oldText = if (ok) side("old") else null,
+            newText = if (ok) side("new") else null,
+            added = (json.opt("add") as? Number)?.toInt(),
+            removed = (json.opt("del") as? Number)?.toInt(),
+            unavailable = if (ok) null else json.optString("reason").ifBlank { "unavailable" },
+        )
+    }
+
     /** Upstream `itemDetail` blocks (`terminal_command` / `terminal_output` / `diff` / `text` / …), leniently. */
     fun detail(json: JSONObject): StepDetail {
         val blocks = json.optJSONArray("blocks")?.objects().orEmpty().mapNotNull { block ->

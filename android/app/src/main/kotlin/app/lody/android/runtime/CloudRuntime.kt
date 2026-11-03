@@ -26,6 +26,8 @@ sealed interface RuntimeCommand {
     data class CloseSession(val id: String) : RuntimeCommand
     /** One step's detail from the watched session (command, output, diff). Read only. */
     data class ItemDetail(val sessionId: String, val entryId: String, val itemId: String) : RuntimeCommand
+    /** One changed file's diff for one turn, from the session's computer. Read only. */
+    data class TurnDiff(val sessionId: String, val entryId: String, val path: String) : RuntimeCommand
     data object Ping : RuntimeCommand
     data object InspectSchema : RuntimeCommand
 }
@@ -36,6 +38,7 @@ sealed interface RuntimeResult {
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult
     data object Accepted : RuntimeResult
     data class Detail(val value: StepDetail) : RuntimeResult
+    data class Diff(val value: FileDiff) : RuntimeResult
     data class Pong(val healthy: Boolean) : RuntimeResult
     data class Schema(val machineIds: Set<String>, val creationTrials: Map<String, String>) : RuntimeResult
 }
@@ -207,3 +210,17 @@ sealed interface StepBlock {
 
 /** One file a turn changed (upstream entry `fileDiffs`). */
 data class FileChange(val path: String, val added: Int, val removed: Int)
+
+/**
+ * A file's text before and after a turn (upstream `turnDiff`). [oldText] / [newText] are null for a
+ * side that is not text (binary, too large); [unavailable] carries the computer's reason when it
+ * could not produce the diff (offline, file gone).
+ */
+data class FileDiff(
+    val path: String,
+    val oldText: String?,
+    val newText: String?,
+    val added: Int? = null,
+    val removed: Int? = null,
+    val unavailable: String? = null,
+)

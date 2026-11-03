@@ -116,6 +116,8 @@ fun ChatTranscript(
     state: LazyListState = rememberLazyListState(),
     /** Opens a step's detail; null where there is no runtime (previews, the stream probe). */
     loadDetail: (suspend (entryId: String, itemId: String) -> StepDetail)? = null,
+    /** Opens a changed file's diff for a turn; null where there is no runtime. */
+    loadDiff: (suspend (entryId: String, path: String) -> app.lody.android.runtime.FileDiff)? = null,
 ) {
     // Follow mode changes only through the reader's own scrolling: dragging up leaves it,
     // reaching the bottom again re-enters it. Growing content alone never turns it off.
@@ -164,11 +166,12 @@ fun ChatTranscript(
     // The turn whose tasks / files a sheet shows, by id, so running tasks keep updating inside it.
     var shownTasks by remember { mutableStateOf<String?>(null) }
     val openTasks: (String) -> Unit = { shownTasks = it }
-    var shownFiles by remember { mutableStateOf<String?>(null) }
-    val openFiles: (String) -> Unit = { shownFiles = it }
-    shownFiles?.let { id ->
-        val files = (entries.firstOrNull { it.id == id } as? ChatEntry.Assistant)?.files.orEmpty()
-        if (files.isNotEmpty()) FilesSheet(files) { shownFiles = null }
+    // The changed file whose diff the sheet shows: (turn id, path).
+    var shownDiff by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val openFile: ((String, String) -> Unit)? = if (loadDiff != null) ({ entryId, path -> shownDiff = entryId to path }) else null
+    shownDiff?.let { (entryId, path) ->
+        val file = (entries.firstOrNull { it.id == entryId } as? ChatEntry.Assistant)?.files?.firstOrNull { it.path == path }
+        if (file != null && loadDiff != null) DiffSheet(entryId, file, loadDiff) { shownDiff = null }
     }
     shownTasks?.let { id ->
         val tasks = entries.firstOrNull { it.id == id }.let { it as? ChatEntry.Assistant }?.layout?.tasks.orEmpty()
@@ -181,7 +184,7 @@ fun ChatTranscript(
     }
     LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
         keys.reset()
-        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFiles) }
+        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFile) }
     }
 }
 
@@ -221,7 +224,7 @@ private fun LazyListScope.transcriptRows(
     toggle: (String, Boolean) -> Unit,
     details: StepDetails,
     onOpenTasks: (String) -> Unit,
-    onOpenFiles: (String) -> Unit,
+    onOpenFile: ((String, String) -> Unit)?,
 ) {
         entries.forEach { entry ->
             when (entry) {
@@ -246,7 +249,7 @@ private fun LazyListScope.transcriptRows(
                         val thinking = last is TurnLayout.Activity && last.items.lastOrNull() is TurnItem.Thought
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
-                    turnOutput(entry, onOpenTasks, onOpenFiles, open, toggle)
+                    turnOutput(entry, onOpenTasks, onOpenFile, open, toggle)
                     turnFooter(entry)
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }

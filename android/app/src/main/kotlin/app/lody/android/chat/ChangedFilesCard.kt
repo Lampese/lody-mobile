@@ -25,7 +25,14 @@ import app.lody.android.designsystem.*
 import app.lody.android.runtime.FileChange
 
 @Composable
-internal fun ChangedFilesCard(files: List<FileChange>, expanded: Boolean, joinedTop: Boolean = false, onToggle: (Boolean) -> Unit) {
+internal fun ChangedFilesCard(
+    files: List<FileChange>,
+    expanded: Boolean,
+    joinedTop: Boolean = false,
+    /** Opens a file's diff for the turn; null where there is no runtime to read it. */
+    onOpenFile: ((FileChange) -> Unit)? = null,
+    onToggle: (Boolean) -> Unit,
+) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val state = stringResource(if (expanded) R.string.home_tree_expanded else R.string.home_tree_collapsed)
@@ -44,11 +51,14 @@ internal fun ChangedFilesCard(files: List<FileChange>, expanded: Boolean, joined
         if (expanded) {
             LazyColumn(Modifier.fillMaxWidth().height(rowHeight * minOf(files.size, 6)), userScrollEnabled = files.size > 6) {
                 itemsIndexed(files) { _, file ->
-                    Row(Modifier.fillMaxWidth().height(rowHeight).padding(horizontal = LodySpacing.md),
+                    Row(Modifier.fillMaxWidth().height(rowHeight)
+                        .then(if (onOpenFile != null) Modifier.clickable(role = Role.Button) { onOpenFile(file) } else Modifier)
+                        .padding(horizontal = LodySpacing.md),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
                         Text(file.path, Modifier.weight(1f), style = type.footnote.copy(fontFamily = type.code.fontFamily),
                             color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         FileCounts(file.added, file.removed)
+                        if (onOpenFile != null) Icon(LodyIcons.Forward, null, Modifier.size(LodyIconSize.xs), tint = colors.iconTertiary)
                     }
                 }
             }

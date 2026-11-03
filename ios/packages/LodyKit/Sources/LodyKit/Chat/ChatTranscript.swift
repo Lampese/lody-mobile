@@ -145,6 +145,8 @@ struct ChatRow: Equatable {
   var shines: Bool { running && kind != "duration" }
   /// `only` / `first` / `middle` / `last` for consecutive file rows in one group.
   var group = ""
+  /// A "Worked for …" row whose folded work is open in place (its chevron points down).
+  var disclosed = false
   /// A user turn's first row: its sender's user id (`ChatAuthors.unknownSender` when the turn
   /// predates the field or is a local send), when, and whether the agent picked it up
   /// (`seen` / `sent` / `queued` / `sending`), drawn above the bubble with the avatar beside it.
@@ -308,6 +310,8 @@ enum ChatTranscriptPreviewMetrics {
 /// Stable identities belong to the protocol, never to the streamed text.
 struct ChatTranscript {
   var entries: [ChatEntry] = []
+  /// Finished turns whose folded work the reader opened in place, by entry id.
+  var expandedWork: Set<String> = []
 
   func liveSubagentItems() -> [ChatItem] {
     entries.flatMap(\.items).filter(\.isLiveSubagent)
@@ -487,7 +491,7 @@ struct ChatTranscript {
         } else {
           visible = entry.items.indices.filter { !answer.contains($0) && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].hidesFromTranscript }
         }
-      } else if folds {
+      } else if folds && !expandedWork.contains(entry.id) {
         let process = entry.items.indices.filter {
           !answer.contains($0) && entry.items[$0].type != "proposed_plan" && !entry.items[$0].isAttachment && !entry.items[$0].isChatFailure && entry.items[$0].type != "subagent_task"
         }
@@ -540,11 +544,16 @@ struct ChatTranscript {
             running: entry.isRunning,
             workDurationMs: duration
           )
-          if folds, let first = groups.keys.min(), let indices = groups[first] {
-            let process = indices.map { entry.items[$0] }
-            row.detail = ChatProcessSummary.title(items: process, running: false, includesThought: false)
+          if folds {
+            // "Worked for …" opens its folded work in place, below itself.
             row.actionable = true
-            absorbed = first
+            row.processStartID = "__work__"
+            row.disclosed = expandedWork.contains(entry.id)
+            if let first = groups.keys.min(), let indices = groups[first] {
+              let process = indices.map { entry.items[$0] }
+              row.detail = ChatProcessSummary.title(items: process, running: false, includesThought: false)
+              absorbed = first
+            }
           } else if !entry.finished, entry.holdOpen != true, entry.executionId == nil,
                     let first = visible.first(where: { entry.items[$0].type != "subagent_task" }),
                     let indices = groups[first] {

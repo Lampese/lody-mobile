@@ -349,6 +349,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     numericText.reset()
     numericText.isHidden = true
     processTree.path = nil
+    processChevron.transform = .identity
     label.onLink = nil
     accessibilityCustomActions = nil
   }
@@ -363,6 +364,17 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     guard rail else {
       processTree.path = nil
       return
+    }
+    // The disclosure turns down when the work is open, with the list's own motion.
+    let turn = CGAffineTransform(rotationAngle: row.disclosed ? .pi / 2 : 0)
+    if processChevron.transform != turn {
+      if window != nil && !UIAccessibility.isReduceMotionEnabled {
+        UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0, options: [.beginFromCurrentState]) {
+          self.processChevron.transform = turn
+        }
+      } else {
+        processChevron.transform = turn
+      }
     }
     processGlyph.kind = Self.glyphKind(row)
     processTitle.attributedText = Self.processTitle(row, traits: traitCollection)
@@ -650,7 +662,12 @@ private func hint(for row: ChatRow) -> String? {
   switch row.kind {
   case "chat_failed": return String(localized: "native.chat.error.view", bundle: .lody)
   case "file": return String(localized: "native.attachment.preview.hint", bundle: .lody)
-  case "duration": return row.actionable ? String(localized: "native.chat.row.openProcess", bundle: .lody) : nil
+  case "duration":
+    guard row.actionable else { return nil }
+    if row.processStartID == "__work__" {
+      return String(localized: String.LocalizationValue(row.disclosed ? "native.chat.message.collapse" : "native.chat.message.expand"), bundle: .lody)
+    }
+    return String(localized: "native.chat.row.openProcess", bundle: .lody)
   case "summary": return String(localized: "native.chat.row.openProcess", bundle: .lody)
   case "changes": return String(localized: "native.chat.row.openChanges", bundle: .lody)
   default: return nil

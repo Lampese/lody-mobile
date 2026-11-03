@@ -290,6 +290,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     ChatTranscript(
                         all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = LodySpacing.md), state = listState,
                         loadDetail = { entryId, itemId -> repository.detail(scope, id, entryId, itemId) },
+                        loadDiff = { entryId, path -> repository.turnDiff(scope, id, entryId, path) },
                     )
                 }
                 ChatHeader(context.title, context.tabs, id, creatingTab, onBack, onSelectTab, createTab)

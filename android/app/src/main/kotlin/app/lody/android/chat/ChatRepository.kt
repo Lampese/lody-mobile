@@ -21,6 +21,10 @@ class ChatRepository(
     suspend fun detail(scope: RuntimeScope, sessionId: String, entryId: String, itemId: String): StepDetail =
         owner.use(scope) { (it.execute(RuntimeCommand.ItemDetail(sessionId, entryId, itemId)) as RuntimeResult.Detail).value }
 
+    /** A changed file's diff for one turn, read from the session's computer; safe to retry. */
+    suspend fun turnDiff(scope: RuntimeScope, sessionId: String, entryId: String, path: String): FileDiff =
+        owner.use(scope) { (it.execute(RuntimeCommand.TurnDiff(sessionId, entryId, path)) as RuntimeResult.Diff).value }
+
     /** A direct GitHub write from the action bar; never retried (see [GitHubPullRequestWrites]). */
     suspend fun mergePullRequest(scope: RuntimeScope, repository: String, number: Int, method: String) =
         pullRequests.write(scope, repository, number, method)

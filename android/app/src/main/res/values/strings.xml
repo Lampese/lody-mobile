@@ -272,4 +272,13 @@
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
     </plurals>
+    <string name="chat_files_back">Back to files</string>
+    <string name="chat_diff_binary">This file is not text, so there is no line diff.</string>
+    <string name="chat_diff_too_large">This change is too large to show on the phone.</string>
+    <string name="chat_diff_unavailable">The diff is unavailable. The computer may be offline or the file gone.</string>
+    <string name="chat_diff_same">No line changes.</string>
+    <plurals name="chat_diff_unchanged">
+        <item quantity="one">⋯ %d unchanged line</item>
+        <item quantity="other">⋯ %d unchanged lines</item>
+    </plurals>
 </resources>

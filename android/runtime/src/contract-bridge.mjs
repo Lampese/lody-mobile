@@ -38,6 +38,8 @@ export function contractBridge(runtime, emit) {
   creationOptions:args=>invoke('creationOptions',args),
   createSession:args=>invoke('createSession',args),
   createTab:args=>invoke('createTab',args),
+  // A changed file's text before and after one turn, read from the session's computer.
+  turnDiff:args=>invoke('turnDiff',args),
   grant(value){for(const e of grants.values())receive(value?{...e,kind:'result',payload:value}:{...e,kind:'error',payload:undefined,error:{code:'grant_unavailable',retryable:true}});grants.clear();return true;},
  };
 }

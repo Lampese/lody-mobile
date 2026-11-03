@@ -216,6 +216,7 @@ extension LodyChatView {
     }
     composer.setQueue(queue)
     let now = Date().timeIntervalSince1970 * 1000
+    transcript.expandedWork = expandedWork
     var projected = transcript.rows(
       processEntryID: processEntryID,
       processStartID: processStartID,
@@ -355,9 +356,11 @@ extension LodyChatView {
     // A stale running reply can complete together with an entire newer history.
     // Only fold in place when it is still the tail; bulk sync keeps the viewport anchor.
     let folding = completing && deferredRows[previousLive ?? ""] == nil && processEntryID.isEmpty && window != nil && projected.last?.entryID == previousLive
-    let anchorID = folding && following
+    let toggled = toggleAnchor.flatMap { id in projected.contains { $0.id == id } ? id : nil }
+    toggleAnchor = nil
+    let anchorID = toggled ?? (folding && following
       ? projected.last(where: { $0.entryID == previousLive && $0.kind == "text" })?.id
-      : collection.indexPathsForVisibleItems.sorted().compactMap { dataSource.itemIdentifier(for: $0) }.first(where: { id in projected.contains { $0.id == id } })
+      : collection.indexPathsForVisibleItems.sorted().compactMap { dataSource.itemIdentifier(for: $0) }.first(where: { id in projected.contains { $0.id == id } }))
     let anchor = anchorID.flatMap { id -> (String, CGFloat)? in
       guard let index = dataSource.indexPath(for: id), let frame = collection.layoutAttributesForItem(at: index)?.frame else { return nil }
       return (id, frame.minY - previousOffset)

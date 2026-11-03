@@ -47,6 +47,16 @@ extension LodyChatView {
       return
     }
     guard let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id], row.actionable else { return }
+    if row.kind == "duration", row.processStartID == "__work__" {
+      // Open or close the turn's folded work in place; the row stays put while rows animate below.
+      if !expandedWork.insert(row.entryID).inserted { expandedWork.remove(row.entryID) }
+      UISelectionFeedbackGenerator().selectionChanged()
+      toggleAnchor = row.id
+      // Opening work is reading, not following the tail.
+      followsBottom = false
+      applyRows()
+      return
+    }
     if row.kind == "changesHeader" {
       UISelectionFeedbackGenerator().selectionChanged()
       if !expandedFileGroups.insert(row.entryID).inserted { expandedFileGroups.remove(row.entryID) }
