@@ -2,6 +2,8 @@ package app.lody.android.create
 
 import app.lody.android.runtime.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.FlowPreview
 
 interface CreationOptionsStore {
     suspend fun readBranches(scope: RuntimeScope, repo: String): BranchCache? = null
@@ -13,6 +15,8 @@ interface CreationOptionsStore {
 }
 
 interface CreationService {
+    suspend fun refreshCapability(scope: RuntimeScope, agentConfigId: String) {}
+    fun observeOptions(scope: RuntimeScope): Flow<CreationOptions?> = flow { emit(options(scope, null)) }
     suspend fun cachedBranches(scope: RuntimeScope, repo: String): BranchCache? = null
     suspend fun branches(scope: RuntimeScope, repo: String, page: Int): BranchPage = error("branches_unavailable")
     suspend fun cacheBranches(scope: RuntimeScope, repo: String, page: BranchPage) {}
@@ -27,6 +31,32 @@ interface CreationService {
 class CreateSessionRepository(private val owner: RuntimeOwner, private val store: CreationOptionsStore,
     private val branchLoader: suspend (RuntimeScope, String, Int) -> BranchPage = { _, _, _ -> error("branches_unavailable") }
 ) : CreationService {
+    override suspend fun refreshCapability(scope: RuntimeScope, agentConfigId: String) {
+        owner.use(scope) { it.execute(RuntimeCommand.GetCreationOptions(null, agentConfigId)) }
+    }
+    @OptIn(FlowPreview::class)
+    override fun observeOptions(scope: RuntimeScope): Flow<CreationOptions?> {
+        val changes = owner.events.filter {
+            it.scope == scope && it.generation == owner.state.value.status.generation &&
+                (it.event is RuntimeEvent.Synced || it.event is RuntimeEvent.CreationChanged || it.event is RuntimeEvent.SyncFailed)
+        }.map { Unit }
+        val readiness = owner.state.map { Triple(it.scope, it.status.phase, it.status.generation) }.distinctUntilChanged().map { Unit }
+        return merge(changes, readiness).debounce(150).map {
+            if (owner.state.value.scope != scope || owner.state.value.status.phase != RuntimePhase.READY) null
+            else try {
+                owner.use(scope) { (it.execute(RuntimeCommand.GetCreationOptions(null)) as RuntimeResult.Options).value }
+                    .takeUnless { it.availability == "unknown" }
+            }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+        }.distinctUntilChanged().onEach { value ->
+            if (value != null) {
+                try { store.writeOptions(scope, null, value) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { }
+            }
+        }
+    }
     override suspend fun cachedBranches(scope: RuntimeScope, repo: String) = store.readBranches(scope, repo)
     override suspend fun branches(scope: RuntimeScope, repo: String, page: Int) = branchLoader(scope, repo, page)
     override suspend fun cacheBranches(scope: RuntimeScope, repo: String, page: BranchPage) = store.writeBranches(scope, repo, page)
@@ -35,7 +65,7 @@ class CreateSessionRepository(private val owner: RuntimeOwner, private val store
     override suspend fun cachedOptions(scope: RuntimeScope, projectId: String?) = store.readOptions(scope, projectId)
     override suspend fun options(scope: RuntimeScope, projectId: String?): CreationOptions = owner.use(scope) {
         val value = (it.execute(RuntimeCommand.GetCreationOptions(projectId)) as RuntimeResult.Options).value
-        try { store.writeOptions(scope, projectId, value) }
+        try { if (value.availability != "unknown") store.writeOptions(scope, projectId, value) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { /* Disk failure must not hide live choices. */ }
         value

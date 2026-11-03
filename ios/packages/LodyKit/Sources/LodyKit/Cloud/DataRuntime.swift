@@ -302,10 +302,11 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     case .machinePresence(let value):
       guard !backgrounded, value.onlineMachineIds.reduce(0, { $0 + $1.utf8.count }) <= 1024 * 1024 else { return }
       reason = "machine_presence"
-      emitStatus()
+      emitStatus(["creationOptionsChanged": true])
       onMachinePresence?(owner, value)
     case .synced:
       if phase != "live" { publish("live", reason: "synced") }
+      emitStatus(["creationOptionsChanged": true])
     case .syncError(let value):
       publish("offline", reason: value.reason.rawValue)
     case .sessionSubscriptions(let value):

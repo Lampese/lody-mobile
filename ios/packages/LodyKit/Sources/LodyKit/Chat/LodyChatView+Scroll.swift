@@ -31,14 +31,10 @@ extension LodyChatView {
   func collectionView(_ collectionView: UICollectionView, shouldHighlightItemAt indexPath: IndexPath) -> Bool {
     guard let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id] else { return false }
     if let cell = collectionView.cellForItem(at: indexPath) as? ChatCell, cell.expandable && !cell.expanded { return true }
-    return row.kind == "changes" || row.actionable || row.image != nil
+    return row.actionable || row.image != nil
   }
 
   func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-    if let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id], row.kind == "changes", let file = row.fileDiff {
-      onTurnChangesPress(["entryId": row.entryID, "path": file.path])
-      return
-    }
     collectionView.deselectItem(at: indexPath, animated: false)
     if let cell = collectionView.cellForItem(at: indexPath) as? ChatCell,
        cell.expandable, !cell.expanded, let row = cell.row {
@@ -51,6 +47,12 @@ extension LodyChatView {
       return
     }
     guard let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id], row.actionable else { return }
+    if row.kind == "changesHeader" {
+      if !expandedFileGroups.insert(row.entryID).inserted { expandedFileGroups.remove(row.entryID) }
+      UISelectionFeedbackGenerator().selectionChanged()
+      applyRows()
+      return
+    }
     if row.kind == "tasksHeader" {
       if !expandedTaskGroups.insert(row.entryID).inserted { expandedTaskGroups.remove(row.entryID) }
       UISelectionFeedbackGenerator().selectionChanged()
@@ -455,7 +457,7 @@ extension LodyChatView {
     if row.kind == "meta" { return ChatMetaCell.height(for: row, width: width, traits: traitCollection, detailsEnabled: turnInfoEnabled) }
     if row.kind == "duration" { return ChatCell.processHeight(for: row, width: width, traits: traitCollection) }
     if row.kind == "changesHeader" { return ChatFileCell.headerHeight }
-    if row.kind == "changes" { return ChatFileCell.rowHeight() }
+    if row.kind == "changesList" { return ChatFileListCell.height(count: row.fileDiffs.count) }
     let measured = measure(row, width: width)
     if row.kind == "user" {
       return ChatMessageContent.height(textHeight: measured,

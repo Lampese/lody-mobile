@@ -132,6 +132,7 @@ struct ChatRow: Equatable {
   var image: ChatImage? = nil
   var file: ChatMessageAttachment? = nil
   var fileDiff: ChatFileDiff? = nil
+  var fileDiffs: [ChatFileDiff] = []
   var attachments: [ChatMessageAttachment] = []
   var uploadProgress: [String: ChatAttachmentUploadProgress] = [:]
   var workDurationMs: Int? = nil
@@ -149,21 +150,15 @@ struct ChatRow: Equatable {
   /// (`seen` / `sent` / `queued` / `sending`), drawn above the bubble with the avatar beside it.
   var author = ""
   var authorImage = ""
+  var authorName = ""
   var authorTime = ""
   var readState = ""
 }
 
-/// The signed-in user names and pictures their own turns; others show as a member until the
-/// workspace member list is loaded.
+/// Formatting shared by user-turn headers and local sends.
 enum ChatAuthors {
   /// Turns without a recorded sender: older history, and this device's own sends.
   static let unknownSender = "-"
-
-  @MainActor static func identity(_ userId: String) -> (name: String, image: String) {
-    let user = AuthSession.shared.snapshot.account?.user
-    if let user, userId == unknownSender || userId == user.id { return (user.name, user.image ?? "") }
-    return (String(localized: "native.chat.member", bundle: .lody), "")
-  }
 
   static func time(_ timestamp: String?) -> String {
     guard let timestamp,

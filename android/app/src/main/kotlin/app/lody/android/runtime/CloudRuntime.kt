@@ -18,7 +18,8 @@ data class RuntimeScope(val accountId: String, val workspaceId: String) {
     init { require(accountId.isNotBlank() && workspaceId.isNotBlank()); require(accountId.length <= 128 && workspaceId.length <= 128) }
 }
 sealed interface RuntimeCommand {
-    data class GetCreationOptions(val projectId: String?) : RuntimeCommand
+    data class CreateTab(val parentId: String, val id: String, val title: String) : RuntimeCommand
+    data class GetCreationOptions(val projectId: String?, val agentConfigId: String? = null) : RuntimeCommand
     data class CreateAndSend(val request: CreateRequest) : RuntimeCommand
     data class SendText(val request: SendTextRequest) : RuntimeCommand
     data class WatchSession(val id: String) : RuntimeCommand
@@ -59,6 +60,7 @@ data class CatalogSession(
     val openedBySessionId: String? = null,
     val openedByRootSessionId: String? = null,
     val parentSessionId: String? = null,
+    val childSessionPlacement: String? = null,
     /** The assistant the session runs, needed to send a turn. */
     val cliType: String? = null,
     val agentType: String? = null,
@@ -87,6 +89,8 @@ data class CatalogSnapshot(
  * picked a user turn up, `pending` / `queued` before); [userId] is a user turn's sender;
  * [startedAt] / [endedAt] (epoch ms) time an agent turn; [model] names its model.
  */
+data class ChangedFile(val path: String, val added: Int = 0, val removed: Int = 0)
+
 data class SessionMessage(
     val id: String,
     val role: String,
@@ -100,6 +104,7 @@ data class SessionMessage(
     val model: String? = null,
     /** The turn's items in order (text, thought, tool steps, plans, notices) for the process view. */
     val items: List<TurnItem> = emptyList(),
+    val files: List<ChangedFile> = emptyList(),
 )
 
 /**
@@ -166,6 +171,7 @@ data class SendTextRequest(
 )
 data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>)
 sealed interface RuntimeEvent {
+    data class CreationChanged(val key: String = "") : RuntimeEvent
     data class SessionUpdated(val snapshot: SessionSnapshot) : RuntimeEvent
     data class CatalogUpdated(val snapshot: CatalogSnapshot) : RuntimeEvent
     data class Synced(val revision: Long, val streams: Int) : RuntimeEvent

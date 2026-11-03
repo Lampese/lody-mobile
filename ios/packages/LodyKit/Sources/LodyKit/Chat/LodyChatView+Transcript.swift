@@ -229,6 +229,19 @@ extension LodyChatView {
         return ChatStream.deferringMarkdown(byEntry[row.entryID] ?? [], previous: frozen)
       }
     }
+    let fileGroups = Dictionary(grouping: projected.filter { $0.kind == "changes" }, by: \.entryID)
+    projected = projected.flatMap { row -> [ChatRow] in
+      if row.kind == "changes" { return [] }
+      guard row.kind == "changesHeader" else { return [row] }
+      var header = row
+      let expanded = expandedFileGroups.contains(row.entryID)
+      header.group = expanded ? "first" : "only"
+      header.actionable = true
+      guard expanded else { return [header] }
+      var list = ChatRow(id: row.entryID + ":changes:list", entryID: row.entryID, kind: "changesList", text: "")
+      list.fileDiffs = (fileGroups[row.entryID] ?? []).compactMap(\.fileDiff)
+      return [header, list]
+    }
     // The task card folds to its header until opened; folded, the header carries the live step.
     let foldedTasks = Set(projected.filter { $0.kind == "tasksHeader" && !expandedTaskGroups.contains($0.entryID) }.map(\.entryID))
     for index in projected.indices where projected[index].kind == "tasksHeader" {
@@ -296,10 +309,22 @@ extension LodyChatView {
       }
     }
     deliveryExits = deliveryExits.filter { id, _ in projected.contains { $0.id == id } }
+    let signedInUser = AuthSession.shared.snapshot.account?.user
+    for index in projected.indices where !projected[index].author.isEmpty {
+      let author = projected[index].author
+      if let user = signedInUser, author == ChatAuthors.unknownSender || author == user.id {
+        projected[index].authorName = user.name
+        projected[index].authorImage = user.image ?? ""
+      } else if let member = members[author] {
+        projected[index].authorName = member.name
+        projected[index].authorImage = member.image ?? ""
+      }
+    }
     updateWorkDurationTimer(rows: projected)
     let entryIDsToRetain = Set(projected.map(\.entryID))
     expandedMessages.formIntersection(entryIDsToRetain)
     expandedAttachments.formIntersection(entryIDsToRetain)
+    expandedFileGroups.formIntersection(entryIDsToRetain)
     collapsedMessageHeights = collapsedMessageHeights.filter { entryIDsToRetain.contains($0.key) }
     for row in projected where row.kind == "user" && collapsedMessageHeights[row.entryID] == nil {
       if let height = ChatSendHandoff.sourceHeight(id: row.entryID) {

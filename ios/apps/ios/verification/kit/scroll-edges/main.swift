@@ -20,7 +20,7 @@ precondition(second.topEdgeEffect.style == .soft && second.bottomEdgeEffect.styl
 
 let chat = UIScrollView()
 LodyScrollEdges.chat(chat)
-precondition(!chat.topEdgeEffect.isHidden && chat.topEdgeEffect.style == .automatic)
+precondition(!chat.topEdgeEffect.isHidden && chat.topEdgeEffect.style == .soft)
 precondition(chat.bottomEdgeEffect.isHidden, "Chat replaces the system bottom edge with LodyEdgeFade")
 
 func maskAlpha(_ mask: UIImage, row: Int) -> CGFloat {

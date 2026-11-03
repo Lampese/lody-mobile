@@ -62,3 +62,20 @@ precondition(headerLabel.textColor == .lodyInk, "The header must use the ink tok
 precondition(header.accessories.isEmpty, "The header must have no navigation chevron")
 precondition(descendants(header).contains { $0.frame.height == 0.5 && !$0.isHidden }, "The header must separate its title from the first file")
 print("Chat files: grouped chrome, row heights, monospaced paths, icon removal and inset hairlines passed")
+
+
+let changedFiles = (0..<10).map { ChatFileDiff(path: "src/file\($0).swift", add: $0, del: 2, status: nil) }
+let fileList = ChatFileListCell(frame: CGRect(x: 16, y: 100, width: 358, height: ChatFileListCell.height(count: changedFiles.count)))
+window.addSubview(fileList)
+fileList.configure(entryID: "turn", files: changedFiles)
+fileList.layoutIfNeeded()
+let innerList = descendants(fileList).compactMap { $0 as? UICollectionView }.first!
+precondition(innerList.frame.height == ChatFileCell.rowHeight() * 6)
+precondition(innerList.isScrollEnabled && innerList.numberOfItems(inSection: 0) == 10)
+var selectedPath = ""
+fileList.onSelect = { selectedPath = $0 }
+fileList.collectionView(innerList, didSelectItemAt: IndexPath(item: 9, section: 0))
+precondition(selectedPath == changedFiles[9].path, "Files past the sixth row remain actionable")
+fileList.configure(entryID: "short", files: Array(changedFiles.prefix(2)))
+precondition(!innerList.isScrollEnabled && ChatFileListCell.height(count: 2) == ChatFileCell.rowHeight() * 2)
+print("PASS: changed files cap at six rows without dropping overflow files or selection")

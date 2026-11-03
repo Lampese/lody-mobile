@@ -24,6 +24,7 @@ struct SessionItem: Equatable, Sendable {
   var createdAt = ""
   var openedBySessionId: String?
   var openedByRootSessionId: String?
+  var childSessionPlacement: String?
   var parentSessionId: String?
   var lastMessageAt: Double?
   var lastReadAt: Double?
@@ -55,7 +56,7 @@ struct SessionItem: Equatable, Sendable {
 extension SessionItem: Decodable {
   private enum CodingKeys: String, CodingKey {
     case id, title, status, archived, pinned, projectId, createdAt, openedBySessionId, openedByRootSessionId
-    case parentSessionId, lastMessageAt, lastReadAt, awaitingUserSince, branchName, lastModel, diff, machineId
+    case childSessionPlacement, parentSessionId, lastMessageAt, lastReadAt, awaitingUserSince, branchName, lastModel, diff, machineId
     case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId, userId, agentConfigId
     case workspaceDirty, workspaceUnpushed
   }
@@ -86,6 +87,7 @@ extension SessionItem: Decodable {
     openedBySessionId = present(value(.openedBySessionId))
     openedByRootSessionId = present(value(.openedByRootSessionId))
     parentSessionId = present(value(.parentSessionId))
+    childSessionPlacement = present(value(.childSessionPlacement))
     lastMessageAt = value(.lastMessageAt)
     lastReadAt = value(.lastReadAt)
     awaitingUserSince = value(.awaitingUserSince)

@@ -82,6 +82,7 @@ import {
   ControlTurnParams,
   ControlTurnResult,
   CreateSessionParams,
+  CreateTabParams,
   CreateSessionResult,
   DeleteSessionParams,
   DeleteSessionResult,
@@ -212,6 +213,11 @@ export const runtimeCalls = {
   listDir: {
     params: ListDirParams,
     result: DirectoryListing,
+    timeoutMs: 45_000,
+  },
+  createTab: {
+    params: CreateTabParams,
+    result: CreateSessionResult,
     timeoutMs: 45_000,
   },
   createSession: {

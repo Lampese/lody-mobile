@@ -4,6 +4,19 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 class CloudAuthHttpTest {
+ @Test fun membersUseUserIdsAndFollowPagination()=runTest {
+  var calls=0
+  val api=CloudAuthHttp {path,_,_->
+   assertTrue(path.contains("organizationId=w")); assertTrue(path.contains("offset=${calls}"))
+   calls++
+   HttpReply(200,"""{"total":2,"members":[{"id":"membership-$calls","userId":"u$calls","user":{"id":"u$calls","name":"Person $calls","image":"http://unsafe/avatar"}}]}""")
+  }
+  val members=api.members(Credential("fixture"),"w")
+  assertEquals(listOf("u1","u2"), members.map { it.id })
+  assertNull(members.first().image)
+  assertEquals(2,calls)
+ }
+
  @Test fun deviceFlowUsesRegisteredClientAndTrustedBrowserAddress()=runTest {
   val api=CloudAuthHttp {path,credential,body->
    assertEquals("/api/auth/device/code",path);assertNull(credential)

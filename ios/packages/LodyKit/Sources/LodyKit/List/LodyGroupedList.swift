@@ -575,7 +575,12 @@ final class LodyGroupedList: LodyAppearanceView, UICollectionViewDelegate, UISea
         rowCount: model?.rows.count ?? 0,
         placeholder: self?.placeholderText ?? ""
       )
-      configuration.headerMode = outline ? .none : .supplementary
+      let emptyLeadingHeader = index == 0
+        && (model?.header ?? "").isEmpty
+        && (model?.headerValue ?? "").isEmpty
+        && (model?.headerStatus ?? "").isEmpty
+        && (model?.headerActionId ?? "").isEmpty
+      configuration.headerMode = outline || emptyLeadingHeader ? .none : .supplementary
       let emptyFlatFooter = flatSystem && (model?.footer ?? "").isEmpty
       configuration.footerMode = outline || hideEmptyFooter || emptyFlatFooter ? .none : .supplementary
       configuration.leadingSwipeActionsConfigurationProvider = { indexPath in

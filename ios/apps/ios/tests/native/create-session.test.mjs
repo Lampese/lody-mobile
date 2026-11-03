@@ -408,6 +408,32 @@ test('create a project session, open its empty history and dispatch the first tu
   const githubMeta = remote.get(['m', `session-${github.sessionId}`]);
   assert.equal(githubMeta.project.branch, 'develop');
   assert.equal(githubMeta.isWorktree, true);
+  const tabOptions = runtime.creationOptions(undefined, meta, machines);
+  const tabResult = await runtime.createSession(
+    {
+      ...args,
+      projectId: undefined,
+      sessionId: tabOptions.sessionId,
+      tabContext: {
+        parentSessionId: github.sessionId,
+        projectId: github.project.id,
+        project: githubMeta.project,
+        repoFullName: githubMeta.repoFullName,
+        baseBranch: githubMeta.baseBranch,
+      },
+    },
+    tabOptions,
+    replica,
+    grant,
+  );
+  assert.equal(tabResult.state, 'created');
+  const tabMeta = remote.get(['m', `session-${tabOptions.sessionId}`]);
+  assert.equal(tabMeta.parentSessionId, github.sessionId);
+  assert.deepEqual(tabMeta.project, githubMeta.project);
+  assert.equal(tabMeta.isWorktree, undefined);
+  assert.equal(tabMeta.resume, undefined);
+  assert.equal(tabResult.session.projectId, github.project.id);
+
   delete globalThis.__creationClient;
 });
 
@@ -619,11 +645,51 @@ test('chat and fresh GitHub repositories can use workspace machines while local 
   delete globalThis.__creationClient;
 });
 
-test('legacy capability keys preserve all builtin agent types',async()=>{
- const {readFile}=await import('node:fs/promises'),{transform}=await import('esbuild'),vm=await import('node:vm');
- const source=await readFile(new URL('../../../../packages/cloud-runtime/src/runtime/create-session.ts',import.meta.url),'utf8');
- const code=(await transform(source.slice(source.indexOf('export function creationOptions('),source.indexOf('const attempted =')).replace('export function','function'),{loader:'ts'})).code;
- const context={crypto,projectRows:()=>({projects:[]}),isThoughtLevel:()=>false,validConfigValue:()=>false};vm.runInNewContext(code+';globalThis.options=creationOptions',context);
- const rows=['grok','codex'].map(id=>({key:['acpCapability','builtin',id],value:{cliType:'builtin',agentType:id,models:[{modelId:id,name:id}],fetchedAt:1}}));
- const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,undefined);assert.equal(result.capabilities[0].agentType,'grok');assert.equal(result.capabilities[1].models[0].id,'codex');
+test('legacy capability keys preserve all builtin agent types', async () => {
+  const { readFile } = await import('node:fs/promises'),
+    { transform } = await import('esbuild'),
+    vm = await import('node:vm');
+  const source = await readFile(
+    new URL(
+      '../../../../packages/cloud-runtime/src/runtime/create-session.ts',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const code = (
+    await transform(
+      source
+        .slice(
+          source.indexOf('export function creationOptions('),
+          source.indexOf('const attempted ='),
+        )
+        .replace('export function', 'function'),
+      { loader: 'ts' },
+    )
+  ).code;
+  const context = {
+    crypto,
+    projectRows: () => ({ projects: [] }),
+    isThoughtLevel: () => false,
+    validConfigValue: () => false,
+  };
+  vm.runInNewContext(code + ';globalThis.options=creationOptions', context);
+  const rows = ['grok', 'codex'].map((id) => ({
+    key: ['acpCapability', 'builtin', id],
+    value: {
+      cliType: 'builtin',
+      agentType: id,
+      models: [{ modelId: id, name: id }],
+      fetchedAt: 1,
+    },
+  }));
+  const result = context.options(
+    undefined,
+    { scan: () => [] },
+    new Map([['m', { scan: () => rows }]]),
+  );
+  assert.equal(result.capabilities.length, 2);
+  assert.equal(result.capabilities[0].agentConfigId, undefined);
+  assert.equal(result.capabilities[0].agentType, 'grok');
+  assert.equal(result.capabilities[1].models[0].id, 'codex');
 });

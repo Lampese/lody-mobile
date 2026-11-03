@@ -201,3 +201,37 @@ enum SessionRows {
     return item
   }
 }
+
+
+enum DirectoryTabs {
+  static func sessions(current: SessionItem, all: [SessionItem]) -> [SessionItem] {
+    let indexed = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    func root(_ item: SessionItem) -> String {
+      var id = item.id
+      var seen = Set<String>()
+      while seen.insert(id).inserted, let parent = indexed[id]?.parentSessionId, !parent.isEmpty { id = parent }
+      return id
+    }
+    let owner = root(current)
+    return all.filter { !$0.archived && $0.childSessionPlacement != "side-panel" && $0.machineId == current.machineId && root($0) == owner }
+      .sorted { left, right in
+        if left.id != right.id && left.id == owner { return true }
+        if right.id == owner { return false }
+        if left.createdAt != right.createdAt { return left.createdAt < right.createdAt }
+        return left.id < right.id
+      }
+  }
+
+  static func symbol(_ sessions: [SessionItem]) -> String {
+    for state: SessionState in [.attention, .failed, .live] {
+      if sessions.contains(where: { SessionState($0) == state }) {
+        switch state {
+        case .attention: return "hand.raised"
+        case .failed: return "exclamationmark.circle"
+        default: return "square.grid.2x2.fill"
+        }
+      }
+    }
+    return sessions.contains(where: SessionRows.isUnread) ? "circle.fill" : ""
+  }
+}

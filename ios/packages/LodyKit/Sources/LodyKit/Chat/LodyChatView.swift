@@ -129,6 +129,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var expandedMessages = Set<String>()
   /// Settled task groups the reader opened, by entry (a running group is always open).
   var expandedTaskGroups = Set<String>()
+  var expandedFileGroups = Set<String>()
   var expandedAttachments = Set<String>()
   var collapsedMessageHeights: [String: CGFloat] = [:]
   var imageWorkspace = ""
@@ -143,6 +144,10 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   let empty = UILabel()
   private weak var scrollOwner: UIViewController?
   var dataSource: UICollectionViewDiffableDataSource<String, String>!
+  var members: [String: WorkspaceMember] = [:] {
+    // Member refreshes do not enqueue new message JSON. Reproject the existing rows directly.
+    didSet { if members != oldValue { applyRows() } }
+  }
   var transcript = ChatTranscript()
   /// Builtin DSH only (web `showThoughts`): its thoughts stay in the transcript.
   var showsThoughts = false
@@ -229,29 +234,10 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     }
     cell.isAccessibilityElement = true
     cell.accessibilityIdentifier = row.id
-    cell.accessibilityTraits = .header
-  }
-  private let fileRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
-    guard let file = row.fileDiff else { return }
-    let content = ChatFileCell.rowContent(for: file.path)
-    cell.directionalLayoutMargins.leading = content.directionalLayoutMargins.leading
-    cell.directionalLayoutMargins.trailing = content.directionalLayoutMargins.leading
-    cell.contentConfiguration = content
-    cell.apply(group: row.group, selected: cell.isHighlighted || cell.isSelected)
-    let counts = UILabel()
-    counts.font = LodyDesign.mono(12, compatibleWith: cell.traitCollection)
-    let value = NSMutableAttributedString(string: "+\(file.add ?? 0)", attributes: [.foregroundColor: UIColor.systemGreen])
-    value.append(NSAttributedString(string: "  −\(file.del ?? 0)", attributes: [.foregroundColor: UIColor.systemRed]))
-    counts.attributedText = value
-    cell.accessories = [.customView(configuration: .init(customView: counts, placement: .trailing())), .disclosureIndicator()]
-    cell.configurationUpdateHandler = { cell, state in
-      (cell as? ChatFileCell)?.apply(group: row.group, selected: state.isHighlighted || state.isSelected)
-      cell.accessibilityTraits = state.isSelected ? [.button, .selected] : .button
-    }
-    cell.isAccessibilityElement = true
-    cell.accessibilityIdentifier = row.id
-    cell.accessibilityLabel = String.localizedStringWithFormat(String(localized: "native.chat.file.diffStats", bundle: .lody), String(describing: file.add ?? 0), String(describing: file.del ?? 0), String(describing: file.path))
-    cell.accessibilityHint = String(localized: "native.chat.row.openChanges", bundle: .lody)
+    let chevron = UIImageView(image: UIImage(systemName: row.group == "only" ? "chevron.right" : "chevron.down"))
+    chevron.tintColor = .secondaryLabel
+    cell.accessories.append(.customView(configuration: .init(customView: chevron, placement: .trailing())))
+    cell.accessibilityTraits = [.header, .button]
   }
 
   /// The task card's header: the same inset card as changed files, a live spinner or the stack
@@ -388,6 +374,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       self.refreshFindHighlights()
     }
     collection.register(ChatMessageAttachmentsCell.self, forCellWithReuseIdentifier: "attachments")
+    collection.register(ChatFileListCell.self, forCellWithReuseIdentifier: "file-list")
     collection.register(ChatImageCell.self, forCellWithReuseIdentifier: "image")
     collection.register(ChatHistoryHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "history")
     collection.register(ChatErrorCell.self, forCellWithReuseIdentifier: "error")
@@ -434,8 +421,11 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       if row.kind == "subagent_task", !row.group.isEmpty {
         return collection.dequeueConfiguredReusableCell(using: self.taskRegistration, for: index, item: row)
       }
-      if row.kind == "changes" {
-        return collection.dequeueConfiguredReusableCell(using: self.fileRegistration, for: index, item: row)
+      if row.kind == "changesList" {
+        let cell = collection.dequeueReusableCell(withReuseIdentifier: "file-list", for: index) as! ChatFileListCell
+        cell.configure(entryID: row.entryID, files: row.fileDiffs)
+        cell.onSelect = { [weak self] path in self?.onTurnChangesPress(["entryId": row.entryID, "path": path]) }
+        return cell
       }
       if row.kind == "attachments" {
         let cell = collection.dequeueReusableCell(withReuseIdentifier: "attachments", for: index) as! ChatMessageAttachmentsCell
@@ -608,6 +598,17 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     updateTitleButton()
   }
 
+  private var directoryTabSymbol: String?
+
+  func setDirectoryTabs(_ caption: String, symbol: String) {
+    directoryTabSymbol = symbol
+    navigationSubtitle = caption
+    navigationMachine = ""
+    navigationMachineState = ""
+    navigationBranch = ""
+    updateTitleButton()
+  }
+
   func setTitleMenu(_ json: String) {
     struct Item: Decodable {
       let id: String
@@ -616,13 +617,15 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       let symbol: String
       var group: Int?
       var destructive: Bool?
+      var selected: Bool?
+      var disabled: Bool?
     }
     let items = (try? JSONDecoder().decode([Item].self, from: Data(json.utf8))) ?? []
     let groups = Dictionary(grouping: items) { $0.group ?? 0 }
     titleButton.menu = items.isEmpty ? nil : UIMenu(children: groups.keys.sorted().map { key in
       UIMenu(options: .displayInline, children: groups[key]!.map { item in
         UIAction(title: item.title, subtitle: item.subtitle, image: UIImage(systemName: item.symbol),
-                 attributes: item.destructive == true ? .destructive : []) { [weak self] _ in
+                 attributes: item.disabled == true ? .disabled : (item.destructive == true ? .destructive : []), state: item.selected == true ? .on : .off) { [weak self] _ in
           self?.onTitleMenu(["id": item.id])
         }
       })
@@ -665,7 +668,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       subtitle: navigationSubtitle,
       machine: navigationMachine,
       branch: navigationBranch,
-      machineState: navigationMachineState
+      machineState: navigationMachineState, tabSymbol: directoryTabSymbol
     )
     attachTitle()
   }
@@ -675,8 +678,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     var responder = next
     while let current = responder {
       if let controller = current as? UIViewController {
-        controller.setContentScrollView(collection, for: .top)
-        controller.setContentScrollView(collection, for: .bottom)
+        LodyScrollEdges.bind(collection, to: controller)
         LodyScrollEdges.chat(collection)
         scrollOwner = controller
         if navigation.parent == nil {

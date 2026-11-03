@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeContract {
   public static let version = 1
-  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","creationOptions","deleteSession","editSession","ensureSession","fileDiff","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
+  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
 
   public enum AgentRoleItemVisibility: String, Codable, Sendable, Equatable, CaseIterable {
     case `private` = "private"
@@ -954,6 +954,33 @@ extension RuntimeContract {
     }
   }
 
+  public struct CreateTabParams: Codable, Sendable, Equatable {
+    public var workspaceId: String
+    public var sessionId: String
+    public var parentSessionId: String
+    public var title: String
+    public init(workspaceId: String, sessionId: String, parentSessionId: String, title: String) {
+      self.workspaceId = workspaceId
+      self.sessionId = sessionId
+      self.parentSessionId = parentSessionId
+      self.title = title
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.workspaceId = try c.decode(String.self, forKey: Key("workspaceId"))
+      self.sessionId = try c.decode(String.self, forKey: Key("sessionId"))
+      self.parentSessionId = try c.decode(String.self, forKey: Key("parentSessionId"))
+      self.title = try c.decode(String.self, forKey: Key("title"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.workspaceId, forKey: Key("workspaceId"))
+      try c.encode(self.sessionId, forKey: Key("sessionId"))
+      try c.encode(self.parentSessionId, forKey: Key("parentSessionId"))
+      try c.encode(self.title, forKey: Key("title"))
+    }
+  }
+
   public enum CreationOptionsAvailability: String, Codable, Sendable, Equatable, CaseIterable {
     case online = "online"
     case offline = "offline"
@@ -1029,19 +1056,23 @@ extension RuntimeContract {
   public struct CreationOptionsParams: Codable, Sendable, Equatable {
     public var workspaceId: String
     public var projectId: String?
-    public init(workspaceId: String, projectId: String? = nil) {
+    public var agentConfigId: String?
+    public init(workspaceId: String, projectId: String? = nil, agentConfigId: String? = nil) {
       self.workspaceId = workspaceId
       self.projectId = projectId
+      self.agentConfigId = agentConfigId
     }
     public init(from decoder: any Decoder) throws {
       let c = try decoder.container(keyedBy: Key.self)
       self.workspaceId = try c.decode(String.self, forKey: Key("workspaceId"))
       self.projectId = try c.decodeIfPresent(String.self, forKey: Key("projectId"))
+      self.agentConfigId = try c.decodeIfPresent(String.self, forKey: Key("agentConfigId"))
     }
     public func encode(to encoder: any Encoder) throws {
       var c = encoder.container(keyedBy: Key.self)
       try c.encode(self.workspaceId, forKey: Key("workspaceId"))
       try c.encodeIfPresent(self.projectId, forKey: Key("projectId"))
+      try c.encodeIfPresent(self.agentConfigId, forKey: Key("agentConfigId"))
     }
   }
 
@@ -6644,6 +6675,16 @@ extension RuntimeContract {
         return nil
       }
     }
+    public enum CreateTab: RuntimeCall {
+      public typealias Params = RuntimeContract.CreateTabParams
+      public typealias Result = RuntimeContract.CreateSessionResult
+      public static let method = "createTab"
+      public static let timeout: Double = 45
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .createTab(let result) = value { return result }
+        return nil
+      }
+    }
     public enum CreationOptions: RuntimeCall {
       public typealias Params = RuntimeContract.CreationOptionsParams
       public typealias Result = RuntimeContract.CreationOptions
@@ -7000,6 +7041,7 @@ extension RuntimeContract {
     case closeSession(RuntimeContract.Empty)
     case controlTurn(RuntimeContract.ControlTurnResult)
     case createSession(RuntimeContract.CreateSessionResult)
+    case createTab(RuntimeContract.CreateSessionResult)
     case creationOptions(RuntimeContract.CreationOptions)
     case deleteSession(RuntimeContract.DeleteSessionResult)
     case editSession(RuntimeContract.EditSessionResult)
@@ -7097,6 +7139,7 @@ extension RuntimeContract {
         case "closeSession": message = .result(id: id, .closeSession(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "controlTurn": message = .result(id: id, .controlTurn(try c.decode(RuntimeContract.ControlTurnResult.self, forKey: Key("payload"))))
         case "createSession": message = .result(id: id, .createSession(try c.decode(RuntimeContract.CreateSessionResult.self, forKey: Key("payload"))))
+        case "createTab": message = .result(id: id, .createTab(try c.decode(RuntimeContract.CreateSessionResult.self, forKey: Key("payload"))))
         case "creationOptions": message = .result(id: id, .creationOptions(try c.decode(RuntimeContract.CreationOptions.self, forKey: Key("payload"))))
         case "deleteSession": message = .result(id: id, .deleteSession(try c.decode(RuntimeContract.DeleteSessionResult.self, forKey: Key("payload"))))
         case "editSession": message = .result(id: id, .editSession(try c.decode(RuntimeContract.EditSessionResult.self, forKey: Key("payload"))))

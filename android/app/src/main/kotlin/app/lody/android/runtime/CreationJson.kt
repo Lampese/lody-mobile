@@ -18,8 +18,10 @@ internal object CreationJson {
                 val a = efforts.getJSONArray(key); (0 until a.length()).map { a.getString(it) }
             }, c.optString("agentConfigId").takeIf { it.isNotBlank() }, defaultModel, defaultEfforts)
         },
+        value.optString("availability", "unknown"),
     )
     fun encodeOptions(value: CreationOptions) = JSONObject().apply {
+        put("availability", value.availability)
         fun choices(values: List<CreationChoice>) = JSONArray(values.map { JSONObject().put("id", it.id).put("name", it.name) })
         put("agents", JSONArray(value.agents.map { JSONObject().put("id", it.id).put("name", it.name).put("machineId", it.machineId).put("cliType", it.cliType).put("agentType", it.agentType) }))
         put("capabilities", JSONArray(value.capabilities.map { c -> JSONObject().put("machineId", c.machineId).put("cliType", c.cliType).put("agentType", c.agentType).put("agentConfigId", c.agentConfigId)

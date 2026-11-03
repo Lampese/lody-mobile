@@ -214,10 +214,17 @@ enum ChatNavigationTitle {
     [branch, project, machine].filter { !$0.isEmpty }.joined(separator: " · ")
   }
 
-  static func configureButton(_ button: ChatNavigationTitleButton, title: String, subtitle: String, machine: String = "", branch: String = "", machineState: String = "") {
+  static func configureButton(_ button: ChatNavigationTitleButton, title: String, subtitle: String, machine: String = "", branch: String = "", machineState: String = "", tabSymbol: String? = nil) {
     button.titleHost.apply(title, animated: true)
     button.captionLabel.lineBreakMode = branch.isEmpty || !machineState.isEmpty ? .byTruncatingMiddle : .byTruncatingTail
-    if let attributed = attributedSubtitle(project: subtitle, machine: machine, branch: branch, machineState: machineState) {
+    if let tabSymbol, !subtitle.isEmpty {
+      let font = UIFont.preferredFont(forTextStyle: .caption1)
+      let text = NSMutableAttributedString(string: subtitle + " ", attributes: [.font: font, .foregroundColor: UIColor.secondaryLabel])
+      let tint: UIColor = tabSymbol == "exclamationmark.circle" ? .systemRed : .systemBlue
+      if let icon = symbolAttachment(tabSymbol, font: font, color: tint) { text.append(NSAttributedString(attachment: icon)) }
+      button.captionLabel.attributedText = text
+      button.captionLabel.isHidden = false
+    } else if let attributed = attributedSubtitle(project: subtitle, machine: machine, branch: branch, machineState: machineState) {
       button.captionLabel.attributedText = NSAttributedString(attributed)
       button.captionLabel.isHidden = false
     } else {

@@ -31,6 +31,11 @@
       "result": "CreateSessionResult",
       "timeoutMs": 45000
     },
+    "createTab": {
+      "params": "CreateTabParams",
+      "result": "CreateSessionResult",
+      "timeoutMs": 45000
+    },
     "creationOptions": {
       "params": "CreationOptionsParams",
       "result": "CreationOptions",
@@ -705,6 +710,20 @@
         }
       ]
     },
+    "CreateTabParams": {
+      "type": "object",
+      "properties": {
+        "workspaceId": { "type": "string", "minLength": 1 },
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+        },
+        "parentSessionId": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 }
+      },
+      "required": ["workspaceId", "sessionId", "parentSessionId", "title"]
+    },
     "CreationOptions": {
       "type": "object",
       "properties": {
@@ -744,7 +763,8 @@
       "type": "object",
       "properties": {
         "workspaceId": { "type": "string", "minLength": 1 },
-        "projectId": { "type": "string" }
+        "projectId": { "type": "string" },
+        "agentConfigId": { "type": "string", "minLength": 1 }
       },
       "required": ["workspaceId"]
     },

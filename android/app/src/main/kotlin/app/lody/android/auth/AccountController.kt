@@ -98,6 +98,7 @@ class AccountController(private val api: CloudAuthApi, private val store: Creden
         if (epoch != identity || credential !== token) throw AuthFailure("account_changed")
         return result
     }
+    suspend fun members(scope: RuntimeScope): List<WorkspaceMember> = withVerifiedAccount(scope) { api.members(it, scope.workspaceId) }
     internal suspend fun <T> withVerifiedAccount(scope: RuntimeScope, block: suspend (Credential) -> T): T {
         val identity = epoch
         val token = credential ?: throw AuthFailure("account_changed")

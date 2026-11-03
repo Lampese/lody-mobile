@@ -17,6 +17,7 @@ object CatalogJson {
         openedBySessionId = json.optText("openedBySessionId"),
         openedByRootSessionId = json.optText("openedByRootSessionId"),
         parentSessionId = json.optText("parentSessionId"),
+        childSessionPlacement = json.optText("childSessionPlacement"),
         cliType = json.optText("cliType"),
         agentType = json.optText("agentType"),
         resume = json.optText("resume"),
@@ -54,6 +55,7 @@ object CatalogJson {
         session.openedBySessionId?.let { put("openedBySessionId", it) }
         session.openedByRootSessionId?.let { put("openedByRootSessionId", it) }
         session.parentSessionId?.let { put("parentSessionId", it) }
+        session.childSessionPlacement?.let { put("childSessionPlacement", it) }
         session.cliType?.let { put("cliType", it) }
         session.agentType?.let { put("agentType", it) }
         session.resume?.let { put("resume", it) }

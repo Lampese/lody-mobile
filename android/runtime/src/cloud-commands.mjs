@@ -7,8 +7,7 @@ export function cloudCommands(runtime, access, stopSessions) {
    access.configure({workspaceId,gatewayBaseUrl});
    connected=true;
    // The verified native identity enables presence for creation; offline probes omit it.
-   runtime.start(workspaceId,userId,Boolean(userId));
-   return true;
+   return runtime.start(workspaceId,userId,Boolean(userId));
   },
   watchSession(id) {
    if(!connected)throw Error('not_connected');

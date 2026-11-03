@@ -1,5 +1,11 @@
 import Foundation
 
+struct WorkspaceMember: Codable, Equatable, Sendable {
+  let id: String
+  let name: String
+  let image: String?
+}
+
 struct AuthUser: Codable, Equatable, Sendable {
   let id: String
   let name: String
@@ -201,6 +207,30 @@ struct AuthAPI: Sendable {
     guard (200..<300).contains(status) else { throw AuthFailure(message: String(localized: "workspace.edit.iconUploadFailed", bundle: .lody)) }
     let avatar = try Self.record(Self.record(value)["avatar"])
     return "\(Self.cloudOrigin)/api/avatars/\(Self.component(try Self.requiredString(avatar["avatarId"])))"
+  }
+
+  func members(token: String, workspaceId: String) async throws -> [WorkspaceMember] {
+    guard workspaceId.range(of: #"^[A-Za-z0-9_-]{1,200}$"#, options: .regularExpression) != nil else {
+      throw AuthFailure(message: "Invalid workspace")
+    }
+    var members: [String: WorkspaceMember] = [:]
+    var offset = 0
+    while offset < 10000 {
+      try Task.checkCancellation()
+      let page = try Self.record(await request("/organization/list-members?organizationId=\(workspaceId)&limit=100&offset=\(offset)", token: token))
+      guard let rows = page["members"] as? [[String: Any]], rows.count <= 100,
+            let total = page["total"] as? Int, (0...10000).contains(total) else { throw AuthFailure(message: "Invalid members") }
+      for row in rows {
+        let id = try Self.requiredString(row["userId"])
+        let user = try Self.record(row["user"] as Any)
+        guard user["id"] as? String == id else { throw AuthFailure(message: "Invalid member identity") }
+        members[id] = WorkspaceMember(id: id, name: user["name"] as? String ?? "", image: Self.optionalHTTPS(user["image"]))
+      }
+      offset += rows.count
+      if offset >= total { return members.values.sorted { $0.id < $1.id } }
+      guard !rows.isEmpty else { throw AuthFailure(message: "Incomplete members") }
+    }
+    throw AuthFailure(message: "Too many members")
   }
 
   func signOut(token: String) async throws {

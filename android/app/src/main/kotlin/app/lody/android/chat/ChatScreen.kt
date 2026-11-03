@@ -57,6 +57,7 @@ data class ChatContext(
     val session: CatalogSession? = null,
     val me: Account? = null,
     /** The GitHub repository (`owner/name`) the session works in; empty without one. */
+    val tabs: List<CatalogSession> = emptyList(),
     val repository: String = "",
     val machineName: String = "",
     val machineKind: app.lody.android.create.CreateSessionModel.MachineKind = app.lody.android.create.CreateSessionModel.MachineKind.Laptop,
@@ -64,7 +65,7 @@ data class ChatContext(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, context: ChatContext, onBack: () -> Unit) {
+fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, context: ChatContext, onBack: () -> Unit, onSelectTab: (String) -> Unit = {}) {
     BackHandler(onBack = onBack)
     var retry by remember(id, scope) { mutableIntStateOf(0) }
     var status by remember(id, scope) { mutableStateOf("syncing") }
@@ -78,6 +79,12 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val agentName = agentLabel(context.session)
     val meName = context.me?.name.orEmpty()
     // Resolved in composition: the transcript is built off the main thread.
+    val application = appContext.applicationContext as app.lody.android.LodyApplication
+    val accountState by application.account.state.collectAsState()
+    var members by remember(scope) { mutableStateOf(emptyMap<String, app.lody.android.auth.WorkspaceMember>()) }
+    LaunchedEffect(scope, accountState.verified) {
+        application.members.observe(scope).collect { members = it }
+    }
     val memberLabel = stringResource(R.string.chat_member)
     val workedFormat = stringResource(R.string.chat_worked_for)
     LaunchedEffect(scope, id, retry) {
@@ -97,7 +104,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                         rendered[message.id]?.takeIf { it.first == message }?.second ?: when (message.role) {
                             "user" -> ChatEntry.User(
                                 message.id, message.text,
-                                TurnIdentity(senderName(message.userId, context.me, memberLabel), senderImage(message.userId, context.me), turnTime(message.timestamp)),
+                                TurnIdentity("", time = turnTime(message.timestamp)),
                                 delivery(message.status),
                             )
                             else -> {
@@ -123,6 +130,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                     TurnIdentity(message.model?.let { "$agentName · $it" } ?: agentName, time = turnTime(message.timestamp)),
                                     worked(message, workedFormat),
                                     working = message.streaming,
+                                    files = message.files,
                                 )
                             }
                         }.also { rendered[message.id] = message to it }
@@ -136,9 +144,14 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         } finally { repair.close() }
     }
     // A sent turn leaves the optimistic list once the transcript carries its id.
-    val shownIds = remember(messages) { messages.map { it.id }.toSet() }
-    val pending = outgoing.filter { it.turnId !in shownIds }
-    val all = entries + pending.map {
+    val authorsByMessage = remember(messages) { messages.associate { it.id to it.userId } }
+    val pending = outgoing.filter { it.turnId !in authorsByMessage }
+    val all = entries.map { entry ->
+        if (entry is ChatEntry.User) {
+            val userId = authorsByMessage[entry.id]
+            entry.copy(who = senderIdentity(userId, context.me, members[userId], memberLabel, entry.who.time))
+        } else entry
+    } + pending.map {
         ChatEntry.User(it.turnId, it.text, TurnIdentity(meName, context.me?.image, turnTime(it.at)), it.delivery)
     }
     val session = context.session
@@ -146,6 +159,34 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val failedText = stringResource(R.string.chat_send_failed)
     val attachText = stringResource(R.string.chat_attach_unavailable)
     val snackbar = remember { SnackbarHostState() }
+    var creatingTab by remember(id, scope) { mutableStateOf(false) }
+    var attemptedTab by rememberSaveable(id, scope.workspaceId) { mutableStateOf<String?>(null) }
+    val newTabTitle = stringResource(R.string.chat_new_tab)
+    val tabFailure = stringResource(R.string.chat_tab_creation_failed)
+    val tabUnknown = stringResource(R.string.chat_tab_creation_unknown)
+    val createTab = {
+        if (!creatingTab) {
+            creatingTab = true
+            coroutines.launch {
+                if (attemptedTab != null) {
+                    onSelectTab(attemptedTab!!)
+                } else {
+                    val target = UUID.randomUUID().toString()
+                    attemptedTab = target
+                    try {
+                        val result = repository.createTab(scope, id, target, newTabTitle)
+                        when (result.state) {
+                            "created" -> { attemptedTab = null; onSelectTab(target) }
+                            "rejected" -> { attemptedTab = null; snackbar.showSnackbar(tabFailure) }
+                            else -> snackbar.showSnackbar(tabUnknown)
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { snackbar.showSnackbar(tabUnknown) }
+                }
+                creatingTab = false
+            }
+        }
+    }
     val running = session?.status in RunningStatuses || pending.any { it.delivery == Delivery.Sending }
     // One send path for typed turns and the action bar's prompts: optimistic bubble, never resent.
     val sendText: (String) -> Unit = sendText@{ text ->
@@ -251,7 +292,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                         loadDetail = { entryId, itemId -> repository.detail(scope, id, entryId, itemId) },
                     )
                 }
-                ChatHeader(context.title, context.subtitle, onBack)
+                ChatHeader(context.title, context.tabs, id, creatingTab, onBack, onSelectTab, createTab)
                 if (status == "offline") {
                     Row(
                         Modifier.align(Alignment.TopCenter).padding(top = top).padding(horizontal = TranscriptMargin).fillMaxWidth(),
@@ -301,7 +342,8 @@ private val RunningStatuses = setOf("running", "initializing", "processing", "in
 
 /** Web's floating header: a round back button, then the title over the repository line. */
 @Composable
-private fun BoxScope.ChatHeader(title: String, subtitle: String, onBack: () -> Unit) {
+private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, currentId: String, creating: Boolean, onBack: () -> Unit, onSelectTab: (String) -> Unit, onNewTab: () -> Unit) {
+    var expanded by remember(currentId) { mutableStateOf(false) }
     val colors = LodyTheme.colors
     Row(
         Modifier
@@ -315,13 +357,23 @@ private fun BoxScope.ChatHeader(title: String, subtitle: String, onBack: () -> U
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
     ) {
         RoundButton(LodyIcons.Back, stringResource(R.string.chat_back), onClick = onBack)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
-                    Icon(LodyIcons.Github, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                    Text(subtitle, style = LodyTheme.typography.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.weight(1f)) {
+            Column(Modifier.fillMaxWidth().heightIn(min = LodySize.touchTarget).clickable(role = Role.Button) { expanded = true }) {
+                Text(title, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (tabs.size > 1) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                    Text(androidx.compose.ui.res.pluralStringResource(R.plurals.chat_directory_tabs, tabs.size, tabs.size), modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis, style = LodyTheme.typography.footnote, color = colors.textSecondary)
+                    DirectoryTabs.attention(tabs)?.let { app.lody.android.home.AttentionGlyph(it) }
                 }
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                if (tabs.size > 1) tabs.forEach { tab ->
+                    DropdownMenuItem(text = { Text(tab.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = { DirectoryTabs.attention(listOf(tab))?.let { app.lody.android.home.AttentionGlyph(it) } },
+                        trailingIcon = { if (tab.id == currentId) Icon(LodyIcons.Check, contentDescription = stringResource(R.string.chat_current_tab)) },
+                        onClick = { expanded = false; if (tab.id != currentId) onSelectTab(tab.id) })
+                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.chat_new_tab)) }, enabled = !creating,
+                    leadingIcon = { Icon(LodyIcons.Plus, contentDescription = null) }, onClick = { expanded = false; onNewTab() })
             }
         }
     }
@@ -348,19 +400,20 @@ private fun RoundButton(icon: ImageVector, label: String, modifier: Modifier = M
 
 private data class Outgoing(val turnId: String, val text: String, val at: String, val delivery: Delivery)
 
-private fun delivery(status: String) = when (status) {
-    "seen", "completed", "done" -> Delivery.Seen
+internal fun delivery(status: String) = when (status) {
+    // Execution failure/cancellation still acknowledges receipt, as on desktop.
+    // Only a send failure means the turn was not delivered.
+    "seen", "processing", "handled", "failed", "canceled", "completed", "done" -> Delivery.Seen
     "queued" -> Delivery.Queued
-    "failed", "not_sent" -> Delivery.Failed
+    "not_sent" -> Delivery.Failed
     else -> Delivery.Sent
 }
 
-/** The signed-in user is named and pictured; other members need the member list (not loaded yet). */
-private fun senderName(userId: String?, me: Account?, member: String): String =
-    if (me != null && (userId == null || userId == me.id)) me.name else member
-
-private fun senderImage(userId: String?, me: Account?): String? =
-    if (me != null && (userId == null || userId == me.id)) me.image else null
+/** Resolve once at display time so member refreshes do not rebuild Markdown. */
+internal fun senderIdentity(userId: String?, me: Account?, member: app.lody.android.auth.WorkspaceMember?, fallback: String, time: String): TurnIdentity {
+    if (me != null && (userId == null || userId == me.id)) return TurnIdentity(me.name, me.image, time)
+    return TurnIdentity(member?.name?.ifBlank { fallback } ?: fallback, member?.image, time)
+}
 
 /** The session's assistant, by its last model or its agent type ("claude-code" → "Claude Code"). */
 private fun agentLabel(session: CatalogSession?): String =

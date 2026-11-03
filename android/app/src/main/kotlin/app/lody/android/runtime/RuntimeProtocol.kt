@@ -13,6 +13,8 @@ internal object RuntimeProtocol {
         return result
     }
     fun event(message: JSONObject): RuntimeEvent? = when (message.getString("type")) {
+        "machinePresence" -> RuntimeEvent.CreationChanged(message.optString("presence"))
+        "creationOptionsChanged" -> RuntimeEvent.CreationChanged()
         "session" -> {
             val envelope = JSONObject(message.getString("session"))
             require(envelope.getInt("v") == 1)
@@ -28,8 +30,12 @@ internal object RuntimeProtocol {
                     }
                 }.joinToString("\n\n")
                 val items = rawItems.mapNotNull(::turnItem)
+                val files = entry.optJSONArray("fileDiffs")?.objects()?.mapNotNull { file ->
+                    val path = file.optString("path").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    ChangedFile(path, file.optInt("add"), file.optInt("del"))
+                }.orEmpty()
                 // An assistant turn may so far be only steps; a user turn needs its text.
-                if (text.isBlank() && (role == "user" || items.isEmpty())) null else SessionMessage(
+                if (text.isBlank() && (role == "user" || (items.isEmpty() && files.isEmpty()))) null else SessionMessage(
                     id = entry.text("id"),
                     role = role,
                     text = text,
@@ -41,6 +47,7 @@ internal object RuntimeProtocol {
                     endedAt = (entry.opt("endedAt") as? Number)?.toLong(),
                     model = entry.optJSONObject("modelInfo")?.let { info -> info.optString("name").ifBlank { info.optString("modelId") }.ifBlank { null } },
                     items = if (role == "assistant") items else emptyList(),
+                    files = if (role == "assistant") files else emptyList(),
                 )
             }
             RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries))

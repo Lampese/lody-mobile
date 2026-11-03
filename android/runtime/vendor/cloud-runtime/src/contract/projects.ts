@@ -62,6 +62,7 @@ export const CreationOptionsParams = z
   .object({
     workspaceId: z.string().min(1),
     projectId: z.string().optional(),
+    agentConfigId: z.string().min(1).optional(),
   })
   .meta({ id: 'CreationOptionsParams' });
 

@@ -1,3 +1,4 @@
+import {contractBridge} from './contract-bridge.mjs';
 import '../vendor/cloud-runtime/src/runtime/index.ts';
 import {createCommands} from './create-commands.mjs';
 import { createDispatcher, HOST_PROTOCOL, CORE_CAPABILITIES } from './dispatch.mjs';
@@ -6,13 +7,14 @@ import { LoroDoc } from 'loro-crdt';
 import { decompress } from 'fzstd';
 import { encodeFrame, decodeFrames } from '../vendor/cloud-runtime/src/frames.ts';
 const emit = message => globalThis.webkit.messageHandlers.dataRuntime.postMessage(message);
+const runtime=contractBridge(globalThis.dataRuntime,emit);
 async function compatibility() {
   const checks = [];
   const check = async (name, test) => {
     try { if (!(await test())) throw Error(); checks.push({name,passed:true}); }
     catch { checks.push({name,passed:false}); }
   };
-  await check('Shared runtime + bridge', () => globalThis.dataRuntime.ping() === true && typeof globalThis.dataRuntime.probeSchema() === 'object');
+  await check('Shared runtime + bridge', async () => await runtime.ping() === true && typeof await runtime.probeSchema() === 'object');
   await check('Flock WASM snapshot', () => {
     const a = new Flock('android-probe-a'), b = new Flock('android-probe-b');
     a.set(['m','session-probe'], {title:'Android ✓'}, 1);
@@ -52,7 +54,7 @@ const creationFixture=createCommands({
  creationOptions:()=>({agents:[{id:'fixture-agent',name:'Fixture assistant',machineId:'fixture-machine',cliType:'builtin',agentType:'codex'}],capabilities:[]}),
  createSession:async()=>({state:'created'}),ensureSession:async()=>true,
 },async args=>({state:args.text==='中文 😀'?'accepted':'not_sent'}),()=>({workspaceId:'fixture',userId:'fixture-user'}));
-globalThis.androidDispatch = createDispatcher(globalThis.dataRuntime, emit, {
+globalThis.androidDispatch = createDispatcher(runtime, emit, {
   ...creationFixture,
   compatibility,
   echo: value => value,

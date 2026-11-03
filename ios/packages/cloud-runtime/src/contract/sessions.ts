@@ -25,6 +25,15 @@ export const ClearableString = z
   .object({ value: z.string().nullable() })
   .meta({ id: 'ClearableString' });
 
+export const CreateTabParams = z
+  .object({
+    workspaceId,
+    sessionId: z.string().uuid(),
+    parentSessionId: z.string().min(1),
+    title: z.string().min(1).max(200),
+  })
+  .meta({ id: 'CreateTabParams' });
+
 export const CreateSessionParams = z
   .object({
     workspaceId,

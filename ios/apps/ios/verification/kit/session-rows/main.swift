@@ -183,3 +183,18 @@ precondition(toolsCatalog.session("with-tools")?.pullRequests.first?.number == 3
 precondition(toolsCatalog.session("with-tools")?.iosSimulatorPreviewRequestId == "preview-request")
 
 precondition(envelope.preview == SessionBrowserPreview(label: "localhost:5173", active: true))
+
+var tabRoot = root
+tabRoot.archived = false
+var directoryTab = tab
+directoryTab.archived = false
+var openedChat = child
+openedChat.archived = false
+var sidePanel = directoryTab
+sidePanel.id = "side"
+sidePanel.childSessionPlacement = "side-panel"
+let directoryFamily = DirectoryTabs.sessions(current: directoryTab, all: [openedChat, sidePanel, directoryTab, tabRoot])
+precondition(directoryFamily.map(\.id) == ["root", "tab"])
+precondition(DirectoryTabs.symbol([live, chat]) == "hand.raised")
+precondition(DirectoryTabs.sessions(current: tabRoot, all: [tabRoot, openedChat]).count == 1)
+print("PASS: directory Tabs exclude opened chats and side panels, and waiting outranks running")

@@ -1,6 +1,6 @@
 # Shared runtime source and dependency updates
 
-`runtime/vendor/cloud-runtime` is an unchanged 96-file snapshot of this monorepo's `ios/packages/cloud-runtime`, commit `bdb9cb467979e36b9a84b43ad2fd561c47533269` (`git archive <commit> ios/packages/cloud-runtime`). Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
+`runtime/vendor/cloud-runtime` is a 98-file snapshot of this monorepo's `ios/packages/cloud-runtime`, commit `bdb9cb467979e36b9a84b43ad2fd561c47533269` (`git archive <commit> ios/packages/cloud-runtime`). It additionally includes the reviewed, uncommitted capability-refresh and directory Tab source files listed in PROVENANCE.json, copied verbatim from the iOS runtime. Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
 
 For an intentional update:
 
@@ -24,3 +24,11 @@ still runs the bundled watcher against a synthetic transport to pin the budget.
 ## Android text creation
 
 `create-commands.mjs` exposes creation options and create-and-send using native scope identity. Presence is read through the grant origin; the UI only offers currently online agents. The adapter calls upstream creation, session bootstrap and text send in order, retaining IDs and never retrying writes. It deliberately uses plain text (no shortcut, attachment or mention expansion). The snapshot's creation carries the public local-project `useWorktree` field. Native and JavaScript network gates permit only the exact workspace stream kinds needed for persistence and dispatch. An accepted Machine RPC is not task completion. GitHub branches are entered by name in this first integration.
+
+Creation keeps cached choices visible until presence is known. The open creation
+page refreshes from catalog/presence events, not a timer. Selecting a provider
+with no capabilities requests `machine/acp-capabilities-refresh` through the
+existing machine RPC transport, once per provider/runtime. Discovery is bounded
+and serialized per machine. Its progress frames are not final replies; validated
+final capabilities are held in a workspace/config-scoped display overlay and
+passed through the normal capability projection. These capabilities are synchronized from the shared iOS runtime snapshot.

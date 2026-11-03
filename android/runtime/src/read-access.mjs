@@ -64,7 +64,12 @@ export function createReadAccess(fetch, emit=()=>{}) {
     cancel(){requests.delete(controller);controller.abort();return reader.cancel();}
    });
    return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
-  } catch(error) {requests.delete(controller);emit({type:'networkStatus',status:'unavailable'});throw error;}
+  } catch(error) {
+   requests.delete(controller);
+   // Closing a session or suspending the app cancels its request, not the network.
+   if(!request.signal.aborted)emit({type:'networkStatus',status:'unavailable'});
+   throw error;
+  }
  }
  return {configure,setActive,fetch:guardedFetch};
 }

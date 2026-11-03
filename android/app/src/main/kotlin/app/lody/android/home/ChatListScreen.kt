@@ -1026,7 +1026,7 @@ private fun Glyph(icon: ImageVector, tint: Color, size: Dp = LodyIconSize.md, mo
 
 /** Web `SessionRowStatusIndicator`: alert when failed, hand when waiting, working grid, unread dot. */
 @Composable
-private fun AttentionGlyph(attention: ChatAttention) {
+internal fun AttentionGlyph(attention: ChatAttention) {
     val colors = LodyTheme.colors
     when (attention) {
         ChatAttention.Failed -> Glyph(LodyIcons.Alert, colors.dangerDefault, LodyIconSize.sm)

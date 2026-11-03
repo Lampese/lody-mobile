@@ -1,3 +1,5 @@
+import type { Value } from '@loro-dev/flock-wasm/base64';
+import { tabOwner } from '../directory-tab';
 import { projectRows } from '../../protocol/catalog.ts';
 import {
   archiveSession,
@@ -48,6 +50,78 @@ export function registerSessions(
     state.catalogs.set('meta', projectRows(replica.flock.scan(), 'meta'));
     ctx.publish();
   }
+  channel.handle('createTab', async (args) => {
+    const replica = metaWrite(args, true);
+    if (creating || !state.userId) return { state: 'rejected' };
+    creating = true;
+    try {
+      const owner = tabOwner(args.parentSessionId, (id) => {
+        const room = `session-${id}`;
+        if (replica.flock.get(['e', room]) === false) return undefined;
+        const base = replica.flock.get(['m', room]);
+        const rows = replica.flock.scan({ prefix: ['m', room] });
+        if (!base && !rows.length) return undefined;
+        const value = {
+          ...(base && typeof base === 'object' && !Array.isArray(base)
+            ? base
+            : {}),
+        } as Record<string, Value | undefined>;
+        for (const row of rows)
+          if (row.key.length === 3 && typeof row.key[2] === 'string')
+            value[row.key[2]] = row.value;
+        return value;
+      });
+      const session = projectRows(replica.flock.scan(), 'meta').sessions.find(
+        (s) => s.id === owner.id,
+      );
+      if (!session) return { state: 'rejected' };
+      const options = creationOptions(
+        undefined,
+        replica.flock,
+        state.machineReplicas,
+      );
+      const agent = options.agents.find(
+        (a) =>
+          a.machineId === session.machineId &&
+          (owner.value.agentConfigId
+            ? a.id === owner.value.agentConfigId
+            : a.cliType === session.cliType &&
+              a.agentType === session.agentType),
+      );
+      if (!agent) return { state: 'rejected' };
+      const result = await createSession(
+        {
+          workspaceId: args.workspaceId,
+          sessionId: args.sessionId,
+          machineId: agent.machineId,
+          agentConfigId: agent.id,
+          userId: state.userId,
+          title: args.title,
+          tabContext: {
+            parentSessionId: owner.id,
+            projectId: session.projectId,
+            project: owner.value.project as Value | undefined,
+            repoFullName: owner.value.repoFullName as Value | undefined,
+            baseBranch: owner.value.baseBranch as Value | undefined,
+          },
+        },
+        options,
+        replica,
+        getGrant,
+      );
+      if (result.state === 'created') republish(replica);
+      return result;
+    } catch (error) {
+      return {
+        state:
+          error instanceof Error && error.message === 'session_already_exists'
+            ? 'unknown'
+            : 'rejected',
+      };
+    } finally {
+      creating = false;
+    }
+  });
   channel.handle('createSession', async (args) => {
     if (
       creating ||

@@ -84,7 +84,7 @@ class HomeActivity : ComponentActivity() {
                     val workspace = catalog.workspace
                     val id = selectedId
                     if (id != null && workspace != null) {
-                        ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, chatContext(catalog, id, selectedTitle, user), onBack = { selectedId = null })
+                        ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, chatContext(catalog, id, selectedTitle, user), onBack = { selectedId = null }, onSelectTab = { selectedId = it; selectedTitle = "" })
                     } else if (creating && workspace != null) {
                         // Like web, new session is its own full screen over Home; back returns.
                         BackHandler { creating = false }
@@ -213,6 +213,7 @@ private fun chatContext(catalog: CatalogState, id: String, title: String, user: 
     val repository = project?.repoFullName ?: session?.projectId?.removePrefix("github:")?.takeIf { session.projectId.startsWith("github:") }
     return app.lody.android.chat.ChatContext(
         session?.title?.ifBlank { null } ?: title, subtitle, session, user,
+        tabs = session?.let { app.lody.android.chat.DirectoryTabs.sessions(it, snapshot.sessions) }.orEmpty(),
         repository = repository.orEmpty(),
         machineName = session?.let { snapshot?.machineNames?.get(it.machineId) }.orEmpty(),
         machineKind = snapshot?.let { app.lody.android.create.CreateSessionModel.machineKind(it, session?.machineId) }

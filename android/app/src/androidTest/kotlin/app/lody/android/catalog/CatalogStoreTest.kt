@@ -13,6 +13,22 @@ class CatalogStoreTest {
  private val account = Account("account", "Fixture", listOf(Workspace("w", "Work"), Workspace("other", "Other")))
  private val scope = RuntimeScope("account", "w")
  private val saved = SavedCatalog(CatalogSnapshot(99, listOf(CatalogProject("p", "m", "项目 🌙", "/fixture")), listOf(CatalogSession("s", "m", "p", "hello", "idle", false, true, "2026")), listOf("m")), 1234)
+ @Test fun membersPersistAcrossRestartAndArePrunedOnLostAccessOrLogout() = runBlocking {
+  val store = AtomicCatalogStore(context, "members-test")
+  val members = listOf(WorkspaceMember("other", "Alice", "https://example.com/avatar.png"))
+  try {
+   store.clear(); store.saveAccount(account); store.writeMembers(scope, members)
+   val reopened = AtomicCatalogStore(context, "members-test")
+   assertEquals(members, reopened.readMembers(scope))
+   assertNull(reopened.readMembers(RuntimeScope("another", "w")))
+   assertNull(reopened.readMembers(RuntimeScope("account", "other")))
+   reopened.saveAccount(account.copy(workspaces = emptyList()))
+   reopened.saveAccount(account)
+   assertNull(reopened.readMembers(scope))
+   reopened.writeMembers(scope, members); reopened.clear()
+   assertNull(store.readMembers(scope))
+  } finally { store.clear() }
+ }
  @Test fun branchesRestoreSelectionAcrossInstancesWithoutCrossingWorkspace() = runBlocking {
   val store = AtomicCatalogStore(context, "branches-test")
   val page = app.lody.android.create.BranchPage(listOf("main", "feature"), "main")

@@ -14,7 +14,7 @@ internal class OkHttpAuthTransport : AuthTransport {
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).callTimeout(25, TimeUnit.SECONDS).build()
     override suspend fun request(path: String, credential: Credential?, body: String?): HttpReply = suspendCancellableCoroutine { continuation ->
-        require(path in setOf("/api/auth/device/code", "/api/auth/device/token", "/api/auth/get-session", "/api/auth/organization/list", "/api/auth/sign-out", "/api/loro-streams/token"))
+        require(path.matches(Regex("/api/auth/organization/list-members\\?organizationId=[A-Za-z0-9_-]{1,200}&limit=100&offset=[0-9]{1,4}")) || path in setOf("/api/auth/device/code", "/api/auth/device/token", "/api/auth/get-session", "/api/auth/organization/list", "/api/auth/sign-out", "/api/loro-streams/token"))
         val request = Request.Builder().url("https://backend.lody.ai$path").apply {
             credential?.let { header("Authorization", "Bearer ${it.token}") }
             if (body != null) post(body.toRequestBody("application/json".toMediaType()))

@@ -12,6 +12,17 @@ class RuntimeProtocolTest {
   assertEquals("live",snapshot.status)
   assertEquals(listOf(SessionMessage("u","user","hello",false),SessionMessage("a","assistant","First\n\nSecond",true)),snapshot.messages.map { it.copy(items = emptyList()) })
  }
+ @Test fun fileOnlyTurnsRetainAllFilesAndStats() {
+  val files = org.json.JSONArray()
+  repeat(9) { files.put(JSONObject().put("path", "src/file$it.kt").put("add", it).put("del", 2)) }
+  files.put(JSONObject().put("path", ""))
+  val entry = JSONObject().put("id", "a").put("role", "assistant").put("finished", true).put("items", org.json.JSONArray()).put("fileDiffs", files)
+  val body = JSONObject().put("v", 1).put("status", "live").put("entries", org.json.JSONArray().put(entry))
+  val event = JSONObject().put("type", "session").put("sessionId", "s").put("session", body.toString())
+  val messages = (RuntimeProtocol.event(event) as RuntimeEvent.SessionUpdated).snapshot.messages
+  assertEquals(9, messages.single().files.size)
+  assertEquals(ChangedFile("src/file8.kt", 8, 2), messages.single().files.last())
+ }
  @Test fun sessionProjectionIsNotDropped() {
   val frame=JSONObject().put("type","session").put("sessionId","s").put("session", """{"v":1,"status":"live","entries":[]}""")
   assertNotNull(RuntimeProtocol.event(frame))

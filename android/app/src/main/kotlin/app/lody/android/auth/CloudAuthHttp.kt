@@ -64,5 +64,32 @@ internal class CloudAuthHttp(private val transport: AuthTransport) : CloudAuthAp
             ShortLivedGrant(data.text("token"), data.text("gatewayBaseUrl").trimEnd('/'), data.seconds("expiresIn", 3600))
         }
     }
+    override suspend fun members(credential: Credential, workspaceId: String): List<WorkspaceMember> {
+        require(workspaceId.matches(Regex("[A-Za-z0-9_-]{1,200}")))
+        val result = linkedMapOf<String, WorkspaceMember>()
+        var offset = 0
+        while (offset < 10000) {
+            val raw = request("/api/auth/organization/list-members?organizationId=$workspaceId&limit=100&offset=$offset", credential)
+            val page = decode {
+                val data = JSONObject(raw)
+                val rows = data.getJSONArray("members")
+                val total = data.getInt("total").also { require(it in 0..10000) }
+                require(rows.length() <= 100)
+                val members = (0 until rows.length()).map { index ->
+                    val row = rows.getJSONObject(index)
+                    val user = row.getJSONObject("user")
+                    val id = row.text("userId")
+                    require(user.text("id") == id)
+                    WorkspaceMember(id, user.optString("name").takeUnless { it == "null" }.orEmpty(), httpsImage(user.optString("image")))
+                }
+                members to total
+            }
+            page.first.forEach { result[it.id] = it }
+            offset += page.first.size
+            if (offset >= page.second) return result.values.toList()
+            if (page.first.isEmpty()) throw AuthFailure("incomplete_members")
+        }
+        throw AuthFailure("members_too_large")
+    }
     override suspend fun signOut(credential: Credential) { request("/api/auth/sign-out", credential, JSONObject()) }
 }

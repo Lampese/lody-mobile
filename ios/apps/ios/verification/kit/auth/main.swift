@@ -150,6 +150,15 @@ final class Fixture: @unchecked Sendable {
     try await fixture.api().signOut(token: "token")
     precondition(fixture.requests[0].url?.path == "/api/auth/sign-out" && fixture.requests[0].httpMethod == "POST")
     precondition(fixture.requests[0].httpBody == Data("{}".utf8))
+    fixture = Fixture()
+    fixture.replies = [
+      (["total": 2, "members": [["id": "membership-1", "userId": "u1", "user": ["id": "u1", "name": "Alice", "image": "https://example.com/a.png"]]]], 200),
+      (["total": 2, "members": [["id": "membership-2", "userId": "u2", "user": ["id": "u2", "name": "Bob", "image": "http://unsafe/b.png"]]]], 200),
+    ]
+    let members = try await fixture.api().members(token: "token", workspaceId: "w")
+    precondition(members.map(\.id) == ["u1", "u2"] && members[1].image == nil)
+    precondition(fixture.requests[1].url!.query!.contains("offset=1"))
+    print("PASS: workspace members use user IDs, paginate and filter unsafe avatars")
     print("PASS: workspace rename, icon upload and sign-out keep the official contracts and reject permission errors")
   }
 }

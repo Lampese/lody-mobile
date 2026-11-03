@@ -16,6 +16,7 @@ export type Session = {
   openedBySessionId?: string;
   openedByRootSessionId?: string;
   parentSessionId?: string;
+  childSessionPlacement?: string;
   status: string;
   archived: boolean;
   pinned: boolean;

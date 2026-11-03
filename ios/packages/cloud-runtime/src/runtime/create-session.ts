@@ -1,4 +1,4 @@
-import { Flock } from '@loro-dev/flock-wasm/base64';
+import { type Value, Flock } from '@loro-dev/flock-wasm/base64';
 import type { StreamsClient } from '@loro-dev/streams-client';
 import type { Session } from '../models/catalog.ts';
 import type {
@@ -30,12 +30,24 @@ export type CreateSessionArgs = {
   /** Local projects: start in a new git worktree (web `project.useWorktree`). */
   useWorktree?: boolean;
   billingEntitlement?: BillingEntitlement | null;
+  tabContext?: {
+    parentSessionId: string;
+    projectId: string;
+    project?: Value;
+    repoFullName?: Value;
+    baseBranch?: Value;
+  };
 };
 
 export function creationOptions(
   projectId: string | undefined,
   meta: Flock,
   machines: Map<string, Flock>,
+  refreshed: {
+    machineId: string;
+    configId: string;
+    value: Record<string, unknown>;
+  }[] = [],
 ): CreationOptions {
   const catalog = projectRows(meta.scan(), 'meta');
   const projects = [...catalog.projects];
@@ -94,7 +106,15 @@ export function creationOptions(
       machineId !== project!.machineId
     )
       continue;
-    for (const row of flock.scan()) {
+    for (const row of [
+      ...flock.scan(),
+      ...refreshed
+        .filter((row) => row.machineId === machineId)
+        .map((row) => ({
+          key: ['acpCapability', row.configId],
+          value: row.value,
+        })),
+    ]) {
       const value = row.value as Record<string, unknown> | undefined;
       if (row.key[0] === 'acpCapability' && value) {
         const cliType = String(value.cliType);
@@ -287,6 +307,7 @@ export async function createSession(
       ...(args.useWorktree === true ? { useWorktree: true } : {}),
     };
   }
+  const tab = args.tabContext;
   const meta = {
     id: args.sessionId,
     machineId: agent.machineId,
@@ -300,6 +321,14 @@ export async function createSession(
     agentType: agent.agentType,
     agentConfigId: agent.id,
     ...(project ? { project } : {}),
+    ...(tab
+      ? {
+          parentSessionId: tab.parentSessionId,
+          ...(tab.project ? { project: tab.project } : {}),
+          ...(tab.repoFullName ? { repoFullName: tab.repoFullName } : {}),
+          ...(tab.baseBranch ? { baseBranch: tab.baseBranch } : {}),
+        }
+      : {}),
     ...(github
       ? {
           repoFullName: options.project!.id.slice(7),
@@ -315,7 +344,9 @@ export async function createSession(
     status: 'idle',
     archived: false,
     pinned: false,
-    projectId: args.projectId ?? `${agent.machineId}:unassigned`,
+    projectId:
+      tab?.projectId ?? args.projectId ?? `${agent.machineId}:unassigned`,
+    ...(tab ? { parentSessionId: tab.parentSessionId } : {}),
     createdAt: meta.createdAt,
     cliType: meta.cliType,
     agentType: meta.agentType,

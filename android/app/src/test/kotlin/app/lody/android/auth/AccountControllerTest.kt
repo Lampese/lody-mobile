@@ -51,6 +51,15 @@ class AccountControllerTest {
   controller.restore().join();assertNull(store.saved);assertNull(controller.state.value.account)
   assertEquals("auth_expired",controller.state.value.failure)
  }
+ @Test fun lateMemberResponseCannotCrossLogout()=runTest {
+  val pending=CompletableDeferred<List<WorkspaceMember>>()
+  val api=object:Api(){override suspend fun members(credential:Credential,workspaceId:String)=pending.await()}
+  val controller=AccountController(api,Store(Credential("saved")),backgroundScope)
+  controller.restore().join()
+  val result=async {try{controller.members(RuntimeScope("user","workspace"));"leaked"}catch(e:AuthFailure){e.code}}
+  runCurrent();controller.logout().join();pending.complete(listOf(WorkspaceMember("p","Person")))
+  assertEquals("account_changed",result.await())
+ }
  @Test fun grantCannotCrossLogoutOrWorkspaceBoundary()=runTest {
   val pending=CompletableDeferred<ShortLivedGrant>()
   val api=object:Api(){override suspend fun grant(credential:Credential,workspaceId:String)=pending.await()}

@@ -30,7 +30,7 @@ enum LodyScrollEdges {
 
   static func chat(_ scrollView: UIScrollView) {
     scrollView.topEdgeEffect.isHidden = false
-    scrollView.topEdgeEffect.style = .automatic
+    scrollView.topEdgeEffect.style = .soft
     scrollView.bottomEdgeEffect.isHidden = true
   }
 

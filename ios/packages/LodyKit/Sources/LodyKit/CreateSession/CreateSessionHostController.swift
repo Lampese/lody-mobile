@@ -49,6 +49,10 @@ class CreateSessionHostController: UIViewController {
   private var mentions: MentionCatalogStore?
   private var created: Any?
   private var opening = false
+  private let optionsObservers = NotificationObservers()
+  private var optionsRefresh: Task<Void, Never>?
+  private var capabilityTask: Task<Void, Never>?
+  private var capabilityConfig: String?
   var onCreated: (@MainActor ([String: Any]) async throws -> Void)?
 
   init(params: CreateSessionHostParams, service: CreateSessionService = .live) {
@@ -79,6 +83,20 @@ class CreateSessionHostController: UIViewController {
     // Web's mobile landing composer: a card that keeps its controls row in view.
     input.composer.cardStyle = true
     wire()
+    if service.persistShare {
+      optionsObservers.add(NotificationCenter.default.addObserver(forName: .lodyDataRuntimeEvent, object: nil, queue: .main) { [weak self] note in
+        guard note.userInfo?["creationOptionsChanged"] as? Bool == true else { return }
+        MainActor.assumeIsolated {
+          guard let self, DataRuntime.current?.workspace == self.params.workspaceId else { return }
+          self.optionsRefresh?.cancel()
+          self.optionsRefresh = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
+            guard let self, self.controller.isViewLoaded, self.view.window != nil else { return }
+            self.controller.load(background: true)
+          }
+        }
+      })
+    }
     Task {
       await configure()
       embedForm()
@@ -166,6 +184,15 @@ class CreateSessionHostController: UIViewController {
 
   private func selectionChanged(_ form: CreateSessionForm) {
     let page = form.current
+    if page.options?.availability == "online", let agent = page.agent,
+       CreateLogic.capabilityFor(page.options, agent) == nil, capabilityConfig != agent.id {
+      capabilityConfig = agent.id
+      capabilityTask?.cancel()
+      capabilityTask = Task { [weak self] in
+        guard let self else { return }
+        try? await service.refreshCapability(params.workspaceId, agent.id)
+      }
+    }
     guard let machineId = page.machine?.id, !machineId.isEmpty else {
       mentions = nil
       input.composer.setMentionItems("null")

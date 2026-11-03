@@ -2,6 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createReadAccess} from '../src/read-access.mjs';
 const config={gatewayBaseUrl:'https://streams.example.org',workspaceId:'workspace'};
+test('closing a session or backgrounding does not report a network outage',async()=>{
+ for(const cancel of ['session','background']) {
+  const events=[];
+  const access=createReadAccess(request=>new Promise((resolve,reject)=>{
+   request.signal.addEventListener('abort',()=>reject(request.signal.reason),{once:true});
+  }),event=>events.push(event));
+  access.configure(config);
+  const controller=new AbortController();
+  const pending=access.fetch('https://streams.example.org/ds/lody/workspace%3As%3Asession-1',{signal:controller.signal});
+  if(cancel==='session')controller.abort(new Error('session_closed'));
+  else access.setActive(false);
+  await assert.rejects(pending);
+  assert.deepEqual(events,[],cancel);
+ }
+});
+test('transport failures still report offline, even when named AbortError without cancellation',async()=>{
+ for(const error of [new TypeError('network failed'),new DOMException('transport aborted','AbortError')]) {
+  const events=[];
+  const access=createReadAccess(async()=>{throw error},event=>events.push(event));
+  access.configure(config);
+  await assert.rejects(access.fetch('https://streams.example.org/ds/lody/workspace%3Ameta'),value=>value===error);
+  assert.deepEqual(events,[{type:'networkStatus',status:'unavailable'}]);
+ }
+});
 test('empty long-poll responses preserve cursor headers without constructing a forbidden body',async()=>{
  const events=[];
  let canceled=0;

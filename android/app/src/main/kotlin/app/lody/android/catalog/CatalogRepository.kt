@@ -106,6 +106,7 @@ class CatalogRepository(private val account: AccountController, private val owne
        else mutable.value = mutable.value.copy(phase = ConnectionPhase.UNAVAILABLE, failure = event.reason)
       }
       is RuntimeEvent.SessionUpdated -> Unit
+      is RuntimeEvent.CreationChanged -> Unit
       RuntimeEvent.GrantRequested -> Unit
      }
     }

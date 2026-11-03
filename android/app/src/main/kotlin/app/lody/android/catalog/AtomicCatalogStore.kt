@@ -17,7 +17,7 @@ import java.io.File
 import java.security.MessageDigest
 
 /** Whole display snapshots, serialized on IO. No tokens, CRDT replicas or cursors. */
-internal class AtomicCatalogStore(context: Context, name: String = "catalog") : CatalogStore, CreationOptionsStore {
+internal class AtomicCatalogStore(context: Context, name: String = "catalog") : CatalogStore, CreationOptionsStore, WorkspaceMemberStore {
     init { require(name.matches(Regex("[a-zA-Z0-9_-]+"))) }
     private val directory = File(context.noBackupFilesDir, name)
     private val mutex = Mutex()
@@ -111,13 +111,28 @@ internal class AtomicCatalogStore(context: Context, name: String = "catalog") : 
         save(file, data.put("selected", name), 1024 * 1024)
     }
     override suspend fun readContext(): AccountContext? = io { context() }
+    private fun membersFile(scope: RuntimeScope) = File(directory, "members-" + catalogFile(scope).name)
+    override suspend fun readMembers(scope: RuntimeScope): List<WorkspaceMember>? = io {
+        if (!owns(scope)) return@io null
+        val data = load(membersFile(scope), 1024 * 1024) ?: return@io null
+        if (data.optString("account") != scope.accountId || data.optString("workspace") != scope.workspaceId) return@io null
+        data.getJSONArray("members").objects().map { WorkspaceMember(it.getString("id"), it.getString("name"), httpsImage(it.optString("image"))) }
+    }
+    override suspend fun writeMembers(scope: RuntimeScope, members: List<WorkspaceMember>) = io {
+        require(owns(scope)) { "cache_scope_changed" }
+        save(membersFile(scope), JSONObject().put("account", scope.accountId).put("workspace", scope.workspaceId)
+            .put("members", JSONArray(members.map { JSONObject().put("id", it.id).put("name", it.name).put("image", it.image) })), 1024 * 1024)
+        directory.listFiles()?.filter { it.name.startsWith("members-") && it.name.endsWith(".json") }
+            ?.sortedByDescending { it.lastModified() }?.drop(16)?.forEach { AtomicFile(it).delete() }
+        Unit
+    }
     override suspend fun saveAccount(account: Account) = io {
         val previous = context()
         if (previous != null && previous.account.id != account.id) directory.deleteRecursively()
         previous?.account?.workspaces?.filter { old -> account.id != previous.account.id || account.workspaces.none { it.id == old.id } }?.forEach {
             AtomicFile(catalogFile(RuntimeScope(previous.account.id, it.id))).delete()
         }
-        directory.listFiles()?.filter { (it.name.startsWith("options-") || it.name.startsWith("branches-")) && it.name.endsWith(".json") }?.forEach { file ->
+        directory.listFiles()?.filter { (it.name.startsWith("options-") || it.name.startsWith("branches-") || it.name.startsWith("members-")) && it.name.endsWith(".json") }?.forEach { file ->
             val cached = load(file)
             if (cached == null || cached.optString("account") != account.id || account.workspaces.none { it.id == cached.optString("workspace") }) AtomicFile(file).delete()
         }

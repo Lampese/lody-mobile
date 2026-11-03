@@ -45,6 +45,8 @@ class SessionController: UIViewController {
   private var listed = false
   private var moreItem: UIBarButtonItem?
   private var renderedEntries: String?
+  private var memberScope = ""
+  private var memberTask: Task<Void, Never>?
 
   init(sessionId: String, findQuery: String = "", choice: ModelChoice? = nil, source: SessionSource = .live,
        feed: SessionFeedService = .live, environment: SessionSendEnvironment = .live, permission: PermissionService = .live,
@@ -84,6 +86,7 @@ class SessionController: UIViewController {
   required init?(coder: NSCoder) { fatalError() }
 
   isolated deinit {
+    memberTask?.cancel()
     feed?.finish()
     simulator?.finish()
     if sender != nil { environment.foreground(sessionId, false) }
@@ -151,6 +154,19 @@ class SessionController: UIViewController {
   func render() {
     guard isViewLoaded else { return }
     let state = source.state
+    if state.key != memberScope {
+      memberTask?.cancel()
+      memberScope = state.key
+      chat.members = [:]
+      if source === SessionSource.live, !LodyUIVerify.enabled, !state.key.isEmpty {
+        memberTask = Task { [weak self] in
+          await WorkspaceMembers.load(userId: state.userId, workspaceId: state.workspaceId) { [weak self] members in
+            guard let self, self.source.state.key == state.key else { return }
+            self.chat.members = members
+          }
+        }
+      }
+    }
     guard let session = state.catalog.session(sessionId) else {
       permissionPage?.update(nil, ready: true)
       if listed, !state.loading { LodyShell.shared.close(from: self) }
@@ -160,15 +176,12 @@ class SessionController: UIViewController {
     prepareSimulator(state, session)
     startFeed(state)
     chat.setAttachmentContext(Self.json(["workspaceId": state.workspaceId, "sessionId": sessionId]))
-    let machine = state.catalog.machineNames[session.machineId] ?? ""
-    let machineState = state.presence.status(of: session.machineId)
     chat.showsThoughts = session.cliType == "builtin" && session.agentType == "deepseek"
     chat.setNavigationTitle(session.title)
-    chat.setNavigationSubtitle(projectName(session, catalog: state.catalog))
-    chat.setNavigationMachine(machine.isEmpty ? String(localized: "session.title.machine", bundle: .lody) : machine)
-    chat.setNavigationMachineState(machineState)
-    chat.setNavigationBranch(session.branchName ?? "")
-    chat.setTitleMenu(titleMenu(session, machine: machine, machineState: machineState))
+    let tabs = DirectoryTabs.sessions(current: session, all: state.catalog.sessions)
+    let caption = tabs.count > 1 ? String(format: String(localized: "session.tabs.count", bundle: .lody), tabs.count) : ""
+    chat.setDirectoryTabs(caption, symbol: DirectoryTabs.symbol(tabs))
+    chat.setTitleMenu(titleMenu(tabs))
     chat.mentionRepository = session.projectId.hasPrefix("github:") ? String(session.projectId.dropFirst(7)) : ""
     renderMentions(state, session)
     renderFeed(session)
@@ -205,29 +218,50 @@ class SessionController: UIViewController {
     return catalog.projects.first { $0.id == session.projectId }?.name ?? ""
   }
 
-  private func titleMenu(_ session: SessionItem, machine: String, machineState: String) -> String {
+  private var creatingTab = false
+  private var attemptedTab: String?
+
+  private func titleMenu(_ tabs: [SessionItem]) -> String {
     var items: [[String: Any]] = []
-    if browsable {
-      items.append([
-        "id": "files", "title": String(localized: "session.action.projectFiles", bundle: .lody),
-        "subtitle": projectName(session, catalog: source.state.catalog), "symbol": "folder",
-      ])
+    if tabs.count > 1 {
+      items = tabs.map { ["id": "tab:" + $0.id, "title": $0.title, "symbol": DirectoryTabs.symbol([$0]), "selected": $0.id == sessionId] }
     }
-    if let branch = session.branchName {
-      items.append([
-        "id": "branch", "title": String(localized: "session.title.copyBranch", bundle: .lody), "subtitle": branch,
-        "symbol": "arrow.triangle.branch",
-      ])
-    }
-    if !machine.isEmpty {
-      items.append([
-        "id": "machine", "title": String(localized: "session.title.machine", bundle: .lody),
-        "subtitle": "\(machine) · \(String(localized: String.LocalizationValue("devices." + machineState), bundle: .lody))", "symbol": "desktopcomputer",
-      ])
-    }
-    items.append(["id": "rename", "title": String(localized: "session.action.rename", bundle: .lody), "symbol": "pencil", "group": 1])
+    items.append(["id": "newTab", "title": String(localized: "session.tabs.new", bundle: .lody), "symbol": "plus", "group": 1, "disabled": creatingTab])
     guard let data = try? JSONSerialization.data(withJSONObject: items) else { return "[]" }
     return String(decoding: data, as: UTF8.self)
+  }
+
+  private func createTab() {
+    guard !creatingTab, let runtime = DataRuntime.current else { return }
+    if let attemptedTab {
+      LodyShell.shared.openSessionFromExternal(attemptedTab)
+      return
+    }
+    let target = UUID().uuidString.lowercased()
+    attemptedTab = target
+    creatingTab = true
+    render()
+    Task { [weak self] in
+      guard let self else { return }
+      defer { self.creatingTab = false; self.render() }
+      do {
+        let result = try await runtime.workspaceCall(RuntimeContract.Calls.CreateTab.self) { workspace, _ in
+          RuntimeContract.CreateTabParams(workspaceId: workspace, sessionId: target, parentSessionId: self.sessionId, title: String(localized: "session.tabs.new", bundle: .lody))
+        }
+        switch result {
+        case .created:
+          self.attemptedTab = nil
+          LodyShell.shared.openSessionFromExternal(target)
+        case .rejected:
+          self.attemptedTab = nil
+          LodyToastOverlay.shared.show(message: String(localized: "session.tabs.failed", bundle: .lody), kind: "error")
+        case .unknown:
+          LodyToastOverlay.shared.show(message: String(localized: "session.tabs.unknown", bundle: .lody), kind: "info")
+        }
+      } catch {
+        LodyToastOverlay.shared.show(message: String(localized: "session.tabs.unknown", bundle: .lody), kind: "info")
+      }
+    }
   }
 
   private func updateMoreMenu(_ session: SessionItem) {
@@ -260,7 +294,7 @@ class SessionController: UIViewController {
     ])
     moreItem = more
     let header = LodyNavigationHeader.of(navigationItem)
-    let items = [pullRequestItem(session), more].compactMap { $0 }
+    let items = [more]
     if header.rightItems != items { header.rightItems = items }
   }
 
@@ -270,20 +304,11 @@ class SessionController: UIViewController {
   }
 
   private func titleMenuSelected(_ id: String) {
-    switch id {
-    case "branch":
-      guard let branch = source.state.catalog.session(sessionId)?.branchName else { return }
-      UIPasteboard.general.string = branch
-      LodyToastOverlay.shared.show(message: String(localized: "session.title.branchCopied", bundle: .lody), kind: "info")
-    case "rename":
-      perform("rename")
-    case "files":
-      guard let session = source.state.catalog.session(sessionId) else { return }
-      let name = projectName(session, catalog: source.state.catalog)
-      openProjectFiles(title: name.isEmpty ? String(localized: "session.action.projectFiles", bundle: .lody) : name)
-    default:
-      break
-    }
+    if id == "newTab" { createTab(); return }
+    guard id.hasPrefix("tab:") else { return }
+    let target = String(id.dropFirst(4))
+    guard target != sessionId else { return }
+    LodyShell.shared.openSessionFromExternal(target)
   }
 
   private func perform(_ action: String) {

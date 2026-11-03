@@ -141,8 +141,19 @@ final class CreateSessionController: UIViewController {
     guard !sending, runConfigSheet == nil, !panelState.runConfig.isEmpty else { return }
     panelState.openInSheet = nil
     let sheet = UIHostingController(rootView: CreateRunConfigSheet(state: panelState))
+    var contentHeight = CGFloat(panelState.runConfig.count) * (LodySize.controlMd + LodySpacing.xs * 2)
+      + LodySpacing.xl + LodySize.controlMd + LodySpacing.lg
+    sheet.rootView = CreateRunConfigSheet(state: panelState, onHeightChange: { [weak sheet] height in
+      guard height > 0, abs(contentHeight - height) > 1 else { return }
+      contentHeight = height
+      sheet?.sheetPresentationController?.animateChanges {
+        sheet?.sheetPresentationController?.invalidateDetents()
+      }
+    })
     if let presentation = sheet.sheetPresentationController {
-      presentation.detents = [.medium(), .large()]
+      presentation.detents = [.custom(identifier: .init("runConfigContent")) { context in
+        min(contentHeight, context.maximumDetentValue)
+      }]
       presentation.prefersGrabberVisible = true
     }
     runConfigSheet = sheet
@@ -226,10 +237,12 @@ final class CreateSessionController: UIViewController {
     onSelection?(form)
   }
 
-  func load() {
+  func load(background: Bool = false) {
     guard !sending else { return }
-    form.current.loading = true
-    render()
+    if !background {
+      form.current.loading = true
+      render()
+    }
     optionsTask?.cancel()
     optionsTask = Task { [weak self] in
       do {

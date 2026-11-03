@@ -90,6 +90,7 @@ sealed interface ChatEntry {
         val who: TurnIdentity,
         val worked: String = "",
         val working: Boolean = false,
+        val files: List<app.lody.android.runtime.ChangedFile> = emptyList(),
     ) : ChatEntry {
         companion object {
             /** A turn that is only prose (the stream probe, older projections). */
@@ -240,6 +241,12 @@ private fun LazyListScope.transcriptRows(
                     }
                     // Web: live status precedes the task panel.
                     taskPanel(entry, open, toggle, onOpenTask)
+                    if (entry.files.isNotEmpty()) {
+                        val key = "${entry.id}#files"
+                        item(key = key, contentType = "files") {
+                            ChangedFilesCard(entry.files, open[key] ?: false) { toggle(key, it) }
+                        }
+                    }
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }

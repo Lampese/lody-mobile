@@ -168,6 +168,7 @@ export function projectRows(
       openedByRootSessionId:
         text(value.openedByRootSessionId).trim() || undefined,
       parentSessionId: text(value.parentSessionId).trim() || undefined,
+      childSessionPlacement: text(value.childSessionPlacement).trim() || undefined,
       machineId,
       title: text(value.title) || labels.untitled,
       status:

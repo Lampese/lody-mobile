@@ -57,7 +57,14 @@ export async function machineRpc(
       new TextDecoder().decode(read.result.payload.body),
     );
     for (const reply of Array.isArray(parsed) ? parsed : [parsed])
-      if (reply.id === id) return reply as RpcReply;
+      if (reply.id === id) {
+        if (
+          method === 'machine/acp-capabilities-refresh' &&
+          reply.result?.type === 'machine/acp-binary-progress'
+        )
+          continue;
+        return reply as RpcReply;
+      }
   }
   throw new Error('cancelled');
 }

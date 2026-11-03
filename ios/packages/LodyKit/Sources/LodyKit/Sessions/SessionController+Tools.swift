@@ -53,22 +53,6 @@ extension SessionController {
   }
   private func toolError(_ error: Error) { LodyToastOverlay.shared.show(message: error.localizedDescription, kind: "error") }
 
-  func pullRequestItem(_ session: SessionItem) -> UIBarButtonItem? {
-    let references = session.pullRequests
-    guard !references.isEmpty else { return nil }
-    let item: UIBarButtonItem
-    if references.count == 1 {
-      let reference = references[0]
-      item = UIBarButtonItem(title: "PR #\(reference.number)", primaryAction: UIAction { [weak self] _ in self?.openPullRequest(reference) })
-    } else {
-      item = UIBarButtonItem(title: "PR · \(references.count)", menu: UIMenu(children: references.map { reference in
-        UIAction(title: "\(reference.repository) #\(reference.number) · \(String(localized: String.LocalizationValue("pr.state." + reference.status), bundle: .lody))") { [weak self] _ in self?.openPullRequest(reference) }
-      }))
-      item.accessibilityLabel = String(localized: "pr.pullRequests", bundle: .lody)
-    }
-    item.tintColor = references.contains { ["f", "e"].contains($0.ci ?? "") } ? .systemOrange : .systemBlue
-    return item
-  }
   static func livePullRequest(_ reference: SessionPullRequest, _ state: SessionListState) -> PullRequestController {
     let scope = SettingsActor.live(["workspaceId": state.workspaceId, "userId": state.userId])
     let store = PullRequestStore(repository: reference.repository, number: reference.number, scope: scope,

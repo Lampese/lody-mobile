@@ -7,6 +7,7 @@ class Credential(val token: String) {
     override fun toString() = "Credential(<redacted>)"
 }
 /** [image] is the workspace logo (HTTPS only), null when it has none. */
+data class WorkspaceMember(val id: String, val name: String, val image: String? = null)
 data class Workspace(val id: String, val name: String, val image: String? = null)
 /** [image] is the user's avatar (HTTPS only), null when they have none. */
 data class Account(val id: String, val name: String, val workspaces: List<Workspace>, val image: String? = null)
@@ -30,6 +31,7 @@ interface CloudAuthApi {
     suspend fun poll(code: DeviceAuthorization): TokenPoll
     suspend fun account(credential: Credential): Account
     suspend fun grant(credential: Credential, workspaceId: String): ShortLivedGrant
+    suspend fun members(credential: Credential, workspaceId: String): List<WorkspaceMember> = throw AuthFailure("members_unavailable")
     suspend fun signOut(credential: Credential)
 }
 interface CredentialStore {

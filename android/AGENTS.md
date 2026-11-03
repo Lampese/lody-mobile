@@ -12,6 +12,12 @@
 - Follow native Android navigation, lifecycle, accessibility, and background execution rules.
 - Verify scaffold changes with `./gradlew :app:assembleDebug :app:lintDebug`. Add behavioral tests when implementing behavior; do not report NO-SOURCE tasks as passing tests.
 
+## Installation and simulator data
+
+- A request to rebuild or reinstall means a data-preserving update: build the APK and use `adb -s <serial> install -r <apk>` on the explicitly selected device. Preserve the application ID and signing identity so login, Keystore keys and cached data survive. If installation fails, diagnose it; do not fall back to uninstalling or clearing data.
+- Keep the user's signed-in preview device separate from instrumentation testing. Run `connectedDebugAndroidTest` and other test installation/cleanup flows on a dedicated disposable emulator, with the target explicitly restricted to that emulator. These flows can remove application data; do not run them on the user's preview device.
+- Rebuilding, reinstalling or taking screenshots does not authorize `adb uninstall`, `pm clear`, emulator wipes or credential deletion. Obtain explicit approval before clearing the user's device data. Never copy credentials between devices to work around a lost login.
+
 ## Phase 1 runtime contract
 
 - `LodyApplication` owns `RuntimeOwner`; pages never create or destroy a runtime. Tie foreground/background to ProcessLifecycleOwner, not Activity callbacks. Every operation supplies its expected account/workspace scope; switching/logout cancels the old lease and observers.
@@ -38,6 +44,7 @@
 - RuntimeLifecycle owns one process-lifetime network subscription. Network validation is a recovery hint for an unavailable read lease, not proof of cloud liveness; backgrounding never registers another callback or starts recovery work.
 
 - Creation options share the atomic cache lifecycle: persist all providers and model/mode/effort choices by account + workspace + project target, restore before refresh, retain on read failure, and enable Send only after live validation. Options files are separately bounded to 16 snapshots and cleared with account cache on logout.
+- An open creation page refreshes on runtime, catalog and presence events, without a polling timer. Unknown presence must not replace cached options. Missing capabilities are probed only for the selected online provider; the RPC reader skips binary-progress frames and merges validated final capabilities into a workspace/provider-scoped display overlay. Keep these changes in the shared source and reviewed snapshot.
 
 ## Home UI
 
@@ -61,3 +68,5 @@
 - `diagnostics/ChatStreamProbeActivity` (debug) replays `assets/chat/fixture.md` as a token stream and reports repair / split cost and long frames, with repair and coalescing toggles.
 
 - The compact new-chat permission face uses a neutral shield for agent/default (a mobile override of web); unknown modes are hidden, read-only/edit/plan use icons, full-access modes use the warning shield, and auto uses the short `Auto` label. Full permission names stay in the picker and accessibility label.
+
+- Conversation sender identities load native `/api/auth/organization/list-members` pages by workspace and match `userId`, never membership `id`. `WorkspaceMembers` emits the account/workspace cache before a background refresh; failures retain it. `AtomicCatalogStore` persists only ID, name and HTTPS avatar URL, prunes removed workspaces and clears members on logout. `AccountController` fences network results across account changes. Member updates refresh names/photos independently of message rendering.

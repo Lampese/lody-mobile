@@ -898,3 +898,17 @@ for style in [UIUserInterfaceStyle.light, .dark] {
 let glyphFill = glyphBubble.backgroundColor!.resolvedColor(with: glyphBubble.traitCollection)
 precondition(glyphFill == UIColor.lodyInset.resolvedColor(with: glyphBubble.traitCollection), "The on-screen user bubble paints the inset fill")
 print("Chat render: user bubbles use the neutral inset fill")
+
+// A member arriving after the message changes the visible identity without changing its text.
+var memberRow = ChatRow(id: "member-refresh", entryID: "member-refresh", kind: "user", text: "Existing message")
+memberRow.author = "other-user"
+memberRow.authorTime = "18:36"
+memberRow.readState = "sent"
+let memberCell = ChatCell(frame: CGRect(x: 0, y: 0, width: 358, height: 100))
+memberCell.configure(memberRow, text: NSAttributedString(string: memberRow.text))
+let unresolvedIdentity = memberCell.accessibilityValue
+memberRow.authorName = "Alice"
+memberCell.configure(memberRow, text: NSAttributedString(string: memberRow.text))
+precondition(memberCell.accessibilityValue?.contains("Alice") == true && memberCell.accessibilityValue != unresolvedIdentity)
+precondition(memberCell.row?.text == "Existing message")
+print("PASS: an existing user message reconfigures with the resolved member identity")

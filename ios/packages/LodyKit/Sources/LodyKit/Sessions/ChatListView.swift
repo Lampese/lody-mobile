@@ -64,9 +64,12 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     config.trailingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipe(path, leading: false) }
     config.leadingSwipeActionsConfigurationProvider = { [weak self] path in self?.swipe(path, leading: true) }
     let layout = UICollectionViewCompositionalLayout { [weak self] index, environment in
-      let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
       let id = self?.dataSource?.sectionIdentifier(for: index)
       let title = id.flatMap { self?.titles[$0] } ?? ""
+      var sectionConfig = config
+      // Untitled first sections start at the navigation safe area without a blank header.
+      if index == 0 && title.isEmpty { sectionConfig.headerMode = .none }
+      let section = NSCollectionLayoutSection.list(using: sectionConfig, layoutEnvironment: environment)
       section.boundarySupplementaryItems.forEach {
         $0.pinToVisibleBounds = self?.pinsGroupLabels == true && !title.isEmpty
         $0.zIndex = 2

@@ -1,0 +1,43 @@
+// Translate Android's native command surface to the shared runtime envelope contract.
+export function contractBridge(runtime, emit) {
+ const pending=new Map(), grants=new Map(); let serial=0, workspace='';
+ const receive=envelope=>runtime.receive(JSON.stringify(envelope));
+ function call(method,payload={}) {
+  const id=`android-${++serial}`;
+  return new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>{pending.delete(id);reject(Error('runtime_timeout'));},45000);
+   pending.set(id,{resolve,reject,timer,method});
+   receive({v:1,gen:1,kind:'request',id,method,payload});
+  });
+ }
+ function message(message) {
+  if(message.type!=='envelope')return false;
+  const e=typeof message.envelope==='string'?JSON.parse(message.envelope):message.envelope;
+  if(e.gen!==1)return true;
+  if(e.kind==='result'||e.kind==='error') {
+   const p=pending.get(e.id);if(!p||p.method!==e.method)return true;
+   clearTimeout(p.timer);pending.delete(e.id);
+   if(e.kind==='error')p.reject(Error(e.error.code));else p.resolve(e.payload);
+  } else if(e.kind==='event')emit({type:e.method,...e.payload,...(e.method==='machinePresence'?{presence:JSON.stringify(e.payload)}:{})});
+  else if(e.kind==='request') {
+   if(e.method==='grant'){grants.set(e.id,e);emit({type:'grant'});}
+   else receive({...e,kind:'error',payload:undefined,error:{code:'unsupported_method',retryable:false}});
+  }
+  return true;
+ }
+ globalThis.androidRuntimeMessage=message;
+ const ready=call('hello',{protocol:1,gen:1});
+ const invoke=async(method,payload)=>{await ready;return call(method,payload);};
+ return {
+  ping:async()=>{await invoke('ping');return true;},
+  setActive:async active=>{await invoke('setActive',{active});return true;},
+  start:async(workspaceId,userId='',active=false)=>{workspace=workspaceId;await invoke('start',{workspaceId,userId,active});return true;},
+  probeSchema:()=>workspace?invoke('probeSchema',{workspaceId:workspace}):ready.then(()=>({creationOptionsTrial:{},machines:{}})),
+  session:id=>invoke('openSession',{sessionId:id}),
+  ensureSession:args=>invoke('ensureSession',args),
+  creationOptions:args=>invoke('creationOptions',args),
+  createSession:args=>invoke('createSession',args),
+  createTab:args=>invoke('createTab',args),
+  grant(value){for(const e of grants.values())receive(value?{...e,kind:'result',payload:value}:{...e,kind:'error',payload:undefined,error:{code:'grant_unavailable',retryable:true}});grants.clear();return true;},
+ };
+}

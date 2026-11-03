@@ -69,6 +69,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -141,6 +142,14 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val agents = options?.agents.orEmpty().filter { it.machineId == target.machineId }
     val agent = agents.firstOrNull { it.id == agentId } ?: agents.firstOrNull()
     val capability = options?.capability(agent)
+    LaunchedEffect(runtimeScope, agent?.id, optionsFresh, capability != null) {
+        val selected = agent ?: return@LaunchedEffect
+        if (optionsFresh && capability == null) {
+            try { repository.refreshCapability(runtimeScope, selected.id) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* Cached choices remain usable for display. */ }
+        }
+    }
     val github = CreateSessionModel.isGithub(target.projectId) && !target.chat
     val canSend = optionsFresh && agent != null && !attempted && !busy && (!github || branch.isNotBlank())
     val waitingText = stringResource(R.string.create_agent)
@@ -155,12 +164,16 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         try { options = repository.cachedOptions(runtimeScope, null) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { /* A missing/corrupt cache is a normal cold start. */ }
-        // One complete workspace refresh on entry; cached options stay visible while it runs.
+        options?.let { target = CreateSessionModel.withInitialAvailability(target, it, explicitlySelected = targetChosen) }
+        // Refresh on runtime/catalog/presence changes, never on a timer.
         try {
-            val loaded = repository.options(runtimeScope, null)
-            options = loaded; optionsFresh = true
-            target = CreateSessionModel.withInitialAvailability(target, loaded, explicitlySelected = targetChosen)
-            if (loaded.agents.isNotEmpty()) targetChosen = true
+            repository.observeOptions(runtimeScope).collect { loaded ->
+                optionsFresh = loaded != null && loaded.availability == "online"
+                if (loaded != null) {
+                    options = loaded
+                    target = CreateSessionModel.withInitialAvailability(target, loaded, explicitlySelected = targetChosen)
+                }
+            }
         }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { optionsFresh = false }
@@ -237,7 +250,9 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                         .padding(horizontal = LodyLayout.screenPaddingX),
                     verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
-                    ContextPanel(catalog, target, onChange = { if (!attempted) { targetChosen = true; target = it } })
+                    ContextPanel(catalog, target,
+                        availableMachines = options?.agents?.map { it.machineId }?.toSet().takeIf { optionsFresh },
+                        onChange = { if (!attempted) { targetChosen = true; target = it } })
                     if (github) BranchLine(branches, branchLoading, branchFailed, enabled = !attempted,
                         onChange = { name ->
                             branches = branches.select(name)
@@ -273,7 +288,19 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         }
     }
     if (runConfig) {
-        ModalBottomSheet(onDismissRequest = { runConfig = false }, containerColor = colors.bgBase) {
+        ModalBottomSheet(
+            onDismissRequest = { runConfig = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = colors.bgBase,
+        ) {
+            if (agents.isEmpty()) {
+                Text(
+                    stringResource(if (optionsFresh) R.string.create_no_available_agents else R.string.create_waiting_agents),
+                    style = LodyTheme.typography.body,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(LodyLayout.screenPaddingX),
+                )
+            }
             RunConfigSheet(
                 rows = buildList {
                     if (agents.isNotEmpty()) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, icon = LodyIcons.Agent) }))
@@ -306,18 +333,23 @@ private const val EFFORT = "effort"
 private const val MODE = "mode"
 
 @Composable
-private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onChange: (CreateTarget) -> Unit) {
+private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
     // One list open at a time, as web's picker coordinator.
     var open by remember { mutableStateOf<String?>(null) }
     val toggle = { id: String -> open = if (open == id) null else id }
 
     val machines = CreateSessionModel.machines(catalog)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
+    val unavailableMachine = stringResource(R.string.create_no_available_agents)
     PickerCard(
         icon = machineIcon(catalog, target.machineId),
         title = machineName ?: stringResource(R.string.create_pick_machine),
         placeholder = machineName == null,
-        options = if (CreateSessionModel.machineChoosable(catalog)) machines.map { (id, name) -> PickerOption(id, name, selected = id == target.machineId, icon = machineIcon(catalog, id)) } else emptyList(),
+        options = if (CreateSessionModel.machineChoosable(catalog)) machines.map { (id, name) ->
+            val unavailable = availableMachines != null && id !in availableMachines
+            PickerOption(id, name, selected = id == target.machineId, icon = machineIcon(catalog, id),
+                subtitle = if (unavailable) unavailableMachine else "", disabled = unavailable)
+        } else emptyList(),
         open = open == MACHINE,
         onToggle = { toggle(MACHINE) },
         onPick = { open = null; onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
@@ -376,6 +408,7 @@ private data class PickerOption(
     val selected: Boolean,
     val subtitle: String = "",
     val icon: ImageVector? = null,
+    val disabled: Boolean = false,
 )
 
 private fun CatalogProject.option(target: CreateTarget) = PickerOption(
@@ -456,6 +489,7 @@ private fun OptionList(
     searchPlaceholder: String,
     onPick: (String) -> Unit,
     expandAllOn: String?,
+    expandsToContent: Boolean = false,
 ) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
@@ -491,14 +525,13 @@ private fun OptionList(
                 )
             }
         }
-        LazyColumn(Modifier.heightIn(max = 280.dp)) {
-            items(shown, key = { it.id }) { option ->
+        val optionContent: @Composable (PickerOption) -> Unit = { option ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = LodySize.listRow)
                         .clip(RoundedCornerShape(LodyRadius.md))
-                        .clickable(role = Role.Button) { if (option.id == expandAllOn) all = true; onPick(option.id) }
+                        .clickable(enabled = !option.disabled, role = Role.Button) { if (option.id == expandAllOn) all = true; onPick(option.id) }
                         .semantics { selected = option.selected }
                         .padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
@@ -513,6 +546,12 @@ private fun OptionList(
                     }
                     if (option.selected) Icon(LodyIcons.Check, contentDescription = null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm))
                 }
+        }
+        if (expandsToContent) {
+            Column { shown.forEach { option -> androidx.compose.runtime.key(option.id) { optionContent(option) } } }
+        } else {
+            LazyColumn(Modifier.heightIn(max = 280.dp)) {
+                items(shown, key = { it.id }) { option -> optionContent(option) }
             }
         }
     }
@@ -632,7 +671,7 @@ private fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPic
                 enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
                 exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
             ) {
-                OptionList(row.options, null, "", { id -> open = null; onPick(row.id, id) }, null)
+                OptionList(row.options, null, "", { id -> open = null; onPick(row.id, id) }, null, expandsToContent = true)
             }
         }
     }

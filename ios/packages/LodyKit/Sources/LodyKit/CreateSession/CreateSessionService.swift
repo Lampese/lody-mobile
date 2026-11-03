@@ -10,6 +10,7 @@ struct CreateSessionService {
   var writePrefs: (_ key: String, _ prefs: CreatePrefs) -> Void
   var put: (_ userId: String, _ workspaceId: String, _ json: String) -> Task<Void, Error>
   var persistShare = true
+  var refreshCapability: (_ workspace: String, _ config: String) async throws -> Void = { _, _ in }
   var cachedOptions: (_ userId: String, _ workspaceId: String, _ projectId: String?) async -> CreationOptions? = { _, _, _ in nil }
 
   var cachedBranches: (_ userId: String, _ workspaceId: String, _ repo: String) async -> CreateBranches? = { _, _, _ in nil }
@@ -45,6 +46,9 @@ struct CreateSessionService {
           RuntimeContract.CreationOptionsParams(workspaceId: workspace, projectId: projectId)
         }
         let options = try JSONDecoder().decode(CreationOptions.self, from: JSONEncoder().encode(result))
+        guard options.availability != "unknown" else {
+          throw DataRuntime.failure("not_ready", String(localized: "native.runtime.sessionNotSynced", bundle: .lody))
+        }
         let value = CreateJSON.encode(options)
         LocalStore.queue.async { try? LocalStore.shared.write(cacheKey, value, generation: generation) }
         return options
@@ -73,6 +77,12 @@ struct CreateSessionService {
         LocalStore.queue.async { try? LocalStore.shared.write(key, value, generation: generation) }
       },
       put: { OutboxSession.shared.put(user: $0, workspace: $1, json: $2) },
+      refreshCapability: { workspaceId, config in
+        guard let runtime = DataRuntime.current, runtime.workspace == workspaceId else { throw CancellationError() }
+        _ = try await runtime.workspaceCall(RuntimeContract.Calls.CreationOptions.self) { workspace, _ in
+          RuntimeContract.CreationOptionsParams(workspaceId: workspace, agentConfigId: config)
+        }
+      },
       cachedOptions: { userId, workspaceId, projectId in
         let key = optionsKey(userId: userId, workspaceId: workspaceId, projectId: projectId)
         let raw: String? = await withCheckedContinuation { continuation in

@@ -1,6 +1,8 @@
 import type { CreationOptions as CreationOptionsWire } from '../../contract/methods.ts';
 import { projectRows } from '../../protocol/catalog.ts';
 import { creationOptions } from '../create-session';
+import { createCapabilityRefresh } from '../capability-refresh';
+import { machineRpc } from '../machine-rpc';
 import {
   directoryResult,
   projectControl,
@@ -12,6 +14,22 @@ import type { RuntimeContext } from './context.ts';
 
 export function registerProjects(ctx: RuntimeContext) {
   const { channel, state, getGrant } = ctx;
+  const refreshMissing = createCapabilityRefresh(
+    (owner, agent, signal) =>
+      machineRpc(
+        owner,
+        agent.machineId,
+        'machine/acp-capabilities-refresh',
+        { configId: agent.id },
+        async () => {
+          if (state.workspace !== owner) throw new Error('workspace_changed');
+          return getGrant();
+        },
+        signal,
+      ),
+    () => state.workspace,
+    () => ctx.publish(),
+  );
   const browsers = new Map<string, AbortController>();
   let registering = false;
   function browserSignal(browserId: string) {
@@ -33,11 +51,20 @@ export function registerProjects(ctx: RuntimeContext) {
       args.projectId,
       state.metaReplica.flock,
       state.machineReplicas,
+      refreshMissing.rows(state.workspace),
     );
-    return availableCreationOptions(
+    const available = availableCreationOptions(
       options,
       state.presence,
     ) as CreationOptionsWire;
+    if (args.agentConfigId)
+      refreshMissing(state.workspace, {
+        ...available,
+        agents: available.agents.filter(
+          (agent) => agent.id === args.agentConfigId,
+        ),
+      });
+    return available;
   });
   channel.handle('localProjects', async (args) => {
     const { workspace, machineReplicas } = state;

@@ -14,6 +14,9 @@ class ChatRepository(
     private val owner: RuntimeOwner,
     private val pullRequests: PullRequestWriter = PullRequestWriter { _, _, _, _ -> throw GitHubWriteFailure("unavailable") },
 ) {
+    suspend fun createTab(scope: RuntimeScope, parentId: String, id: String, title: String): CreationReceipt =
+        owner.use(scope) { (it.execute(RuntimeCommand.CreateTab(parentId, id, title)) as RuntimeResult.Created).value }
+
     /** One step's detail from the watched session's replica; a read, safe to retry. */
     suspend fun detail(scope: RuntimeScope, sessionId: String, entryId: String, itemId: String): StepDetail =
         owner.use(scope) { (it.execute(RuntimeCommand.ItemDetail(sessionId, entryId, itemId)) as RuntimeResult.Detail).value }

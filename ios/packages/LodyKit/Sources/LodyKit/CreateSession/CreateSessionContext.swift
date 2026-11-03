@@ -382,6 +382,7 @@ private struct PickerFace: View {
 /// The expanded options: optional search, then rows with a check on the selected one.
 struct OptionList: View {
   let picker: CreatePicker
+  var expandsToContent = false
   let onPick: (String) -> Void
   @State private var query = ""
 
@@ -408,17 +409,23 @@ struct OptionList: View {
         .padding(.horizontal, LodySpacing.xs)
         .frame(minHeight: LodySize.controlMd)
       }
-      ScrollView {
-        LazyVStack(spacing: 0) {
-          ForEach(shown) { option in
-            Button { onPick(option.id) } label: { row(option) }
-              .buttonStyle(.plain)
-              .disabled(option.disabled)
-          }
+      if expandsToContent {
+        VStack(spacing: 0) { optionRows }
+      } else {
+        ScrollView {
+          LazyVStack(spacing: 0) { optionRows }
         }
+        .frame(maxHeight: 280)
+        .fixedSize(horizontal: false, vertical: shown.count < 6)
       }
-      .frame(maxHeight: 280)
-      .fixedSize(horizontal: false, vertical: shown.count < 6)
+    }
+  }
+
+  private var optionRows: some View {
+    ForEach(shown) { option in
+      Button { onPick(option.id) } label: { row(option) }
+        .buttonStyle(.plain)
+        .disabled(option.disabled)
     }
   }
 
@@ -468,20 +475,21 @@ struct GlyphView: View {
 /// Web's `MobileRunConfigSheet`: labelled rows whose value expands its options in place.
 struct CreateRunConfigSheet: View {
   @ObservedObject var state: CreatePanelState
+  var onHeightChange: (CGFloat) -> Void = { _ in }
 
   var body: some View {
-    VStack(spacing: LodySpacing.md) {
-      Text(String(localized: "create.runConfig.title", bundle: .lody))
-        .lodyTextStyle(.headline)
-        .foregroundStyle(LodyColor.textPrimary)
-        .padding(.top, LodySpacing.xl)
-      ScrollView {
+    ScrollView {
+      VStack(spacing: LodySpacing.md) {
+        Text(String(localized: "create.runConfig.title", bundle: .lody))
+          .lodyTextStyle(.headline)
+          .foregroundStyle(LodyColor.textPrimary)
+          .padding(.top, LodySpacing.xl)
         VStack(spacing: LodySpacing.sm) {
           ForEach(state.runConfig) { row in
             VStack(spacing: LodySpacing.xs) {
               rowFace(row)
               if state.openInSheet == row.id {
-                OptionList(picker: row) { id in
+                OptionList(picker: row, expandsToContent: true) { id in
                   state.openInSheet = nil
                   state.onPick(row.id, id)
                 }
@@ -493,6 +501,11 @@ struct CreateRunConfigSheet: View {
         .padding(.horizontal, LodyLayout.screenPaddingX)
         .padding(.bottom, LodySpacing.lg)
         .animation(.smooth(duration: 0.3), value: state.openInSheet)
+      }
+      .onGeometryChange(for: CGFloat.self) { geometry in
+        geometry.size.height
+      } action: { height in
+        onHeightChange(height)
       }
     }
     .background(LodyColor.bgBase)

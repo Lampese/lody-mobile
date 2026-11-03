@@ -278,7 +278,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     for view in [authorMark, authorLabel, authorAvatar] as [UIView] { view.isHidden = !shown }
     accessibilityValue = nil
     guard shown else { return }
-    let who = ChatAuthors.identity(row.author)
+    let who = (name: row.authorName.isEmpty ? String(localized: "native.chat.member", bundle: .lody) : row.authorName, image: row.authorImage)
     // Web's order: delivery mark, time, then the sender.
     authorLabel.text = [row.authorTime, who.name].filter { !$0.isEmpty }.joined(separator: "  ")
     let marks: [String: (String, UIColor)] = [

@@ -20,6 +20,8 @@ open class LodyApplication : Application() {
     lateinit var creation: app.lody.android.create.CreationService
     lateinit var pullRequests: app.lody.android.chat.PullRequestWriter
         private set
+    lateinit var members: WorkspaceMembers
+        private set
     private var prepared: Pair<RuntimeScope, ShortLivedGrant>? = null
     protected open fun createRuntime(scope: RuntimeScope): CloudRuntime {
         val ready = prepared?.takeIf { it.first == scope }
@@ -52,6 +54,7 @@ open class LodyApplication : Application() {
             prepared = null
             cloud.disconnect()
         }
+        members = WorkspaceMembers(cache, account::members)
         cloud = CatalogRepository(account, runtimeOwner, applicationScope, cache) { scope, grant -> prepared = scope to grant }
         ProcessLifecycleOwner.get().lifecycle.addObserver(RuntimeLifecycle(runtimeOwner, applicationScope, NetworkAvailability(this).available) {
             ConnectionTrace.mark("network_validated")

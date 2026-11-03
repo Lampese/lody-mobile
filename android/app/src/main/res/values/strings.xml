@@ -257,4 +257,12 @@
         <item quantity="one">%d background task</item>
         <item quantity="other">%d background tasks</item>
     </plurals>
+    <string name="create_no_available_agents">No available assistants on this computer. Choose another computer.</string>
+    <string name="create_waiting_agents">Waiting for assistants to sync…</string>
+    <string name="chat_new_tab">New Tab conversation</string>
+    <string name="chat_current_tab">Current conversation</string>
+    <string name="chat_tab_creation_failed">Could not create a Tab conversation.</string>
+    <string name="chat_tab_creation_unknown">Creation result is unknown. Tap again to open the conversation.</string>
+    <plurals name="chat_directory_tabs"><item quantity="one">%d conversation in this directory</item><item quantity="other">%d conversations in this directory</item></plurals>
+    <plurals name="chat_changed_files"><item quantity="one">%d file</item><item quantity="other">%d files</item></plurals>
 </resources>
