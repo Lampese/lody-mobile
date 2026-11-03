@@ -1,6 +1,6 @@
 # Shared runtime source and dependency updates
 
-`runtime/vendor/cloud-runtime` is an unchanged 96-file snapshot of this monorepo's `ios/packages/cloud-runtime`, commit `bdb9cb467979e36b9a84b43ad2fd561c47533269` (`git archive <commit> ios/packages/cloud-runtime`). Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
+`runtime/vendor/cloud-runtime` is an unchanged 96-file snapshot of this monorepo's `ios/packages/cloud-runtime`, commit `216d24ee8163821783f6cbd41604c761fc61ee74` (`git archive <commit> ios/packages/cloud-runtime`). Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
 
 For an intentional update:
 

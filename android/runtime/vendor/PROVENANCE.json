@@ -1,6 +1,6 @@
 {
   "source": "Lody Mobile ios/packages/cloud-runtime",
-  "commit": "bdb9cb467979e36b9a84b43ad2fd561c47533269",
+  "commit": "216d24ee8163821783f6cbd41604c761fc61ee74",
   "license": "AGPL-3.0-only",
   "path": "ios/packages/cloud-runtime",
   "note": "Unmodified source snapshot. Build has no dependency on the source checkout."
