@@ -231,7 +231,14 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     controller.contentUnavailableConfiguration = configuration
     return controller
   }
+  private var barScroll = HomeBarScrollState()
+
   private func configureTabs() {
+    inbox.list.onScroll = { [weak self] offset, scrolling in
+      guard let self, self.selectedTab == .chats else { return }
+      self.barScroll.update(offset: offset, scrolling: scrolling, threshold: Double(LodySpacing.xxl))
+      self.tabBar?.setCollapsed(self.barScroll.collapsed)
+    }
     tabBar = HomeTabBar(page: primary, selected: selectedTab, actions: HomeTabBar.Actions(
       select: { [weak self] in self?.selectTab($0) },
       create: { [weak self] in self?.inbox.newSession() },
@@ -263,6 +270,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
 
   private func updateTabBar(for controller: UIViewController?) {
     let root = tabPages.values.first { $0 === controller }
+    tabBar?.setCollapsed(selectedTab == .chats && barScroll.collapsed)
     tabBar?.display(content: root?.children.first, visible: root != nil)
   }
 

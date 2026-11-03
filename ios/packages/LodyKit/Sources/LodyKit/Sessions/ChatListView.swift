@@ -28,6 +28,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     let canToggle: Bool
   }
 
+  var onScroll: ((Double, Bool) -> Void)?
   var forwarded: ((String, [String: Any]) -> Void)?
   private(set) var collection: UICollectionView!
   private var dataSource: UICollectionViewDiffableDataSource<String, Item>!
@@ -201,6 +202,8 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   }
 
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
+    onScroll?(Double(scrollView.contentOffset.y + scrollView.adjustedContentInset.top),
+      scrollView.isDragging || scrollView.isDecelerating)
     updateBackdrop()
   }
 

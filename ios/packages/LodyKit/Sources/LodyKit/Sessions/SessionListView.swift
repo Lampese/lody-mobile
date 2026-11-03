@@ -6,6 +6,7 @@ import UIKit
 final class SessionListView: UIView {
   private let grouped = ChatListView(frame: .zero)
   private let sidebar = LodySidebar(frame: .zero)
+  var onScroll: ((Double, Bool) -> Void)? { didSet { grouped.onScroll = onScroll } }
   var forwarded: ((String, [String: Any]) -> Void)?
   var selectedSessionId = "" { didSet { sidebar.setSelectedRowId(selectedSessionId) } }
   private var sections: [LodyListSection] = []

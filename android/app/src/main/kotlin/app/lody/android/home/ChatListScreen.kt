@@ -42,6 +42,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.LocalDensity
+import app.lody.android.designsystem.LodyMotion
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -163,6 +170,17 @@ fun ChatListScreen(
     onNewChat: () -> Unit,
 ) {
     val colors = LodyTheme.colors
+    val chatsListState = rememberLazyListState()
+    val barScroll = remember { HomeBarScrollState() }
+    var barCollapsed by remember { mutableStateOf(false) }
+    val threshold = with(LocalDensity.current) { LodySpacing.xxl.toPx() }
+    LaunchedEffect(chatsListState, threshold) {
+        snapshotFlow { Triple(chatsListState.firstVisibleItemIndex, chatsListState.firstVisibleItemScrollOffset, chatsListState.isScrollInProgress) }
+            .collect { (index, offset, scrolling) ->
+                barScroll.update(if (index > 0) threshold + offset + 1 else offset.toFloat(), scrolling, threshold)
+                barCollapsed = barScroll.collapsed
+            }
+    }
     var tab by rememberSaveable { mutableStateOf(HomeTab.Chats) }
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -207,6 +225,7 @@ fun ChatListScreen(
             if (!searching && project == null) {
                 HomeBottomBar(
                     selected = tab,
+                    collapsed = tab == HomeTab.Chats && barCollapsed,
                     onSelect = { tab = it },
                     onCreate = onNewChat,
                 )
@@ -226,6 +245,7 @@ fun ChatListScreen(
                 if (grouping == HomeGrouping.Project) details - ChatRowDetail.Project else details,
                 padding,
                 empty = state.placeholder,
+                listState = chatsListState,
                 idleExpanded = idleExpanded,
                 onToggleIdle = { idleExpanded = !idleExpanded },
                 onOpenChat = onOpenChat,
@@ -520,50 +540,54 @@ private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose
 
 /** Labelled tabs in a floating capsule plus a separate new-chat button. */
 @Composable
-private fun HomeBottomBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, onCreate: () -> Unit) {
+private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (HomeTab) -> Unit, onCreate: () -> Unit) {
     val colors = LodyTheme.colors
     val create = stringResource(R.string.home_new_chat)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+    val progress by animateFloatAsState(
+        if (collapsed) 1f else 0f,
+        tween(LodyMotion.slowMillis, easing = LodyMotion.standard), label = "home-bar-collapse",
+    )
+    val shrink = (progress * 2).coerceAtMost(1f)
+    val height = BarHeight + (LodySize.controlLg - BarHeight) * shrink
+    val labelHeight = with(LocalDensity.current) { LodyTheme.typography.micro.lineHeight.toDp() }
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().navigationBarsPadding()
+            .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.xs)
+            .height(BarHeight),
     ) {
+        val expandedWidth = maxWidth - BarHeight - LodySpacing.md
+        val compactWidth = LodySize.controlLg * HomeTab.entries.size + LodySpacing.xs * 2
+        val width = expandedWidth + (compactWidth - expandedWidth) * progress
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .height(BarHeight)
+            modifier = Modifier.align(Alignment.CenterStart).width(width).height(height)
                 .dropShadow(CircleShape, LodyElevations.md.shadow())
-                .clip(CircleShape)
-                .background(colors.bgOverlay)
-                .padding(LodySpacing.xs),
+                .clip(CircleShape).background(colors.bgOverlay).padding(LodySpacing.xs)
+                .selectableGroup(),
         ) {
             HomeTab.entries.forEach { tab ->
                 val isSelected = tab == selected
                 val tint = if (isSelected) colors.accentFg else colors.iconSecondary
+                val label = stringResource(tab.label)
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(CircleShape)
+                    modifier = Modifier.weight(1f).fillMaxHeight().clip(CircleShape)
                         .background(if (isSelected) colors.fillSelected else Color.Transparent)
-                        .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) },
+                        .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) }
+                        .semantics { contentDescription = label },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Glyph(tab.icon, tint)
-                    Text(stringResource(tab.label), style = LodyTheme.typography.micro, color = tint, maxLines = 1)
+                    Box(Modifier.height(labelHeight * (1 - shrink)).clip(CircleShape)) {
+                        Text(label, style = LodyTheme.typography.micro, color = tint, maxLines = 1,
+                            modifier = Modifier.graphicsLayer { alpha = 1 - shrink }.clearAndSetSemantics {})
+                    }
                 }
             }
         }
         Box(
-            modifier = Modifier
-                .size(BarHeight)
+            modifier = Modifier.align(Alignment.CenterEnd).size(height)
                 .dropShadow(CircleShape, LodyElevations.md.shadow())
-                .clip(CircleShape)
-                .background(colors.bgOverlay)
+                .clip(CircleShape).background(colors.bgOverlay)
                 .clickable(role = Role.Button, onClick = onCreate)
                 .semantics { contentDescription = create },
             contentAlignment = Alignment.Center,
@@ -583,6 +607,7 @@ internal fun HomeList(
     details: Set<ChatRowDetail>,
     padding: PaddingValues,
     empty: String?,
+    listState: LazyListState = rememberLazyListState(),
     idleExpanded: Boolean = false,
     onToggleIdle: () -> Unit = {},
     pinsLabels: Boolean = true,
@@ -607,6 +632,7 @@ internal fun HomeList(
     // Keep the sticky slot below the app bar; content padding alone scrolls away.
     LazyColumn(
         Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+        state = listState,
         contentPadding = PaddingValues(
             start = padding.calculateStartPadding(direction),
             end = padding.calculateEndPadding(direction),

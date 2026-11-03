@@ -46,6 +46,8 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
   private var createSize: NSLayoutConstraint!
   private var barLeading: NSLayoutConstraint!
   private var barTrailing: NSLayoutConstraint!
+  private var compactWidth: NSLayoutConstraint!
+  private var collapsed = false
   private let actions: Actions
   private weak var page: UIViewController?
   private weak var content: UIViewController?
@@ -62,6 +64,7 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
 
     let items = HomeTab.allCases.enumerated().map { index, tab in
       let item = UITabBarItem(title: tab.title, image: tab.icon.uiImage?.withRenderingMode(.alwaysTemplate), tag: index)
+      item.accessibilityLabel = tab.title
       item.accessibilityIdentifier = "home-tab-\(String(describing: tab))"
       return item
     }
@@ -99,6 +102,7 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
       create.widthAnchor.constraint(equalTo: create.heightAnchor),
       createCenter, createSize,
     ])
+    compactWidth = bar.widthAnchor.constraint(equalToConstant: 3 * Self.height + 2 * LodySpacing.xxl)
     bar.capsuleChanged = { [weak self] capsule in self?.follow(capsule) }
     page.registerForTraitChanges([UITraitHorizontalSizeClass.self]) { [weak self] (_: UIViewController, _: UITraitCollection) in
       self?.updateVisibility()
@@ -126,6 +130,27 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     }
   }
 
+  func setCollapsed(_ value: Bool) {
+    guard collapsed != value, let page else { return }
+    page.view.layoutIfNeeded()
+    collapsed = value
+    bar.itemPositioning = value ? .fill : .automatic
+    barTrailing.isActive = !value
+    compactWidth.isActive = value
+    for (index, item) in (bar.items ?? []).enumerated() {
+      item.title = value ? nil : HomeTab.allCases[index].title
+    }
+    let changes = {
+      page.view.layoutIfNeeded()
+      if let capsule = self.bar.capsule { self.follow(capsule) }
+    }
+    if UIAccessibility.isReduceMotionEnabled { changes() }
+    else {
+      UIView.animate(withDuration: LodyMotion.slow, delay: 0,
+        options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut], animations: changes)
+    }
+  }
+
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
     guard HomeTab.allCases.indices.contains(item.tag) else { return }
     actions.select(HomeTab.allCases[item.tag])
@@ -146,8 +171,11 @@ final class HomeTabBar: NSObject, UITabBarDelegate {
     let rtl = bar.effectiveUserInterfaceLayoutDirection == .rightToLeft
     let offset = rtl ? (bar.bounds.width - capsule.maxX) / 2 : -capsule.minX / 2
     let translation = CGAffineTransform(translationX: offset, y: 0)
-    bar.transform = translation
-    create.transform = translation
+    let scale = collapsed ? LodySize.touchTarget / max(LodySize.touchTarget, capsule.height) : 1
+    let shift = collapsed ? (scale - 1) * bar.bounds.width / 2 : offset
+    let vertical = (1 - scale) * (capsule.midY - bar.bounds.midY)
+    bar.transform = CGAffineTransform(translationX: shift, y: vertical).scaledBy(x: scale, y: scale)
+    create.transform = translation.scaledBy(x: scale, y: scale)
     if createCenter.constant != capsule.midY { createCenter.constant = capsule.midY }
     if createSize.constant != capsule.height { createSize.constant = capsule.height }
     updateVisibility()
