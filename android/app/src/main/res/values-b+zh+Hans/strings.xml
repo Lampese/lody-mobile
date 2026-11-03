@@ -259,4 +259,8 @@
     <string name="chat_tasks_subagents">子代理</string>
     <string name="chat_tasks_others">任务</string>
     <string name="chat_tasks_back">返回任务列表</string>
+    <plurals name="chat_files_count">
+        <item quantity="one">%d 个文件</item>
+        <item quantity="other">%d 个文件</item>
+    </plurals>
 </resources>

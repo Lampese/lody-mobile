@@ -41,6 +41,11 @@ internal object RuntimeProtocol {
                     endedAt = (entry.opt("endedAt") as? Number)?.toLong(),
                     model = entry.optJSONObject("modelInfo")?.let { info -> info.optString("name").ifBlank { info.optString("modelId") }.ifBlank { null } },
                     items = if (role == "assistant") items else emptyList(),
+                    files = entry.optJSONArray("fileDiffs")?.objects().orEmpty().mapNotNull { diff ->
+                        diff.optString("path").takeIf { it.isNotBlank() }?.let {
+                            FileChange(it, (diff.opt("add") as? Number)?.toInt() ?: 0, (diff.opt("del") as? Number)?.toInt() ?: 0)
+                        }
+                    },
                 )
             }
             RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries))

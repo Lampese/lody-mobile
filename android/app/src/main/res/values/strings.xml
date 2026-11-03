@@ -260,4 +260,8 @@
     <string name="chat_tasks_subagents">Subagents</string>
     <string name="chat_tasks_others">Tasks</string>
     <string name="chat_tasks_back">Back to tasks</string>
+    <plurals name="chat_files_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
 </resources>

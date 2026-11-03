@@ -51,6 +51,11 @@ extension LodyChatView {
       return
     }
     guard let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id], row.actionable else { return }
+    if row.kind == "changesHeader" {
+      UISelectionFeedbackGenerator().selectionChanged()
+      onActivityPress(["entryId": row.entryID, "itemId": "", "processStartId": "__turnFiles__"])
+      return
+    }
     if row.kind == "tasksHeader" {
       UISelectionFeedbackGenerator().selectionChanged()
       onActivityPress(["entryId": row.entryID, "itemId": "", "processStartId": "__taskSheet__"])

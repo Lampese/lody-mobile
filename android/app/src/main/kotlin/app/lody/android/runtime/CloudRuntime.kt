@@ -100,6 +100,8 @@ data class SessionMessage(
     val model: String? = null,
     /** The turn's items in order (text, thought, tool steps, plans, notices) for the process view. */
     val items: List<TurnItem> = emptyList(),
+    /** Files the turn changed, with their line counts (the output card's files row). */
+    val files: List<FileChange> = emptyList(),
 )
 
 /**
@@ -200,3 +202,6 @@ sealed interface StepBlock {
     data class Diff(val path: String, val oldText: String, val newText: String) : StepBlock
     data class Text(val text: String) : StepBlock
 }
+
+/** One file a turn changed (upstream entry `fileDiffs`). */
+data class FileChange(val path: String, val added: Int, val removed: Int)

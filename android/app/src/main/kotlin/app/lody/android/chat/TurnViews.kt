@@ -69,7 +69,8 @@ internal fun LazyListScope.turnBlocks(
         when (block) {
             is TurnLayout.Content -> content(entry, block, open, toggle, details)
             is TurnLayout.Activity -> {
-                val expanded = open[block.key] ?: block.opensByDefault
+                // A running turn shows its work open; once it settles, groups rest closed (web).
+                val expanded = open[block.key] ?: (entry.working || block.opensByDefault)
                 val running = block.key == active
                 item(key = block.key, contentType = "disclosure") {
                     Disclosure(activityLabel(block, running), expanded, Modifier.animateItem(), shimmer = running) { toggle(block.key, it) }
@@ -460,19 +461,126 @@ private const val OutputLines = 40
 private const val DiffLines = 60
 
 /**
- * Web's task panel, compact: ONE raised card row under the turn — a live spinner (or the stack
- * glyph once settled), "Waiting on N tasks" / "N tasks", the newest running task's latest step,
- * and a chevron. The tasks themselves open in a near full-screen sheet ([TasksSheet]), never
- * inline. Neutral tones; iOS draws the same card.
+ * The turn's output card: one raised card with a row per kind of output — its background tasks and
+ * sub-agents (live spinner or stack glyph, "Waiting on N tasks" / "N tasks", the newest running
+ * task's latest step) and its changed files ("3 files +135 −157"). Each row opens its own near
+ * full-screen sheet ([TasksSheet], [FilesSheet]); nothing expands inline. Neutral tones; iOS
+ * draws the same card.
  */
-internal fun LazyListScope.taskPanel(entry: ChatEntry.Assistant, onOpenTasks: (String) -> Unit) {
+internal fun LazyListScope.turnOutput(entry: ChatEntry.Assistant, onOpenTasks: (String) -> Unit, onOpenFiles: (String) -> Unit) {
     val tasks = entry.layout.tasks
-    if (tasks.isEmpty()) return
-    val key = "${entry.id}#tasks"
-    item(key = key, contentType = "tasks-card") {
-        TaskCard(tasks, Modifier.animateItem().cardSegment(Segment.Only)) { onOpenTasks(entry.id) }
+    val files = if (entry.working) emptyList() else entry.files
+    if (tasks.isEmpty() && files.isEmpty()) return
+    val key = "${entry.id}#output"
+    if (tasks.isNotEmpty()) {
+        item(key = "$key:tasks", contentType = "output-row") {
+            TaskCard(tasks, Modifier.animateItem().cardSegment(if (files.isEmpty()) Segment.Only else Segment.First)) { onOpenTasks(entry.id) }
+        }
     }
-    item(key = "$key:end", contentType = "tasks-end") { androidx.compose.foundation.layout.Spacer(Modifier.padding(bottom = LodySpacing.md)) }
+    if (files.isNotEmpty()) {
+        item(key = "$key:files", contentType = "output-row") {
+            FilesRow(files, Modifier.animateItem().cardSegment(if (tasks.isEmpty()) Segment.Only else Segment.Last)) { onOpenFiles(entry.id) }
+        }
+    }
+    item(key = "$key:end", contentType = "output-end") { androidx.compose.foundation.layout.Spacer(Modifier.padding(bottom = LodySpacing.md)) }
+}
+
+/**
+ * The line that closes a finished turn, always last: the agent mark, model and finish time (web's
+ * footer shows config, not author identity).
+ */
+internal fun LazyListScope.turnFooter(entry: ChatEntry.Assistant) {
+    if (entry.working) return
+    val text = listOf(entry.who.name, entry.who.time).filter { it.isNotBlank() }.joinToString(" · ")
+    if (text.isEmpty()) return
+    item(key = "${entry.id}#footer", contentType = "footer") {
+        Row(
+            Modifier.animateItem().fillMaxWidth().padding(horizontal = TranscriptMargin, vertical = LodySpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+        ) {
+            Icon(LodyIcons.Agent, contentDescription = null, tint = LodyTheme.colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+            Text(text, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun FilesRow(files: List<app.lody.android.runtime.FileChange>, modifier: Modifier = Modifier, onOpen: () -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val digits = type.footnote.copy(fontFeatureSettings = "tnum")
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = onOpen)
+            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        Icon(LodyIcons.Diff, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+        Text(pluralStringResource(R.plurals.chat_files_count, files.size, files.size), style = type.subhead, color = colors.textPrimary, modifier = Modifier.weight(1f))
+        Text("+${files.sumOf { it.added }}", style = digits, color = colors.diffAddedText)
+        Text("−${files.sumOf { it.removed }}", style = digits, color = colors.diffRemovedText)
+        Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+    }
+}
+
+/**
+ * A turn's changed files in a near full-screen native sheet: one card of ruled rows, each the
+ * file's name in code type, its folder, and its +/− counts.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun FilesSheet(files: List<app.lody.android.runtime.FileChange>, onDismiss: () -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val sheet = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgBase) {
+        androidx.compose.foundation.lazy.LazyColumn(
+            Modifier.fillMaxWidth().fillMaxHeight(0.92f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = LodySpacing.xl),
+        ) {
+            item(key = "title") {
+                Row(
+                    Modifier.padding(horizontal = TranscriptMargin).padding(bottom = LodySpacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                ) {
+                    Text(pluralStringResource(R.plurals.chat_files_count, files.size, files.size), style = type.headline, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                    val digits = type.subhead.copy(fontFeatureSettings = "tnum")
+                    Text("+${files.sumOf { it.added }}", style = digits, color = colors.diffAddedText)
+                    Text("−${files.sumOf { it.removed }}", style = digits, color = colors.diffRemovedText)
+                }
+            }
+            files.forEachIndexed { index, file ->
+                item(key = file.path) {
+                    val segment = when {
+                        files.size == 1 -> Segment.Only
+                        index == 0 -> Segment.First
+                        index == files.lastIndex -> Segment.Last
+                        else -> Segment.Middle
+                    }
+                    Row(
+                        Modifier.animateItem().cardSegment(segment).fillMaxWidth().heightIn(min = 52.dp)
+                            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                    ) {
+                        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                            Text(file.path.substringAfterLast('/'), style = type.subhead.copy(fontFamily = type.code.fontFamily), color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                            val folder = file.path.substringBeforeLast('/', "")
+                            if (folder.isNotEmpty()) Text(folder, style = type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.StartEllipsis)
+                        }
+                        val digits = type.footnote.copy(fontFeatureSettings = "tnum")
+                        Text("+${file.added}", style = digits, color = colors.diffAddedText)
+                        Text("−${file.removed}", style = digits, color = colors.diffRemovedText)
+                    }
+                }
+            }
+        }
+    }
 }
 
 private enum class Segment { Only, First, Middle, Last }

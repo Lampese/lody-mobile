@@ -123,6 +123,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                     TurnIdentity(message.model?.let { "$agentName · $it" } ?: agentName, time = turnTime(message.timestamp)),
                                     worked(message, workedFormat),
                                     working = message.streaming,
+                                    files = message.files,
                                 )
                             }
                         }.also { rendered[message.id] = message to it }

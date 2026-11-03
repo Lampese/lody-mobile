@@ -637,7 +637,8 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
 
 private func chromeColor(for row: ChatRow) -> UIColor {
   if row.kind == "chat_failed" { return .systemRed }
-  if row.attention { return .systemOrange }
+  // No warning orange in a conversation: a failed or waiting step says so in its own words.
+  if row.attention { return .secondaryLabel }
   if row.kind == "changes" || row.kind == "file" || (row.kind == "summary" && row.running) { return .lodyAccent }
   return .secondaryLabel
 }

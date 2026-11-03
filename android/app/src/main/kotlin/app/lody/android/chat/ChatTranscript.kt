@@ -90,6 +90,8 @@ sealed interface ChatEntry {
         val who: TurnIdentity,
         val worked: String = "",
         val working: Boolean = false,
+        /** Files the turn changed: the output card's files row and its sheet. */
+        val files: List<FileChange> = emptyList(),
     ) : ChatEntry {
         companion object {
             /** A turn that is only prose (the stream probe, older projections). */
@@ -160,9 +162,15 @@ fun ChatTranscript(
         }
     }
     val details = remember(loadDetail != null) { StepDetails(loadDetail) }
-    // The turn whose tasks the sheet shows, by id, so running tasks keep updating inside it.
+    // The turn whose tasks / files a sheet shows, by id, so running tasks keep updating inside it.
     var shownTasks by remember { mutableStateOf<String?>(null) }
     val openTasks: (String) -> Unit = { shownTasks = it }
+    var shownFiles by remember { mutableStateOf<String?>(null) }
+    val openFiles: (String) -> Unit = { shownFiles = it }
+    shownFiles?.let { id ->
+        val files = (entries.firstOrNull { it.id == id } as? ChatEntry.Assistant)?.files.orEmpty()
+        if (files.isNotEmpty()) FilesSheet(files) { shownFiles = null }
+    }
     shownTasks?.let { id ->
         val tasks = entries.firstOrNull { it.id == id }.let { it as? ChatEntry.Assistant }?.layout?.tasks.orEmpty()
         // Tasks that left the transcript just leave the sheet closed.
@@ -174,7 +182,7 @@ fun ChatTranscript(
     }
     LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
         keys.reset()
-        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks) }
+        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFiles) }
     }
 }
 
@@ -214,6 +222,7 @@ private fun LazyListScope.transcriptRows(
     toggle: (String, Boolean) -> Unit,
     details: StepDetails,
     onOpenTasks: (String) -> Unit,
+    onOpenFiles: (String) -> Unit,
 ) {
         entries.forEach { entry ->
             when (entry) {
@@ -238,8 +247,9 @@ private fun LazyListScope.transcriptRows(
                         val thinking = last is TurnLayout.Activity && last.items.lastOrNull() is TurnItem.Thought
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
-                    // Web: live status precedes the task panel.
-                    taskPanel(entry, onOpenTasks)
+                    // Web: live status precedes the output card; the footer always closes the turn.
+                    turnOutput(entry, onOpenTasks, onOpenFiles)
+                    turnFooter(entry)
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }

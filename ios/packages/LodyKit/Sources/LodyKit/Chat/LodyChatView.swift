@@ -222,12 +222,16 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       let value = NSMutableAttributedString(string: "+\(file.add ?? 0)", attributes: [.foregroundColor: UIColor.systemGreen])
       value.append(NSAttributedString(string: "  −\(file.del ?? 0)", attributes: [.foregroundColor: UIColor.systemRed]))
       counts.attributedText = value
-      cell.accessories = [.customView(configuration: .init(customView: counts, placement: .trailing()))]
+      // A row of the turn's output card: the files open in their own sheet.
+      cell.accessories = [.customView(configuration: .init(customView: counts, placement: .trailing())), .disclosureIndicator()]
       cell.accessibilityLabel = String.localizedStringWithFormat(String(localized: "native.chat.file.diffStats", bundle: .lody), String(describing: file.add ?? 0), String(describing: file.del ?? 0), String(describing: row.text))
+    }
+    cell.configurationUpdateHandler = { cell, state in
+      (cell as? ChatFileCell)?.apply(group: row.group, selected: state.isHighlighted)
     }
     cell.isAccessibilityElement = true
     cell.accessibilityIdentifier = row.id
-    cell.accessibilityTraits = .header
+    cell.accessibilityTraits = .button
   }
   private let fileRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
     guard let file = row.fileDiff else { return }
