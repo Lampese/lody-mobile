@@ -693,9 +693,11 @@ extension ChatTranscript {
     return (start...index).filter { prose(items[$0]) }
   }
 
-  /// Web's task panel: a turn's background tasks and sub-agents follow its answer as one group,
-  /// headed "Waiting on N tasks" while any runs (rows shown) and "N tasks" once all settled — then
-  /// the rows fold away until the reader opens them (`LodyChatView.expandedTaskGroups`).
+  /// Web's task panel as one inset card after the turn's answer: a header row ("Waiting on N
+  /// tasks" while any runs, "N tasks" once settled; the newest running task's latest step as its
+  /// detail) and a row per task. `LodyChatView` folds the card to its header by default and opens
+  /// it on tap (`expandedTaskGroups`). Neutral: a failure reads in its own row, never as an
+  /// attention mark on the card.
   static func hangSubagents(_ rows: [ChatRow]) -> [ChatRow] {
     var tasks = rows.filter { $0.kind == "subagent_task" }
     var result = rows.filter { $0.kind != "subagent_task" }
@@ -710,15 +712,14 @@ extension ChatTranscript {
     case (false, false): key = "native.chat.tasks.count"
     }
     var header = ChatRow(
-      id: first.entryID + ":tasks", entryID: first.entryID, kind: "summary",
+      id: first.entryID + ":tasks", entryID: first.entryID, kind: "tasksHeader",
       text: String.localizedStringWithFormat(String(localized: String.LocalizationValue(key), bundle: .lody), running > 0 ? running : tasks.count),
-      symbol: ChatProcessSummary.mark(attention: tasks.contains(where: \.attention)),
-      actionable: running == 0, running: running > 0, attention: tasks.contains(where: \.attention)
+      actionable: true, running: running > 0
     )
-    header.treeDown = true
+    header.detail = tasks.last { $0.running && !($0.subagent?.detail ?? "").isEmpty }?.subagent?.detail ?? ""
     for index in tasks.indices {
-      tasks[index].treeChild = true
-      tasks[index].treeLast = index == tasks.count - 1
+      tasks[index].attention = false
+      tasks[index].group = index == tasks.count - 1 ? "last" : "middle"
     }
     // After the answer, before the turn's meta and changed files.
     let anchor = result.firstIndex { ["meta", "changesHeader", "changes"].contains($0.kind) } ?? result.endIndex

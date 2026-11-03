@@ -51,7 +51,7 @@ extension LodyChatView {
       return
     }
     guard let id = dataSource.itemIdentifier(for: indexPath), let row = rows[id], row.actionable else { return }
-    if row.kind == "summary", row.id.hasSuffix(":tasks") {
+    if row.kind == "tasksHeader" {
       if !expandedTaskGroups.insert(row.entryID).inserted { expandedTaskGroups.remove(row.entryID) }
       UISelectionFeedbackGenerator().selectionChanged()
       applyRows()
@@ -446,6 +446,11 @@ extension LodyChatView {
       return ChatMessageAttachmentsCell.height(count: row.attachments.count, width: width, expanded: expandedAttachments.contains(row.entryID))
     }
     if row.kind == "chat_failed" { return ChatErrorCell.height(row, width: width, traits: traitCollection) }
+    if row.kind == "tasksHeader" { return row.detail.isEmpty ? ChatFileCell.headerHeight : 56 }
+    if let card = row.subagent, !row.group.isEmpty {
+      // A second line only for a running task's step or a failure (`taskRegistration`).
+      return !card.detail.isEmpty && (row.running || card.status == "failed") ? 60 : 48
+    }
     if row.subagent != nil { return ChatSubagentCell.height(row, width: width, traits: traitCollection) }
     if row.kind == "meta" { return ChatMetaCell.height(for: row, width: width, traits: traitCollection, detailsEnabled: turnInfoEnabled) }
     if row.kind == "duration" { return ChatCell.processHeight(for: row, width: width, traits: traitCollection) }

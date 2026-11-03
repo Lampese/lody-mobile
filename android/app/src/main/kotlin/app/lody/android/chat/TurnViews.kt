@@ -11,6 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import app.lody.android.runtime.StepBlock
 import app.lody.android.runtime.StepDetail
 import androidx.compose.foundation.layout.Arrangement
@@ -455,10 +457,12 @@ private const val OutputLines = 40
 private const val DiffLines = 60
 
 /**
- * Web's task panel for background tasks and sub-agents: while any runs it stays open under the
- * turn with "Waiting on N tasks" and a row per task (state mark, actor · description, the latest
- * step); once every task has settled it is one "N tasks ›" row, closed until opened. A row opens
- * the task's own run in a native bottom sheet.
+ * Web's task panel for background tasks and sub-agents, as one raised card under the turn so it
+ * reads as its own thing, folded by default to a single header row: a live mark (or the stack
+ * glyph once settled), "Waiting on N tasks" / "N tasks", the latest step of a running task, and a
+ * chevron. Opened, each task is a ruled row of the same card (state mark, actor · description,
+ * the latest step); a row opens the task's run in a native bottom sheet. Colour is for failure
+ * only. iOS draws the same card from inset list cells.
  */
 internal fun LazyListScope.taskPanel(
     entry: ChatEntry.Assistant,
@@ -469,33 +473,81 @@ internal fun LazyListScope.taskPanel(
     val tasks = entry.layout.tasks
     if (tasks.isEmpty()) return
     val key = "${entry.id}#tasks"
-    val running = tasks.count { it.running }
-    val expanded = running > 0 || open[key] == true
+    val expanded = open[key] == true
     item(key = key, contentType = "tasks-header") {
-        val background = tasks.all { it.background }
-        val label = when {
-            running > 0 && background -> pluralStringResource(R.plurals.chat_tasks_waiting_background, running, running)
-            running > 0 -> pluralStringResource(R.plurals.chat_tasks_waiting, running, running)
-            background -> pluralStringResource(R.plurals.chat_tasks_count_background, tasks.size, tasks.size)
-            else -> pluralStringResource(R.plurals.chat_tasks_count, tasks.size, tasks.size)
-        }
-        if (running > 0) {
-            Row(
-                Modifier.animateItem().fillMaxWidth().heightIn(min = 36.dp).padding(horizontal = TranscriptMargin),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-            ) {
-                LodyWorkingGrid()
-                Text(label, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textSecondary)
-            }
-        } else {
-            Disclosure(label, expanded, Modifier.animateItem()) { toggle(key, it) }
-        }
+        TaskHeader(tasks, expanded, Modifier.animateItem().cardSegment(if (expanded) Segment.First else Segment.Only)) { toggle(key, it) }
     }
     if (expanded) {
-        for (task in tasks) {
-            item(key = "$key:${task.id}", contentType = "task") { TaskRow(task, Modifier.animateItem()) { onOpenTask(task) } }
+        tasks.forEachIndexed { index, task ->
+            item(key = "$key:${task.id}", contentType = "task") {
+                TaskRow(task, Modifier.animateItem().cardSegment(if (index == tasks.lastIndex) Segment.Last else Segment.Middle)) { onOpenTask(task) }
+            }
         }
+    }
+    item(key = "$key:end", contentType = "tasks-end") { androidx.compose.foundation.layout.Spacer(Modifier.padding(bottom = LodySpacing.md)) }
+}
+
+private enum class Segment { Only, First, Middle, Last }
+
+/** One row's slice of the task card: rounded only where the card starts or ends, ruled between rows. */
+@Composable
+private fun Modifier.cardSegment(segment: Segment): Modifier {
+    val colors = LodyTheme.colors
+    val radius = LodySpacing.md
+    val shape = when (segment) {
+        Segment.Only -> androidx.compose.foundation.shape.RoundedCornerShape(radius)
+        Segment.First -> androidx.compose.foundation.shape.RoundedCornerShape(topStart = radius, topEnd = radius)
+        Segment.Middle -> androidx.compose.ui.graphics.RectangleShape
+        Segment.Last -> androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = radius, bottomEnd = radius)
+    }
+    val rule = colors.borderSubtle
+    return this
+        .padding(horizontal = TranscriptMargin)
+        .background(colors.fillTertiary, shape)
+        .then(
+            if (segment == Segment.Middle || segment == Segment.Last) Modifier.drawBehind {
+                drawLine(rule, androidx.compose.ui.geometry.Offset(LodySpacing.md.toPx(), 0f), androidx.compose.ui.geometry.Offset(size.width - LodySpacing.md.toPx(), 0f), 0.5.dp.toPx())
+            } else Modifier,
+        )
+        .clip(shape)
+}
+
+@Composable
+private fun TaskHeader(tasks: List<TurnItem.Task>, expanded: Boolean, modifier: Modifier = Modifier, onToggle: (Boolean) -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val running = tasks.count { it.running }
+    val background = tasks.all { it.background }
+    val label = when {
+        running > 0 && background -> pluralStringResource(R.plurals.chat_tasks_waiting_background, running, running)
+        running > 0 -> pluralStringResource(R.plurals.chat_tasks_waiting, running, running)
+        background -> pluralStringResource(R.plurals.chat_tasks_count_background, tasks.size, tasks.size)
+        else -> pluralStringResource(R.plurals.chat_tasks_count, tasks.size, tasks.size)
+    }
+    // Folded, the card still says what is happening: the newest running task's latest step.
+    val latest = if (!expanded) tasks.lastOrNull { it.running && it.latest.isNotBlank() }?.latest else null
+    val state = stringResource(if (expanded) R.string.home_tree_expanded else R.string.home_tree_collapsed)
+    val angle by animateFloatAsState(if (expanded) 0f else -90f, label = "tasks-chevron")
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button) { onToggle(!expanded) }
+            .semantics { stateDescription = state }
+            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        if (running > 0) {
+            androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm).padding(1.dp), color = colors.iconSecondary, strokeWidth = 1.5.dp)
+        } else {
+            Icon(LodyIcons.Sessions, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+        }
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            latest?.let { Text(it, style = type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.shimmer()) }
+        }
+        Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm).rotate(angle))
     }
 }
 
@@ -513,8 +565,9 @@ private fun TaskRow(task: TurnItem.Task, modifier: Modifier = Modifier, onOpen: 
     androidx.compose.foundation.layout.Column(
         modifier
             .fillMaxWidth()
+            .heightIn(min = 44.dp)
             .clickable(role = Role.Button, onClick = onOpen)
-            .padding(horizontal = TranscriptMargin, vertical = LodySpacing.xs),
+            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
         verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
@@ -523,12 +576,13 @@ private fun TaskRow(task: TurnItem.Task, modifier: Modifier = Modifier, onOpen: 
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = colors.textPrimary)) { append(actor) }
                     if (task.description.isNotBlank() && task.description != actor) {
-                        withStyle(SpanStyle(color = colors.textTertiary)) { append(" · ") ; append(task.description) }
+                        withStyle(SpanStyle(color = colors.textSecondary)) { append(" · ") ; append(task.description) }
                     }
                 },
                 style = type.footnote, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
             if (meta.isNotEmpty()) Text(meta, style = type.footnote, color = if (task.state == "failed") colors.dangerDefault else colors.textTertiary)
+            Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
         }
         if (task.running && task.latest.isNotBlank()) {
             Text(
