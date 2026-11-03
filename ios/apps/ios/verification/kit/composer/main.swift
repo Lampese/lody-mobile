@@ -1211,8 +1211,8 @@ let barContent: [String: Any] = [
 barState(["actionBar": barContent])
 RunLoop.main.run(until: Date().addingTimeInterval(0.3))
 barComposer.layoutIfNeeded()
-precondition(!actionBar.isHidden && abs(actionBar.bounds.height - ChatActionBarView.height) < 0.5,
-  "The action bar is one fixed-height panel above the capsule")
+precondition(!actionBar.isHidden && abs(actionBar.bounds.height - ChatActionBarView.rowHeight) < 0.5,
+  "The action bar keeps its capsules on one row at the default text size")
 var barActions: [String] = []
 barComposer.onPreview = { barActions.append($0) }
 actionBar.onAction?("act")
@@ -1221,7 +1221,7 @@ precondition(barActions == ["bar:act", "bar:more:merge"], "Bar actions reach the
 barState(["actionBar": barContent, "running": true])
 precondition(!actionBar.isHidden, "The bar stays while the agent runs")
 barComposer.removeFromSuperview()
-print("Action bar: hidden without content, one fixed-height panel, survives running, actions routed as bar: ids")
+print("Action bar: hidden without content, one row of capsules, survives running, actions routed as bar: ids")
 
 let orderComposer = ChatComposerView(frame: CGRect(x: 0, y: 300, width: 390, height: 300))
 materialWindow.addSubview(orderComposer)

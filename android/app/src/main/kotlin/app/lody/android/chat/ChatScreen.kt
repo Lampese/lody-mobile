@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -430,11 +432,12 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
 }
 
 /**
- * Web `SessionInfoBar` above the composer as one panel: the computer icon (menu names it), then
- * the repository context (PR or branch; menu opens the PR or copies the branch) and the ±diff,
- * and trailing the repository action as a neutral split control (the top action, then a chevron
- * whose menu holds the rest). Colour is kept for status, so Send stays the one accent; when the
- * row is short the context truncates first and the action stays whole. iOS: `ChatActionBarView`.
+ * Web `SessionInfoBar` above the composer as grouped capsules, so the composer stays the only
+ * full-width shape: the computer (menu names it), the context (PR or branch with ±diff; menu
+ * opens the PR or copies the branch) and, pinned trailing, the repository action as a neutral
+ * split capsule. Colour is for status only, so Send stays the one accent. It never scrolls: the
+ * first stage that fits on one line wins — labels capped, then the diff as a dot — and only at
+ * very large text does the action move to its own row. iOS: `ChatActionBarView`.
  */
 @Composable
 private fun ChatActionBar(
@@ -444,45 +447,73 @@ private fun ChatActionBar(
     onAction: (SessionInfoBar.Action) -> Unit,
     onCopied: (String) -> Unit,
 ) {
-    val colors = LodyTheme.colors
     val context = bar.pullRequest != null || bar.branch.isNotEmpty() || bar.repository.isNotEmpty()
     val diff = bar.added + bar.removed > 0
     if (machine.isEmpty() && !context && !diff && bar.actions.isEmpty()) return
-    val shape = RoundedCornerShape(percent = 50)
-    Row(
-        Modifier
-            .padding(horizontal = LodySpacing.md)
-            .padding(top = LodySpacing.xs)
-            .fillMaxWidth()
-            .height(BarHeight)
-            .clip(shape)
-            .background(colors.bgRaised, shape)
-            .border(0.5.dp, colors.borderSubtle, shape)
-            .padding(horizontal = LodySpacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Information leads and takes what the action leaves; the action keeps its full width.
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            if (machine.isNotEmpty()) MachineItem(machine, machineKind)
-            if (machine.isNotEmpty() && (context || diff)) {
-                Box(Modifier.padding(horizontal = LodySpacing.xs).width(0.5.dp).height(LodyIconSize.md).background(colors.borderDefault))
-            }
-            if (context) ContextItem(bar, onCopied, Modifier.weight(1f, fill = false))
-            if (diff) DiffItem(bar.added, bar.removed)
+    @Composable fun Leading(diffDot: Boolean, modifier: Modifier = Modifier) {
+        if (machine.isNotEmpty()) MachineItem(machine, machineKind)
+        if (context || diff) ContextItem(bar, diffDot, onCopied, modifier)
+    }
+    @Composable fun Action() { if (bar.actions.isNotEmpty()) ActionSplit(bar.actions, onAction) }
+    @Composable fun Line(fill: Boolean, diffDot: Boolean) {
+        Row(
+            if (fill) Modifier.fillMaxWidth() else Modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+        ) {
+            Leading(diffDot)
+            if (fill) Spacer(Modifier.weight(1f))
+            Action()
         }
-        if (bar.actions.isNotEmpty()) ActionSplit(bar.actions, onAction)
+    }
+    FirstThatFits(
+        Modifier.padding(horizontal = LodySpacing.md).padding(top = LodySpacing.xs).fillMaxWidth(),
+        stages = listOf({ fill -> Line(fill, diffDot = false) }, { fill -> Line(fill, diffDot = true) }),
+    ) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                Leading(diffDot = true, Modifier.weight(1f, fill = false))
+            }
+            Action()
+        }
     }
 }
 
-private val BarHeight = 44.dp
+/**
+ * Shows the first stage whose natural one-line width fits (each is probed unfilled, then shown
+ * filled to the available width), else [fallback].
+ */
+@Composable
+private fun FirstThatFits(modifier: Modifier, stages: List<@Composable (fill: Boolean) -> Unit>, fallback: @Composable () -> Unit) {
+    SubcomposeLayout(modifier) { constraints ->
+        val loose = Constraints(maxHeight = constraints.maxHeight)
+        val index = stages.indices.firstOrNull { i ->
+            val width = subcompose("probe$i") { stages[i](false) }.maxOfOrNull { it.measure(loose).width } ?: 0
+            width <= constraints.maxWidth
+        }
+        val placeables = subcompose("show${index ?: "fallback"}") {
+            if (index != null) stages[index](true) else fallback()
+        }.map { it.measure(constraints.copy(minWidth = 0)) }
+        layout(constraints.maxWidth, placeables.maxOfOrNull { it.height } ?: 0) { placeables.forEach { it.place(0, 0) } }
+    }
+}
 
-/** A bar cell: at least 40 dp square to tap, drawn without its own fill. */
+private val CapsuleHeight = 36.dp
+
+/** One raised capsule of the bar. */
+private fun Modifier.barCapsule(colors: LodyColors): Modifier = this
+    .height(CapsuleHeight)
+    .clip(CircleShape)
+    .background(colors.bgRaised)
+    .border(0.5.dp, colors.borderSubtle, CircleShape)
+
+/** A tappable cell inside a capsule; the capsule draws the surface. */
 @Composable
 private fun BarCell(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     Row(
         modifier
-            .heightIn(min = 40.dp)
-            .widthIn(min = 40.dp)
+            .height(CapsuleHeight)
+            .widthIn(min = CapsuleHeight)
             .clip(RoundedCornerShape(percent = 50))
             .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
             .semantics { contentDescription = label }
@@ -502,7 +533,7 @@ private fun MachineItem(name: String, kind: app.lody.android.create.CreateSessio
         app.lody.android.create.CreateSessionModel.MachineKind.Desktop -> LodyIcons.Desktop
         app.lody.android.create.CreateSessionModel.MachineKind.Server -> LodyIcons.Server
     }
-    Box {
+    Box(Modifier.barCapsule(colors)) {
         BarCell("${stringResource(R.string.bar_machine)}, $name", onClick = { open = true }) {
             Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
         }
@@ -517,9 +548,12 @@ private fun MachineItem(name: String, kind: app.lody.android.create.CreateSessio
     }
 }
 
-/** PR number, else branch, else the repository name without its owner; CI trouble tints the glyph. */
+/**
+ * PR number, else branch, else the repository name without its owner, with the ±diff in the same
+ * capsule (a dot when space is short; the counts then lead the menu). CI trouble tints the glyph.
+ */
 @Composable
-private fun ContextItem(bar: SessionInfoBar, onCopied: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String) -> Unit, modifier: Modifier = Modifier) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
@@ -548,13 +582,37 @@ private fun ContextItem(bar: SessionInfoBar, onCopied: (String) -> Unit, modifie
     }
     val label = pr?.let { "#${it.number}" } ?: bar.branch.ifEmpty { bar.repository.substringAfterLast('/') }
     val copied = stringResource(R.string.bar_branch_copied)
-    val description = listOfNotNull(bar.repository, bar.branch, label, verdict).filter { it.isNotEmpty() }.distinct().joinToString(", ")
-    Box(modifier) {
-        BarCell(description, onClick = { open = true }) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.sm))
-            Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
+    val diff = bar.added + bar.removed > 0
+    val counts = "+${bar.added} −${bar.removed}"
+    val showsContext = pr != null || bar.branch.isNotEmpty() || bar.repository.isNotEmpty()
+    val description = listOfNotNull(bar.repository, bar.branch, label, verdict, counts.takeIf { diff })
+        .filter { it.isNotEmpty() }.distinct().joinToString(", ")
+    Box(modifier.barCapsule(colors)) {
+        BarCell(description, onClick = { open = true }, Modifier.padding(horizontal = LodySpacing.xs)) {
+            if (showsContext) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.sm))
+                Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis,
+                    // Not weighted: the fitting probe measures unbounded, where a weight would read as zero.
+                    modifier = Modifier.widthIn(max = 160.dp))
+            }
+            if (diff && diffDot) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(colors.diffAddedText))
+            } else if (diff) {
+                val style = type.subhead.copy(fontFeatureSettings = "tnum")
+                Text("+${bar.added}", style = style, color = colors.diffAddedText, maxLines = 1)
+                Text("−${bar.removed}", style = style, color = colors.diffRemovedText, maxLines = 1)
+            }
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
+            if (diff) {
+                // Display only until Android has a workspace changes page.
+                DropdownMenuItem(
+                    text = { Text(counts, style = type.body.copy(fontFeatureSettings = "tnum"), color = colors.textPrimary) },
+                    leadingIcon = { Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
+                    onClick = { open = false },
+                    enabled = false,
+                )
+            }
             if (pr != null) {
                 val state = stringResource(
                     when (pr.status) {
@@ -596,28 +654,10 @@ private fun ContextItem(bar: SessionInfoBar, onCopied: (String) -> Unit, modifie
     }
 }
 
-/** Web's ±diff in its own quiet well; display only until Android has a changes page. */
-@Composable
-private fun DiffItem(added: Int, removed: Int) {
-    val colors = LodyTheme.colors
-    val style = LodyTheme.typography.subhead.copy(fontFeatureSettings = "tnum")
-    Row(
-        Modifier
-            .padding(horizontal = LodySpacing.xxs)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(colors.fillTertiary)
-            .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xxs)
-            .semantics(mergeDescendants = true) {},
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
-    ) {
-        Text("+$added", style = style, color = colors.diffAddedText, maxLines = 1)
-        Text("−$removed", style = style, color = colors.diffRemovedText, maxLines = 1)
-    }
-}
-
 /**
- * Web's primary action + chevron as one neutral surface with a soft internal divider: the top
+ * Web's primary action + chevron as one neutral capsule with a soft internal divider: the top
  * action runs on tap (with a confirm haptic); the chevron's menu holds the rest in priority order.
+ * Its label never truncates.
  */
 @Composable
 private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (SessionInfoBar.Action) -> Unit) {
@@ -629,7 +669,7 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
     val more = stringResource(R.string.bar_more)
     Box {
         Row(
-            Modifier.height(LodySize.controlSm).clip(CircleShape).background(colors.fillSecondary),
+            Modifier.barCapsule(colors),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(

@@ -12,10 +12,9 @@ struct ChatMenuAction: Decodable, Equatable, Identifiable {
   var disabled: Bool?
 }
 
-/// Web `SessionInfoBar` for the native composer: one Liquid Glass panel above the input.
-/// Leading: the computer and live resources (browser preview, simulator, sub-tasks) as icons;
-/// then the repository context and ±diff; trailing: the repository action as a neutral split
-/// control. Colour is kept for status (PR state, diff), so Send stays the one accent on screen.
+/// Web `SessionInfoBar` for the native composer, as grouped glass capsules above the input:
+/// the computer and live resources, the repository context with ±diff, and the repository
+/// action. Colour is kept for status (PR state, CI, diff), so Send stays the one accent on screen.
 struct ChatActionBarState: Decodable, Equatable {
   struct Item: Decodable, Equatable, Identifiable {
     let id: String
@@ -23,6 +22,8 @@ struct ChatActionBarState: Decodable, Equatable {
     var tint: String?
     /// Connecting: a spinner replaces the glyph.
     var busy: Bool?
+    /// A count beside the glyph (sub-tasks).
+    var badge: String?
     let accessibilityLabel: String
     /// Tap acts on the item itself; its menu (if any) opens on a long press.
     var tap: Bool?
@@ -62,6 +63,11 @@ struct ChatActionBarState: Decodable, Equatable {
   var isEmpty: Bool { (items ?? []).isEmpty && context == nil && diff == nil && primary == nil }
 }
 
+/// Three glass capsules grouped by purpose, so the composer stays the only full-width shape:
+/// environment (computer, live resources, sub-tasks), context (PR or branch with ±diff) and the
+/// repository action, pinned trailing. Never scrolls: `ViewThatFits` takes the first stage that
+/// fits on one line — long labels capped, then the diff as a dot, then the environment folded
+/// into one icon with a "+n" badge — and only at very large text moves the action to its own row.
 struct ChatActionBarContent: View {
   var state = ChatActionBarState()
   var tasks = 0
@@ -69,117 +75,188 @@ struct ChatActionBarContent: View {
   var onTasks: () -> Void = {}
 
   var body: some View {
-    HStack(spacing: 2) {
-      ForEach(state.items ?? []) { item($0) }
-      if tasks > 0 { tasksItem }
-      if hasLeading && (state.context != nil || state.diff != nil) {
-        Divider().frame(height: 18).padding(.horizontal, 4)
+    GlassEffectContainer(spacing: 8) {
+      ViewThatFits(in: .horizontal) {
+        row(diffDot: false, folded: false)
+        row(diffDot: true, folded: false)
+        row(diffDot: true, folded: true)
+        stacked
       }
-      if let context = state.context { contextItem(context) }
-      if let diff = state.diff { diffItem(diff) }
-      Spacer(minLength: 8)
-      if let primary = state.primary { primaryItem(primary) }
     }
     .font(.subheadline)
-    .padding(.horizontal, 6)
-    .frame(height: ChatActionBarView.height)
+  }
+
+  private func row(diffDot: Bool, folded: Bool) -> some View {
+    HStack(spacing: 8) {
+      leading(diffDot: diffDot, folded: folded)
+      Spacer(minLength: 0)
+      if let primary = state.primary { primaryCapsule(primary) }
+    }
+    .frame(height: ChatActionBarView.rowHeight)
+  }
+
+  /// Last resort at very large text: information on the first line (the context truncates), the
+  /// action whole on its own trailing line.
+  private var stacked: some View {
+    VStack(alignment: .trailing, spacing: 8) {
+      HStack(spacing: 8) {
+        leading(diffDot: true, folded: true)
+        Spacer(minLength: 0)
+      }
+      .frame(minHeight: ChatActionBarView.rowHeight)
+      if let primary = state.primary { primaryCapsule(primary) }
+    }
+  }
+
+  @ViewBuilder private func leading(diffDot: Bool, folded: Bool) -> some View {
+    if !environment.isEmpty {
+      if folded && environment.count > 1 { foldedEnvironment } else { environmentCapsule }
+    }
+    if state.context != nil || state.diff != nil { contextCapsule(diffDot: diffDot) }
+  }
+
+  // MARK: Environment
+
+  /// Computer and live resources, with sub-tasks as one more icon.
+  private var environment: [ChatActionBarState.Item] {
+    var items = state.items ?? []
+    if tasks > 0 {
+      items.append(.init(
+        id: "tasks", symbol: "point.3.connected.trianglepath.dotted", tint: "secondary", badge: "\(tasks)",
+        accessibilityLabel: String.localizedStringWithFormat(String(localized: "native.chat.overlay.tasks", bundle: .lody), tasks)
+      ))
+    }
+    return items
+  }
+
+  private var environmentCapsule: some View {
+    HStack(spacing: 0) {
+      ForEach(environment) { item($0) }
+    }
+    .padding(.horizontal, 2)
     .glassEffect(.regular, in: .capsule)
   }
 
-  private var hasLeading: Bool { !(state.items ?? []).isEmpty || tasks > 0 }
+  /// One icon stands for the group: a computer in trouble first, then a live resource, then
+  /// sub-tasks; the menu lists every item.
+  private var foldedEnvironment: some View {
+    let items = environment
+    let lead = items.first { $0.id == "machine" && $0.tint == "warning" }
+      ?? items.first { ["browser", "simulator"].contains($0.id) }
+      ?? items.first { $0.id == "tasks" }
+      ?? items[0]
+    return Menu {
+      ForEach(items) { item in
+        Button { open(item) } label: { Label(item.accessibilityLabel, systemImage: item.symbol) }
+          .disabled(item.id == "machine")
+      }
+    } label: {
+      HStack(spacing: 2) {
+        glyph(lead)
+        Text("+\(items.count - 1)").font(.caption.weight(.semibold).monospacedDigit()).foregroundStyle(LodyColor.iconSecondary)
+          .padding(.trailing, 8)
+      }
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .padding(.horizontal, 2)
+    .glassEffect(.regular, in: .capsule)
+    .accessibilityLabel(items.map(\.accessibilityLabel).joined(separator: ", "))
+    .accessibilityIdentifier("session-bar:environment")
+  }
 
-  // MARK: Leading icons
+  private func open(_ item: ChatActionBarState.Item) {
+    if item.id == "tasks" { onTasks() } else { onAction(item.id) }
+  }
 
   @ViewBuilder private func item(_ item: ChatActionBarState.Item) -> some View {
     let actions = item.actions ?? []
     Group {
       if actions.isEmpty {
-        Button { onAction(item.id) } label: { glyph(item) }
+        Button { open(item) } label: { glyph(item) }
       } else if item.tap == true {
-        Menu { menu(actions, prefix: item.id, title: item.menuTitle) } label: { glyph(item) } primaryAction: { onAction(item.id) }
+        Menu { menu(actions, prefix: item.id, title: item.menuTitle) } label: { glyph(item) } primaryAction: { open(item) }
       } else {
         Menu { menu(actions, prefix: item.id, title: item.menuTitle) } label: { glyph(item) }
       }
     }
     .buttonStyle(.plain)
     .accessibilityLabel(item.accessibilityLabel)
-    .accessibilityIdentifier(["browser", "simulator"].contains(item.id) ? "session-preview" : "session-bar:" + item.id)
+    .accessibilityIdentifier(Self.identifier(item.id))
+  }
+
+  private static func identifier(_ id: String) -> String {
+    switch id {
+    case "browser", "simulator": "session-preview"
+    case "tasks": "session-subtasks"
+    default: "session-bar:" + id
+    }
   }
 
   private func glyph(_ item: ChatActionBarState.Item) -> some View {
-    ZStack {
+    HStack(spacing: 3) {
       if item.busy == true {
         ProgressView().controlSize(.small)
       } else {
         Image(systemName: item.symbol).foregroundStyle(Self.tint(item.tint))
       }
+      if let badge = item.badge {
+        Text(badge).monospacedDigit().foregroundStyle(LodyColor.iconSecondary)
+      }
     }
-    .frame(width: 36, height: 36)
+    .padding(.horizontal, item.badge == nil ? 0 : 6)
+    .frame(minWidth: ChatActionBarView.rowHeight, minHeight: ChatActionBarView.rowHeight)
     .contentShape(Rectangle())
   }
 
-  private var tasksItem: some View {
-    let label = String.localizedStringWithFormat(String(localized: "native.chat.overlay.tasks", bundle: .lody), tasks)
-    return Button(action: onTasks) {
-      HStack(spacing: 3) {
-        Image(systemName: "point.3.connected.trianglepath.dotted")
-        Text("\(tasks)").monospacedDigit()
+  // MARK: Context
+
+  /// PR or branch with the ±diff. Long labels are capped; once space runs short the diff becomes
+  /// a dot and its counts move to the top of the menu.
+  private func contextCapsule(diffDot: Bool) -> some View {
+    let context = state.context
+    var actions = context?.actions ?? []
+    if let diff = state.diff, diff.tap == true {
+      actions.insert(.init(
+        id: "diff", title: String(localized: "workspaceChanges.title", bundle: .lody), symbol: "plus.forwardslash.minus",
+        subtitle: "+\(diff.added) −\(diff.removed)"
+      ), at: 0)
+    }
+    return Menu { menu(actions, prefix: "context", title: context?.menuTitle) } label: {
+      HStack(spacing: 6) {
+        if let context {
+          Image(systemName: context.symbol).foregroundStyle(Self.tint(context.tint))
+          Text(context.label).lineLimit(1).truncationMode(.middle).foregroundStyle(LodyColor.textPrimary)
+            .frame(maxWidth: 140, alignment: .leading).fixedSize(horizontal: !diffDot, vertical: false)
+        }
+        if let diff = state.diff {
+          if diffDot {
+            Circle().fill(LodyColor.diffAddedText).frame(width: 6, height: 6)
+          } else {
+            HStack(spacing: 4) {
+              Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
+              Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
+            }
+            .font(.subheadline.weight(.medium).monospacedDigit())
+            .fixedSize()
+          }
+        }
       }
-      .foregroundStyle(LodyColor.iconSecondary)
-      .padding(.horizontal, 6)
-      .frame(minWidth: 36, minHeight: 36)
-      .contentShape(Rectangle())
+      .padding(.horizontal, 12)
+      .frame(minHeight: ChatActionBarView.rowHeight)
+      .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(label)
-    .accessibilityIdentifier("session-subtasks")
-  }
-
-  // MARK: Context and diff
-
-  private func contextItem(_ context: ChatActionBarState.Context) -> some View {
-    Menu { menu(context.actions, prefix: "context", title: context.menuTitle) } label: {
-      HStack(spacing: 5) {
-        Image(systemName: context.symbol).foregroundStyle(Self.tint(context.tint))
-        // The context gives way first when the bar is short.
-        Text(context.label).lineLimit(1).truncationMode(.middle).foregroundStyle(LodyColor.textPrimary)
-      }
-      .padding(.horizontal, 6)
-      .frame(minHeight: 36)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .layoutPriority(0)
-    .accessibilityLabel(context.accessibilityLabel)
+    .glassEffect(.regular, in: .capsule)
+    .accessibilityLabel([context?.accessibilityLabel, state.diff?.accessibilityLabel].compactMap { $0 }.joined(separator: ", "))
     .accessibilityIdentifier("session-bar:context")
   }
 
-  private func diffItem(_ diff: ChatActionBarState.Diff) -> some View {
-    Button { onAction("diff") } label: {
-      HStack(spacing: 4) {
-        Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
-        Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
-      }
-      .font(.subheadline.weight(.medium).monospacedDigit())
-      .padding(.horizontal, 8)
-      .frame(minHeight: 28)
-      .background(Capsule().fill(LodyColor.fillTertiary))
-      .frame(minHeight: 36)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .disabled(diff.tap != true)
-    .fixedSize()
-    .layoutPriority(1)
-    .accessibilityLabel(diff.accessibilityLabel)
-    .accessibilityIdentifier("session-bar:diff")
-  }
+  // MARK: Action
 
-  // MARK: Primary action
-
-  /// Web's primary action + chevron as one neutral surface with a soft internal divider. The
-  /// action label never truncates: the context yields first.
-  private func primaryItem(_ primary: ChatActionBarState.Primary) -> some View {
+  /// Web's primary action + chevron as one neutral capsule with a soft internal divider. The
+  /// label never truncates.
+  private func primaryCapsule(_ primary: ChatActionBarState.Primary) -> some View {
     HStack(spacing: 0) {
       Button {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -188,9 +265,9 @@ struct ChatActionBarContent: View {
         Text(primary.label)
           .fontWeight(.semibold)
           .lineLimit(1)
-          .padding(.leading, 12)
-          .padding(.trailing, primary.more.isEmpty ? 12 : 8)
-          .frame(minHeight: 32)
+          .padding(.leading, 14)
+          .padding(.trailing, primary.more.isEmpty ? 14 : 8)
+          .frame(minHeight: ChatActionBarView.rowHeight)
           .contentShape(Rectangle())
       }
       .accessibilityIdentifier("session-bar:act")
@@ -199,8 +276,9 @@ struct ChatActionBarContent: View {
         Menu { menu(primary.more, prefix: "more", title: nil) } label: {
           Image(systemName: "chevron.down")
             .font(.footnote.weight(.semibold))
-            .padding(.horizontal, 10)
-            .frame(minHeight: 32)
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .frame(minHeight: ChatActionBarView.rowHeight)
             .contentShape(Rectangle())
         }
         .accessibilityLabel(primary.moreLabel)
@@ -209,9 +287,8 @@ struct ChatActionBarContent: View {
     }
     .buttonStyle(.plain)
     .foregroundStyle(LodyColor.textPrimary)
-    .background(Capsule().fill(LodyColor.fillSecondary))
     .fixedSize()
-    .layoutPriority(2)
+    .glassEffect(.regular.interactive(), in: .capsule)
   }
 
   // MARK: Menus
@@ -252,9 +329,10 @@ struct ChatActionBarContent: View {
   }
 }
 
-/// UIKit host for the bar inside the composer: fixed height, fades in and out with its content.
+/// UIKit host for the bar inside the composer. One row is `rowHeight`; at very large text the
+/// stacked fallback is taller, so the composer asks for `fittingHeight(width:)`.
 final class ChatActionBarView: UIView {
-  static let height: CGFloat = 44
+  static let rowHeight: CGFloat = 36
 
   private let host = UIHostingController(rootView: ChatActionBarContent())
   private var rendered: (state: ChatActionBarState, tasks: Int)?
@@ -285,15 +363,28 @@ final class ChatActionBarView: UIView {
   /// Whether the bar has anything to show for this state.
   static func shows(_ state: ChatActionBarState?, tasks: Int) -> Bool { !(state?.isEmpty ?? true) || tasks > 0 }
 
+  /// The height the chosen stage needs at this width: one row, or two at very large text.
+  func fittingHeight(width: CGFloat) -> CGFloat {
+    guard width > 0 else { return Self.rowHeight }
+    let size = host.sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude))
+    return max(Self.rowHeight, ceil(size.height))
+  }
+
   func render(_ state: ChatActionBarState?, tasks: Int, visible: Bool, animated: Bool) {
     let state = state ?? ChatActionBarState()
     if rendered?.state != state || rendered?.tasks != tasks {
       rendered = (state, tasks)
-      host.rootView = ChatActionBarContent(
+      let content = ChatActionBarContent(
         state: state, tasks: tasks,
         onAction: { [weak self] in self?.onAction?($0) },
         onTasks: { [weak self] in self?.onTasks?() }
       )
+      // Glass capsules morph between stages and as groups come and go.
+      if animated && window != nil && !UIAccessibility.isReduceMotionEnabled {
+        withAnimation(.smooth(duration: 0.3)) { host.rootView = content }
+      } else {
+        host.rootView = content
+      }
     }
     let shown = visible && Self.shows(state, tasks: tasks)
     guard isUserInteractionEnabled != shown || isHidden == shown else { return }

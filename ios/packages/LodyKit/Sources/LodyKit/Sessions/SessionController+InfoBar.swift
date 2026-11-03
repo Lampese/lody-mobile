@@ -1,12 +1,12 @@
 import UIKit
 
-/// The action bar above the composer (web `SessionInfoBar`): one Liquid Glass panel
-/// (`ChatActionBarView`) built from `actionBarState`. Leading icons: the computer (menu: name and
-/// presence) and live resources (browser preview, simulator). Then the repository context (PR or
-/// branch; menu: open the native PR page, copy the branch), the ±diff (opens the workspace
-/// changes) and, trailing, the top repository action with the rest behind its chevron. Prompt
-/// actions send web's quick-action prompt as an ordinary turn; Merge (after a native method sheet
-/// that doubles as confirmation) and Ready for review write to GitHub directly.
+/// The action bar above the composer (web `SessionInfoBar`): grouped glass capsules
+/// (`ChatActionBarView`) built from `actionBarState`. Environment: the computer (menu: name and
+/// presence) and live resources (browser preview, simulator). Context: PR or branch with the
+/// ±diff (menu: workspace changes, the native PR page, copy branch). Action: the top repository
+/// action with the rest behind its chevron. Prompt actions send web's quick-action prompt as an
+/// ordinary turn; Merge (after a native method sheet that doubles as confirmation) and Ready for
+/// review write to GitHub directly.
 extension SessionController {
   func actionBarState(_ session: SessionItem, busy: Bool) -> [String: Any] {
     let state = source.state
@@ -100,7 +100,7 @@ extension SessionController {
     if ["browser", "simulator"].contains(parts[0]) { resourceAction(parts[0], parts.count > 1 ? parts[1] : "open"); return }
     guard let bar = infoBar else { return }
     switch id {
-    case "diff":
+    case "diff", "context:diff":
       openWorkspaceChanges()
     case "act":
       if let first = bar.actions.first { performInfoBarAction(first) }

@@ -1448,7 +1448,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     // The action bar stays while typing; expanded editing gives its row to the editor.
     let showsBar = !expanded && ChatActionBarView.shows(state.actionBar, tasks: taskCount)
     actionBar.render(state.actionBar, tasks: taskCount, visible: showsBar, animated: true)
-    actionBarHeight.constant = showsBar ? ChatActionBarView.height : 0
+    // One row of capsules; the stacked fallback at very large text is taller.
+    actionBarHeight.constant = showsBar ? actionBar.fittingHeight(width: max(0, bounds.width - 32)) : 0
     queueGap.constant = showsBar && queueHeight.constant > 0 ? 8 : 0
     let noticeText = failedDraft == nil ? (displayError ?? state.notice) : String(localized: "native.chat.composer.failedDraft", bundle: .lody)
     let canReconnect = failedDraft != nil || displayError != nil || state.reconnect
