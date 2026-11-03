@@ -49,7 +49,6 @@ final class PreferencesController: UIViewController {
       ]),
       .group("chat", header: text("preferences.chat"), footer: text("queuedMessageBehavior.hint"), [
         queued,
-        .item("quick-replies", text("quickReplies.title"), image: "text.bubble", disclosure: true, navigates: true),
       ]),
     ])
   }
@@ -63,8 +62,6 @@ final class PreferencesController: UIViewController {
       openLanguageSettings()
     case ("rowPress", "notifications", _):
       LodyShell.shared.openPage("notification-settings", from: self)
-    case ("rowPress", "quick-replies", _):
-      LodyShell.shared.pushNative(QuickRepliesController(), title: text("quickReplies.title"), from: self)
     default:
       break
     }

@@ -1190,194 +1190,38 @@ precondition(!materialBar.hasVisiblePills && materialHeight == withAttachment - 
 materialInput.resignFirstResponder()
 print("Glass hosts: queue and final attachment retain their space through exit; unrelated pills retain identity")
 
-let quickComposer = ChatComposerView(frame: CGRect(x: 0, y: 600, width: 390, height: 108))
-materialWindow.addSubview(quickComposer)
-let quickInput = descendants(quickComposer).compactMap { $0 as? UITextView }.first!
-let quickStrip = descendants(quickComposer).compactMap { $0 as? ChatQuickRepliesView }.first!
-let quickMessage = "Commit and push the changes from this task."
-let quickReady: [String: Any] = [
-  "editable": true, "canSend": true, "sending": false, "running": false,
-  "notice": "", "reconnect": false, "placeholder": "Message",
-  "quickReplies": [["id": "commit", "label": "Commit & Push", "message": quickMessage]],
+let barComposer = ChatComposerView(frame: CGRect(x: 0, y: 600, width: 390, height: 108))
+materialWindow.addSubview(barComposer)
+barComposer.onHeightChange = { barComposer.frame.size.height = $0 }
+let actionBar = descendants(barComposer).compactMap { $0 as? ChatActionBarView }.first!
+@MainActor func barState(_ extra: [String: Any]) {
+  var state: [String: Any] = ["editable": true, "canSend": true, "sending": false, "running": false, "placeholder": "Task"]
+  state.merge(extra) { $1 }
+  barComposer.setComposerState(String(decoding: try! JSONSerialization.data(withJSONObject: state), as: UTF8.self))
+  barComposer.layoutIfNeeded()
+}
+barState([:])
+precondition(actionBar.isHidden && actionBar.bounds.height < 0.5, "Without content the action bar leaves the composer")
+let barContent: [String: Any] = [
+  "items": [["id": "machine", "symbol": "desktopcomputer", "accessibilityLabel": "Studio, Online", "actions": []]],
+  "context": ["label": "#7", "symbol": "arrow.triangle.pull", "tint": "open", "accessibilityLabel": "lody/zed #7", "actions": []],
+  "diff": ["added": 12, "removed": 3, "accessibilityLabel": "+12 −3", "tap": true],
+  "primary": ["label": "Commit & Push", "more": [["id": "merge", "title": "Merge", "symbol": "arrow.triangle.merge"]], "moreLabel": "More actions"],
 ]
-@MainActor func quickState(_ changes: [String: Any] = [:]) {
-  let json = try! JSONSerialization.data(withJSONObject: quickReady.merging(changes) { _, value in value })
-  quickComposer.setComposerState(String(decoding: json, as: UTF8.self))
-  quickComposer.layoutIfNeeded()
-}
-quickState()
-let quickChipHeight = ChatQuickRepliesView.chipHeight
-let connectingChipHeight = ChatQuickRepliesView.titleFont.lineHeight + 12
-precondition(abs(quickChipHeight - connectingChipHeight - 4) < 0.5,
-  "Quick-reply chips must sit four points above the connecting overlay height")
-precondition(!quickStrip.isHidden && abs(quickStrip.bounds.height - quickChipHeight) < 0.5)
-let quickButton = descendants(quickStrip).compactMap { $0 as? UIButton }.first!
-let singleChip = quickButton.convert(quickButton.bounds, to: quickStrip)
-precondition(abs(singleChip.height - quickChipHeight) < 0.5)
-precondition(singleChip.width < 200 && singleChip.maxX < quickStrip.bounds.width - 8,
-  "A single chip must follow its title instead of filling the composer")
-var quickSends: [[String: Any]] = []
-quickComposer.onSend = { quickSends.append($0) }
-quickInput.becomeFirstResponder()
-quickComposer.layoutIfNeeded()
-RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-let quickEditingHeight = quickComposer.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).height
-for draft in ["Existing draft", " "] {
-  quickInput.text = draft
-  quickComposer.textViewDidChange(quickInput)
-  quickButton.sendActions(for: .touchUpInside)
-  precondition(!quickStrip.isUserInteractionEnabled && quickStrip.accessibilityElementsHidden)
-  precondition(quickStrip.hitTest(CGPoint(x: singleChip.midX, y: singleChip.midY), with: nil) == nil,
-    "Fading quick replies must stop intercepting touches immediately")
-  quickComposer.layoutIfNeeded()
-  precondition(abs(quickComposer.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).height - quickEditingHeight) < 0.5,
-    "Typing must preserve the quick-reply slot and composer height")
-  RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-  precondition(quickStrip.isHidden && quickStrip.accessibilityElementsHidden && quickInput.text == draft && quickSends.isEmpty,
-    "Quick replies must never replace even a whitespace-only draft")
-}
-quickInput.text = ""
-quickComposer.textViewDidChange(quickInput)
-quickComposer.layoutIfNeeded()
-precondition(abs(quickComposer.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).height - quickEditingHeight) < 0.5,
-  "Deleting the last character must reveal replies without changing composer height")
-let quickUnavailableStates: [[String: Any]] = [
-  ["running": true], ["sending": true], ["canSend": false], ["editable": false],
-  ["stopping": true], ["controlling": true], ["connection": "paused"], ["quickReplies": []],
-]
-for (index, unavailable) in quickUnavailableStates.enumerated() {
-  quickState(unavailable)
-  RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-  quickButton.sendActions(for: .touchUpInside)
-  precondition(quickStrip.isHidden && quickSends.isEmpty, "A stale quick-reply tap must not send while unavailable")
-  precondition(quickStrip.bounds.height < 0.5, "Unavailable replies must release their reserved height")
-  // The ordinary sending prop captures a pending draft, just as production does.
-  quickComposer.clearDraft(token: index + 1)
-}
-quickState()
-quickComposer.setInitialAttachments(#"[{"id":"quick-file","name":"quick.txt","uri":"file:///tmp/quick.txt","kind":"file"}]"#)
-precondition(quickStrip.isHidden, "An attachment-only draft must hide quick replies")
-let quickRemove = descendants(quickComposer).compactMap { $0 as? UIButton }.first {
-  $0.accessibilityLabel == String.localizedStringWithFormat(String(localized: "native.chat.attachment.remove", bundle: .lody), String(describing: "quick.txt"))
-}!
-quickRemove.sendActions(for: .touchUpInside)
-quickComposer.setQueue([ChatQueuedDraft(id: "quick-queued", text: "Waiting")])
-precondition(quickStrip.isHidden, "Queued work must not expose an idle shortcut")
-quickComposer.setQueue([])
-RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-quickState()
-let activeQuickButton = descendants(quickStrip).compactMap { $0 as? UIButton }.first!
-activeQuickButton.sendActions(for: .touchUpInside)
-activeQuickButton.sendActions(for: .touchUpInside)
-precondition(quickSends.count == 1 && quickSends[0]["text"] as? String == quickMessage,
-  "A quick reply sends its full message once through the ordinary send event")
-precondition(quickSends[0]["queue"] as? Bool == false && quickSends[0]["guide"] as? Bool == false)
-precondition(quickStrip.isHidden && quickInput.text.isEmpty)
-quickComposer.restoreDraft(token: 1)
-precondition(quickInput.text == quickMessage && quickStrip.isHidden,
-  "Rejected quick replies must restore the original message, not silently send again")
-quickInput.text = ""
-quickComposer.textViewDidChange(quickInput)
-quickState([
-  "quickReplies": [
-    ["id": "ok", "label": "OK", "message": "OK"],
-    ["id": "go", "label": "Commit & Push", "message": "Go"],
-  ],
-])
-let huggingButtons = descendants(quickStrip).compactMap { $0 as? UIButton }
-precondition(huggingButtons.count == 2)
-let okChip = huggingButtons[0].convert(huggingButtons[0].bounds, to: quickStrip)
-let longChip = huggingButtons[1].convert(huggingButtons[1].bounds, to: quickStrip)
-precondition(okChip.width < longChip.width)
-precondition(okChip.width < 100, "A short label must not stretch toward an equal share of the row")
-precondition(longChip.maxX < quickStrip.bounds.width,
-  "Two compact chips must leave trailing space instead of filling the composer")
-let manyReplies = (1...8).map { ["id": "r\($0)", "label": "Reply \($0)", "message": "Reply \($0)"] }
-quickState(["quickReplies": manyReplies])
-precondition(quickStrip.contentSize.width > quickStrip.bounds.width,
-  "Overflowing chips must scroll horizontally")
-print("Quick replies: idle-only visibility, draft/attachment preservation, queue gating, single send and failed draft recovery passed")
-
-@MainActor func previewChip(_ label: String, state: String = "ready") -> [String: Any] {
-  ["label": label, "symbol": "safari", "state": state, "accessibilityLabel": "Open preview \(label)",
-   "actions": [["id": "copy", "title": "Copy Share Link", "symbol": "link"]]]
-}
-@MainActor func contextButton() -> UIButton? {
-  descendants(quickStrip).compactMap { $0 as? UIButton }.first { $0.accessibilityIdentifier == "session-preview" }
-}
-@MainActor func shownReplies() -> [UIButton] {
-  descendants(quickStrip).compactMap { $0 as? UIButton }.filter {
-    $0.accessibilityIdentifier?.hasPrefix("quick-reply:") == true && !$0.isHidden && $0.alpha > 0.01
-  }
-}
-let contextReply: [[String: Any]] = [["id": "commit", "label": "Commit & Push", "message": quickMessage]]
-quickState(["quickReplies": contextReply, "preview": previewChip("Connecting…", state: "connecting")])
-let context = contextButton()!
-let connectingWidth = context.bounds.width
-let contextFrame = context.convert(context.bounds, to: quickStrip)
-let replyFrame = shownReplies().first!.convert(shownReplies().first!.bounds, to: quickStrip)
-precondition(!quickStrip.isHidden && abs(contextFrame.minX - 20) < 0.5 && abs(contextFrame.height - quickChipHeight) < 0.5,
-  "The context chip aligns with the transcript's leading edge at chip height")
-precondition(replyFrame.minX - contextFrame.maxX > 12, "A separator divides the context zone from suggestions")
-precondition(quickStrip.hitTest(CGPoint(x: contextFrame.midX, y: contextFrame.midY), with: nil) === context,
-  "Hosted chip content must leave touches to the native button")
-quickState(["quickReplies": contextReply, "preview": previewChip("localhost:5173")])
-precondition(contextButton() === context, "The context chip keeps its identity so state changes animate in place")
-precondition(context.bounds.width > connectingWidth + 8, "The context chip follows its label width")
-var contextOpens: [String] = []
-quickComposer.onPreview = { contextOpens.append($0) }
-context.sendActions(for: .touchUpInside)
-precondition(contextOpens == ["open"])
-quickState(["quickReplies": contextReply, "preview": previewChip("localhost:5173"), "running": true])
-precondition(!quickStrip.isHidden && contextButton() === context && shownReplies().isEmpty,
-  "A running agent keeps the context chip and hides suggestions")
-quickState(["quickReplies": contextReply, "preview": previewChip("localhost:5173")])
-quickInput.becomeFirstResponder()
-quickComposer.layoutIfNeeded()
-let contextFocusedHeight = quickComposer.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).height
-quickInput.text = "Draft"
-quickComposer.textViewDidChange(quickInput)
-quickComposer.layoutIfNeeded()
-precondition(!quickStrip.isHidden && !quickStrip.accessibilityElementsHidden && shownReplies().isEmpty,
-  "Typing keeps the context chip while suggestions leave")
-precondition(abs(context.bounds.width - quickChipHeight) < 0.5, "Typing collapses the context chip to its icon")
-precondition(abs(quickComposer.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).height - contextFocusedHeight) < 0.5,
-  "The compact context chip reuses the reserved slot")
-quickInput.text = ""
-quickComposer.textViewDidChange(quickInput)
-quickComposer.layoutIfNeeded()
-precondition(context.bounds.width > quickChipHeight + 40 && shownReplies().isEmpty,
-  "Clearing a focused draft restores the labelled chip while the sheet keeps suggestions away")
-quickInput.resignFirstResponder()
-quickComposer.layoutIfNeeded()
-precondition(shownReplies().count == 1, "Closing the sheet restores suggestions")
-quickState(["quickReplies": contextReply, "preview": previewChip("localhost:5173"), "connection": "paused"])
-precondition(quickStrip.isHidden, "A disconnected session hides the context chip")
-quickState(["quickReplies": contextReply])
-precondition(contextButton()?.isHidden != false && shownReplies().count == 1,
-  "Without a resource the context zone leaves the row")
-quickInput.text = "Draft"
-quickComposer.textViewDidChange(quickInput)
-precondition(quickStrip.alpha < 0.01 && shownReplies().count == 1,
-  "Without a context chip, suggestions fade out with the row instead of vanishing first")
-RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-quickInput.text = ""
-quickComposer.textViewDidChange(quickInput)
-quickState(["quickReplies": manyReplies])
-RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-quickStrip.contentOffset.x = 150
-quickState(["quickReplies": manyReplies, "preview": previewChip("localhost:5173")])
-precondition(context.convert(context.bounds, to: quickStrip).minX - quickStrip.contentOffset.x >= 0,
-  "A context chip appearing in a scrolled row must be scrolled into view")
-RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-precondition(quickStrip.contentSize.width > quickStrip.bounds.width + 150)
-quickStrip.contentOffset.x = 150
-quickInput.text = "Draft"
-quickComposer.textViewDidChange(quickInput)
-quickComposer.layoutIfNeeded()
-precondition(context.convert(context.bounds, to: quickStrip).minX - quickStrip.contentOffset.x >= 0,
-  "Collapsing suggestions must bring a scrolled-away context chip back into view")
-print("Context chip: persistent identity, label-driven width, compact while typing, survives running, native touch ownership passed")
+barState(["actionBar": barContent])
+RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+barComposer.layoutIfNeeded()
+precondition(!actionBar.isHidden && abs(actionBar.bounds.height - ChatActionBarView.height) < 0.5,
+  "The action bar is one fixed-height panel above the capsule")
+var barActions: [String] = []
+barComposer.onPreview = { barActions.append($0) }
+actionBar.onAction?("act")
+actionBar.onAction?("more:merge")
+precondition(barActions == ["bar:act", "bar:more:merge"], "Bar actions reach the session as bar: ids")
+barState(["actionBar": barContent, "running": true])
+precondition(!actionBar.isHidden, "The bar stays while the agent runs")
+barComposer.removeFromSuperview()
+print("Action bar: hidden without content, one fixed-height panel, survives running, actions routed as bar: ids")
 
 let orderComposer = ChatComposerView(frame: CGRect(x: 0, y: 300, width: 390, height: 300))
 materialWindow.addSubview(orderComposer)
@@ -1385,7 +1229,7 @@ orderComposer.onHeightChange = { orderComposer.frame.size.height = $0 }
 let orderState: [String: Any] = [
   "editable": true, "canSend": true, "sending": false, "running": true, "canStop": true,
   "notice": "Machine disconnected. Tap to reconnect.", "reconnect": true, "placeholder": "Task",
-  "preview": previewChip("localhost:5173"),
+  "actionBar": ["primary": ["label": "Commit & Push", "more": [], "moreLabel": "More actions"]],
 ]
 orderComposer.setComposerState(String(decoding: try! JSONSerialization.data(withJSONObject: orderState), as: UTF8.self))
 orderComposer.setQueue([ChatQueuedDraft(id: "order-queue", text: "Then run pnpm check")])
@@ -1394,18 +1238,18 @@ RunLoop.main.run(until: Date().addingTimeInterval(0.4))
 orderComposer.layoutIfNeeded()
 @MainActor func orderFrame(_ view: UIView) -> CGRect { view.convert(view.bounds, to: orderComposer) }
 let orderNotice = descendants(orderComposer).compactMap { $0 as? UIButton }.first { $0.title(for: .normal) == "Machine disconnected. Tap to reconnect." }!
-let orderChips = descendants(orderComposer).compactMap { $0 as? ChatQuickRepliesView }.first!
+let orderChips = descendants(orderComposer).compactMap { $0 as? ChatActionBarView }.first!
 let orderQueue = descendants(orderComposer).first { $0.accessibilityIdentifier == "session-queue" }!
 let orderInput = descendants(orderComposer).compactMap { $0 as? UITextView }.first!
 let orderSurface = sequence(first: orderInput.superview, next: { $0?.superview }).lazy.compactMap { $0 as? UIVisualEffectView }.first!
-precondition(!orderChips.isHidden && !orderQueue.isHidden && !orderNotice.isHidden, "The order fixture must show notice, chips and queue")
-precondition(orderFrame(orderNotice).maxY <= orderFrame(orderChips).minY + 0.5, "The notice must sit above the chip row")
-precondition(orderFrame(orderChips).maxY <= orderFrame(orderQueue).minY + 0.5, "The queue must sit below the chip row")
+precondition(!orderChips.isHidden && !orderQueue.isHidden && !orderNotice.isHidden, "The order fixture must show notice, action bar and queue")
+precondition(orderFrame(orderNotice).maxY <= orderFrame(orderChips).minY + 0.5, "The notice must sit above the action bar")
+precondition(orderFrame(orderChips).maxY <= orderFrame(orderQueue).minY + 0.5, "The queue must sit below the action bar")
 precondition(orderFrame(orderQueue).maxY <= orderFrame(orderSurface).minY + 0.5, "The queue must sit directly above the capsule")
 precondition(abs(orderFrame(orderQueue).minX - 16) < 0.5 && abs(orderComposer.bounds.maxX - orderFrame(orderQueue).maxX - 16) < 0.5,
   "The queue card keeps 16-point side insets")
 orderComposer.removeFromSuperview()
-print("Composer order: notice, chips, queue, then the capsule")
+print("Composer order: notice, action bar, queue, then the capsule")
 
 @MainActor func makeRichComposer() -> (ChatComposerView, ChatComposerInput) {
   let composer = ChatComposerView(frame: CGRect(x: 0, y: 0, width: 390, height: 64))

@@ -92,7 +92,8 @@ class SessionController: UIViewController {
 
   var queuedMessageBehavior: String { LodyPreferences.queuedMessageBehavior }
   var persistsDraft: Bool { true }
-  var composerPreview: [String: Any]? { makeComposerPreview() }
+  /// Browser preview and simulator icons for the action bar; preview fixtures override them.
+  var resourceItems: [[String: Any]] { [browserItem, simulatorItem].compactMap { $0 } }
   func adjustComposer(_ state: inout [String: Any]) {}
 
   // The chat binds its title and scroll edges to its nearest controller; the shell page shows this item.

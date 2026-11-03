@@ -39,9 +39,9 @@ final class SendPreviewController: SessionController {
     state["placeholder"] = "Offline sending works too"
   }
 
-  override var composerPreview: [String: Any]? {
-    guard fixture.contextChip else { return nil }
-    return ["label": "localhost:5173", "accessibilityLabel": "localhost:5173", "symbol": "safari", "state": "ready"]
+  override var resourceItems: [[String: Any]] {
+    guard fixture.contextChip else { return [] }
+    return [["id": "browser", "symbol": "safari", "tap": true, "tint": "primary", "accessibilityLabel": "localhost:5173"]]
   }
 
   override func viewDidLoad() {

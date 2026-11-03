@@ -117,11 +117,8 @@ extension SessionController {
       "connection": connection(feed),
       "placeholder": placeholder(session, locked: locked),
     ]
-    let replies = live && feed.transcript.conversational ? LodyPreferences.quickReplies : []
-    composer["quickReplies"] = replies.map { ["id": $0.id, "label": $0.label, "message": $0.message] }
-    composer["preview"] = composerPreview
     let busy = control.running || sender?.awaitingReply == true || sender?.sending == true || OutboxDispatcher.busy.contains(session.status)
-    composer["infoBar"] = infoBarChips(session, busy: busy)
+    composer["actionBar"] = actionBarState(session, busy: busy)
     adjustComposer(&composer)
     apply("composer", Self.json(composer), chat.setComposerState)
     apply("options", composerModel.optionsJSON, chat.setComposerOptions)

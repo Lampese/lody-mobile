@@ -53,7 +53,7 @@ private final class ItemDetailFixture {
       if scenario == "subtask" {
         return .init(itemId: params.itemId, rev: revision, blocks: [
           block(["type": "terminal_command", "command": "cat ChatComposerView.swift"]),
-          block(["type": "terminal_output", "output": "The shared chip row is ChatQuickRepliesView."]),
+          block(["type": "terminal_output", "output": "The action bar is ChatActionBarView."]),
         ], truncated: false)
       }
       return .init(itemId: params.itemId, rev: revision, blocks: [

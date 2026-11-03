@@ -30,7 +30,6 @@ ui.capture('preferences')
 assert ui.element('language')['frame']['height'] >= 44
 assert ui.element('language')['AXValue'] == 'English'
 assert ui.element('notifications')['frame']['height'] >= 44
-assert ui.element('quick-replies')['frame']['height'] >= 44
 choose('queue')
 choose('guide')
 container = Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', ui.udid, 'ai.lody.mobile', 'data'], text=True).strip())

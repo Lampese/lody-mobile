@@ -74,8 +74,6 @@ PREVIEW = {
     'session-tree-pad': 'session-tree-preview',
     'message-share': 'message-share-preview',
     'session-share': 'session-share-preview',
-    'quick-replies': 'quick-replies-preview',
-    'context-chip': 'quick-replies-preview',
     'reply-haptics': 'reply-haptics-preview',
     'scroll-edge': 'chat-preview',
     'scroll-edge-pages': 'scroll-edge-pages',
@@ -150,7 +148,6 @@ PREVIEW = {
     'fast-sheet': 'composer-preview',
     'composer-glass-chat': 'composer-success',
     'composer-rest-draft': 'composer-success',
-    'composer-motion': 'quick-replies-preview',
     'composer-video': 'composer-success',
     'composer-success': 'composer-success',
     'composer-failure': 'composer-failure',
@@ -193,8 +190,6 @@ READY = {
     'session-tree-pad': 'tree-root',
     'message-share': 'paper-reply:meta:actions',
     'session-share': 'open-session-share',
-    'quick-replies': 'quick-reset',
-    'context-chip': 'quick-reset',
     'reply-haptics': 'reply-haptics-start',
     'scroll-edge': 'session-input',
     'scroll-edge-pages': 'create-session-input',
@@ -261,7 +256,6 @@ READY = {
     'fast-sheet': 'create-session-input',
     'composer-glass-chat': 'session-input',
     'composer-rest-draft': 'session-input',
-    'composer-motion': 'quick-reset',
     'composer-video': 'session-input',
     'composer-success': 'session-input',
     'composer-failure': 'session-input',
@@ -536,7 +530,7 @@ try:
                     script = Path(__file__).with_name(f'{case}.py')
                 if case == 'file-selection':
                     script = Path(__file__).with_name('file-selection.py')
-                if case in {'home-settings', 'home-workspace', 'ipad-create', 'quick-replies', 'context-chip', 'morph', 'sheet-zoom-project', 'native-collection', 'ipad-chrome', 'ipad-sidebar', 'wide-panel', 'pad-layout', 'composer-relay', 'outbox', 'navigation-toolbar', 'scroll-edge', 'scroll-edge-pages', 'scroll-edge-diff', 'reply-haptics', 'free-turn-notice', 'create-parity'}:
+                if case in {'home-settings', 'home-workspace', 'ipad-create', 'morph', 'sheet-zoom-project', 'native-collection', 'ipad-chrome', 'ipad-sidebar', 'wide-panel', 'pad-layout', 'composer-relay', 'outbox', 'navigation-toolbar', 'scroll-edge', 'scroll-edge-pages', 'scroll-edge-diff', 'reply-haptics', 'free-turn-notice', 'create-parity'}:
                     script = Path(__file__).with_name(f'{case}.py')
                 if case in ['session-tree', 'session-tree-pad']:
                     script = Path(__file__).with_name('session-tree.py')
@@ -566,7 +560,7 @@ try:
                     script = Path(__file__).with_name('paste-plain.py')
                 if case in ['rich-paste-sheet', 'rich-paste-chat']:
                     script = Path(__file__).with_name('rich-paste.py')
-                if case in ('composer-rest-draft', 'composer-motion'):
+                if case == 'composer-rest-draft':
                     script = Path(__file__).with_name(f'{case}.py')
                 if case == 'composer-glass-chat':
                     script = Path(__file__).with_name('composer-glass.py')
@@ -619,7 +613,7 @@ try:
                 if case == 'proposed-plan':
                     # Document, search and business dispatch outcomes share this case.
                     check_timeout = 360
-                if case in ('quick-replies', 'model-memory'):
+                if case == 'model-memory':
                     # Editing, restart or several model/agent round trips share these checks.
                     check_timeout = 420
                 if case.startswith(('attachment-overlay-', 'attachment-motion-')) and args.photo_access in ['full', 'granted']:
@@ -690,7 +684,7 @@ try:
                 result['checkSeconds'] = round(time.monotonic() - check_started, 2)
                 ui.capture('after')
                 result['status'] = 'passed'
-                if case in ('appearance', 'quick-replies', 'queued-message-behavior'):
+                if case in ('appearance', 'queued-message-behavior'):
                     # These checks cold-launch the App; the next case needs a fresh process baseline.
                     launch_mode = None
             except Exception as error:

@@ -17,17 +17,6 @@ extension SessionController {
 
   }
 
-  var simulatorChip: [String: Any]? {
-    guard let session = source.state.catalog.session(sessionId),
-      source.state.catalog.machineSimulators[session.machineId] == "available", let simulator,
-      session.iosSimulatorPreviewRequestId != nil || simulator.running else { return nil }
-    let name = simulator.running ? simulator.name : String(localized: "simulator.menu", bundle: .lody)
-    var chip: [String: Any] = ["label": name, "symbol": "iphone", "state": simulator.connecting ? "connecting" : "ready",
-      "accessibilityLabel": String.localizedStringWithFormat(String(localized: "simulator.chip.open", bundle: .lody), String(describing: name))]
-    chip["actions"] = simulator.running ? [["id": "stop", "title": String(localized: "simulator.stop", bundle: .lody), "symbol": "stop.circle", "destructive": true]] : []
-    return chip
-  }
-
   func simulatorMenu() -> [UIMenuElement] {
     guard let session = source.state.catalog.session(sessionId),
       let availability = source.state.catalog.machineSimulators[session.machineId] else { return [] }
@@ -102,58 +91,35 @@ extension SessionController {
 }
 
 extension SessionController {
-  var browserChip: [String: Any]? {
+  /// Live resources as action bar icons: tap opens, the menu copies or stops.
+  var browserItem: [String: Any]? {
     guard let preview = feed?.state.preview else { return nil }
     var actions: [[String: Any]] = [["id": "copy", "title": String(localized: "session.preview.copyLink", bundle: .lody), "symbol": "link"]]
     if preview.active { actions.append(["id": "stop", "title": String(localized: "session.preview.stop", bundle: .lody), "symbol": "stop.circle", "destructive": true]) }
-    return ["label": browserBusy ? String(localized: "session.preview.connecting", bundle: .lody) : preview.label,
-      "symbol": "safari", "state": browserBusy ? "connecting" : "ready",
-      "accessibilityLabel": String.localizedStringWithFormat(String(localized: "session.preview.open", bundle: .lody), String(describing: preview.label)), "actions": actions]
+    return ["id": "browser", "symbol": "safari", "busy": browserBusy, "tap": true, "tint": "primary", "menuTitle": preview.label, "actions": actions,
+      "accessibilityLabel": String.localizedStringWithFormat(String(localized: "session.preview.open", bundle: .lody), String(describing: preview.label))]
   }
 
-  var contextChips: [(id: String, chip: [String: Any])] {
-    var chips: [(String, [String: Any])] = []
-    if let browserChip { chips.append(("browser", browserChip)) }
-    if let simulatorChip { chips.append(("simulator", simulatorChip)) }
-    return chips
-  }
-
-  func makeComposerPreview() -> [String: Any]? {
-    let chips = contextChips
-    guard chips.count > 1 else { return chips.first?.chip }
-    let label = String.localizedStringWithFormat(String(localized: "session.context.count", bundle: .lody), String(describing: chips.count))
-    let actions = chips.flatMap { source in
-      (source.chip["actions"] as? [[String: Any]] ?? []).map { action in
-        var action = action; action["id"] = source.id + ":" + (action["id"] as! String); return action
-      }
-    }
-    return ["label": label, "symbol": "square.stack", "state": browserBusy || simulator?.connecting == true ? "connecting" : "ready",
-      "accessibilityLabel": label, "actions": actions]
+  var simulatorItem: [String: Any]? {
+    guard let session = source.state.catalog.session(sessionId),
+      source.state.catalog.machineSimulators[session.machineId] == "available", let simulator,
+      session.iosSimulatorPreviewRequestId != nil || simulator.running else { return nil }
+    let name = simulator.running ? simulator.name : String(localized: "simulator.menu", bundle: .lody)
+    var item: [String: Any] = ["id": "simulator", "symbol": "iphone", "busy": simulator.connecting, "tap": true, "tint": "primary", "menuTitle": name,
+      "accessibilityLabel": String.localizedStringWithFormat(String(localized: "simulator.chip.open", bundle: .lody), String(describing: name))]
+    item["actions"] = simulator.running ? [["id": "stop", "title": String(localized: "simulator.stop", bundle: .lody), "symbol": "stop.circle", "destructive": true]] : []
+    return item
   }
 
   func contextAction(_ action: String) {
     if action.hasPrefix("bar:") { infoBarAction(String(action.dropFirst(4))); return }
-    // The floating simulator uses these actions independently of the composer chip.
+    // The floating simulator preview's own actions.
     if action == "expand" { openSimulator(); return }
     if action == "close" { simulator?.hidePreview(); return }
-    let chips = contextChips
-    if chips.count < 2 { resourceAction(chips.first?.id ?? "simulator", action); return }
-    if action != "open", let separator = action.firstIndex(of: ":") {
-      resourceAction(String(action[..<separator]), String(action[action.index(after: separator)...])); return
-    }
-    let menu = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-    for source in chips {
-      menu.addAction(UIAlertAction(title: source.chip["accessibilityLabel"] as? String, style: .default) { [weak self] _ in
-        self?.resourceAction(source.id, "open")
-      })
-    }
-    menu.addAction(UIAlertAction(title: String(localized: "common.cancel", bundle: .lody), style: .cancel))
-    menu.popoverPresentationController?.sourceView = chat.composer
-    menu.popoverPresentationController?.sourceRect = chat.composer.bounds
-    present(menu, animated: true)
+    resourceAction("simulator", action)
   }
 
-  private func resourceAction(_ resource: String, _ action: String) {
+  func resourceAction(_ resource: String, _ action: String) {
     if resource == "browser" { browserAction(action); return }
     if action == "stop" {
       Task { do { try await simulator?.stop() } catch { toolError(error) } }

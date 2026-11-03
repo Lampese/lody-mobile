@@ -1,39 +1,39 @@
 import UIKit
 
-/// The action bar above the composer (web `SessionInfoBar`), as native glass chips leading the
-/// composer's chip row: the computer (icon; its menu says which and whether it is online), the
-/// repository context (PR / branch with ±diff; its menu opens the PR page, the workspace changes
-/// or copies the branch) and the top repository action as the prominent chip, with the rest in a
-/// menu. Prompt actions send web's quick-action prompt as an ordinary turn; Merge (after a native
-/// method sheet that doubles as confirmation) and Ready for review write to GitHub directly.
+/// The action bar above the composer (web `SessionInfoBar`): one Liquid Glass panel
+/// (`ChatActionBarView`) built from `actionBarState`. Leading icons: the computer (menu: name and
+/// presence) and live resources (browser preview, simulator). Then the repository context (PR or
+/// branch; menu: open the native PR page, copy the branch), the ±diff (opens the workspace
+/// changes) and, trailing, the top repository action with the rest behind its chevron. Prompt
+/// actions send web's quick-action prompt as an ordinary turn; Merge (after a native method sheet
+/// that doubles as confirmation) and Ready for review write to GitHub directly.
 extension SessionController {
-  func infoBarChips(_ session: SessionItem, busy: Bool) -> [[String: Any]] {
+  func actionBarState(_ session: SessionItem, busy: Bool) -> [String: Any] {
     let state = source.state
     let project = state.catalog.projects.first { $0.id == session.projectId }
     let repository = project?.repoFullName ?? (session.projectId.hasPrefix("github:") ? String(session.projectId.dropFirst(7)) : "")
     let bar = SessionInfoBar(session: session, repository: repository, busy: busy)
     infoBar = bar
-    var chips: [[String: Any]] = []
-    if let machine = machineChip(session) { chips.append(machine) }
-    if bar.hasContext { chips.append(contextChip(bar)) }
-    if let first = bar.actions.first {
-      chips.append([
-        "id": "act", "label": SessionInfoBar.title(first), "symbol": Self.symbol(first), "prominent": true, "tap": true,
-        "accessibilityLabel": SessionInfoBar.title(first),
-      ])
-      let rest = bar.actions.dropFirst()
-      if !rest.isEmpty {
-        chips.append([
-          "id": "more", "symbol": "ellipsis", "tint": "label",
-          "accessibilityLabel": String(localized: "bar.more", bundle: .lody),
-          "actions": rest.map { ["id": $0.rawValue, "title": SessionInfoBar.title($0), "symbol": Self.symbol($0)] },
-        ])
-      }
+    var result: [String: Any] = [:]
+    result["items"] = [machineItem(session)].compactMap { $0 } + resourceItems
+    if let context = contextItem(bar) { result["context"] = context }
+    if bar.added + bar.removed > 0 {
+      result["diff"] = [
+        "added": bar.added, "removed": bar.removed, "tap": reviewable,
+        "accessibilityLabel": "\(String(localized: "workspaceChanges.title", bundle: .lody)), +\(bar.added) −\(bar.removed)",
+      ]
     }
-    return chips
+    if let first = bar.actions.first {
+      result["primary"] = [
+        "label": SessionInfoBar.title(first),
+        "moreLabel": String(localized: "bar.more", bundle: .lody),
+        "more": bar.actions.dropFirst().map { ["id": $0.rawValue, "title": SessionInfoBar.title($0), "symbol": Self.symbol($0)] },
+      ]
+    }
+    return result
   }
 
-  private func machineChip(_ session: SessionItem) -> [String: Any]? {
+  private func machineItem(_ session: SessionItem) -> [String: Any]? {
     let state = source.state
     guard let name = state.catalog.machineNames[session.machineId], !name.isEmpty else { return nil }
     let status = state.presence.status(of: session.machineId)
@@ -42,47 +42,43 @@ extension SessionController {
     return [
       "id": "machine", "symbol": symbols[state.catalog.machineOs[session.machineId] ?? ""] ?? "desktopcomputer",
       // Colour only for a confirmed problem; unknown presence stays neutral.
-      "tint": status == "offline" ? "orange" : "secondary",
+      "tint": status == "offline" ? "warning" : "secondary",
       "accessibilityLabel": "\(name), \(statusText)",
       "menuTitle": name,
       "actions": [["id": "status", "title": statusText, "symbol": status == "online" ? "checkmark.circle" : "circle.dashed", "disabled": true]],
     ]
   }
 
-  private func contextChip(_ bar: SessionInfoBar) -> [String: Any] {
-    let diff = bar.added + bar.removed > 0 ? "+\(bar.added) −\(bar.removed)" : ""
-    var label = bar.branch.isEmpty ? bar.repository : bar.branch
+  /// PR number, else branch, else the repository name without its owner (web truncated the
+  /// owner first; on a phone it carries nothing). CI trouble tints the PR glyph instead of text.
+  private func contextItem(_ bar: SessionInfoBar) -> [String: Any]? {
+    guard !bar.repository.isEmpty || !bar.branch.isEmpty || bar.pullRequest != nil else { return nil }
+    let name = bar.repository.split(separator: "/").last.map(String.init) ?? bar.repository
+    var label = bar.branch.isEmpty ? name : bar.branch
     var symbol = "arrow.triangle.branch"
     var tint = "secondary"
     var actions: [[String: Any]] = []
+    var description = [bar.repository, bar.branch]
     if let pr = bar.pullRequest {
       label = "#\(pr.number)"
       symbol = pr.status == "merged" ? "arrow.triangle.merge" : "arrow.triangle.pull"
-      tint = ["open": "green", "merged": "purple", "closed": "red"][pr.status] ?? "secondary"
-      let state = String(localized: String.LocalizationValue("pr.state." + pr.status), bundle: .lody)
-      var subtitle = state
+      tint = pr.status
+      var subtitle = String(localized: String.LocalizationValue("pr.state." + pr.status), bundle: .lody)
       if ["open", "draft"].contains(pr.status), let ci = pr.ci, ["s", "f", "e", "p"].contains(ci) {
-        let verdict = String(localized: String.LocalizationValue("bar.ci." + ci), bundle: .lody)
-        subtitle += " · " + verdict
-        if ci != "s" { label += " · " + verdict }
+        subtitle += " · " + String(localized: String.LocalizationValue("bar.ci." + ci), bundle: .lody)
+        if ci == "f" || ci == "e" { tint = "danger" } else if ci == "p" { tint = "warning" }
       }
       if pr.merge == "d" { subtitle += " · " + String(localized: "bar.conflicts", bundle: .lody) }
       actions.append(["id": "pr", "title": "\(pr.repository) #\(pr.number)", "subtitle": subtitle, "symbol": symbol])
-    }
-    if !diff.isEmpty {
-      label += " · " + diff
-      if reviewable {
-        actions.append(["id": "changes", "title": String(localized: "workspaceChanges.title", bundle: .lody), "subtitle": diff, "symbol": "plus.forwardslash.minus"])
-      }
+      description += [label, subtitle]
     }
     if !bar.branch.isEmpty {
       actions.append(["id": "branch", "title": String(localized: "session.title.copyBranch", bundle: .lody), "subtitle": bar.branch, "symbol": "doc.on.doc"])
     }
     return [
-      "id": "context", "label": label, "symbol": symbol, "tint": tint,
-      "accessibilityLabel": [bar.repository, bar.branch, label].filter { !$0.isEmpty }.joined(separator: ", "),
-      "menuTitle": [bar.repository, bar.branch].filter { !$0.isEmpty }.joined(separator: " · "),
-      "actions": actions,
+      "label": label, "symbol": symbol, "tint": tint, "actions": actions,
+      "accessibilityLabel": description.filter { !$0.isEmpty }.joined(separator: ", "),
+      "menuTitle": bar.repository,
     ]
   }
 
@@ -98,16 +94,18 @@ extension SessionController {
     }
   }
 
-  /// `chip` or `chip:menuAction`, from the composer's chip row.
+  /// `item` or `item:menuAction`, from the action bar.
   func infoBarAction(_ id: String) {
+    let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
+    if ["browser", "simulator"].contains(parts[0]) { resourceAction(parts[0], parts.count > 1 ? parts[1] : "open"); return }
     guard let bar = infoBar else { return }
     switch id {
+    case "diff":
+      openWorkspaceChanges()
     case "act":
       if let first = bar.actions.first { performInfoBarAction(first) }
     case "context:pr":
       if let pr = bar.pullRequest { openPullRequest(pr) }
-    case "context:changes":
-      openWorkspaceChanges()
     case "context:branch":
       guard !bar.branch.isEmpty else { return }
       UIPasteboard.general.string = bar.branch

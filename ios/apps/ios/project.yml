@@ -161,7 +161,7 @@ targets:
           - Chat/ChatComposerLiquidGlassSurfaceLayout.swift
           - Chat/ChatComposerAttachmentStack.swift
           - Chat/ChatComposerGrabber.swift
-          - Chat/ChatQuickReplies.swift
+          - Chat/ChatActionBar.swift
           - Chat/ChatMentionPanel.swift
           - Chat/ChatSendHandoff.swift
           - Chat/ChatThrowCurve.swift

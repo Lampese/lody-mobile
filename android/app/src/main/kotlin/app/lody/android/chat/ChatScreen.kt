@@ -16,8 +16,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -432,10 +430,11 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
 }
 
 /**
- * Web `SessionInfoBar` above the composer, with native menus: the computer (icon; its menu names
- * it), the repository context (PR / branch, CI, ±diff; its menu opens the PR or copies the
- * branch) and the repository actions as one accent split button — the top action, then a chevron
- * whose menu holds the rest. iOS counterpart: `SessionController+InfoBar`.
+ * Web `SessionInfoBar` above the composer as one panel: the computer icon (menu names it), then
+ * the repository context (PR or branch; menu opens the PR or copies the branch) and the ±diff,
+ * and trailing the repository action as a neutral split control (the top action, then a chevron
+ * whose menu holds the rest). Colour is kept for status, so Send stays the one accent; when the
+ * row is short the context truncates first and the action stays whole. iOS: `ChatActionBarView`.
  */
 @Composable
 private fun ChatActionBar(
@@ -445,43 +444,57 @@ private fun ChatActionBar(
     onAction: (SessionInfoBar.Action) -> Unit,
     onCopied: (String) -> Unit,
 ) {
-    if (machine.isEmpty() && !bar.hasContext && bar.actions.isEmpty()) return
+    val colors = LodyTheme.colors
+    val context = bar.pullRequest != null || bar.branch.isNotEmpty() || bar.repository.isNotEmpty()
+    val diff = bar.added + bar.removed > 0
+    if (machine.isEmpty() && !context && !diff && bar.actions.isEmpty()) return
+    val shape = RoundedCornerShape(percent = 50)
     Row(
         Modifier
+            .padding(horizontal = LodySpacing.md)
+            .padding(top = LodySpacing.xs)
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = LodySpacing.md),
+            .height(BarHeight)
+            .clip(shape)
+            .background(colors.bgRaised, shape)
+            .border(0.5.dp, colors.borderSubtle, shape)
+            .padding(horizontal = LodySpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
     ) {
-        if (machine.isNotEmpty()) MachineChip(machine, machineKind)
-        if (bar.hasContext) ContextChip(bar, onCopied)
+        // Information leads and takes what the action leaves; the action keeps its full width.
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            if (machine.isNotEmpty()) MachineItem(machine, machineKind)
+            if (machine.isNotEmpty() && (context || diff)) {
+                Box(Modifier.padding(horizontal = LodySpacing.xs).width(0.5.dp).height(LodyIconSize.md).background(colors.borderDefault))
+            }
+            if (context) ContextItem(bar, onCopied, Modifier.weight(1f, fill = false))
+            if (diff) DiffItem(bar.added, bar.removed)
+        }
         if (bar.actions.isNotEmpty()) ActionSplit(bar.actions, onAction)
     }
 }
 
-/** A raised pill in the bar; its 48 dp touch target does not grow the pill. */
+private val BarHeight = 44.dp
+
+/** A bar cell: at least 40 dp square to tap, drawn without its own fill. */
 @Composable
-private fun BarChip(label: String, onClick: () -> Unit, content: @Composable RowScope.() -> Unit) {
-    val colors = LodyTheme.colors
+private fun BarCell(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier
-            .minimumInteractiveComponentSize()
-            .height(LodySize.controlSm)
-            .clip(CircleShape)
-            .background(colors.bgRaised)
-            .border(0.5.dp, colors.borderSubtle, CircleShape)
+        modifier
+            .heightIn(min = 40.dp)
+            .widthIn(min = 40.dp)
+            .clip(RoundedCornerShape(percent = 50))
             .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
             .semantics { contentDescription = label }
-            .padding(horizontal = LodySpacing.md),
+            .padding(horizontal = LodySpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs, Alignment.CenterHorizontally),
         content = content,
     )
 }
 
 @Composable
-private fun MachineChip(name: String, kind: app.lody.android.create.CreateSessionModel.MachineKind) {
+private fun MachineItem(name: String, kind: app.lody.android.create.CreateSessionModel.MachineKind) {
     val colors = LodyTheme.colors
     var open by remember { mutableStateOf(false) }
     val icon = when (kind) {
@@ -490,8 +503,8 @@ private fun MachineChip(name: String, kind: app.lody.android.create.CreateSessio
         app.lody.android.create.CreateSessionModel.MachineKind.Server -> LodyIcons.Server
     }
     Box {
-        BarChip("${stringResource(R.string.bar_machine)}, $name", onClick = { open = true }) {
-            Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+        BarCell("${stringResource(R.string.bar_machine)}, $name", onClick = { open = true }) {
+            Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
@@ -504,40 +517,42 @@ private fun MachineChip(name: String, kind: app.lody.android.create.CreateSessio
     }
 }
 
+/** PR number, else branch, else the repository name without its owner; CI trouble tints the glyph. */
 @Composable
-private fun ContextChip(bar: SessionInfoBar, onCopied: (String) -> Unit) {
+private fun ContextItem(bar: SessionInfoBar, onCopied: (String) -> Unit, modifier: Modifier = Modifier) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var open by remember { mutableStateOf(false) }
     val pr = bar.pullRequest
-    val (icon, tint) = when (pr?.status) {
+    val ci = pr?.ci?.takeIf { pr.status == "open" || pr.status == "draft" }
+    val (icon, statusTint) = when (pr?.status) {
         null -> LodyIcons.Branch to colors.iconSecondary
         "merged" -> LodyIcons.Merge to colors.prMerged
         "closed" -> LodyIcons.PullRequestClosed to colors.prClosed
         "draft" -> LodyIcons.PullRequestDraft to colors.prDraft
         else -> LodyIcons.PullRequest to colors.prOpen
     }
-    val ci = pr?.ci?.takeIf { pr.status == "open" || pr.status == "draft" }
+    val tint = when (ci) {
+        "f", "e" -> colors.dangerDefault
+        "p" -> colors.warningDefault
+        else -> statusTint
+    }
     val verdict = when (ci) {
-        "f" -> stringResource(R.string.bar_ci_f) to colors.dangerDefault
-        "e" -> stringResource(R.string.bar_ci_e) to colors.dangerDefault
-        "p" -> stringResource(R.string.bar_ci_p) to colors.warningDefault
+        "s" -> stringResource(R.string.bar_ci_s)
+        "f" -> stringResource(R.string.bar_ci_f)
+        "e" -> stringResource(R.string.bar_ci_e)
+        "p" -> stringResource(R.string.bar_ci_p)
         else -> null
     }
-    val label = pr?.let { "#${it.number}" } ?: bar.branch.ifEmpty { bar.repository }
+    val label = pr?.let { "#${it.number}" } ?: bar.branch.ifEmpty { bar.repository.substringAfterLast('/') }
     val copied = stringResource(R.string.bar_branch_copied)
-    val description = listOf(bar.repository, bar.branch, label, verdict?.first.orEmpty()).filter { it.isNotEmpty() }.distinct().joinToString(", ")
-    Box {
-        BarChip(description, onClick = { open = true }) {
+    val description = listOfNotNull(bar.repository, bar.branch, label, verdict).filter { it.isNotEmpty() }.distinct().joinToString(", ")
+    Box(modifier) {
+        BarCell(description, onClick = { open = true }) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.sm))
-            Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.widthIn(max = 160.dp))
-            verdict?.let { (text, color) -> Text(text, style = type.footnote, color = color, maxLines = 1) }
-            if (bar.added + bar.removed > 0) {
-                Text("+${bar.added}", style = type.footnote.copy(fontFeatureSettings = "tnum"), color = colors.diffAddedText)
-                Text("−${bar.removed}", style = type.footnote.copy(fontFeatureSettings = "tnum"), color = colors.diffRemovedText)
-            }
+            Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
             if (pr != null) {
@@ -553,7 +568,7 @@ private fun ContextChip(bar: SessionInfoBar, onCopied: (String) -> Unit) {
                     text = {
                         Column {
                             Text("${pr.repository} #${pr.number}", style = type.body, color = colors.textPrimary)
-                            Text(listOfNotNull(state, verdict?.first, if (pr.merge == "d") stringResource(R.string.bar_conflicts) else null).joinToString(" · "), style = type.footnote, color = colors.textSecondary)
+                            Text(listOfNotNull(state, verdict, if (pr.merge == "d") stringResource(R.string.bar_conflicts) else null).joinToString(" · "), style = type.footnote, color = colors.textSecondary)
                         }
                     },
                     leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.md)) },
@@ -581,9 +596,28 @@ private fun ContextChip(bar: SessionInfoBar, onCopied: (String) -> Unit) {
     }
 }
 
+/** Web's ±diff in its own quiet well; display only until Android has a changes page. */
+@Composable
+private fun DiffItem(added: Int, removed: Int) {
+    val colors = LodyTheme.colors
+    val style = LodyTheme.typography.subhead.copy(fontFeatureSettings = "tnum")
+    Row(
+        Modifier
+            .padding(horizontal = LodySpacing.xxs)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(colors.fillTertiary)
+            .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xxs)
+            .semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+    ) {
+        Text("+$added", style = style, color = colors.diffAddedText, maxLines = 1)
+        Text("−$removed", style = style, color = colors.diffRemovedText, maxLines = 1)
+    }
+}
+
 /**
- * Web's primary action + chevron as one accent surface with a soft internal divider: the top
- * action sends on tap (with a confirm haptic); the chevron's menu holds the rest in priority order.
+ * Web's primary action + chevron as one neutral surface with a soft internal divider: the top
+ * action runs on tap (with a confirm haptic); the chevron's menu holds the rest in priority order.
  */
 @Composable
 private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (SessionInfoBar.Action) -> Unit) {
@@ -593,13 +627,12 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
     var open by remember { mutableStateOf(false) }
     val first = actions.first()
     val more = stringResource(R.string.bar_more)
-    Box(Modifier.minimumInteractiveComponentSize()) {
+    Box {
         Row(
-            Modifier.height(LodySize.controlSm).clip(CircleShape).background(colors.accentSolid),
+            Modifier.height(LodySize.controlSm).clip(CircleShape).background(colors.fillSecondary),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val title = actionTitle(first)
-            Row(
+            Box(
                 Modifier
                     .fillMaxHeight()
                     .clickable(role = Role.Button) {
@@ -607,14 +640,12 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
                         onAction(first)
                     }
                     .padding(start = LodySpacing.md, end = if (actions.size > 1) LodySpacing.sm else LodySpacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(actionIcon(first), contentDescription = null, tint = colors.textOnAccent, modifier = Modifier.size(LodyIconSize.sm))
-                Text(title, style = type.subhead, color = colors.textOnAccent, maxLines = 1)
+                Text(actionTitle(first), style = type.subhead, color = colors.textPrimary, maxLines = 1)
             }
             if (actions.size > 1) {
-                Box(Modifier.width(1.dp).height(LodyIconSize.md).background(colors.textOnAccent.copy(alpha = 0.3f)))
+                Box(Modifier.width(0.5.dp).height(LodyIconSize.sm).background(colors.borderStrong))
                 Box(
                     Modifier
                         .fillMaxHeight()
@@ -623,7 +654,7 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
                         .padding(horizontal = LodySpacing.sm),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(LodyIcons.Expand, contentDescription = null, tint = colors.textOnAccent, modifier = Modifier.size(LodyIconSize.sm))
+                    Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
                 }
             }
         }

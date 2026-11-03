@@ -16,9 +16,7 @@ import UniformTypeIdentifiers
 
 private struct ChatComposerState: Decodable {
   var mentionItems: [ChatMentionItem]?
-  var quickReplies: [ChatQuickReply]?
-  var preview: ChatPreviewChip?
-  var infoBar: [ChatInfoChip]?
+  var actionBar: ChatActionBarState?
   var editable = true
   var canSend = false
   var sending = false
@@ -611,8 +609,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private let queueView = ChatQueueView()
   private var queueHeight: NSLayoutConstraint!
   private var queueGap: NSLayoutConstraint!
-  private let quickRepliesView = ChatQuickRepliesView(frame: .zero)
-  private var quickRepliesHeight: NSLayoutConstraint!
+  private let actionBar = ChatActionBarView(frame: .zero)
+  private var actionBarHeight: NSLayoutConstraint!
   private var queuedDrafts: [ChatQueuedDraft] = []
   var retiringQueueHeight: CGFloat { queuedDrafts.isEmpty ? queueView.panelHeight + queueGap.constant : 0 }
   private var state = ChatComposerState()
@@ -841,21 +839,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     addSubview(composer)
     composer.contentView.addSubview(queueView)
     queueView.onSteer = { [weak self] in self?.onSteer?($0) }
-    // Standalone buttons must not also contribute to the composer's merged glass.
-    addSubview(quickRepliesView)
-    quickRepliesView.onSelect = { [weak self] id in
-      guard let self, self.canShowQuickReplies,
-            let reply = self.state.quickReplies?.first(where: { $0.id == id }),
-            !reply.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            reply.message.utf16.count <= 32000 else { return }
-      self.input.text = reply.message
-      self.updateComposer()
-      self.layoutIfNeeded()
-      self.submit()
-    }
-    quickRepliesView.onPreview = { [weak self] in self?.onPreview?($0) }
-    quickRepliesView.onInfo = { [weak self] in self?.onPreview?("bar:" + $0) }
-    quickRepliesView.onTasksPress = { [weak self] in self?.onTasksPress?() }
+    // Its own glass panel: it must not also contribute to the composer's merged glass.
+    addSubview(actionBar)
+    actionBar.onAction = { [weak self] in self?.onPreview?("bar:" + $0) }
+    actionBar.onTasks = { [weak self] in self?.onTasksPress?() }
     composer.contentView.addSubview(notice)
     composer.contentView.addSubview(quotaNotice)
     composer.contentView.addSubview(inputSurface)
@@ -874,7 +861,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     for view in [mentionPanel, mentionSeparator, attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, controls, send, grabber] {
       inputSurface.contentView.addSubview(view)
     }
-    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, quickRepliesView, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, grabber] {
+    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, actionBar, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, grabber] {
       view.translatesAutoresizingMaskIntoConstraints = false
     }
     inputHeight = editorView.heightAnchor.constraint(equalToConstant: 48)
@@ -889,8 +876,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     grabberHeight = grabber.heightAnchor.constraint(equalToConstant: 0)
     attachmentTop = attachmentBar.topAnchor.constraint(equalTo: mentionPanel.bottomAnchor)
     queueHeight = queueView.heightAnchor.constraint(equalToConstant: 0)
-    queueGap = queueView.topAnchor.constraint(equalTo: quickRepliesView.bottomAnchor)
-    quickRepliesHeight = quickRepliesView.heightAnchor.constraint(equalToConstant: 0)
+    queueGap = queueView.topAnchor.constraint(equalTo: actionBar.bottomAnchor)
+    actionBarHeight = actionBar.heightAnchor.constraint(equalToConstant: 0)
     mentionHeight = mentionPanel.heightAnchor.constraint(equalToConstant: 0)
     surfaceLayout.activate()
     NSLayoutConstraint.activate([
@@ -910,9 +897,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       mentionSeparator.heightAnchor.constraint(equalToConstant: 0.5),
       queueView.leadingAnchor.constraint(equalTo: composer.leadingAnchor, constant: 16),
       queueView.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -16), queueHeight, queueGap,
-      quickRepliesView.topAnchor.constraint(equalTo: notice.bottomAnchor),
-      quickRepliesView.leadingAnchor.constraint(equalTo: composer.leadingAnchor),
-      quickRepliesView.trailingAnchor.constraint(equalTo: composer.trailingAnchor), quickRepliesHeight,
+      actionBar.topAnchor.constraint(equalTo: notice.bottomAnchor),
+      actionBar.leadingAnchor.constraint(equalTo: composer.leadingAnchor, constant: 16),
+      actionBar.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -16), actionBarHeight,
       notice.topAnchor.constraint(equalTo: composer.topAnchor), notice.leadingAnchor.constraint(equalTo: composer.leadingAnchor, constant: 20),
       notice.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -20), noticeHeight,
       attachmentTop,
@@ -1405,15 +1392,6 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     queuedDrafts = drafts
     updateComposer()
   }
-  private var canShowQuickReplies: Bool {
-    quickRepliesAvailable && input.text.isEmpty
-  }
-  private var quickRepliesAvailable: Bool {
-    state.running == false && state.editable && state.canSend && !state.sending &&
-      state.stopping != true && state.controlling != true && pendingDraft == nil &&
-      failedDraft == nil && displayError == nil && queuedDrafts.isEmpty && !relaying &&
-      attachments.isEmpty && connection.isEmpty
-  }
   private func updateComposer() {
     mentionPanel.update(input: input, items: activeMentionItems ?? [], enabled: activeMentionItems != nil)
     mentionHeight.constant = mentionPanel.panelHeight
@@ -1467,18 +1445,11 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     send.isHidden = !expanded && !hasContent && !stop && !loading
     queueView.render(queuedDrafts, enabled: state.canStop == true && !sending && state.controlling != true, steeringID: state.steerID ?? "", firstOnly: state.steerInterrupts == true)
     queueHeight.constant = queueView.panelHeight
-    let replies = quickRepliesAvailable ? (state.quickReplies ?? []) : []
-    let context = connection.isEmpty ? state.preview : nil
-    let typing = !input.text.isEmpty
-    let showsReplies = !typing && !expanded
-    // The action bar stays while typing; expanded editing gives the row to the editor.
-    let info = expanded ? [] : (state.infoBar ?? [])
-    let showsRow = !info.isEmpty || context != nil || taskCount > 0 || (!replies.isEmpty && showsReplies)
-    let reservesQuickReplies = showsRow
-    quickRepliesView.render(replies, context: context, showsReplies: showsReplies, compact: typing, visible: showsRow, animated: reservesQuickReplies, taskCount: taskCount, info: info)
-    quickRepliesHeight.constant = reservesQuickReplies ? ChatQuickRepliesView.chipHeight : 0
-    let queueFloats = reservesQuickReplies && queueHeight.constant > 0
-    queueGap.constant = queueFloats ? 8 : 0
+    // The action bar stays while typing; expanded editing gives its row to the editor.
+    let showsBar = !expanded && ChatActionBarView.shows(state.actionBar, tasks: taskCount)
+    actionBar.render(state.actionBar, tasks: taskCount, visible: showsBar, animated: true)
+    actionBarHeight.constant = showsBar ? ChatActionBarView.height : 0
+    queueGap.constant = showsBar && queueHeight.constant > 0 ? 8 : 0
     let noticeText = failedDraft == nil ? (displayError ?? state.notice) : String(localized: "native.chat.composer.failedDraft", bundle: .lody)
     let canReconnect = failedDraft != nil || displayError != nil || state.reconnect
     notice.setTitle(noticeText, for: .normal)
@@ -1527,7 +1498,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     hintTop.constant = topInset
     let height = input.sizeThatFits(CGSize(width: max(1, input.bounds.width), height: .greatestFiniteMagnitude)).height
     let overflows = height > ChatMessageContent.maximumCollapsedHeight
-    let chrome = mentionHeight.constant + queueHeight.constant + queueGap.constant + quickRepliesHeight.constant + noticeHeight.constant + attachmentTop.constant + attachmentHeight.constant + quotaNoticeHeight.constant + accessoryHeight.constant + formatHeight.constant + grabberHeight.constant + (expanded ? 8 : 16)
+    let chrome = mentionHeight.constant + queueHeight.constant + queueGap.constant + actionBarHeight.constant + noticeHeight.constant + attachmentTop.constant + attachmentHeight.constant + quotaNoticeHeight.constant + accessoryHeight.constant + formatHeight.constant + grabberHeight.constant + (expanded ? 8 : 16)
     // Card style rests at one line above its controls and opens to three while editing; the
     // glass sheet keeps its taller writing area.
     var minimumHeight: CGFloat = 132

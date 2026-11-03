@@ -89,11 +89,6 @@ for index, scenario in enumerate(scenarios):
         tap('notifications')
         assert catalog.text('notifications.hint.signedOut') in ui.element('notification-permission')['AXLabel']
         back()
-        tap('quick-replies')
-        ui.wait(lambda items: any(item.get('AXLabel') == catalog.text('settings.quickReplies.add')
-                                 for item in items), 'Missing Quick Replies editor entry')
-        ui.capture('quick-replies-opened')
-        back()
         assert ui.element('queued-message-behavior').get('AXValue') == original
         back()
         tap('appearance')

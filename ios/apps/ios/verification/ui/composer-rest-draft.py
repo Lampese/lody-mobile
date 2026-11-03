@@ -27,8 +27,6 @@ def assert_resting_draft(label):
         f'{label}: attachment stack is not inside the capsule after Add: {frame}'
     assert abs(frame['y'] + frame['height'] / 2 - field['y'] - field['height'] / 2) <= 1, f'{label}: stack is not centered'
     assert send and send.get('enabled', True), f'{label}: a resting draft must offer Send'
-    assert not any((item.get('AXUniqueId') or '').startswith('quick-reply:') and item['frame']['height'] > 0 for item in ui.state()), \
-        f'{label}: quick replies must hide while a draft exists'
 
 
 ui.axe('tap', '--id', 'session-input', '--tap-style', 'physical', '--post-delay', '.8')

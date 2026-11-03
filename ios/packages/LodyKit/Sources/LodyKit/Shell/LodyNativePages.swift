@@ -47,7 +47,6 @@ enum LodyNativePages {
     "app-icon": { _ in AppIconController() },
     "about": { _ in AboutController() },
     "preferences": { _ in PreferencesController() },
-    "quick-reply-editor": { params in QuickReplyEditorController(item: QuickReply(params["item"])) },
     "ai-usage": { _ in AIUsageController() },
     "ai-usage-preview": { _ in AIUsagePreviewController() },
     "project-visibility": { _ in ProjectVisibilityController() },
