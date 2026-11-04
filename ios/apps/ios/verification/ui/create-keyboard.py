@@ -27,4 +27,8 @@ search = ui.wait(lambda items: next((i for i in items if i.get('type') == 'TextF
 tap_frame(search['frame'])
 ui.wait(lambda items: ui.visible_keyboard(items), 'Search must accept keyboard focus')
 ui.screenshot('search-focused')
+ui.axe('tap', '-x', '4', '-y', '180', '--post-delay', '.6')
+hidden()
+ui.wait(lambda items: not any(i.get('type') == 'TextField' and i.get('AXUniqueId') != 'create-session-input' for i in items), 'Blank tap must collapse the picker too')
+ui.screenshot('picker-dismissed')
 print('PASS: blank/picker taps dismiss keyboard; picker search can refocus')

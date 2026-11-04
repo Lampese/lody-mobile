@@ -79,4 +79,4 @@
 
 - A parent chat always retains its own status. When its children are folded, show the most urgent child status between the family chevron and child count; never replace the parent status with a child status.
 
-- On the creation page, tapping outside the composer or opening/selecting a context option dismisses the keyboard. Picker search fields must still accept focus, and a dismissal tap must not swallow the option action. Opening run configuration also clears composer focus.
+- On the creation page, tapping outside the composer or opening/selecting a context option dismisses the keyboard. Picker search fields must still accept focus, and a dismissal tap must not swallow the option action. Opening run configuration also clears composer focus. A blank-area tap also closes the expanded context picker; controls and search fields retain their own tap handling.

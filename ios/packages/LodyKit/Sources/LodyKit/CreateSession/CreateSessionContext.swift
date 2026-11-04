@@ -305,6 +305,9 @@ struct CreateContextPanel: View {
         .padding(.horizontal, LodyLayout.screenPaddingX)
         .padding(.bottom, LodySpacing.md)
         .frame(minHeight: geometry.size.height, alignment: .bottom)
+        .background {
+          Color.clear.contentShape(Rectangle()).onTapGesture { state.open = nil }
+        }
       }
       .scrollBounceBehavior(.basedOnSize)
       .defaultScrollAnchor(.bottom)

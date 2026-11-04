@@ -122,6 +122,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     var target by remember(catalog.revision == 0L) { mutableStateOf(CreateSessionModel.initial(catalog)) }
     var prompt by rememberSaveable { mutableStateOf("") }
     var runConfig by remember { mutableStateOf(false) }
+    var openContext by remember { mutableStateOf<String?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.create_extras_unavailable)
@@ -245,7 +246,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 .padding(padding)
                 .imePadding()
                 .navigationBarsPadding()
-                .pointerInput(dismissKeyboard) { detectTapGestures(onTap = { dismissKeyboard() }) },
+                .pointerInput(dismissKeyboard) { detectTapGestures(onTap = { dismissKeyboard(); openContext = null }) },
         ) {
             // Bottom-aligned above the composer; an expanded list grows upward and, once the
             // panel outgrows the space, scrolls (anchored at its bottom).
@@ -257,10 +258,11 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                         .padding(horizontal = LodyLayout.screenPaddingX),
                     verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
-                    ContextPanel(catalog, target,
+                    ContextPanel(catalog, target, open = openContext, onOpenChange = { openContext = it },
                         availableMachines = options?.agents?.map { it.machineId }?.toSet().takeIf { optionsFresh },
                         onChange = { if (!attempted) { targetChosen = true; target = it } })
                     if (github) BranchLine(branches, branchLoading, branchFailed, enabled = !attempted,
+                        open = openContext == "branch", onOpenChange = { openContext = if (it) "branch" else null },
                         onChange = { name ->
                             branches = branches.select(name)
                             val selectedRepo = branchRepo
@@ -342,11 +344,10 @@ private const val EFFORT = "effort"
 private const val MODE = "mode"
 
 @Composable
-private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
+private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, open: String?, onOpenChange: (String?) -> Unit, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
     // One list open at a time, as web's picker coordinator.
-    var open by remember { mutableStateOf<String?>(null) }
     val dismissKeyboard = rememberKeyboardDismissal()
-    val toggle = { id: String -> dismissKeyboard(); open = if (open == id) null else id }
+    val toggle = { id: String -> dismissKeyboard(); onOpenChange(if (open == id) null else id) }
 
     val machines = CreateSessionModel.machines(catalog)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
@@ -362,7 +363,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, availab
         } else emptyList(),
         open = open == MACHINE,
         onToggle = { toggle(MACHINE) },
-        onPick = { open = null; onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
+        onPick = { onOpenChange(null); onChange(CreateSessionModel.pickMachine(catalog, target, it)) },
         searchPlaceholder = stringResource(R.string.create_search_machines),
     )
 
@@ -389,8 +390,8 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, availab
         onPick = { id ->
             when (id) {
                 MORE -> Unit // More expands the list to every project in place.
-                CHAT -> { open = null; onChange(CreateSessionModel.chat(catalog, target)) }
-                else -> { open = null; onChange(CreateSessionModel.select(catalog, target, id)) }
+                CHAT -> { onOpenChange(null); onChange(CreateSessionModel.chat(catalog, target)) }
+                else -> { onOpenChange(null); onChange(CreateSessionModel.select(catalog, target, id)) }
             }
         },
         expandAllOn = MORE,
@@ -610,13 +611,12 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** Cached choices stay interactive while the next snapshot loads. */
 @Composable
-private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, enabled: Boolean, onChange: (String) -> Unit, onMore: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
+private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, enabled: Boolean, open: Boolean, onOpenChange: (Boolean) -> Unit, onChange: (String) -> Unit, onMore: () -> Unit) {
     var query by remember { mutableStateOf("") }
     val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
     Column {
-        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { dismissKeyboard(); open = !open }
+        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { dismissKeyboard(); onOpenChange(!open) }
             .padding(horizontal = LodySpacing.xs), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
             Icon(LodyIcons.Branch, null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
@@ -632,7 +632,7 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
                 decorationBox = { field -> Box { if (query.isEmpty()) Text(stringResource(R.string.create_search_branches), style = LodyTheme.typography.body, color = colors.textPlaceholder); field() } })
             LazyColumn(Modifier.heightIn(max = LodySize.controlMd * 6)) {
               items(state.page?.names.orEmpty().filter { it.contains(query.trim(), ignoreCase = true) }, key = { it }) { name ->
-                Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { dismissKeyboard(); onChange(name); open = false }
+                Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { dismissKeyboard(); onChange(name); onOpenChange(false) }
                     .padding(horizontal = LodySpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                     Text(name, style = LodyTheme.typography.body, color = colors.textPrimary, modifier = Modifier.weight(1f))
                     if (name == state.selected) Icon(LodyIcons.Check, null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm))
