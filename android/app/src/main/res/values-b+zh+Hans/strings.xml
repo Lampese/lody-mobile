@@ -107,6 +107,7 @@
     <string name="create_agent_unavailable">Android 暂不支持读取助手</string>
     <string name="create_readonly_note">Android 暂不支持创建会话，此页面仅展示布局。</string>
     <string name="create_composer_placeholder">描述你要做什么…</string>
+    <string name="create_composer_placeholder_agent">和 %1$s 一起工作</string>
     <string name="create_attach">添加附件</string>
     <string name="create_mention">提及</string>
     <string name="create_send">发送</string>

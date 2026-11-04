@@ -1678,7 +1678,12 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       title.append(dot)
       title.append(NSAttributedString(attachment: symbol))
     }
-    if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: traitCollection) {
+    if let emoji = composerOptions.roleEmoji, !emoji.isEmpty {
+      // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
+      title.addAttribute(.font, value: font, range: NSRange(location: 0, length: title.length))
+      title.setAttributedString(roleFace(emoji: emoji, name: composerOptions.roleName ?? "", rest: title, font: font))
+      summary = [composerOptions.roleName ?? "", summary].filter { !$0.isEmpty }.joined(separator: " · ")
+    } else if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: traitCollection) {
       // Marks are template images: draw them in the title's ink so they read in dark mode.
       let attachment = NSTextAttachment(image: mark.withTintColor(.label.resolvedColor(with: traitCollection), renderingMode: .alwaysOriginal))
       attachment.bounds = CGRect(x: 0, y: font.descender, width: font.lineHeight, height: font.lineHeight)
@@ -1699,6 +1704,27 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     if !modelButton.isEnabled { optionsPopover?.dismiss(animated: true) }
     renderCollapsedMark()
   }
+  /// The chip with an Agent Role: emoji, the Role's name, then model · effort · mode in secondary
+  /// ink — or, when that does not fit the chip's room, the emoji right before the model.
+  private func roleFace(emoji: String, name: String, rest: NSAttributedString, font: UIFont) -> NSAttributedString {
+    let glyph = NSAttributedString(string: emoji + "  ", attributes: [.font: font])
+    let compact = NSMutableAttributedString(attributedString: glyph)
+    compact.append(rest)
+    guard !name.isEmpty else { return compact }
+    let named = NSMutableAttributedString(attributedString: glyph)
+    named.append(NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: UIColor.label]))
+    named.append(NSAttributedString(string: "   ", attributes: [.font: font]))
+    let quiet = NSMutableAttributedString(attributedString: rest)
+    quiet.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: quiet.length)) { value, range, _ in
+      // Model and effort recede; status colour (a warning mode) and the dots keep theirs.
+      if (value as? UIColor) == UIColor.label { quiet.addAttribute(.foregroundColor, value: UIColor.secondaryLabel, range: range) }
+    }
+    named.append(quiet)
+    // The chip shares the bottom row with + and Send (44 pt each) and its own insets.
+    let room = input.bounds.width - 44 * 2 - 24
+    return room > 0 && named.size().width <= room ? named : compact
+  }
+
   @objc private func presentComposerOptions() {
     if cardStyle, let onRunConfig {
       guard modelButton.isEnabled else { return }

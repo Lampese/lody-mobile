@@ -225,7 +225,8 @@ enum CreateSessionContext {
     // Roles are listed, even with none to pick: then it reads None.
     if form.roles != nil, !page.agents.isEmpty {
       let active = form.activeRole
-      let none = CreateOption(id: roleNoneOption, title: text("create.role.none"), selected: active == nil)
+      // An empty glyph keeps None's title in line with the Roles' emoji.
+      let none = CreateOption(id: roleNoneOption, title: text("create.role.none"), glyph: .emoji(""), selected: active == nil)
       rows.append(CreatePicker(
         id: "role", glyph: active.map { CreateGlyph.emoji($0.glyph) } ?? .lody(.user), title: active?.role.name ?? text("create.role.none"),
         placeholder: active == nil,
@@ -578,7 +579,9 @@ struct CreateRunConfigSheet: View {
         .frame(width: 96, alignment: .leading)
       Button { state.openInSheet = state.openInSheet == row.id ? nil : row.id } label: {
         HStack(spacing: LodySpacing.sm) {
-          if row.id == "agent" || row.id == "permission" { GlyphView(glyph: row.glyph, size: LodyIconSize.sm) }
+          if row.id == "agent" || row.id == "permission" || (row.id == "role" && !row.placeholder) {
+            GlyphView(glyph: row.glyph, size: LodyIconSize.sm)
+          }
           Text(row.title).lodyTextStyle(.body).lineLimit(1)
             .foregroundStyle(row.placeholder ? LodyColor.textTertiary : LodyColor.textPrimary)
           Spacer(minLength: 0)

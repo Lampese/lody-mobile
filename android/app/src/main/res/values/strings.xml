@@ -108,6 +108,7 @@
     <string name="create_agent_unavailable">Assistants aren’t available on Android yet</string>
     <string name="create_readonly_note">Android can’t create sessions yet; this page shows the layout.</string>
     <string name="create_composer_placeholder">Describe what you want to do…</string>
+    <string name="create_composer_placeholder_agent">Work with %1$s</string>
     <string name="create_attach">Add attachment</string>
     <string name="create_mention">Mention</string>
     <string name="create_send">Send</string>

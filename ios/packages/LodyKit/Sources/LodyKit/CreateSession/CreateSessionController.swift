@@ -260,6 +260,10 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
     if let fast { options["fast"] = fast.enabled }
     if let agent = page.agent { options["agentName"] = agent.name }
     if let asset = LodyAgentIcon.asset(cliType: page.agent?.cliType, agentType: page.agent?.agentType) { options["agentAsset"] = asset }
+    if let role = form.activeRole {
+      options["roleEmoji"] = role.glyph
+      options["roleName"] = role.role.name
+    }
     composer.setComposerOptions(Self.json(options))
     composer.setComposerState(Self.json([
       "editable": true, "canSend": form.canSend, "sending": sending, "notice": form.notice,
@@ -267,10 +271,11 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
     ]))
   }
 
-  /// Web's landing prompt: "Work with <assistant>" once one is chosen.
+  /// Web's landing prompt: "Work with <assistant>" once one is chosen — the Agent Role when one is.
   private var placeholder: String {
     guard let agent = form.current.agent else { return String(localized: "create.composer.placeholder", bundle: .lody) }
-    return String.localizedStringWithFormat(String(localized: "create.composer.placeholderAgent", bundle: .lody), agent.name)
+    let name = form.activeRole?.role.name ?? agent.name
+    return String.localizedStringWithFormat(String(localized: "create.composer.placeholderAgent", bundle: .lody), name)
   }
 
   private static func json(_ value: [String: Any]) -> String {

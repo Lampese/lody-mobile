@@ -19,6 +19,9 @@ struct ChatComposerOptions: Decodable {
   /// mobile run-config chip. Absent in chats, which show the model alone.
   var agentAsset: String?
   var agentName: String?
+  /// The Agent Role the composer is (new chat): its emoji leads the chip, and its name too when it fits.
+  var roleEmoji: String?
+  var roleName: String?
 }
 
 extension ChatComposerOptions {

@@ -324,6 +324,9 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                     agentReady = agent != null,
                     agentCliType = agent?.cliType,
                     agentType = agent?.agentType,
+                    roleEmoji = activeRole?.role?.emoji,
+                    roleName = activeRole?.role?.name,
+                    agentName = agent?.name,
                     face = listOfNotNull(modelName ?: agent?.name, effort),
                     mode = modeId,
                     modeLabel = modeName,
@@ -357,7 +360,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                             CreateSessionModel.RoleUnavailable.Offline to stringResource(R.string.create_role_unavailable_offline),
                         )
                         add(RunConfigRow(ROLE, stringResource(R.string.create_role),
-                            listOf(PickerOption(ROLE_NONE, stringResource(R.string.create_role_none), activeRole == null)) +
+                            // An empty glyph keeps None's title in line with the Roles' emoji.
+                            listOf(PickerOption(ROLE_NONE, stringResource(R.string.create_role_none), activeRole == null, emoji = "")) +
                                 roleItems.map { item ->
                                     PickerOption(item.role.id, item.role.name, item.role.id == activeRole?.role?.id,
                                         subtitle = item.unavailable?.let { reasons.getValue(it) }.orEmpty(),
@@ -789,6 +793,9 @@ private fun Composer(
     agentReady: Boolean,
     agentCliType: String?,
     agentType: String?,
+    roleEmoji: String?,
+    roleName: String?,
+    agentName: String?,
     face: List<String>,
     mode: String?,
     modeLabel: String?,
@@ -797,7 +804,10 @@ private fun Composer(
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val shape = RoundedCornerShape(LodyRadius.xl)
-    val placeholder = stringResource(R.string.create_composer_placeholder)
+    // Web's landing prompt: "Work with <assistant>" once one is chosen — the Agent Role when one is.
+    val workWith = roleName ?: agentName
+    val placeholder = if (workWith.isNullOrEmpty()) stringResource(R.string.create_composer_placeholder)
+        else stringResource(R.string.create_composer_placeholder_agent, workWith)
     var focused by remember { mutableStateOf(false) }
     Column(
         Modifier
@@ -841,19 +851,29 @@ private fun Composer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
             ) {
-                AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
-                val label = buildAnnotatedString {
+                // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
+                if (roleEmoji != null) Text(roleEmoji, style = type.subhead)
+                else AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
+                fun label(named: Boolean) = buildAnnotatedString {
                     if (!agentReady || face.isEmpty()) {
                         withStyle(SpanStyle(color = colors.textTertiary)) { append(waiting) }
                     } else {
+                        // With the Role's name, model · effort recede to secondary ink.
+                        if (named) withStyle(SpanStyle(color = colors.textPrimary)) { append(roleName.orEmpty()); append("   ") }
                         face.forEachIndexed { index, part ->
                             if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
-                            withStyle(SpanStyle(color = colors.textPrimary)) { append(part) }
+                            withStyle(SpanStyle(color = if (named) colors.textSecondary else colors.textPrimary)) { append(part) }
                         }
-
                     }
                 }
-                Text(label, style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                // The Role's name only when the whole face fits; otherwise the emoji alone marks it.
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+                    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+                    val named = label(named = true)
+                    val fits = !roleName.isNullOrEmpty() &&
+                        measurer.measure(named, type.subhead, maxLines = 1).size.width <= constraints.maxWidth
+                    Text(if (fits) named else label(named = false), style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 ModeMark(mode, modeLabel)
 
             }
