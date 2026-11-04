@@ -862,7 +862,7 @@ private fun ChatRow(
                 }
             }
         }
-        if (expanded != null) FamilyToggle(chat.childCount, expanded, onToggle)
+        if (expanded != null) FamilyToggle(chat.childCount, expanded, chat.childAttention, onToggle)
     }
 }
 
@@ -896,7 +896,7 @@ private fun DrawScope.drawRail(color: Color, last: Boolean) {
  * "7 opened chats, expanded". iOS: `ChatRowContent.familyToggle`.
  */
 @Composable
-private fun FamilyToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
+private fun FamilyToggle(count: Int, expanded: Boolean, childAttention: ChatAttention?, onToggle: () -> Unit) {
     val colors = LodyTheme.colors
     val action = stringResource(if (expanded) R.string.home_tree_collapse else R.string.home_tree_expand)
     val label = pluralStringResource(R.plurals.home_tree_count, count, count)
@@ -913,6 +913,7 @@ private fun FamilyToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
     ) {
         Glyph(LodyIcons.Forward, colors.iconSecondary, FamilyChevron, Modifier.rotate(angle))
+        if (!expanded) childAttention?.let { AttentionGlyph(it) }
         Text(
             label,
             style = LodyTheme.typography.footnote.copy(fontFeatureSettings = "tnum"),

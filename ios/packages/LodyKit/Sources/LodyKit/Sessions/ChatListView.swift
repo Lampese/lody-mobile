@@ -174,9 +174,9 @@ final class ChatListView: UIView, UICollectionViewDelegate {
         } else if !row.parentId.isEmpty, foldedOpeners.contains(row.parentId) {
           continue
         } else if row.treeParent {
-          // A folded opener stands for its family: it shows their most urgent state.
+          // The parent keeps its own state; hidden children have a separate summary.
           let open = !foldedOpeners.contains(row.id)
-          entry = Entry(kind: .session, row: row.displayingCollapsed(!open, keepingTime: true), expanded: open, canToggle: true)
+          entry = Entry(kind: .session, row: row, expanded: open, canToggle: true)
         } else {
           entry = Entry(kind: .session, row: row, expanded: nil, canToggle: false)
         }
@@ -245,6 +245,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
     a.title == b.title && a.subtitle == b.subtitle && a.unread == b.unread && a.imageTint == b.imageTint
       && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus && a.prCI == b.prCI
+      && a.collapsedImageTint == b.collapsedImageTint && a.collapsedBadge == b.collapsedBadge
       && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.lastChild == b.lastChild && a.treeParent == b.treeParent && a.childCount == b.childCount && a.highlight == b.highlight && ea == eb
   }
 
@@ -667,6 +668,9 @@ private struct ChatRowContent: View {
           .frame(width: Self.chevronSize, height: Self.chevronSize)
           .rotationEffect(.degrees(expanded ? 90 : 0))
           .animation(LodySpring.snappy, value: expanded)
+        if !expanded, let status = Attention(tint: row.collapsedImageTint, unread: false) {
+          AttentionGlyph(attention: status)
+        }
         Text(String.localizedStringWithFormat(String(localized: "home.tree.count", bundle: .lody), row.childCount))
           .lodyTextStyle(.footnote)
           .foregroundStyle(LodyColor.textSecondary)

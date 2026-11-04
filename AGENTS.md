@@ -13,3 +13,7 @@ hard-coded colors, fonts or sizes, so both apps stay visually consistent.
 
 `ios/.github/` workflows came from the standalone repo and do not run from a
 subdirectory; move them to the root `.github/` with path filters when CI is needed.
+
+After completing and verifying requested changes, commit and push them without
+asking for a separate confirmation, unless the user explicitly asks otherwise.
+Stage only task-related changes; preserve unrelated local edits and files.

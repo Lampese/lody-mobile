@@ -38,6 +38,8 @@ data class ChatItem(
     val treeParent: Boolean = false,
     /** How many rows are nested under this one; the family toggle's count. */
     val childCount: Int = 0,
+    /** Hidden children only; never replaces the parent row status. */
+    val childAttention: ChatAttention? = null,
 ) {
     val unread: Boolean get() = attention == ChatAttention.Unread
 }
@@ -343,8 +345,7 @@ object ChatListModel {
     }
 
     /**
-     * Hides the nested chats of [folded] openers. A folded opener stands for its family, so it
-     * takes the family's most urgent attention.
+     * Hides the nested chats of [folded] openers and summarizes children separately.
      */
     fun fold(chats: List<ChatItem>, folded: Set<String>): List<ChatItem> {
         if (folded.isEmpty()) return chats
@@ -352,7 +353,7 @@ object ChatListModel {
         return chats.mapNotNull { chat ->
             when {
                 chat.nestedUnder in folded -> null
-                chat.treeParent && chat.id in folded -> chat.copy(attention = mostUrgent(listOf(chat) + family[chat.id].orEmpty()))
+                chat.treeParent && chat.id in folded -> chat.copy(childAttention = mostUrgent(family[chat.id].orEmpty()))
                 else -> chat
             }
         }

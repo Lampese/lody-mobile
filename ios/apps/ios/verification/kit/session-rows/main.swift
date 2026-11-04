@@ -48,6 +48,15 @@ let archived = catalog.sessions.filter(\.archived).sorted(by: SessionRows.byActi
 precondition(archived.map(\.id) == ["root", "child", "tab"])
 let rows = SessionRows.treeRows(archived, all: catalog.sessions) { SessionRows.row($0, now: now) }
 precondition(rows.map(\.id) == ["root", "child", "tab"], "Opened sessions nest; contained tabs keep their own entry")
+// Parent and hidden children retain separate states.
+var failedParent = SessionItem(id: "family-parent", projectId: "p")
+failedParent.status = "error"
+var runningChild = SessionItem(id: "family-child", projectId: "p", openedBySessionId: "family-parent")
+runningChild.status = "running"
+let family = [failedParent, runningChild]
+let familyRows = SessionRows.treeRows(family, all: family) { SessionRows.row($0, now: now) }
+precondition(familyRows[0].imageTint == "danger", "Parent keeps its own state")
+precondition(familyRows[0].collapsedImageTint == "blue", "Collapsed summary uses children only")
 var foldedRow = rows[0]
 foldedRow.value = "1h"
 foldedRow.collapsedBadge = "attention"

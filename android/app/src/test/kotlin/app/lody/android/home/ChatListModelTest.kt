@@ -228,7 +228,7 @@ class ChatListModelTest {
     }
 
     @Test
-    fun foldingAnOpenerHidesItsFamilyAndCarriesTheirUrgency() {
+    fun foldingKeepsParentStatusSeparateFromChildStatus() {
         val chats = listOf(
             ChatItem("p", "p", null, treeParent = true),
             ChatItem("a", "a", ChatAttention.Running, nestedUnder = "p"),
@@ -238,6 +238,11 @@ class ChatListModelTest {
         assertEquals(chats, ChatListModel.fold(chats, emptySet()))
         val folded = ChatListModel.fold(chats, setOf("p"))
         assertEquals(listOf("p", "q"), folded.map { it.id })
-        assertEquals(ChatAttention.Waiting, folded[0].attention)
+        assertEquals(null, folded[0].attention)
+        assertEquals(ChatAttention.Waiting, folded[0].childAttention)
+        val runningParent = chats.map { if (it.id == "p") it.copy(attention = ChatAttention.Failed) else it }
+        val separate = ChatListModel.fold(runningParent, setOf("p"))[0]
+        assertEquals(ChatAttention.Failed, separate.attention)
+        assertEquals(ChatAttention.Waiting, separate.childAttention)
     }
 }

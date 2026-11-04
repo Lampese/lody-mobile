@@ -88,11 +88,11 @@ enum SessionRows {
     tree(sessions, all: all).prefix(maxRoots).flatMap { group -> [LodyListRow] in
       var parent = row(group.session)
       guard !group.children.isEmpty else { return [parent] }
-      let members = [group.session] + group.children
+      let members = group.children
       let urgent = [SessionState.attention, .failed, .live].lazy.compactMap { state in
         members.first { SessionState($0) == state }
       }.first
-      let status = urgent.map(row) ?? parent
+      let status = row(urgent ?? group.children[0])
       parent.treeParent = true
       parent.childCount = group.children.count
       parent.collapsedValue = String.localizedStringWithFormat(String(localized: "inbox.session.children", bundle: .lody), group.children.count)
