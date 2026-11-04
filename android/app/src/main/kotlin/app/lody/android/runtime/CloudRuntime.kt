@@ -31,7 +31,7 @@ sealed interface RuntimeCommand {
     /** One changed file's diff for one turn, from the session's computer. Read only. */
     data class TurnDiff(val sessionId: String, val entryId: String, val path: String) : RuntimeCommand
     /** One mention category for the composer's @ panel (upstream `mentionCatalog`). Read only. */
-    data class MentionCatalog(val category: String, val sessionId: String?, val cliType: String?, val agentType: String?) : RuntimeCommand
+    data class MentionCatalog(val category: String, val source: MentionSource) : RuntimeCommand
     /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
     data class StopTurn(val sessionId: String, val machineId: String, val turnId: String) : RuntimeCommand
     data object Ping : RuntimeCommand
@@ -272,8 +272,17 @@ data class FileDiff(
 )
 
 /** One mention candidate (upstream `MentionCatalog` item); [insertText] defaults to `@path`. */
-data class MentionCandidate(val path: String, val name: String, val kind: String, val subtitle: String = "", val insertText: String? = null) {
+data class MentionCandidate(
+    val path: String, val name: String, val kind: String, val subtitle: String = "", val insertText: String? = null,
+    /** A Role's emoji: it leads the row instead of an icon (as the run-config Role row). */
+    val emoji: String? = null,
+) {
     /** Folders browse with the files. */
     val category: String get() = if (kind == "directory") "file" else kind
 }
+/** What references come from: a conversation, or the new-chat page's selection (iOS `MentionSource`). */
+data class MentionSource(
+    val sessionId: String? = null, val projectId: String? = null, val machineId: String? = null,
+    val agentConfigId: String? = null, val cliType: String? = null, val agentType: String? = null,
+)
 data class MentionCatalogPage(val items: List<MentionCandidate>, val truncated: Boolean = false, val incomplete: Boolean = false)

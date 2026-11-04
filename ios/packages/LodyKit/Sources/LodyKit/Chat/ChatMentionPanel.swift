@@ -7,11 +7,24 @@ struct ChatMentionItem: Decodable, Equatable {
   let kind: String
   let subtitle: String
   var insertText: String?
+  /// A Role's emoji: it leads the row instead of a symbol (as the run-config Role row).
+  var emoji: String?
 
   var category: String { kind == "directory" ? "file" : kind }
   static let categories = ["file", "skill", "session", "role", "issue", "pr", "cmd"]
   static let labels = ["file": "files", "skill": "skills", "session": "sessions", "role": "roles", "issue": "issues", "pr": "prs", "cmd": "commands"]
   static let glyphs = ["file": "doc.text", "directory": "folder", "skill": "sparkles", "session": "bubble.left.and.bubble.right", "role": "person.crop.rectangle", "issue": "exclamationmark.circle", "pr": "arrow.triangle.branch", "cmd": "command"]
+
+  /// An emoji as a list image (drawn in its own colours, never tinted).
+  static func emojiImage(_ emoji: String, size: CGFloat) -> UIImage {
+    let font = UIFont.systemFont(ofSize: size * 0.85)
+    let image = UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { _ in
+      let text = emoji as NSString
+      let bounds = text.size(withAttributes: [.font: font])
+      text.draw(at: CGPoint(x: (size - bounds.width) / 2, y: (size - bounds.height) / 2), withAttributes: [.font: font])
+    }
+    return image.withRenderingMode(.alwaysOriginal)
+  }
 
   func matches(_ query: String) -> Bool {
     query.isEmpty || (name + " " + path + " " + subtitle).localizedStandardContains(query)
@@ -27,6 +40,9 @@ struct ChatMentionItem: Decodable, Equatable {
     content.secondaryTextProperties.numberOfLines = 1
     let glyph = Self.glyphs[kind == "category" ? path : kind] ?? "doc.text"
     content.image = UIImage(systemName: glyph, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .regular))
+    if kind == "role" {
+      content.image = Self.emojiImage(emoji?.isEmpty == false ? emoji! : "🪼", size: 20)
+    }
     content.imageProperties.tintColor = .secondaryLabel
     content.imageProperties.maximumSize = CGSize(width: 20, height: 20)
     content.imageProperties.reservedLayoutSize = CGSize(width: 32, height: 32)
@@ -84,6 +100,7 @@ final class ChatMentionPanel: UIView {
     navigation.navigationBar.compactAppearance = appearance
     navigation.navigationBar.scrollEdgeAppearance = appearance
     navigation.navigationBar.prefersLargeTitles = false
+    navigation.navigationBar.isTranslucent = false
     navigation.setNavigationBarHidden(true, animated: false)
     let separator = UIView()
     separator.backgroundColor = .separator
@@ -331,6 +348,10 @@ final class ChatMentionLevelController: UIViewController, UICollectionViewDelega
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .clear
+    // Lay out below the bar rather than under it: inside this short embedded panel the safe-area
+    // inset does not fully clear the bar, which covered the first row.
+    edgesForExtendedLayout = []
+    navigationItem.largeTitleDisplayMode = .never
     var config = UICollectionLayoutListConfiguration(appearance: .plain)
     config.backgroundColor = .clear
     config.showsSeparators = true
@@ -338,6 +359,7 @@ final class ChatMentionLevelController: UIViewController, UICollectionViewDelega
     list.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     list.backgroundColor = .clear
     list.keyboardDismissMode = .none
+    list.contentInsetAdjustmentBehavior = .never
     list.delegate = self
     list.accessibilityIdentifier = "mention-list"
     view.addSubview(list)

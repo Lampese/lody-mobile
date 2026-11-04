@@ -66,6 +66,7 @@ export function roleMentions(
         path,
         name,
         roleName: role.name,
+        emoji: role.emoji ?? DEFAULT_ROLE_EMOJI,
         kind: 'role',
         subtitle: role.description?.slice(0, 140) || String(agent.name ?? ''),
         insertText: `@role:${path}`,

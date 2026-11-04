@@ -25,6 +25,8 @@ interface CreationService {
     suspend fun cachedOptions(scope: RuntimeScope, projectId: String?): CreationOptions? = null
     /** The workspace's Agent Roles for the Role row; none where there is no runtime. */
     suspend fun roles(scope: RuntimeScope): List<AgentRole> = emptyList()
+    /** One mention category for the composer's @ panel; none where there is no runtime. */
+    suspend fun mentions(scope: RuntimeScope, category: String, source: MentionSource): MentionCatalogPage = MentionCatalogPage(emptyList())
     suspend fun options(scope: RuntimeScope, projectId: String?): CreationOptions
     suspend fun create(scope: RuntimeScope, request: CreateRequest): CreationReceipt
 }
@@ -67,6 +69,9 @@ class CreateSessionRepository(private val owner: RuntimeOwner, private val store
     override suspend fun cachedOptions(scope: RuntimeScope, projectId: String?) = store.readOptions(scope, projectId)
     override suspend fun roles(scope: RuntimeScope): List<AgentRole> = owner.use(scope) {
         (it.execute(RuntimeCommand.ListAgentRoles) as RuntimeResult.Roles).value
+    }
+    override suspend fun mentions(scope: RuntimeScope, category: String, source: MentionSource): MentionCatalogPage = owner.use(scope) {
+        (it.execute(RuntimeCommand.MentionCatalog(category, source)) as RuntimeResult.Mentions).value
     }
     override suspend fun options(scope: RuntimeScope, projectId: String?): CreationOptions = owner.use(scope) {
         val value = (it.execute(RuntimeCommand.GetCreationOptions(projectId)) as RuntimeResult.Options).value

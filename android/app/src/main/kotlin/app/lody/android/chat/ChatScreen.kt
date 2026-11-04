@@ -337,27 +337,11 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     // @ references (iOS `ChatMentionPanel`, Notion-style): every category is read once the
     // conversation is live; a trigger at the caret opens the panel docked on the keyboard.
-    var mentionCatalogs by remember(id, scope) { mutableStateOf(emptyMap<String, MentionCatalogPage>()) }
-    var mentionPending by remember(id, scope) { mutableStateOf(Mentions.categories.toSet()) }
+    val mentions = rememberMentionState(id, scope)
     LaunchedEffect(scope, id, status == "live", session?.cliType, session?.agentType) {
         if (session == null || status != "live") return@LaunchedEffect
-        Mentions.categories.forEach { category ->
-            launch {
-                try {
-                    val page = repository.mentions(scope, category, session)
-                    mentionCatalogs = mentionCatalogs + (category to page)
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { /* That category shows as empty; the others still work. */ }
-                finally { mentionPending = mentionPending - category }
-            }
-        }
+        mentions.load { category -> repository.mentions(scope, category, session) }
     }
-    var mentionStack by remember(id) { mutableStateOf(listOf<MentionLevel>(MentionLevel.Root)) }
-    val mentionTrigger = if (composerFocused && canSend) Mentions.trigger(field) else null
-    // Leaving the trigger (sent, deleted, caret moved) starts the next one at the categories.
-    LaunchedEffect(mentionTrigger == null) { if (mentionTrigger == null) mentionStack = listOf(MentionLevel.Root) }
-    val showMentions = mentionTrigger != null &&
-        (mentionStack.size > 1 || Mentions.rows(MentionLevel.Root, mentionCatalogs, mentionTrigger).isNotEmpty())
     val resolver = appContext.contentResolver
     val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(8),
@@ -528,34 +512,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 onStop = stop,
             )
             // Docked between the prompt and the keyboard; rows never take focus, so the keyboard stays.
-            androidx.compose.animation.AnimatedVisibility(
-                showMentions,
-                enter = androidx.compose.animation.expandVertically(expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.shrinkVertically(shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut(),
-            ) {
-                val trigger = mentionTrigger
-                MentionPanel(
-                    stack = mentionStack,
-                    rowsFor = { level -> if (trigger == null) emptyList() else Mentions.rows(level, mentionCatalogs, trigger) },
-                    loading = { level ->
-                        when (level) {
-                            is MentionLevel.Category -> level.category in mentionPending
-                            is MentionLevel.Directory -> "file" in mentionPending
-                            MentionLevel.Root -> mentionPending.isNotEmpty()
-                        }
-                    },
-                    onPush = { mentionStack = mentionStack + it },
-                    onPop = { if (mentionStack.size > 1) mentionStack = mentionStack.dropLast(1) },
-                    onInsert = { item ->
-                        val current = Mentions.trigger(field)
-                        if (current != null) {
-                            val next = Mentions.insert(field, current, item)
-                            if (next.text.length <= 32000) { field = next; prompt = next.text }
-                        }
-                        mentionStack = listOf(MentionLevel.Root)
-                    },
-                )
-            }
+            MentionDock(mentions, field, active = composerFocused && canSend) { next -> field = next; prompt = next.text }
         }
     }
     if (runConfig && session != null) {

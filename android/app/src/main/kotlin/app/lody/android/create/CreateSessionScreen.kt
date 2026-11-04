@@ -127,6 +127,12 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val catalog = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
     var target by remember(catalog.revision == 0L) { mutableStateOf(CreateSessionModel.initial(catalog)) }
     var prompt by rememberSaveable { mutableStateOf("") }
+    // The field with its caret and IME composition; the @ panel reads the trigger at the caret.
+    var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(prompt, androidx.compose.ui.text.TextRange(prompt.length))) }
+    LaunchedEffect(prompt) {
+        if (field.text != prompt) field = androidx.compose.ui.text.input.TextFieldValue(prompt, androidx.compose.ui.text.TextRange(prompt.length))
+    }
+    var composerFocused by remember { mutableStateOf(false) }
     var runConfig by remember { mutableStateOf(false) }
     var openContext by remember { mutableStateOf<String?>(null) }
     var searchFocused by remember { mutableStateOf(false) }
@@ -301,8 +307,9 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 layout(child.width, if (coverComposer) 0 else child.height) { child.placeRelative(0, 0) }
             }) {
                 Composer(
-                    prompt,
-                    onPromptChange = { if (!attempted && it.length <= 32000) prompt = it },
+                    field,
+                    onPromptChange = { if (!attempted && it.text.length <= 32000) { field = it; prompt = it.text } },
+                    onFocusChange = { composerFocused = it },
                     onAttach = notice,
                     onRunConfig = { dismissKeyboard(); if (!attempted) runConfig = true },
                     onSend = send,
@@ -319,6 +326,20 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                     waiting = waitingText,
                 )
             }
+            // @ references, docked between the prompt and the keyboard as in a conversation; they
+            // come from the chosen project, computer and agent (iOS creation `MentionSource`).
+            val mentions = app.lody.android.chat.rememberMentionState(runtimeScope)
+            val mentionSource = MentionSource(
+                projectId = target.projectId.takeUnless { target.chat }, machineId = target.machineId,
+                agentConfigId = agent?.id, cliType = agent?.cliType, agentType = agent?.agentType,
+            )
+            LaunchedEffect(runtimeScope, mentionSource) {
+                if (mentionSource.machineId == null) return@LaunchedEffect
+                mentions.load { category -> repository.mentions(runtimeScope, category, mentionSource) }
+            }
+            app.lody.android.chat.MentionDock(
+                mentions, field, active = composerFocused && !attempted && !coverComposer,
+            ) { next -> if (!attempted) { field = next; prompt = next.text } }
         }
     }
     if (runConfig) {
@@ -792,8 +813,9 @@ private val RunConfigLabelWidth = LodySize.controlLg * 2
  */
 @Composable
 private fun Composer(
-    prompt: String,
-    onPromptChange: (String) -> Unit,
+    prompt: androidx.compose.ui.text.input.TextFieldValue,
+    onPromptChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
+    onFocusChange: (Boolean) -> Unit,
     onAttach: () -> Unit,
     onRunConfig: () -> Unit,
     onSend: () -> Unit,
@@ -836,12 +858,12 @@ private fun Composer(
             maxLines = 10,
             modifier = Modifier
                 .fillMaxWidth()
-                .onFocusChanged { focused = it.isFocused }
+                .onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) }
                 .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs)
                 .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
                 Box {
-                    if (prompt.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder)
+                    if (prompt.text.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder)
                     inner()
                 }
             },
@@ -885,7 +907,7 @@ private fun Composer(
                 ModeMark(mode, modeLabel)
 
             }
-            val ready = enabled && prompt.isNotBlank()
+            val ready = enabled && prompt.text.isNotBlank()
             val send = stringResource(R.string.create_send)
             Box(
                 Modifier

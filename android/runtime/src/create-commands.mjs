@@ -16,10 +16,17 @@ export function createCommands(runtime, sendTurn, identity) {
   // The workspace's Agent Roles (emoji, per-machine targets and what each pins); a read.
   agentRoles:async()=>({roles:await roles()}),
   // One mention category for the composer's @ panel (shared runtime `mentionCatalog`); a read.
-  async mentionCatalog(category,sessionId,cliType,agentType) {
+  // `source` names what the references come from: a conversation, or the new-chat page's
+  // project / computer / agent (iOS `MentionSource`); only non-empty strings cross.
+  async mentionCatalog(category,source) {
    const scope=identity();if(!scope?.userId)throw Error('not_connected');
    if(!['file','skill','session','role','issue','pr','cmd'].includes(category))throw Error('invalid_category');
-   return runtime.mentionCatalog({workspaceId:scope.workspaceId,userId:scope.userId,category,...(typeof sessionId==='string'&&sessionId?{sessionId}:{}),...(typeof cliType==='string'&&cliType?{cliType}:{}),...(typeof agentType==='string'&&agentType?{agentType}:{})});
+   const fields={};
+   for(const key of ['sessionId','projectId','machineId','agentConfigId','cliType','agentType']) {
+    const value=source?.[key];
+    if(typeof value==='string' && value && value.length<=256)fields[key]=value;
+   }
+   return runtime.mentionCatalog({workspaceId:scope.workspaceId,userId:scope.userId,category,...fields});
   },
   // A text turn in an existing conversation. The stable turn id lets upstream reject a
   // duplicate; nothing here retries, and an uncertain write reports `unknown`.

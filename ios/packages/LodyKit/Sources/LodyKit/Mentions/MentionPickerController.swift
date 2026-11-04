@@ -93,7 +93,7 @@ final class MentionPickerController: UIViewController {
       return
     }
     let items = (catalog?.items ?? []).map {
-      ChatMentionItem(path: $0.path, name: $0.name, kind: $0.kind.rawValue, subtitle: $0.subtitle, insertText: $0.insertText)
+      ChatMentionItem(path: $0.path, name: $0.name, kind: $0.kind.rawValue, subtitle: $0.subtitle, insertText: $0.insertText, emoji: $0.emoji)
     }
     picker.configure(category: category, items: items, query: query, notice: MentionCatalogStore.notice(catalog))
   }

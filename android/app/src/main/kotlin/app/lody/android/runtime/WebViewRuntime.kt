@@ -40,8 +40,12 @@ open class WebViewRuntime internal constructor(
         is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL).put(command.agentConfigId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
         RuntimeCommand.ListAgentRoles -> RuntimeResult.Roles(CreationJson.roles(call("agentRoles", deadline = CommandDeadline.QUERY) as JSONObject))
         is RuntimeCommand.MentionCatalog -> {
-            val args = JSONArray().put(command.category).put(command.sessionId ?: JSONObject.NULL)
-                .put(command.cliType ?: JSONObject.NULL).put(command.agentType ?: JSONObject.NULL)
+            val source = command.source
+            val args = JSONArray().put(command.category).put(JSONObject().apply {
+                source.sessionId?.let { put("sessionId", it) }; source.projectId?.let { put("projectId", it) }
+                source.machineId?.let { put("machineId", it) }; source.agentConfigId?.let { put("agentConfigId", it) }
+                source.cliType?.let { put("cliType", it) }; source.agentType?.let { put("agentType", it) }
+            })
             val value = call("mentionCatalog", args, CommandDeadline.QUERY) as JSONObject
             val items = value.optJSONArray("items") ?: JSONArray()
             RuntimeResult.Mentions(MentionCatalogPage(
@@ -49,6 +53,7 @@ open class WebViewRuntime internal constructor(
                     MentionCandidate(
                         it.getString("path"), it.optString("name", it.getString("path")), it.optString("kind", "file"),
                         it.optString("subtitle"), it.optString("insertText").ifBlank { null },
+                        it.optString("emoji").ifBlank { null },
                     )
                 },
                 value.optBoolean("truncated"), value.optBoolean("incomplete"),

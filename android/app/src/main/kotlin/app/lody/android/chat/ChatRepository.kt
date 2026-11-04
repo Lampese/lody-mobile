@@ -48,7 +48,8 @@ class ChatRepository(
     /** One mention category for the composer's @ panel; a read, safe to retry. */
     suspend fun mentions(scope: RuntimeScope, category: String, session: CatalogSession?): MentionCatalogPage =
         owner.use(scope) {
-            (it.execute(RuntimeCommand.MentionCatalog(category, session?.id, session?.cliType, session?.agentType)) as RuntimeResult.Mentions).value
+            val source = MentionSource(sessionId = session?.id, cliType = session?.cliType, agentType = session?.agentType)
+            (it.execute(RuntimeCommand.MentionCatalog(category, source)) as RuntimeResult.Mentions).value
         }
 
     /** Stops the running turn; never retried (a lost reply is reported, not replayed). */

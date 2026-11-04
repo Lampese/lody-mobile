@@ -3393,13 +3393,15 @@ extension RuntimeContract {
     public var subtitle: String
     public var insertText: String?
     public var roleName: String?
-    public init(path: String, name: String, kind: MentionCatalogItemsItemKind, subtitle: String, insertText: String? = nil, roleName: String? = nil) {
+    public var emoji: String?
+    public init(path: String, name: String, kind: MentionCatalogItemsItemKind, subtitle: String, insertText: String? = nil, roleName: String? = nil, emoji: String? = nil) {
       self.path = path
       self.name = name
       self.kind = kind
       self.subtitle = subtitle
       self.insertText = insertText
       self.roleName = roleName
+      self.emoji = emoji
     }
     public init(from decoder: any Decoder) throws {
       let c = try decoder.container(keyedBy: Key.self)
@@ -3409,6 +3411,7 @@ extension RuntimeContract {
       self.subtitle = try c.decode(String.self, forKey: Key("subtitle"))
       self.insertText = try c.decodeIfPresent(String.self, forKey: Key("insertText"))
       self.roleName = try c.decodeIfPresent(String.self, forKey: Key("roleName"))
+      self.emoji = try c.decodeIfPresent(String.self, forKey: Key("emoji"))
     }
     public func encode(to encoder: any Encoder) throws {
       var c = encoder.container(keyedBy: Key.self)
@@ -3418,6 +3421,7 @@ extension RuntimeContract {
       try c.encode(self.subtitle, forKey: Key("subtitle"))
       try c.encodeIfPresent(self.insertText, forKey: Key("insertText"))
       try c.encodeIfPresent(self.roleName, forKey: Key("roleName"))
+      try c.encodeIfPresent(self.emoji, forKey: Key("emoji"))
     }
   }
 

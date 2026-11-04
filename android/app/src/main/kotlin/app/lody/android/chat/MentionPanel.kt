@@ -2,6 +2,9 @@ package app.lody.android.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,11 +23,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -38,6 +48,9 @@ import app.lody.android.R
 import app.lody.android.designsystem.*
 import app.lody.android.runtime.MentionCandidate
 import app.lody.android.runtime.MentionCatalogPage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** One level of the mention panel: the categories (or typed matches), one category, or a folder. */
 sealed interface MentionLevel {
@@ -225,6 +238,7 @@ fun MentionPanel(
                         MentionRow(
                             icon = Mentions.icon(if (item.kind == "category") item.path else item.kind),
                             title = title, subtitle = subtitle, accent = false, disclosure = browse,
+                            emoji = if (item.kind == "role") item.emoji ?: "🪼" else null,
                         ) {
                             when (item.kind) {
                                 "category" -> { haptics.performHapticFeedback(HapticFeedbackType.SegmentTick); onPush(MentionLevel.Category(item.path)) }
@@ -252,8 +266,78 @@ fun MentionPanel(
 /** The panel's height while shown; the keyboard sits right below it. */
 val MentionPanelHeight = 280.dp
 
+/** One composer's references: the catalogs read for it and the panel's level stack. */
+@Stable
+class MentionState {
+    var catalogs by mutableStateOf(emptyMap<String, MentionCatalogPage>())
+    var pending by mutableStateOf(Mentions.categories.toSet())
+    var stack by mutableStateOf(listOf<MentionLevel>(MentionLevel.Root))
+
+    /** Reads every category in parallel; a category that fails stays empty. */
+    suspend fun load(fetch: suspend (String) -> MentionCatalogPage) = coroutineScope {
+        pending = Mentions.categories.toSet()
+        Mentions.categories.forEach { category ->
+            launch {
+                try {
+                    val page = fetch(category)
+                    catalogs = catalogs + (category to page)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* The other categories still work. */ }
+                finally { pending = pending - category }
+            }
+        }
+    }
+}
+
 @Composable
-private fun MentionRow(icon: ImageVector, title: String, subtitle: String, accent: Boolean, disclosure: Boolean, onClick: () -> Unit) {
+fun rememberMentionState(vararg keys: Any?): MentionState = remember(*keys) { MentionState() }
+
+/**
+ * The panel as a composer host places it: right below the composer, at the bottom of a column
+ * that already sits on the keyboard (`imePadding`). Shown while [active] (the prompt focused and
+ * able to send) and the caret is in a trigger; choosing a row writes the reference into the field.
+ */
+@Composable
+fun MentionDock(state: MentionState, field: TextFieldValue, active: Boolean, onFieldChange: (TextFieldValue) -> Unit) {
+    val trigger = if (active) Mentions.trigger(field) else null
+    // Leaving the trigger (sent, deleted, caret moved) starts the next one at the categories.
+    LaunchedEffect(trigger == null) { if (trigger == null) state.stack = listOf(MentionLevel.Root) }
+    val show = trigger != null &&
+        (state.stack.size > 1 || Mentions.rows(MentionLevel.Root, state.catalogs, trigger).isNotEmpty())
+    AnimatedVisibility(
+        show,
+        enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+        exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+    ) {
+        MentionPanel(
+            stack = state.stack,
+            rowsFor = { level -> if (trigger == null) emptyList() else Mentions.rows(level, state.catalogs, trigger) },
+            loading = { level ->
+                when (level) {
+                    is MentionLevel.Category -> level.category in state.pending
+                    is MentionLevel.Directory -> "file" in state.pending
+                    MentionLevel.Root -> state.pending.isNotEmpty()
+                }
+            },
+            onPush = { state.stack = state.stack + it },
+            onPop = { if (state.stack.size > 1) state.stack = state.stack.dropLast(1) },
+            onInsert = { item ->
+                val current = Mentions.trigger(field)
+                if (current != null) {
+                    val next = Mentions.insert(field, current, item)
+                    if (next.text.length <= 32000) onFieldChange(next)
+                }
+                state.stack = listOf(MentionLevel.Root)
+            },
+        )
+    }
+}
+
+@Composable
+private fun MentionRow(
+    icon: ImageVector, title: String, subtitle: String, accent: Boolean, disclosure: Boolean,
+    emoji: String? = null, onClick: () -> Unit,
+) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     Row(
@@ -265,7 +349,13 @@ private fun MentionRow(icon: ImageVector, title: String, subtitle: String, accen
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
     ) {
-        Icon(icon, contentDescription = null, tint = if (accent) colors.accentFg else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+        if (emoji != null) {
+            Box(Modifier.size(LodyIconSize.md), contentAlignment = Alignment.Center) {
+                Text(emoji, fontSize = with(LocalDensity.current) { (LodyIconSize.md * 0.85f).toSp() })
+            }
+        } else {
+            Icon(icon, contentDescription = null, tint = if (accent) colors.accentFg else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, style = type.body, color = if (accent) colors.accentFg else colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle.isNotEmpty()) {
