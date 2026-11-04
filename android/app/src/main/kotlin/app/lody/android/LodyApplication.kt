@@ -19,6 +19,7 @@ open class LodyApplication : Application() {
         private set
     lateinit var creation: app.lody.android.create.CreationService
     lateinit var pullRequests: app.lody.android.chat.PullRequestWriter
+    lateinit var attachments: app.lody.android.chat.AttachmentUploader
         private set
     lateinit var members: WorkspaceMembers
         private set
@@ -49,6 +50,10 @@ open class LodyApplication : Application() {
                 if (method != null) writes.merge(credential, scope.workspaceId, repo, number, method)
                 else writes.markReady(credential, scope.workspaceId, repo, number)
             }
+        }
+        val uploads = app.lody.android.chat.SessionAttachmentUploads(contentResolver)
+        attachments = app.lody.android.chat.AttachmentUploader { scope, sessionId, items ->
+            account.withVerifiedAccount(scope) { credential -> uploads.upload(credential.token, scope.workspaceId, sessionId, items) }
         }
         account = AccountController(CloudAuthHttp(OkHttpAuthTransport()), KeystoreCredentialStore(this), applicationScope, cache) {
             prepared = null

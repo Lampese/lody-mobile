@@ -49,9 +49,12 @@ open class WebViewRuntime internal constructor(
                 .put("machineId", request.machineId).put("cliType", request.cliType).put("agentType", request.agentType)
                 .put("queue", request.queue)
             request.resume?.let { payload.put("resume", it) }
-            request.modelId?.let { payload.put("modelId", it) }
+            if (request.explicitChoice) {
+                payload.put("modelId", request.modelId ?: JSONObject.NULL)
+                payload.put("effort", request.effort ?: JSONObject.NULL)
+            }
             request.modeId?.let { payload.put("modeId", it) }
-            request.effort?.let { payload.put("effort", it) }
+            if (request.attachments.isNotEmpty()) payload.put("attachments", JSONArray(request.attachments))
             val value = call("sendText", JSONArray().put(payload), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Sent(value.optString("state", "unknown"), value.optString("reason").ifBlank { null })
         }

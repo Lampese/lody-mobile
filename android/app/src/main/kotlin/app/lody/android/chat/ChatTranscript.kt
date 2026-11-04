@@ -1,6 +1,9 @@
 package app.lody.android.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import app.lody.android.designsystem.LodyWorkingGrid
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
@@ -76,7 +79,10 @@ enum class Delivery { Sending, Sent, Queued, Seen, Failed }
 sealed interface ChatEntry {
     val id: String
 
-    data class User(override val id: String, val text: String, val who: TurnIdentity, val delivery: Delivery = Delivery.Sent) : ChatEntry
+    data class User(
+        override val id: String, val text: String, val who: TurnIdentity, val delivery: Delivery = Delivery.Sent,
+        val attachments: List<app.lody.android.runtime.MessageAttachment> = emptyList(),
+    ) : ChatEntry
     /**
      * An agent turn laid out like web's: prose, thought / tool groups, and for a finished turn
      * the "Worked for …" fold above its answer ([TurnLayout]). [prose] holds each prose item's
@@ -288,7 +294,18 @@ private fun UserTurn(entry: ChatEntry.User) {
                 if (entry.who.time.isNotEmpty()) Text(entry.who.time, style = LodyTheme.typography.footnote, color = colors.textTertiary, maxLines = 1)
                 Text(entry.who.name, style = LodyTheme.typography.footnote, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(
+            // Attachments sit above the bubble, trailing-aligned, one chip each (name + kind glyph).
+            if (entry.attachments.isNotEmpty()) {
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
+                    Modifier.widthIn(max = LodyLayout.readableMaxWidth),
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs, Alignment.End),
+                    verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+                ) {
+                    entry.attachments.forEach { AttachmentChip(it.name, it.image) }
+                }
+            }
+            if (entry.text.isNotBlank()) Text(
                 entry.text,
                 style = LodyTheme.typography.reading,
                 color = colors.textPrimary,
@@ -303,6 +320,26 @@ private fun UserTurn(entry: ChatEntry.User) {
     }
 }
 
+/** One attachment as a compact capsule: image or file glyph and the name (middle-truncated). */
+@Composable
+internal fun AttachmentChip(name: String, image: Boolean, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
+    val colors = LodyTheme.colors
+    Row(
+        modifier
+            .heightIn(min = LodySize.controlSm)
+            .widthIn(max = AttachmentChipMaxWidth)
+            .background(colors.fillSecondary, RoundedCornerShape(LodyRadius.md))
+            .padding(start = LodySpacing.sm, end = if (trailing == null) LodySpacing.md else LodySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+    ) {
+        Icon(if (image) LodyIcons.Image else LodyIcons.File, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+        Text(name, style = LodyTheme.typography.footnote, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f, fill = false))
+        trailing?.invoke()
+    }
+}
+
+private val AttachmentChipMaxWidth = LodySize.controlLg * 5
 private val UserHeaderHeight = LodySpacing.xl
 private val UserAvatarSize = LodySize.avatarLg - LodySpacing.xs
 private val UserBubbleRadius = LodySpacing.xl

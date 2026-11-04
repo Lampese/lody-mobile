@@ -34,8 +34,16 @@ internal object RuntimeProtocol {
                     val path = file.optString("path").takeIf { it.isNotBlank() } ?: return@mapNotNull null
                     FileChange(path, file.optInt("add"), file.optInt("del"))
                 }.orEmpty()
-                // An assistant turn may so far be only steps; a user turn needs its text.
-                if (text.isBlank() && (role == "user" || (items.isEmpty() && files.isEmpty()))) null else SessionMessage(
+                val attachments = if (role != "user") emptyList() else rawItems.flatMap { item ->
+                    when (item.optString("type")) {
+                        "image" -> listOfNotNull(item.optJSONObject("image"))
+                        "image_group" -> item.optJSONArray("images")?.objects().orEmpty()
+                        else -> emptyList()
+                    }.map { MessageAttachment(it.optString("fileName").ifBlank { "image" }, image = true) } +
+                        listOfNotNull(item.optJSONObject("file")?.takeIf { item.optString("type") == "file" }?.let { MessageAttachment(it.optString("fileName").ifBlank { "file" }, image = false) })
+                }
+                // An assistant turn may so far be only steps; a user turn needs its text or attachments.
+                if (text.isBlank() && (if (role == "user") attachments.isEmpty() else items.isEmpty() && files.isEmpty())) null else SessionMessage(
                     id = entry.text("id"),
                     role = role,
                     text = text,
@@ -48,9 +56,14 @@ internal object RuntimeProtocol {
                     model = entry.optJSONObject("modelInfo")?.let { info -> info.optString("name").ifBlank { info.optString("modelId") }.ifBlank { null } },
                     items = if (role == "assistant") items else emptyList(),
                     files = if (role == "assistant") files else emptyList(),
+                    attachments = attachments,
                 )
             }
-            RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries))
+            val composer = envelope.optJSONObject("composer")?.let { value ->
+                fun field(key: String) = (value.opt(key) as? String)?.takeIf { it.isNotBlank() }
+                RunChoice(field("modelId"), field("modeId"), field("effort"))
+            }
+            RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries, composer))
         }
         "catalog" -> {
             val catalog = JSONObject(message.get("catalog") as String)

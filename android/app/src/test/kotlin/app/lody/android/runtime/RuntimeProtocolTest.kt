@@ -23,6 +23,13 @@ class RuntimeProtocolTest {
   assertEquals(9, messages.single().files.size)
   assertEquals(FileChange("src/file8.kt", 8, 2), messages.single().files.last())
  }
+ @Test fun composerChoiceAndUserAttachmentsAreParsed() {
+  val body="""{"v":1,"status":"live","composer":{"modelId":"gpt","modeId":"plan","effort":"high","configOptionValues":{"fast":true}},"entries":[{"id":"u","role":"user","finished":true,"items":[{"type":"image_group","images":[{"id":"i1","fileName":"a.png"},{"id":"i2","fileName":"b.png"}]},{"type":"file","file":{"id":"f1","fileName":"notes.md"}}]}]}"""
+  val snapshot=(RuntimeProtocol.event(JSONObject().put("type","session").put("sessionId","s").put("session",body)) as RuntimeEvent.SessionUpdated).snapshot
+  assertEquals(RunChoice("gpt","plan","high"),snapshot.composer)
+  // An attachment-only user turn stays in the transcript.
+  assertEquals(listOf(MessageAttachment("a.png",true),MessageAttachment("b.png",true),MessageAttachment("notes.md",false)),snapshot.messages.single().attachments)
+ }
  @Test fun sessionProjectionIsNotDropped() {
   val frame=JSONObject().put("type","session").put("sessionId","s").put("session", """{"v":1,"status":"live","entries":[]}""")
   assertNotNull(RuntimeProtocol.event(frame))

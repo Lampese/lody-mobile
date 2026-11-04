@@ -108,6 +108,8 @@ data class SessionMessage(
     /** The turn's items in order (text, thought, tool steps, plans, notices) for the process view. */
     val items: List<TurnItem> = emptyList(),
     val files: List<FileChange> = emptyList(),
+    /** A user turn's attachments (images and files), by display name, in order. */
+    val attachments: List<MessageAttachment> = emptyList(),
 )
 
 /**
@@ -173,12 +175,22 @@ data class SendTextRequest(
     val agentType: String,
     val resume: String? = null,
     val queue: Boolean = false,
-    /** The composer's explicit run-config choice; null keeps the session's previous one. */
+    /**
+     * The composer's run config once the reader changed it ([explicitChoice]): then a null model
+     * or effort clears it to the agent default (iOS `sendChoice`); otherwise every field is
+     * omitted and upstream keeps the session's previous one. A null mode always keeps it.
+     */
     val modelId: String? = null,
     val modeId: String? = null,
     val effort: String? = null,
+    val explicitChoice: Boolean = false,
+    /** Uploaded attachment blocks (`image` / `file`, server references only), in order. */
+    val attachments: List<org.json.JSONObject> = emptyList(),
 )
-data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>)
+data class MessageAttachment(val name: String, val image: Boolean)
+/** The latest user turn's run config (runtime session `composer`), what the next turn would use. */
+data class RunChoice(val modelId: String? = null, val modeId: String? = null, val effort: String? = null)
+data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>, val composer: RunChoice? = null)
 sealed interface RuntimeEvent {
     data class CreationChanged(val key: String = "") : RuntimeEvent
     data class SessionUpdated(val snapshot: SessionSnapshot) : RuntimeEvent

@@ -67,6 +67,11 @@ test('a conversation turn carries only the explicit run-config choice',async()=>
  assert.equal((await c.sendText({...turn,modelId:'gpt',effort:'high',reasoningEffortConfigId:'reasoning_effort',modeId:null})).state,'accepted');
  const sent=calls.find(x=>x[0]==='send')[1];
  assert.equal(sent.modelId,'gpt');assert.equal(sent.reasoningEffort,'high');assert.equal(sent.reasoningEffortConfigId,'reasoning_effort');assert.equal('modeId' in sent,false);
- await c.sendText(turn);assert.equal('modelId' in calls.filter(x=>x[0]==='send')[1][1],false);
+ await c.sendText({...turn,modelId:null,effort:null});const cleared=calls.filter(x=>x[0]==='send').at(-1)[1];assert.equal(cleared.modelId,null);assert.equal(cleared.reasoningEffort,null);
+ const image={type:'image',imageId:'i1',mimeType:'image/png',sizeBytes:3};
+ await c.sendText({...turn,text:'',attachments:[image]});assert.deepEqual(calls.filter(x=>x[0]==='send').at(-1)[1].attachmentBlocks,[image]);
+ await assert.rejects(c.sendText({...turn,text:' '}),/invalid_send/);
+ await assert.rejects(c.sendText({...turn,attachments:[{type:'video'}]}),/invalid_send/);
+ await c.sendText(turn);assert.equal('modelId' in calls.filter(x=>x[0]==='send').at(-1)[1],false);
  await assert.rejects(c.sendText({...turn,modelId:7}),/invalid_send/);
 });

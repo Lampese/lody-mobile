@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -71,6 +72,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     var retry by remember(id, scope) { mutableIntStateOf(0) }
     var status by remember(id, scope) { mutableStateOf("syncing") }
     var messages by remember(id, scope) { mutableStateOf(emptyList<SessionMessage>()) }
+    // The latest user turn's run config, from the session snapshot (iOS `composerJSON`).
+    var snapshotChoice by remember(id, scope) { mutableStateOf<RunChoice?>(null) }
     var entries by remember(id, scope) { mutableStateOf(emptyList<ChatEntry>()) }
     // Turns this page sent that the transcript has not shown yet (optimistic, never resent).
     var outgoing by remember(id, scope) { mutableStateOf(emptyList<Outgoing>()) }
@@ -100,6 +103,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             repository.observe(scope, id).conflate().collect { snapshot ->
                 status = snapshot.status
                 messages = snapshot.messages
+                snapshotChoice = snapshot.composer
                 entries = withContext(Dispatchers.Default) {
                     val next = snapshot.messages.map { message ->
                         rendered[message.id]?.takeIf { it.first == message }?.second ?: when (message.role) {
@@ -107,6 +111,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                 message.id, message.text,
                                 TurnIdentity("", time = turnTime(message.timestamp)),
                                 delivery(message.status),
+                                message.attachments,
                             )
                             else -> {
                                 val items = message.items.ifEmpty { listOf(TurnItem.Text(message.id, message.text)) }
@@ -155,13 +160,14 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             entry.copy(who = senderIdentity(userId, context.me, members[userId], memberLabel, entry.who.time))
         } else entry
     } + pending.map {
-        ChatEntry.User(it.turnId, it.text, TurnIdentity(meName, context.me?.image, turnTime(it.at)), it.delivery)
+        ChatEntry.User(it.turnId, it.text, TurnIdentity(meName, context.me?.image, turnTime(it.at)), it.delivery, it.attachments)
     }
     val session = context.session
     val canSend = status == "live" && session?.cliType != null && session.agentType != null
     // The composer's run config (web's mobile run-config chip): the session's provider choices,
-    // read once the conversation is live. A choice applies from the next turn on; nothing chosen
-    // keeps the session's previous model, effort and mode (upstream `sendTurn`).
+    // read once the conversation is live. Until the reader changes it the chip shows the latest
+    // turn's config from the snapshot and sends nothing (upstream keeps it); the first change
+    // copies that config and from then on the whole choice rides on each turn (iOS `hydrated`).
     var options by remember(id, scope) { mutableStateOf<CreationOptions?>(null) }
     LaunchedEffect(scope, id, session?.projectId, status == "live") {
         if (session == null || status != "live") return@LaunchedEffect
@@ -170,12 +176,22 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         catch (_: Exception) { /* The chip still shows the session's model; choices wait for the next load. */ }
     }
     val capability = session?.let { options?.capability(it.machineId, it.cliType, it.agentType) }
-    var modelId by rememberSaveable(id) { mutableStateOf<String?>(null) }
-    var effort by rememberSaveable(id) { mutableStateOf<String?>(null) }
-    var modeId by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var chosen by rememberSaveable(id) { mutableStateOf(false) }
+    var chosenModel by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var chosenEffort by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var chosenMode by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    val modelId = if (chosen) chosenModel else snapshotChoice?.modelId
+    val effort = if (chosen) chosenEffort else snapshotChoice?.effort
+    val modeId = if (chosen) chosenMode else snapshotChoice?.modeId
+    val choose: (model: String?, effort: String?, mode: String?) -> Unit = { m, e, o ->
+        chosenModel = m; chosenEffort = e; chosenMode = o; chosen = true
+    }
     var runConfig by remember(id) { mutableStateOf(false) }
     val failedText = stringResource(R.string.chat_send_failed)
-    val attachText = stringResource(R.string.chat_attach_unavailable)
+    // Picked attachments wait in the composer and upload when the turn is sent.
+    var attachments by remember(id) { mutableStateOf(emptyList<PendingAttachment>()) }
+    val attachLimit = stringResource(R.string.chat_attach_limit)
+    val uploadFailed = stringResource(R.string.chat_attach_failed)
     val snackbar = remember { SnackbarHostState() }
     var creatingTab by remember(id, scope) { mutableStateOf(false) }
     var attemptedTab by rememberSaveable(id, scope.workspaceId) { mutableStateOf<String?>(null) }
@@ -207,14 +223,31 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     val running = session?.status in RunningStatuses || pending.any { it.delivery == Delivery.Sending }
     // One send path for typed turns and the action bar's prompts: optimistic bubble, never resent.
-    val sendText: (String) -> Unit = sendText@{ text ->
-        if (!canSend || text.isEmpty() || session == null) return@sendText
+    // Attachments upload first; a failed upload fails the turn before anything is written and
+    // hands the text and attachments back to an empty composer.
+    val sendText: (String, List<PendingAttachment>) -> Unit = sendText@{ text, files ->
+        if (!canSend || (text.isEmpty() && files.isEmpty()) || session == null) return@sendText
         val turnId = UUID.randomUUID().toString()
-        outgoing = outgoing + Outgoing(turnId, text, Instant.now().toString(), Delivery.Sending)
+        val shown = files.map { MessageAttachment(it.name, it.image) }
+        outgoing = outgoing + Outgoing(turnId, text, Instant.now().toString(), Delivery.Sending, shown)
+        val explicit = chosen
+        val choice = Triple(modelId, modeId, effort)
         coroutines.launch {
             val queue = session.status in RunningStatuses
+            val blocks = try { repository.upload(scope, id, files) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+            if (blocks == null) {
+                outgoing = outgoing.map { if (it.turnId == turnId) it.copy(delivery = Delivery.Failed) else it }
+                if (prompt.isEmpty() && attachments.isEmpty()) { prompt = text; attachments = files }
+                snackbar.showSnackbar(uploadFailed)
+                return@launch
+            }
             val result = try {
-                repository.send(scope, SendTextRequest(id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = queue, modelId = modelId, modeId = modeId, effort = effort)).state
+                repository.send(scope, SendTextRequest(
+                    id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = queue,
+                    modelId = choice.first, modeId = choice.second, effort = choice.third, explicitChoice = explicit, attachments = blocks,
+                )).state
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { "unknown" }
             val delivery = when (result) {
@@ -229,11 +262,26 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     val send = {
         val text = prompt.trim()
-        if (canSend && text.isNotEmpty()) {
-            sendText(text)
+        if (canSend && (text.isNotEmpty() || attachments.isNotEmpty())) {
+            sendText(text, attachments)
             prompt = ""
+            attachments = emptyList()
         }
     }
+    // Web's limits: at most 8 images and 8 files per turn; extra picks are dropped with a notice.
+    val addAttachments: (List<PendingAttachment>) -> Unit = { picked ->
+        val merged = attachments + picked
+        val kept = merged.filter { it.image }.take(8) + merged.filter { !it.image }.take(8)
+        attachments = merged.filter { it in kept }
+        if (kept.size < merged.size) coroutines.launch { snackbar.showSnackbar(attachLimit) }
+    }
+    val resolver = appContext.contentResolver
+    val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(8),
+    ) { uris -> addAttachments(uris.mapNotNull { SessionAttachmentUploads.describe(resolver, it, image = true) }) }
+    val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> addAttachments(uris.mapNotNull { SessionAttachmentUploads.describe(resolver, it, image = false) }) }
     // Stop the running turn (web's composer stop button); one request at a time, never retried.
     val runningTurn = messages.lastOrNull { it.role != "user" && it.streaming }?.id
     var stopping by remember(id) { mutableStateOf(false) }
@@ -357,7 +405,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                             action !in bar.actions -> Unit
                             action == SessionInfoBar.Action.Merge -> merging = true
                             action == SessionInfoBar.Action.ReadyForReview -> writePullRequest(null)
-                            else -> sendText(bar.prompt(action, prompts))
+                            else -> sendText(bar.prompt(action, prompts), emptyList())
                         }
                     },
                     onCopied = { coroutines.launch { snackbar.showSnackbar(it) } },
@@ -376,7 +424,12 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 onRunConfig = if (capability != null && (capability.models.isNotEmpty() || capability.modes.isNotEmpty())) ({ runConfig = true }) else null,
                 stoppable = runningTurn != null && status == "live",
                 stopping = stopping,
-                onAttach = { coroutines.launch { snackbar.showSnackbar(attachText) } },
+                attachments = attachments,
+                onPickPhotos = {
+                    photoPicker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                },
+                onPickFiles = { filePicker.launch(arrayOf("*/*")) },
+                onRemoveAttachment = { removed -> attachments = attachments.filterNot { it.id == removed } },
                 onSend = send,
                 onStop = stop,
             )
@@ -403,9 +456,9 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 defaultLabel = stringResource(R.string.create_default),
             ) { row, value ->
                 when (row) {
-                    RUN_MODEL -> { modelId = value; effort = null }
-                    RUN_EFFORT -> effort = value
-                    RUN_MODE -> modeId = value
+                    RUN_MODEL -> choose(value, null, modeId)
+                    RUN_EFFORT -> choose(modelId, value, modeId)
+                    RUN_MODE -> choose(modelId, effort, value)
                 }
             }
         }
@@ -476,7 +529,7 @@ private fun RoundButton(icon: ImageVector, label: String, modifier: Modifier = M
     }
 }
 
-private data class Outgoing(val turnId: String, val text: String, val at: String, val delivery: Delivery)
+private data class Outgoing(val turnId: String, val text: String, val at: String, val delivery: Delivery, val attachments: List<MessageAttachment> = emptyList())
 
 internal fun delivery(status: String) = when (status) {
     // Execution failure/cancellation still acknowledges receipt, as on desktop.
@@ -535,7 +588,10 @@ private fun ChatComposer(
     onRunConfig: (() -> Unit)?,
     stoppable: Boolean,
     stopping: Boolean,
-    onAttach: () -> Unit,
+    attachments: List<PendingAttachment>,
+    onPickPhotos: () -> Unit,
+    onPickFiles: () -> Unit,
+    onRemoveAttachment: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -554,6 +610,29 @@ private fun ChatComposer(
             .animateContentSize()
             .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.sm),
     ) {
+        // Picked attachments, one removable chip each, above the prompt (web / iOS attachment stack).
+        if (attachments.isNotEmpty()) {
+            val remove = stringResource(R.string.chat_attach_remove)
+            androidx.compose.foundation.lazy.LazyRow(
+                Modifier.fillMaxWidth().padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+            ) {
+                items(attachments, key = { it.id }) { item ->
+                    AttachmentChip(item.name, item.image, Modifier.animateItem()) {
+                        Box(
+                            Modifier
+                                .size(LodySize.controlSm)
+                                .clip(CircleShape)
+                                .clickable(role = Role.Button) { onRemoveAttachment(item.id) }
+                                .semantics { contentDescription = "$remove ${item.name}" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(LodyIcons.Close, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
+                        }
+                    }
+                }
+            }
+        }
         BasicTextField(
             value = prompt,
             onValueChange = onPromptChange,
@@ -576,8 +655,23 @@ private fun ChatComposer(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             val attach = stringResource(R.string.create_attach)
-            IconButton(onClick = onAttach, modifier = Modifier.semantics { contentDescription = attach }) {
-                Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+            var attachMenu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { attachMenu = true }, enabled = enabled, modifier = Modifier.semantics { contentDescription = attach }) {
+                    Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+                }
+                DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_attach_photos)) },
+                        leadingIcon = { Icon(LodyIcons.Image, contentDescription = null) },
+                        onClick = { attachMenu = false; onPickPhotos() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_attach_files)) },
+                        leadingIcon = { Icon(LodyIcons.File, contentDescription = null) },
+                        onClick = { attachMenu = false; onPickFiles() },
+                    )
+                }
             }
             // The one flexible slot: the chip takes the middle and Send stays on the trailing edge.
             // (Two weighted children split the free space, which left Send short of the edge.)
@@ -603,8 +697,8 @@ private fun ChatComposer(
             }
             // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs
             // cross-fade and the fill follows, so the button never jumps.
-            val showStop = stoppable && prompt.isBlank()
-            val ready = if (showStop) !stopping else enabled && prompt.isNotBlank()
+            val showStop = stoppable && prompt.isBlank() && attachments.isEmpty()
+            val ready = if (showStop) !stopping else enabled && (prompt.isNotBlank() || attachments.isNotEmpty())
             val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
             val fill by androidx.compose.animation.animateColorAsState(
                 when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",

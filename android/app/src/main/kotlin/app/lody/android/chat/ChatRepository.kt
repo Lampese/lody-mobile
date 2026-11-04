@@ -13,7 +13,12 @@ fun interface PullRequestWriter {
 class ChatRepository(
     private val owner: RuntimeOwner,
     private val pullRequests: PullRequestWriter = PullRequestWriter { _, _, _, _ -> throw GitHubWriteFailure("unavailable") },
+    private val attachments: AttachmentUploader = AttachmentUploader { _, _, _ -> throw AttachmentFailure("unavailable") },
 ) {
+    /** Uploads a turn's attachments natively; only the returned references reach the runtime. */
+    suspend fun upload(scope: RuntimeScope, sessionId: String, items: List<PendingAttachment>): List<org.json.JSONObject> =
+        if (items.isEmpty()) emptyList() else attachments.upload(scope, sessionId, items)
+
     suspend fun createTab(scope: RuntimeScope, parentId: String, id: String, title: String): CreationReceipt =
         owner.use(scope) { (it.execute(RuntimeCommand.CreateTab(parentId, id, title)) as RuntimeResult.Created).value }
 
