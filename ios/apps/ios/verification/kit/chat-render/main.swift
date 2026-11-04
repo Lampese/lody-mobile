@@ -266,7 +266,7 @@ func summaryRow(running: Bool, attention: Bool) -> ChatRow {
     entryID: "reply",
     kind: "summary",
     text: "执行过程",
-    symbol: attention ? "exclamationmark.triangle.fill" : "circle.fill",
+    symbol: ChatProcessSummary.mark(attention: attention),
     actionable: true,
     running: running,
     attention: attention
@@ -288,10 +288,8 @@ let doneSummary = summaryCell(for: summaryRow(running: false, attention: false))
 let failedSummary = summaryCell(for: summaryRow(running: false, attention: true))
 let failedLiveSummary = summaryCell(for: summaryRow(running: true, attention: true))
 let traits = runningSummary.traitCollection
-precondition(resolved(runningSummary.icon.tintColor, traits: traits) == resolved(.lodyAccent, traits: traits),
-  "A live process pip must use the accent color")
-precondition(resolved(doneSummary.icon.tintColor, traits: traits) == resolved(.secondaryLabel, traits: traits),
-  "A finished process pip must use secondary label")
+precondition(runningSummary.icon.image == nil && doneSummary.icon.image == nil, "A healthy process shows no pip")
+precondition(ChatCell.leading(doneSummary.row!) == 0, "Without a pip the summary starts at the text edge")
 precondition(resolved(failedSummary.icon.tintColor, traits: traits) == resolved(.systemOrange, traits: traits),
   "A failed or pending process pip must be system orange")
 precondition(runningSummary.row!.shines, "A live process pip must shine")
@@ -301,7 +299,7 @@ precondition(failedLiveSummary.row!.symbol == "exclamationmark.triangle.fill",
   "A live process with a failed tool must use a warning mark")
 precondition(failedSummary.row!.symbol == "exclamationmark.triangle.fill",
   "A failed process must use a warning mark")
-precondition(runningSummary.row!.symbol == "circle.fill", "A healthy live process must keep the pip")
+precondition(runningSummary.row!.symbol.isEmpty, "A healthy live process carries no pip")
 let warnMark = UIImage(
   systemName: "exclamationmark.triangle.fill",
   withConfiguration: ChatCell.iconSymbolConfiguration(for: failedLiveSummary.row!)
@@ -725,7 +723,7 @@ let countRow = ChatRow(
   entryID: "reply",
   kind: "summary",
   text: "思考过程 · 调用了 2 个工具 · 编辑了 2 个文件",
-  symbol: "circle.fill",
+  symbol: "",
   actionable: true,
   running: true
 )

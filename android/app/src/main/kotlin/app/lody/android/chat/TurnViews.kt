@@ -167,7 +167,8 @@ internal fun Disclosure(label: String, expanded: Boolean, modifier: Modifier = M
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 36.dp)
+            // Compact, as iOS process summaries (32 pt): runs of them stack between paragraphs.
+            .heightIn(min = 32.dp)
             .clickable(role = Role.Button) { onToggle(!expanded) }
             .semantics { stateDescription = state }
             .padding(horizontal = TranscriptMargin),

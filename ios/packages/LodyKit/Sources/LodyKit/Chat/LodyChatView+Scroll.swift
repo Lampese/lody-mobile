@@ -467,8 +467,11 @@ extension LodyChatView {
         limit: collapsedMessageHeights[row.entryID] ?? ChatMessageContent.maximumCollapsedHeight,
         expanded: expandedMessages.contains(row.entryID)) + ChatRowPadding.content + 12
     }
-    let tapFloor = row.actionable || row.kind == "summary" || row.kind == "pending"
     let measuredHeight = measured + ChatCell.rowExtra(for: row, previousKind: previousKind ?? kind(before: row.id))
+    // Process summaries sit close together (32 pt rows, the whole width taps); other actionable
+    // rows keep the 44 pt floor.
+    if row.kind == "summary" { return max(ChatCell.summaryHeight, measuredHeight) }
+    let tapFloor = row.actionable || row.kind == "pending"
     if tapFloor { return max(44, measuredHeight) }
     if row.kind == "delivery" {
       return max(ChatCell.messageFont(for: row, compatibleWith: traitCollection).lineHeight, measuredHeight)

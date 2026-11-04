@@ -529,6 +529,9 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     return font
   }
 
+  /// A process summary row's height: compact, since runs of them stack between paragraphs.
+  static let summaryHeight: CGFloat = 32
+
   static func rowExtra(for row: ChatRow, previousKind: String? = nil) -> CGFloat {
     if row.kind == "delivery" { return 0 }
     if row.kind == "user" { return 44 + (row.author.isEmpty ? 0 : authorHeader) }
@@ -539,7 +542,8 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   static func leading(_ row: ChatRow) -> CGFloat {
     switch row.kind {
     case "text", "user", "duration", "delivery": return 0
-    case "summary": return LodyDesign.Rail.text - ChatReadingColumn.cellMargin
+    // A process summary starts at the text edge; only a warning mark keeps the rail inset.
+    case "summary": return row.symbol.isEmpty ? 0 : LodyDesign.Rail.text - ChatReadingColumn.cellMargin
     default: return 24
     }
   }

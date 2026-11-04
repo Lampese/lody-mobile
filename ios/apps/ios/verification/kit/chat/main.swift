@@ -11,8 +11,8 @@ var transcript = ChatTranscript(entries: try JSONDecoder().decode([ChatEntry].se
 let streaming = transcript.rows()
 assert(!streaming.contains { $0.itemID == "tool" || $0.itemID == "intro" })
 assert(streaming.contains { $0.kind == "summary" && $0.actionable })
-assert(streaming.contains { $0.kind == "summary" && $0.symbol == "circle.fill" },
-  "Process rows must use a status pip, not a disclosure chevron")
+assert(streaming.contains { $0.kind == "summary" && $0.symbol.isEmpty },
+  "A healthy process row carries no pip")
 let process = transcript.rows(processEntryID: "reply")
 assert(process.map(\.itemID) == ["intro", "tool"])
 assert(!process.contains { $0.kind == "summary" || $0.itemID == "answer" })

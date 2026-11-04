@@ -23015,13 +23015,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "第二行显示"
+            "value": "显示"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show on second line"
+            "value": "Display"
           }
         }
       }

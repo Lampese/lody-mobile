@@ -14,7 +14,7 @@
     <string name="home_search_clear">Clear search</string>
     <string name="home_search_empty">No chats match “%1$s”</string>
     <string name="home_view">View</string>
-    <string name="home_view_details">Show on second line</string>
+    <string name="home_view_details">Display</string>
     <string name="home_view_project">Project</string>
     <string name="home_view_pull_request">PR status</string>
     <string name="home_view_branch">Branch</string>

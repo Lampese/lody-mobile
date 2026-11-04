@@ -375,7 +375,7 @@ struct ChatTranscript {
         if !process.isEmpty {
           result.append(ChatRow(id: groupID + ":execution", entryID: tail.id, kind: "summary",
             text: String.localizedStringWithFormat(String(localized: "native.chat.transcript.execution", bundle: .lody), String(describing: String(tail.steerCount ?? 0))),
-            symbol: "circle.fill", processStartID: "__execution__", actionable: true))
+            symbol: "", processStartID: "__execution__", actionable: true))
         }
         result += members.filter { $0.role == "assistant" }.flatMap {
           ChatTranscript(entries: [$0]).entryRows(processEntryID: $0.id, flatItems: true).filter { $0.kind == "proposed_plan" }
@@ -777,8 +777,9 @@ struct ChatSubagentCard: Equatable {
 }
 
 enum ChatProcessSummary {
+  /// No pip for a healthy process (the row's shine shows it is live); a warning when it needs a look.
   static func mark(attention: Bool) -> String {
-    attention ? "exclamationmark.triangle.fill" : "circle.fill"
+    attention ? "exclamationmark.triangle.fill" : ""
   }
 
   static func title(items: [ChatItem], running: Bool, includesThought: Bool = true) -> String {

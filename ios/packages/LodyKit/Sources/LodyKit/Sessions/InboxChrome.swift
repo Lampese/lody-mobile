@@ -247,28 +247,27 @@ final class InboxChrome {
     header.leftItems = value ? nil : [workspaceItem]
   }
 
-  /// iPhone view menu: multi-select toggles for what each chat row's second line shows.
-  /// Built on open so the checkmarks always match the stored choice; the menu stays open while toggling.
+  /// iPhone view menu: multi-select toggles for what each chat row's second line shows; the menu
+  /// stays open while toggling. The toggles are plain actions, rebuilt with the stored choice on
+  /// every render: inside a deferred element UIKit shows a copy, so a handler's `state` change
+  /// never reached the visible checkmark.
   private func compactViewMenu() -> UIMenu {
     let options: [(ChatRowDetails, String, String)] = [
       (.project, "home.view.project", "folder"),
       (.pullRequest, "home.view.pullRequest", "arrow.triangle.pull"),
       (.branch, "home.view.branch", "arrow.triangle.branch"),
     ]
-    let toggles = UIDeferredMenuElement.uncached { completion in
-      let current = ChatRowDetails.stored
-      completion(options.map { option, key, symbol in
-        let action = UIAction(
-          title: String(localized: String.LocalizationValue(key), bundle: .lody), image: UIImage(systemName: symbol),
-          attributes: .keepsMenuPresented, state: current.contains(option) ? .on : .off
-        ) { action in
-          var next = ChatRowDetails.stored
-          if next.contains(option) { next.remove(option) } else { next.insert(option) }
-          action.state = next.contains(option) ? .on : .off
-          ChatRowDetails.store(next)
-        }
-        return action
-      })
+    let current = ChatRowDetails.stored
+    let toggles: [UIMenuElement] = options.map { option, key, symbol in
+      UIAction(
+        title: String(localized: String.LocalizationValue(key), bundle: .lody), image: UIImage(systemName: symbol),
+        attributes: .keepsMenuPresented, state: current.contains(option) ? .on : .off
+      ) { action in
+        var next = ChatRowDetails.stored
+        if next.contains(option) { next.remove(option) } else { next.insert(option) }
+        action.state = next.contains(option) ? .on : .off
+        ChatRowDetails.store(next)
+      }
     }
     // Single choice; uncached so the check follows the stored value after each pick.
     let groupings = UIDeferredMenuElement.uncached { completion in
@@ -293,7 +292,7 @@ final class InboxChrome {
       children: [
         UIMenu(title: String(localized: "home.view.scope", bundle: .lody), options: [.displayInline, .singleSelection], children: [scopes]),
         UIMenu(title: String(localized: "home.view.grouping", bundle: .lody), options: [.displayInline, .singleSelection], children: [groupings]),
-        UIMenu(title: String(localized: "home.view.details", bundle: .lody), options: .displayInline, children: [toggles]),
+        UIMenu(title: String(localized: "home.view.details", bundle: .lody), options: .displayInline, children: toggles),
       ]
     )
   }

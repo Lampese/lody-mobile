@@ -170,12 +170,12 @@ final class ProjectsListController: UIViewController, UICollectionViewDelegate {
             image: UIImage(systemName: symbol), state: current == value ? .on : .off) { _ in ProjectSource.store(value) }
         })
     }
-    let hide = UIDeferredMenuElement.uncached { completion in
-      let on = ProjectSource.hidesEmpty
-      let action = UIAction(title: String(localized: "home.projects.hideEmpty", bundle: .lody), image: UIImage(systemName: "eye.slash"),
-        state: on ? .on : .off) { _ in ProjectSource.storeHidesEmpty(!on) }
-      action.attributes = .keepsMenuPresented
-      completion([action])
+    // A plain action (not deferred) so the checkmark follows the tap while the menu stays open.
+    let hide = UIAction(title: String(localized: "home.projects.hideEmpty", bundle: .lody), image: UIImage(systemName: "eye.slash"),
+      attributes: .keepsMenuPresented, state: ProjectSource.hidesEmpty ? .on : .off) { action in
+      let next = !ProjectSource.hidesEmpty
+      action.state = next ? .on : .off
+      ProjectSource.storeHidesEmpty(next)
     }
     return UIMenu(children: [
       UIMenu(title: String(localized: "home.view.scope", bundle: .lody), options: [.displayInline, .singleSelection], children: [scope]),
