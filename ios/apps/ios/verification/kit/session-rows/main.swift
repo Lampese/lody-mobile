@@ -3,6 +3,26 @@ import Foundation
 let hour = 3_600_000.0
 let now = Date().timeIntervalSince1970 * 1000
 
+// A family belongs exclusively to its parent's bucket, even across projects and dates.
+var bucketParent = SessionItem(id: "bucket-parent", projectId: "p")
+bucketParent.createdAt = Date(timeIntervalSince1970: (now - 3 * 86_400_000) / 1000).ISO8601Format()
+var bucketChild = SessionItem(id: "bucket-child", projectId: "other", openedBySessionId: "bucket-parent")
+bucketChild.status = "running"
+bucketChild.createdAt = Date().ISO8601Format()
+var bucketTab = SessionItem(id: "bucket-tab", projectId: "other")
+bucketTab.parentSessionId = "bucket-parent"
+bucketTab.status = "waiting"
+bucketTab.createdAt = Date().ISO8601Format()
+let bucketCatalog = SessionCatalog(sessions: [bucketChild, bucketTab, bucketParent])
+for grouping in [HomeGrouping.time, .status, .project] {
+  let sections = InboxSections.home(bucketCatalog, grouping: grouping, now: now)
+  precondition(sections.count == 1, "Children must never create their own bucket")
+  precondition(sections[0].rows.map(\.id) == ["bucket-parent", "bucket-child", "bucket-tab"])
+  precondition(sections[0].rows.map(\.parentId) == ["", "bucket-parent", "bucket-parent"])
+}
+precondition(InboxSections.home(bucketCatalog, grouping: .time, now: now)[0].id == "week")
+precondition(InboxSections.home(bucketCatalog, grouping: .status, now: now)[0].id == "idle")
+
 let saved = """
 {"catalog":{"projects":[{"id":"p","name":"Lody","rootPath":"/Users/me/lody","machineId":"m"},{"broken":true}],
 "machineIds":["m"],"sessions":[
@@ -47,7 +67,7 @@ precondition(chatRow.badge == "inbox.badge.attention" && chatRow.imageTint == "w
 let archived = catalog.sessions.filter(\.archived).sorted(by: SessionRows.byActivity)
 precondition(archived.map(\.id) == ["root", "child", "tab"])
 let rows = SessionRows.treeRows(archived, all: catalog.sessions) { SessionRows.row($0, now: now) }
-precondition(rows.map(\.id) == ["root", "child", "tab"], "Opened sessions nest; contained tabs keep their own entry")
+precondition(rows.map(\.id) == ["root", "child", "tab"], "Opened sessions and contained tabs share the parent family")
 // Parent and hidden children retain separate states.
 var failedParent = SessionItem(id: "family-parent", projectId: "p")
 failedParent.status = "error"
@@ -63,16 +83,16 @@ foldedRow.collapsedBadge = "attention"
 let shownFolded = foldedRow.displayingCollapsed(true, keepingTime: true)
 precondition(shownFolded.value == "1h" && shownFolded.badge == "attention", "A folded parent keeps its time and takes its children's state")
 precondition(foldedRow.displayingCollapsed(true).value == "inbox.session.children", "Compact hosts still show the count in the time column")
-precondition(rows[0].collapsedValue == "inbox.session.children" && rows[1].parentId == "root" && rows[2].parentId.isEmpty)
+precondition(rows[0].collapsedValue == "inbox.session.children" && rows[1].parentId == "root" && rows[2].parentId == "root")
 precondition(rows[0].collapsedBadge == "inbox.badge.archived")
-precondition(rows.map(\.lastChild) == [false, true, false], "Only the final opened session closes the rail")
+precondition(rows.map(\.lastChild) == [false, false, true], "Only the final opened session closes the rail")
 var second = SessionItem(id: "second", projectId: "p", openedBySessionId: "root")
 second.lastMessageAt = 1
 second.archived = true
 let pair = SessionRows.treeRows([root, child, second], all: [root, child, second]) { SessionRows.row($0, now: now) }
 precondition(pair.map(\.id) == ["root", "child", "second"] && pair.map(\.lastChild) == [false, false, true],
              "Earlier siblings keep the trunk running to the last child")
-precondition(SessionRows.treeRows(archived, all: catalog.sessions, maxRoots: 1) { SessionRows.row($0) }.count == 2)
+precondition(SessionRows.treeRows(archived, all: catalog.sessions, maxRoots: 1) { SessionRows.row($0) }.count == 3)
 
 var cycleA = SessionItem(id: "a", projectId: "p", openedBySessionId: "b")
 var cycleB = SessionItem(id: "b", projectId: "p", openedBySessionId: "a")

@@ -74,6 +74,14 @@ enum class StatusGroup {
 
 /** One Home group; the screen localizes [header]. */
 data class HomeSection(val id: String, val header: Header, val chats: List<ChatItem>) {
+    val rootCount: Int get() = chats.count { it.nestedUnder == null }
+    val folds: Boolean get() = (header as? Header.Status)?.group == StatusGroup.Idle && rootCount > ChatListModel.IDLE_LIMIT
+    fun visibleChats(idleExpanded: Boolean): List<ChatItem> {
+        if (!folds || idleExpanded) return chats
+        val roots = chats.filter { it.nestedUnder == null }.take(ChatListModel.IDLE_LIMIT).mapTo(mutableSetOf()) { it.id }
+        return chats.filter { it.id in roots || it.nestedUnder in roots }
+    }
+
     sealed interface Header {
         data class Bucket(val bucket: TimeBucket) : Header
         data class Project(val name: String) : Header
@@ -159,10 +167,11 @@ object ChatListModel {
         today: LocalDate = LocalDate.now(),
         zone: ZoneId = ZoneId.systemDefault(),
     ): List<HomeSection> {
-        // A contained Tab of the owner's chat stays with it, as on iOS (`InboxSections.owned`).
+        // Keep the whole family and parent context when filtering to the owner's chats.
         val scoped = owner?.let { id ->
             val mine = snapshot.sessions.filter { it.userId == id }.mapTo(mutableSetOf()) { it.id }
-            snapshot.copy(sessions = snapshot.sessions.filter { it.id in mine || it.parentSessionId in mine })
+            val included = families(snapshot).filter { family -> family.any { it.id in mine } }.flatten().mapTo(mutableSetOf()) { it.id }
+            snapshot.copy(sessions = snapshot.sessions.filter { it.id in included })
         } ?: snapshot
         return grouped(scoped, grouping, today, zone)
     }
@@ -177,19 +186,19 @@ object ChatListModel {
     /** One group per project, most recently active first; unassigned chats form the "Chats" group. */
     fun byProject(snapshot: CatalogSnapshot): List<HomeSection> {
         val names = snapshot.projects.associate { it.id to it.name }
-        return homeItems(snapshot)
-            .groupBy { if (isChat(it.projectId)) CHATS_ID else it.projectId }
+        return families(snapshot)
+            .groupBy { family -> family.first().let { if (isChat(it.projectId)) CHATS_ID else it.projectId } }
             .map { (key, chats) ->
                 val header = if (key == CHATS_ID) HomeSection.Header.Chats else HomeSection.Header.Project(names[key].orEmpty())
-                HomeSection("project-$key", header, nest(chats))
+                HomeSection("project-$key", header, chats.flatten())
             }
     }
 
     /** [StatusGroup] order; the screen folds a long idle group behind "Show all". */
     fun byStatus(snapshot: CatalogSnapshot): List<HomeSection> {
-        val groups = homeItems(snapshot).groupBy { it.statusGroup }
+        val groups = families(snapshot).groupBy { it.first().statusGroup }
         return StatusGroup.entries.mapNotNull { group ->
-            groups[group]?.let { HomeSection("status-$group", HomeSection.Header.Status(group), nest(it)) }
+            groups[group]?.let { HomeSection("status-$group", HomeSection.Header.Status(group), it.flatten()) }
         }
     }
 
@@ -209,19 +218,13 @@ object ChatListModel {
             .sortedByDescending { it.activityAt ?: Long.MIN_VALUE }
     }
 
-    /**
-     * The session that opened [session], mirroring iOS `SessionRows.tree`: contained Tabs keep
-     * their own entry; an opener inside a Tab resolves to that Tab's root; the opener must share
-     * the project and archive state.
-     */
-    private fun opener(session: CatalogSession, all: Map<String, CatalogSession>): String? {
-        if (session.parentSessionId != null) return null
-        var id = session.openedByRootSessionId ?: session.openedBySessionId ?: return null
-        val seen = mutableSetOf<String>()
-        while (seen.add(id)) id = all[id]?.parentSessionId ?: break
-        val opener = all[id] ?: return null
-        return id.takeIf { it != session.id && opener.projectId == session.projectId && opener.archived == session.archived }
-    }
+    /** Build families before any display bucket; only the root participates in grouping. */
+    private fun families(snapshot: CatalogSnapshot): List<List<ChatItem>> =
+        nest(homeItems(snapshot)).groupBy { it.nestedUnder ?: it.id }.values.toList()
+
+    private fun opener(session: CatalogSession, all: Map<String, CatalogSession>): String? =
+        listOfNotNull(session.parentSessionId, session.openedBySessionId, session.openedByRootSessionId)
+            .firstOrNull { it != session.id && all[it]?.archived == session.archived }
 
     /**
      * Nests each chat under its root opener when that opener is in the same group (one level, as
@@ -288,10 +291,10 @@ object ChatListModel {
 
     /** Home "by time": non-archived chats in activity buckets, newest first. */
     fun timeline(snapshot: CatalogSnapshot, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<TimeSection> {
-        return homeItems(snapshot)
-            .groupBy { bucket(it.activityAt, today, zone) }
+        return families(snapshot)
+            .groupBy { bucket(it.first().activityAt, today, zone) }
             .toSortedMap()
-            .map { (bucket, chats) -> TimeSection(bucket, nest(chats)) }
+            .map { (bucket, chats) -> TimeSection(bucket, chats.flatten()) }
     }
 
     fun bucket(createdAt: String, today: LocalDate, zone: ZoneId): TimeBucket =

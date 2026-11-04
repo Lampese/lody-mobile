@@ -17,6 +17,34 @@ class ChatListModelTest {
     private fun session(id: String, project: String, status: String = "idle", archived: Boolean = false, pinned: Boolean = false, at: String) =
         CatalogSession(id, "m", project, "Chat $id", status, archived, pinned, at)
 
+    @Test fun childrenAlwaysFollowParentBucketAcrossProjectsDatesAndStatuses() {
+        val parent = session("parent", "p-zed", at = "2026-10-01T00:00:00Z")
+        val child = session("child", "p-alpha", status = "running", at = "2026-10-06T00:00:00Z").copy(openedBySessionId = "parent")
+        val tab = session("tab", "p-alpha", status = "waiting", at = "2026-10-06T00:00:00Z").copy(parentSessionId = "parent")
+        val data = snapshot.copy(sessions = listOf(child, tab, parent))
+        val expected = listOf("parent", "child", "tab")
+        val time = ChatListModel.timeline(data, LocalDate.parse("2026-10-06"), ZoneOffset.UTC)
+        assertEquals(1, time.size)
+        assertEquals(TimeBucket.Week, time.single().bucket)
+        assertEquals(expected, time.single().chats.map { it.id })
+        val status = ChatListModel.byStatus(data)
+        assertEquals(1, status.size)
+        assertEquals(HomeSection.Header.Status(StatusGroup.Idle), status.single().header)
+        assertEquals(expected, status.single().chats.map { it.id })
+        val projects = ChatListModel.byProject(data)
+        assertEquals(1, projects.size)
+        assertEquals(expected, projects.single().chats.map { it.id })
+        assertEquals(listOf(null, "parent", "parent"), projects.single().chats.map { it.nestedUnder })
+    }
+
+    @Test fun idleLimitNeverCutsThroughFamily() {
+        val chats = (1..21).flatMap { index -> listOf(ChatItem("p$index", "Parent", null), ChatItem("c$index", "Child", null, nestedUnder = "p$index")) }
+        val section = HomeSection("idle", HomeSection.Header.Status(StatusGroup.Idle), chats)
+        assertEquals(21, section.rootCount)
+        assertEquals(40, section.visibleChats(false).size)
+        assertEquals("c20", section.visibleChats(false).last().id)
+    }
+
     private val snapshot = CatalogSnapshot(
         revision = 1,
         projects = listOf(
@@ -214,17 +242,19 @@ class ChatListModelTest {
             } + CatalogSession("t", "m", "p-zed", "Tab", "idle", false, false, "2026-09-01T00:00:00Z", parentSessionId = "2"),
         )
         val zed = ChatListModel.byProject(opened).first { it.header == HomeSection.Header.Project("zed") }.chats
-        // The family takes its freshest member's (#5) place; the contained Tab keeps its own row.
+        // The family takes its freshest member's (#5) place; the contained Tab joins the family.
         assertEquals(listOf("2", "5", "1", "t"), zed.map { it.id })
-        assertEquals(listOf(null, "2", "2", null), zed.map { it.nestedUnder })
-        assertEquals(listOf(false, false, true, false), zed.map { it.lastChild })
-        // Children drop a project that repeats their opener's; the top-level Tab keeps it.
-        assertEquals(listOf("zed", "", "", "zed"), zed.map { it.place })
+        assertEquals(listOf(null, "2", "2", "2"), zed.map { it.nestedUnder })
+        assertEquals(listOf(false, false, false, true), zed.map { it.lastChild })
+        // Children drop a project that repeats their opener's; the Tab does too.
+        assertEquals(listOf("zed", "", "", ""), zed.map { it.place })
         assertTrue(zed[0].treeParent)
-        assertEquals(listOf(2, 0, 0, 0), zed.map { it.childCount })
-        // An opener in another group (#3 opened by #2, different project) stays top-level.
+        assertEquals(listOf(3, 0, 0, 0), zed.map { it.childCount })
+        // A child from a different project follows its parent and retains its project label.
         val other = opened.copy(sessions = opened.sessions.map { if (it.id == "3") it.copy(openedBySessionId = "2") else it })
-        assertNull(ChatListModel.byProject(other).first { it.header == HomeSection.Header.Project("Alpha") }.chats.single().nestedUnder)
+        val crossProject = ChatListModel.byProject(other).first { it.header == HomeSection.Header.Project("zed") }.chats.first { it.id == "3" }
+        assertEquals("2", crossProject.nestedUnder)
+        assertEquals("Alpha", crossProject.place)
     }
 
     @Test

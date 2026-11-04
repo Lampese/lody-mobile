@@ -111,20 +111,13 @@ enum SessionRows {
 
   // Input order is the list's ranking; a group takes its freshest member's place.
   static func tree(_ sessions: [SessionItem], all: [SessionItem]) -> [(session: SessionItem, children: [SessionItem])] {
-    let everything = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     let visible = Dictionary(sessions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     func parent(of session: SessionItem) -> String? {
-      // Contained Tabs keep their existing entry until iOS has a Tab navigation host.
-      guard session.parentSessionId == nil else { return nil }
-      var id = session.openedByRootSessionId ?? session.openedBySessionId
-      var seen = Set<String>()
-      while let current = id, let next = everything[current]?.parentSessionId, !seen.contains(current) {
-        seen.insert(current)
-        id = next
+      // Tabs and opened chats share one family, even across projects/computers.
+      let candidates = [session.parentSessionId, session.openedBySessionId, session.openedByRootSessionId]
+      return candidates.compactMap { $0 }.first { id in
+        id != session.id && visible[id]?.archived == session.archived
       }
-      guard let id, let opener = visible[id], opener.projectId == session.projectId, opener.archived == session.archived
-      else { return nil }
-      return opener.id
     }
     func root(of session: SessionItem) -> String {
       var seen: Set = [session.id]

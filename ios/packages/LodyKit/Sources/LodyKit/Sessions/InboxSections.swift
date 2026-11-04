@@ -32,7 +32,9 @@ enum InboxSections {
       .filter { term.isEmpty || "\($0.title) \(place($0, names))".lowercased().contains(term) }
       .sorted(by: SessionRows.byActivity)
     var buckets: [String: [SessionItem]] = [:]
-    for session in visible { buckets[group(session, now: now), default: []].append(session) }
+    for family in SessionRows.tree(visible, all: catalog.sessions) {
+      buckets[group(family.session, now: now), default: []] += [family.session] + family.children
+    }
     return groups.compactMap { id in
       var sessions = buckets[id] ?? []
       if id == pinnedId { sessions = orderPinned(sessions, pinOrder: pinOrder) }
@@ -101,10 +103,12 @@ enum InboxSections {
     }
   }
 
-  /// The owner's chats, plus any child tab whose parent is theirs so trees stay whole.
+  /// Keep complete families containing the owner's chats, including parent context.
   static func owned(_ sessions: [SessionItem], by owner: String) -> [SessionItem] {
-    let mine = Set(sessions.filter { $0.userId == owner }.map(\.id))
-    return sessions.filter { mine.contains($0.id) || $0.parentSessionId.map(mine.contains) == true }
+    SessionRows.tree(sessions, all: sessions).flatMap { family in
+      let members = [family.session] + family.children
+      return members.contains { $0.userId == owner } ? members : []
+    }
   }
 
   /// Quiet chats beyond this many top-level rows fold behind "Show all" in the status view.
@@ -115,7 +119,9 @@ enum InboxSections {
   static func timeline(_ catalog: SessionCatalog, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
     let home = HomeRows(catalog, now: now)
     var buckets: [String: [SessionItem]] = [:]
-    for session in home.visible { buckets[activityBucket(session.activityAt, now: now), default: []].append(session) }
+    for family in home.families {
+      buckets[activityBucket(family.session.activityAt, now: now), default: []] += [family.session] + family.children
+    }
     return ["today", "yesterday", "week", "month", "older"].compactMap { id in
       guard let sessions = buckets[id], !sessions.isEmpty else { return nil }
       return section(id, header: String(localized: String.LocalizationValue("inbox.section." + id), bundle: .lody), rows: home.rows(sessions))
@@ -128,10 +134,10 @@ enum InboxSections {
     let home = HomeRows(catalog, now: now)
     var order: [String] = []
     var groups: [String: [SessionItem]] = [:]
-    for session in home.visible {
-      let key = SessionRows.isChat(session.projectId) ? chatId : session.projectId
+    for family in home.families {
+      let key = SessionRows.isChat(family.session.projectId) ? chatId : family.session.projectId
       if groups[key] == nil { order.append(key) }
-      groups[key, default: []].append(session)
+      groups[key, default: []] += [family.session] + family.children
     }
     return order.map { key in
       let header = key == chatId ? String(localized: "inbox.section.chat", bundle: .lody) : home.names[key] ?? ""
@@ -143,7 +149,9 @@ enum InboxSections {
   static func byStatus(_ catalog: SessionCatalog, idleExpanded: Bool = false, now: Double = LodyRelativeTime.now()) -> [LodyListSection] {
     let home = HomeRows(catalog, now: now)
     var groups: [HomeStatusGroup: [SessionItem]] = [:]
-    for session in home.visible { groups[HomeStatusGroup(session), default: []].append(session) }
+    for family in home.families {
+      groups[HomeStatusGroup(family.session), default: []] += [family.session] + family.children
+    }
     return HomeStatusGroup.allCases.compactMap { group in
       guard let sessions = groups[group], !sessions.isEmpty else { return nil }
       let header = String(localized: String.LocalizationValue("home.group." + group.rawValue), bundle: .lody)
@@ -179,10 +187,15 @@ enum InboxSections {
       visible = catalog.sessions.filter { !$0.archived }.sorted { $0.activityAt > $1.activityAt }
     }
 
+    var families: [(session: SessionItem, children: [SessionItem])] {
+      SessionRows.tree(visible, all: catalog.sessions)
+    }
+
     func rows(_ sessions: [SessionItem], showsPlace: Bool = true, maxRoots: Int = .max) -> [LodyListRow] {
-      SessionRows.treeRows(sessions, all: catalog.sessions, maxRoots: maxRoots) { session in
+      let rootProjects = Set(SessionRows.tree(sessions, all: catalog.sessions).map { $0.session.projectId })
+      return SessionRows.treeRows(sessions, all: catalog.sessions, maxRoots: maxRoots) { session in
         var row = SessionRows.row(session, projectName: InboxSections.place(session, names), now: now)
-        row.place = showsPlace && !SessionRows.isChat(session.projectId) ? names[session.projectId] ?? "" : ""
+        row.place = (showsPlace || !rootProjects.contains(session.projectId)) && !SessionRows.isChat(session.projectId) ? names[session.projectId] ?? "" : ""
         row.placeIsRepo = repos.contains(session.projectId)
         return row
       }

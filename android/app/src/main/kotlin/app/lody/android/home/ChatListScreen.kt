@@ -242,7 +242,7 @@ fun ChatListScreen(
             // A project header already names the project, so rows drop it from their detail line.
             tab == HomeTab.Chats -> HomeList(
                 sections,
-                if (grouping == HomeGrouping.Project) details - ChatRowDetail.Project else details,
+                details,
                 padding,
                 empty = state.placeholder,
                 listState = chatsListState,
@@ -650,7 +650,7 @@ internal fun HomeList(
             }
             items(section.visibleChats(idleExpanded), key = { "${section.id}/${it.id}" }) { chat ->
                 ChatRow(
-                    chat, details, now,
+                    chat, if (section.header is HomeSection.Header.Project && chat.nestedUnder == null) details - ChatRowDetail.Project else details, now,
                     expanded = if (chat.treeParent) chat.id !in folded else null,
                     onToggle = { toggleOpener(chat.id) },
                 ) { onOpenChat(chat) }
@@ -658,7 +658,7 @@ internal fun HomeList(
             if (section.folds) {
                 item(key = "${section.id}/more") {
                     MoreRow(
-                        if (idleExpanded) showLess else pluralStringResource(R.plurals.home_group_show_all, section.chats.size, section.chats.size),
+                        if (idleExpanded) showLess else pluralStringResource(R.plurals.home_group_show_all, section.rootCount, section.rootCount),
                         onToggleIdle,
                     )
                 }
@@ -666,12 +666,6 @@ internal fun HomeList(
         }
     }
 }
-
-/** The status view's idle group folds after [ChatListModel.IDLE_LIMIT] chats. */
-private val HomeSection.folds: Boolean
-    get() = (header as? HomeSection.Header.Status)?.group == StatusGroup.Idle && chats.size > ChatListModel.IDLE_LIMIT
-
-private fun HomeSection.visibleChats(idleExpanded: Boolean) = if (folds && !idleExpanded) chats.take(ChatListModel.IDLE_LIMIT) else chats
 
 @Composable
 private fun HomeSection.Header.title(): String = when (this) {
