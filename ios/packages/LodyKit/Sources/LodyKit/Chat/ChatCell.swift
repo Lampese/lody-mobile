@@ -230,6 +230,8 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   var collapsedHeight: CGFloat = ChatMessageContent.maximumCollapsedHeight
   var expandable = false
   private var markReady = false
+  /// The summary's text, to place its chevron right after it.
+  private var shownText = NSAttributedString()
   override init(frame: CGRect) {
     super.init(frame: frame)
     bubble.backgroundColor = .lodyUserBubble
@@ -307,6 +309,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     let sameRow = self.row?.id == row.id
     let previousSymbol = self.row?.symbol ?? ""
     label.setText(text, animate: row.streaming, reset: !sameRow)
+    shownText = text
     self.row = row
     if row.kind == "user" { ChatSendHandoff.hold(id: row.entryID, target: messageContent) }
     else { messageContent.isHidden = false }
@@ -441,7 +444,11 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     processDetail.frame = CGRect(x: x, y: processTitle.frame.maxY + 2, width: textWidth, height: lines.detail - 2)
     let glyph = LodyDesign.Rail.glyph
     processGlyph.frame = CGRect(x: Self.railCenter - glyph / 2, y: processTitle.frame.midY - glyph / 2, width: glyph, height: glyph)
-    processChevron.frame = CGRect(x: width - 16, y: (height - 16) / 2, width: 16, height: 16)
+    // The chevron follows the title ("Worked for 2m ›"), as process summaries do.
+    let titleUsed = processTitle.attributedText?.boundingRect(
+      with: CGSize(width: textWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil
+    ).width ?? textWidth
+    processChevron.frame = CGRect(x: min(width - 16, x + ceil(titleUsed) + 2), y: processTitle.frame.midY - 8, width: 16, height: 16)
     let path = UIBezierPath()
     if row.treeDown && !processGlyph.isHidden {
       path.move(to: CGPoint(x: Self.railCenter, y: processGlyph.frame.maxY + 3))
@@ -649,7 +656,15 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
         ? (label.lineAdvances(width: textWidth).first ?? height)
         : height
       icon.frame = Self.iconFrame(for: row, textY: y, textHeight: markHeight)
-      processChevron.frame = CGRect(x: width - 16, y: icon.frame.midY - 8, width: 16, height: 16)
+      // A process summary's chevron follows its text ("Ran 2 commands ›"), not the row's edge.
+      var chevronX = width - 16
+      if row.kind == "summary" {
+        let used = shownText.boundingRect(
+          with: CGSize(width: textWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil
+        ).width
+        chevronX = min(width - 16, inset + ceil(used) + 2)
+      }
+      processChevron.frame = CGRect(x: chevronX, y: icon.frame.midY - 8, width: 16, height: 16)
     }
   }
 

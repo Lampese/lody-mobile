@@ -227,25 +227,25 @@ class SessionController: UIViewController {
   /// The conversation's Tabs (itself first), for the title's panel.
   private var directoryTabs: [SessionItem] = []
 
-  /// The title's Tabs panel, hanging below the header: each Tab with the Chats list's status
-  /// mark, the current one checked, then New Tab.
+  /// The title's Tabs panel, opening just below the header: each Tab with the Chats list's
+  /// status mark, the current one checked, then New Tab. Tapping the title again closes it.
   private func presentTabs() {
     let host: UIViewController = parent ?? self
+    if let shown = ChatTabsOverlay.shown(in: host.view) { return shown.close() }
     guard host.presentedViewController == nil else { return }
     let tabs = directoryTabs.count > 1 ? directoryTabs : []
     let items = tabs.map { ChatTabItem(id: $0.id, title: $0.title, attention: Attention($0), current: $0.id == sessionId) }
+    weak var overlay: ChatTabsOverlay?
     let panel = ChatTabsPanel(
       tabs: items, creating: creatingTab,
-      onSelect: { [weak self, weak host] id in
-        host?.dismiss(animated: true)
-        self?.titleMenuSelected("tab:" + id)
+      onSelect: { [weak self] id in
+        overlay?.close { self?.titleMenuSelected("tab:" + id) }
       },
-      onNew: { [weak self, weak host] in
-        host?.dismiss(animated: true)
-        self?.titleMenuSelected("newTab")
+      onNew: { [weak self] in
+        overlay?.close { self?.titleMenuSelected("newTab") }
       }
     )
-    ChatTabsPopover.present(panel, tabs: items.count, from: host, below: host.navigationController?.navigationBar, fallback: chat.titleView)
+    overlay = ChatTabsOverlay.present(panel, tabs: items.count, in: host)
   }
 
   private func createTab() {
