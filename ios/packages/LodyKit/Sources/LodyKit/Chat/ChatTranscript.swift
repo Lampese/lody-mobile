@@ -172,7 +172,8 @@ enum ChatAuthors {
 
   static func readState(_ status: String) -> String {
     switch status {
-    case "seen", "completed", "done": "seen"
+    // Execution outcomes acknowledge receipt even if the run failed or was canceled.
+    case "seen", "processing", "handled", "failed", "canceled", "completed", "done": "seen"
     case "queued": "queued"
     default: "sent"
     }
