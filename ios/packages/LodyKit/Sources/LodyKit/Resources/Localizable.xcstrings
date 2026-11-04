@@ -17892,6 +17892,13 @@
       },
       "comment": "1: count; 2: total"
     },
+    "workspaceChanges.menuTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "变更" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Changes" } }
+      }
+    },
     "workspaceChanges.title": {
       "extractionState": "manual",
       "localizations": {

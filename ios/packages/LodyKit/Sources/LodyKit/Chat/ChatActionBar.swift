@@ -230,7 +230,7 @@ struct ChatActionBarContent: View {
     var actions = context?.actions ?? []
     if let diff = state.diff, diff.tap == true {
       actions.insert(.init(
-        id: "diff", title: "\(String(localized: "workspaceChanges.title", bundle: .lody)) +\(diff.added) −\(diff.removed)", symbol: "plus.forwardslash.minus"
+        id: "diff", title: String(localized: "workspaceChanges.menuTitle", bundle: .lody), symbol: "plus.forwardslash.minus"
       ), at: 0)
     }
     let label = HStack(spacing: 6) {
@@ -255,18 +255,14 @@ struct ChatActionBarContent: View {
       .padding(.horizontal, 12)
       .frame(minHeight: ChatActionBarView.rowHeight)
       .contentShape(Capsule())
-    return Group {
-      // A PR capsule opens the PR panel on tap and keeps its menu on a long press.
-      if context?.tap == true {
-        Menu { menu(actions, prefix: "context", title: context?.menuTitle) } label: { label } primaryAction: { onAction("context:pr") }
-      } else {
-        Menu { menu(actions, prefix: "context", title: context?.menuTitle) } label: { label }
-      }
-    }
+    return ContextActionsPopover(
+      actions: actions, title: context?.menuTitle, diff: state.diff,
+      primaryAction: context?.tap == true ? { onAction("context:pr") } : nil,
+      onAction: { onAction("context:" + $0) }, label: label
+    )
     .buttonStyle(.plain)
     .glassEffect(.regular, in: .capsule)
     .accessibilityLabel([context?.accessibilityLabel, state.diff?.accessibilityLabel].compactMap { $0 }.joined(separator: ", "))
-    .menuOrder(.fixed)
     .accessibilityIdentifier("session-bar:context")
   }
 
@@ -418,5 +414,61 @@ final class ChatActionBarView: UIView {
       update()
       isHidden = !shown
     }
+  }
+}
+
+/// Native popover content keeps semantic diff colours, which system menu titles discard.
+private struct ContextActionsPopover<Label: View>: View {
+  let actions: [ChatMenuAction]
+  let title: String?
+  let diff: ChatActionBarState.Diff?
+  let primaryAction: (() -> Void)?
+  let onAction: (String) -> Void
+  let label: Label
+  @State private var presented = false
+
+  var body: some View {
+    label
+      .accessibilityElement(children: .ignore)
+      .onTapGesture {
+        if let primaryAction { primaryAction() } else { presented = true }
+      }
+      .onLongPressGesture { presented = true }
+      .accessibilityAddTraits(.isButton)
+      .popover(isPresented: $presented, arrowEdge: .bottom) {
+        VStack(alignment: .leading, spacing: LodySpacing.xs) {
+          if let title, !title.isEmpty {
+            Text(title).font(.subheadline).foregroundStyle(LodyColor.textSecondary)
+              .lineLimit(1).padding(.horizontal, LodySpacing.md)
+              .padding(.vertical, LodySpacing.sm)
+          }
+          ForEach(actions) { action in
+            Button {
+              presented = false
+              onAction(action.id)
+            } label: {
+              HStack(spacing: LodySpacing.md) {
+                Image(systemName: action.symbol).frame(width: LodyIconSize.md)
+                Text(action.title)
+                if action.id == "diff", let diff {
+                  Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
+                  Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
+                }
+              }
+              .font(.body.monospacedDigit())
+              .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+              .padding(LodySpacing.md)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(LodyColor.textPrimary)
+            .disabled(action.disabled == true)
+          }
+        }
+        .padding(LodySpacing.sm)
+        .fixedSize(horizontal: true, vertical: true)
+        .presentationCompactAdaptation(.popover)
+      }
   }
 }

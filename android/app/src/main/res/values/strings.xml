@@ -287,5 +287,5 @@
         <item quantity="one">⋯ %d unchanged line</item>
         <item quantity="other">⋯ %d unchanged lines</item>
     </plurals>
-    <string name="bar_workspace_changes">Workspace changes</string>
+    <string name="bar_workspace_changes">Changes</string>
 </resources>
