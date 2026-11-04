@@ -34,6 +34,7 @@ export type Capability = {
 
 export type CreationOptions = {
   availability?: 'online' | 'offline' | 'unknown';
+  onlineMachineIds?: string[];
   sessionId: string;
   project?: Project;
   agents: {

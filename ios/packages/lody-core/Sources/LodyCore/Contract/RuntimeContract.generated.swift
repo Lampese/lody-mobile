@@ -1063,12 +1063,14 @@ extension RuntimeContract {
 
   public struct CreationOptions: Codable, Sendable, Equatable {
     public var availability: CreationOptionsAvailability?
+    public var onlineMachineIds: [String]?
     public var sessionId: String
     public var project: Project?
     public var agents: [CreationOptionsAgentsItem]
     public var capabilities: [Capability]
-    public init(availability: CreationOptionsAvailability? = nil, sessionId: String, project: Project? = nil, agents: [CreationOptionsAgentsItem], capabilities: [Capability]) {
+    public init(availability: CreationOptionsAvailability? = nil, onlineMachineIds: [String]? = nil, sessionId: String, project: Project? = nil, agents: [CreationOptionsAgentsItem], capabilities: [Capability]) {
       self.availability = availability
+      self.onlineMachineIds = onlineMachineIds
       self.sessionId = sessionId
       self.project = project
       self.agents = agents
@@ -1077,6 +1079,7 @@ extension RuntimeContract {
     public init(from decoder: any Decoder) throws {
       let c = try decoder.container(keyedBy: Key.self)
       self.availability = try c.decodeIfPresent(CreationOptionsAvailability.self, forKey: Key("availability"))
+      self.onlineMachineIds = try c.decodeIfPresent([String].self, forKey: Key("onlineMachineIds"))
       self.sessionId = try c.decode(String.self, forKey: Key("sessionId"))
       self.project = try c.decodeIfPresent(Project.self, forKey: Key("project"))
       self.agents = try c.decode([CreationOptionsAgentsItem].self, forKey: Key("agents"))
@@ -1085,6 +1088,7 @@ extension RuntimeContract {
     public func encode(to encoder: any Encoder) throws {
       var c = encoder.container(keyedBy: Key.self)
       try c.encodeIfPresent(self.availability, forKey: Key("availability"))
+      try c.encodeIfPresent(self.onlineMachineIds, forKey: Key("onlineMachineIds"))
       try c.encode(self.sessionId, forKey: Key("sessionId"))
       try c.encodeIfPresent(self.project, forKey: Key("project"))
       try c.encode(self.agents, forKey: Key("agents"))

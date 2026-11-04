@@ -106,3 +106,26 @@ test('presence uses the workspace meta channel and a grant-provided dedicated or
     'https://presence.streams.example/ds/lody/w%3Ameta?ephemeral=presence',
   );
 });
+
+test('creation exposes confirmed machine presence independently of installed assistants', () => {
+  const options = { agents: [], capabilities: [] };
+  assert.deepEqual(
+    availableCreationOptions(options, {
+      state: 'live',
+      onlineMachineIds: ['empty-machine'],
+    }).onlineMachineIds,
+    ['empty-machine'],
+  );
+  assert.deepEqual(
+    availableCreationOptions(options, { state: 'live', onlineMachineIds: [] })
+      .onlineMachineIds,
+    [],
+  );
+  assert.equal(
+    availableCreationOptions(options, {
+      state: 'unknown',
+      onlineMachineIds: [],
+    }).onlineMachineIds,
+    undefined,
+  );
+});

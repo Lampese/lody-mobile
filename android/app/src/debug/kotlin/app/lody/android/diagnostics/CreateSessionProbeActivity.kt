@@ -19,6 +19,7 @@ class CreateSessionProbeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val result = intent.getStringExtra("result") ?: "accepted"
+        val presenceMode = intent.getStringExtra("presence")
         val branchMode = intent.getStringExtra("branches")
         var calls = 0
         val service = object : CreationService {
@@ -32,6 +33,7 @@ class CreateSessionProbeActivity : ComponentActivity() {
             override suspend fun options(scope: RuntimeScope, projectId: String?) = CreationOptions(
                 listOf(CreationAgent("agent", "Fixture assistant", "machine", "builtin", "fixture")),
                 listOf(CreationCapability("machine", "builtin", "fixture", listOf(CreationChoice("model", "Fixture model")), listOf(CreationChoice("auto", "Automatic")), mapOf("model" to listOf("low", "high")))),
+                onlineMachineIds = if (presenceMode == "mixed") setOf("machine", "empty") else null,
             )
             override suspend fun create(scope: RuntimeScope, request: CreateRequest): CreationReceipt {
                 check(++calls == 1) { "Duplicate creation" }
@@ -40,7 +42,11 @@ class CreateSessionProbeActivity : ComponentActivity() {
                 return CreationReceipt(request.sessionId, result)
             }
         }
-        val catalog = CatalogSnapshot(1, if (branchMode == null) emptyList() else listOf(CatalogProject("github:Fixture/Repo", "", "Fixture/Repo", "")), emptyList(), listOf("machine"), mapOf("machine" to "Fixture computer"))
+        val baseCatalog = CatalogSnapshot(1, if (branchMode == null) emptyList() else listOf(CatalogProject("github:Fixture/Repo", "", "Fixture/Repo", "")), emptyList(), listOf("machine"), mapOf("machine" to "Fixture computer"))
+        val catalog = if (presenceMode == "mixed") baseCatalog.copy(
+            machineIds = listOf("offline", "machine", "empty", "offline2"),
+            machineNames = mapOf("offline" to "Offline desktop", "machine" to "Online computer", "empty" to "Online without assistants", "offline2" to "Offline server"),
+        ) else baseCatalog
         setContent {
             LodyTheme {
                 var receipt by remember { mutableStateOf<String?>(null) }

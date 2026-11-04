@@ -293,4 +293,5 @@
         <item quantity="other">⋯ %d unchanged lines</item>
     </plurals>
     <string name="bar_workspace_changes">Changes</string>
+    <string name="create_machine_no_agents">No available assistants</string>
 </resources>

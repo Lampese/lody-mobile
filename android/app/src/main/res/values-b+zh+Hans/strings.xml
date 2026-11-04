@@ -292,4 +292,5 @@
         <item quantity="other">⋯ %d 行未改动</item>
     </plurals>
     <string name="bar_workspace_changes">变更</string>
+    <string name="create_machine_no_agents">无可用助手</string>
 </resources>

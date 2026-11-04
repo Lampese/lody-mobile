@@ -19,6 +19,7 @@ internal object CreationJson {
             }, c.optString("agentConfigId").takeIf { it.isNotBlank() }, defaultModel, defaultEfforts)
         },
         value.optString("availability", "unknown"),
+        value.optJSONArray("onlineMachineIds")?.let { ids -> (0 until ids.length()).map { ids.getString(it) }.toSet() },
     )
     fun encodeOptions(value: CreationOptions) = JSONObject().apply {
         put("availability", value.availability)

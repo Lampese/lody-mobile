@@ -3,7 +3,7 @@
   "commit": "216d24ee8163821783f6cbd41604c761fc61ee74",
   "license": "AGPL-3.0-only",
   "path": "ios/packages/cloud-runtime",
-  "note": "Base commit snapshot plus reviewed local capability-refresh and directory Tab changes shared verbatim with ios/packages/cloud-runtime; recorded in e7df50f. Agent Role creation (role run config and emoji in the listing, sendTurn agentRoleId resolved from the fresh row, createSession role provenance) shared verbatim with ios/packages/cloud-runtime in the same change.",
+  "note": "Base commit snapshot plus reviewed local capability-refresh and directory Tab changes shared verbatim with ios/packages/cloud-runtime; recorded in e7df50f. Agent Role creation (role run config and emoji in the listing, sendTurn agentRoleId resolved from the fresh row, createSession role provenance) shared verbatim with ios/packages/cloud-runtime in the same change. Creation options expose confirmed online machine IDs for the Android computer picker, copied verbatim from the shared runtime in this change.",
   "localSourceFiles": [
     "contract/runtime-contract.json",
     "src/contract/projects.ts",
@@ -22,6 +22,8 @@
     "src/protocol/agent-roles.ts",
     "src/runtime/agent-roles.ts",
     "src/runtime/role-settings.ts",
-    "src/runtime/session.ts"
+    "src/runtime/session.ts",
+    "src/models/send.ts",
+    "src/runtime/machine-presence.ts"
   ]
 }

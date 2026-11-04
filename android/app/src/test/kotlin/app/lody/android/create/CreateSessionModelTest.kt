@@ -31,6 +31,14 @@ class CreateSessionModelTest {
     }
 
     @Test
+    fun machinesKeepStableOrderWithinPresenceGroups() {
+        val catalog = snapshot.copy(machineIds = listOf("offline", "m2", "m1", "offline"))
+        assertEquals(listOf("m2", "m1", "offline"), CreateSessionModel.machines(catalog, setOf("m1", "m2")).map { it.first })
+        assertEquals(listOf("offline", "m2", "m1"), CreateSessionModel.machines(catalog).map { it.first })
+        assertEquals(listOf("offline", "m2", "m1"), CreateSessionModel.machines(catalog, emptySet()).map { it.first })
+    }
+
+    @Test
     fun localProjectsFixTheirComputerAndOnlyLocalOnesKeepWorktree() {
         val github = CreateSessionModel.initial(snapshot)
         assertEquals("github:lody/web", github.projectId)

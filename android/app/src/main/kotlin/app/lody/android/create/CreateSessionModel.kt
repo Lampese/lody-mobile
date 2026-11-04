@@ -30,8 +30,8 @@ object CreateSessionModel {
     fun isChat(projectId: String) = projectId.endsWith(":unassigned")
 
     /** Computers by id with their display name (the id when the catalog has none). */
-    fun machines(snapshot: CatalogSnapshot): List<Pair<String, String>> =
-        snapshot.machineIds.distinct().map { it to (snapshot.machineNames[it] ?: it) }
+    fun machines(snapshot: CatalogSnapshot, onlineMachineIds: Set<String>? = null): List<Pair<String, String>> =
+        snapshot.machineIds.distinct().sortedBy { onlineMachineIds != null && it !in onlineMachineIds }.map { it to (snapshot.machineNames[it] ?: it) }
 
     /** Projects, most recently active first (matching Home's by-project order). */
     fun projects(snapshot: CatalogSnapshot): List<CatalogProject> {

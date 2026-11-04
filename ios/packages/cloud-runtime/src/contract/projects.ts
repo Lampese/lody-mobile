@@ -69,6 +69,7 @@ export const CreationOptionsParams = z
 export const CreationOptions = z
   .object({
     availability: z.enum(['online', 'offline', 'unknown']).optional(),
+    onlineMachineIds: z.array(z.string()).optional(),
     sessionId: z.string().min(1),
     project: Project.optional(),
     agents: z.array(

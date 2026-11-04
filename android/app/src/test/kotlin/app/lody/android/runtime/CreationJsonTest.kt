@@ -5,6 +5,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CreationJsonTest {
+    @Test fun machinePresenceIsReadButNeverRestoredFromCache() {
+        val options = CreationJson.options(JSONObject("""{"availability":"online","agents":[],"capabilities":[],"onlineMachineIds":["without-agent"]}"""))
+        assertEquals(setOf("without-agent"), options.onlineMachineIds)
+        assertNull(CreationJson.options(CreationJson.encodeOptions(options)).onlineMachineIds)
+        assertEquals(emptySet<String>(), CreationJson.options(JSONObject("""{"onlineMachineIds":[]}""")).onlineMachineIds)
+        assertNull(CreationJson.options(JSONObject()).onlineMachineIds)
+    }
+
     @Test fun completeOptionsSurvivePersistenceRoundTrip() {
         val a = CreationAgent("provider", "Provider", "machine", "acp", "codex")
         val c = CreationCapability("machine", "acp", "codex", listOf(CreationChoice("m", "Model")), listOf(CreationChoice("auto", "Auto")), mapOf("m" to listOf("low", "high")), "provider")

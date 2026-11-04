@@ -5,7 +5,7 @@ data class CreationAgent(val id: String, val name: String, val machineId: String
 data class CreationCapability(val machineId: String, val cliType: String, val agentType: String, val models: List<CreationChoice>, val modes: List<CreationChoice>, val efforts: Map<String, List<String>>, val agentConfigId: String? = null, val defaultModelId: String? = null, val defaultEfforts: List<String> = emptyList()) {
     fun effortsFor(modelId: String?): List<String> = efforts[modelId ?: defaultModelId] ?: defaultEfforts
 }
-data class CreationOptions(val agents: List<CreationAgent>, val capabilities: List<CreationCapability>, val availability: String = "online") {
+data class CreationOptions(val agents: List<CreationAgent>, val capabilities: List<CreationCapability>, val availability: String = "online", val onlineMachineIds: Set<String>? = null) {
     fun capability(agent: CreationAgent?): CreationCapability? {
         if (agent == null) return null
         return capabilities.firstOrNull { it.machineId == agent.machineId && it.agentConfigId == agent.id }

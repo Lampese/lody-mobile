@@ -137,6 +137,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val notice = { scope.launch { snackbar.showSnackbar(unavailable) }; Unit }
     var options by remember(runtimeScope) { mutableStateOf<CreationOptions?>(null) }
     var targetChosen by remember(runtimeScope) { mutableStateOf(false) }
+    var onlineMachines by remember(runtimeScope) { mutableStateOf<Set<String>?>(null) }
     var optionsFresh by remember(runtimeScope) { mutableStateOf(false) }
     var agentId by rememberSaveable { mutableStateOf<String?>(null) }
     var modelId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -196,6 +197,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         // Refresh on runtime/catalog/presence changes, never on a timer.
         try {
             repository.observeOptions(runtimeScope).collect { loaded ->
+                onlineMachines = loaded?.onlineMachineIds
                 optionsFresh = loaded != null && loaded.availability == "online"
                 if (loaded != null) {
                     options = loaded
@@ -204,7 +206,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
             }
         }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { optionsFresh = false }
+        catch (_: Exception) { optionsFresh = false; onlineMachines = null }
     }
     LaunchedEffect(runtimeScope, target.projectId, target.chat, branchPage, branchAttempt) {
         if (!github) return@LaunchedEffect
@@ -284,7 +286,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                     verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
                     ContextPanel(catalog, target, onSearchFocus = { searchFocused = it }, open = openContext, onOpenChange = { openContext = it },
-                        availableMachines = options?.agents?.map { it.machineId }?.toSet().takeIf { optionsFresh },
+                        availableMachines = options?.agents?.map { it.machineId }?.toSet().takeIf { onlineMachines != null },
+                        onlineMachines = onlineMachines,
                         onChange = { if (!attempted) { targetChosen = true; target = it } })
                     if (github) BranchLine(branches, branchLoading, branchFailed, enabled = !attempted,
                         onSearchFocus = { searchFocused = it }, open = openContext == "branch", onOpenChange = { openContext = if (it) "branch" else null },
@@ -400,23 +403,25 @@ private const val EFFORT = "effort"
 private const val MODE = "mode"
 
 @Composable
-private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearchFocus: (Boolean) -> Unit, open: String?, onOpenChange: (String?) -> Unit, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
+private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearchFocus: (Boolean) -> Unit, open: String?, onOpenChange: (String?) -> Unit, onlineMachines: Set<String>?, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
     // One list open at a time, as web's picker coordinator.
     val dismissKeyboard = rememberKeyboardDismissal()
     val toggle = { id: String -> dismissKeyboard(); onOpenChange(if (open == id) null else id) }
 
-    val machines = CreateSessionModel.machines(catalog)
+    val machines = CreateSessionModel.machines(catalog, onlineMachines)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
-    val unavailableMachine = stringResource(R.string.create_no_available_agents)
+    val unavailableMachine = stringResource(R.string.create_machine_no_agents)
+    val offlineMachine = stringResource(R.string.home_offline)
     PickerCard(
         onSearchFocus = onSearchFocus,
         icon = machineIcon(catalog, target.machineId),
         title = machineName ?: stringResource(R.string.create_pick_machine),
         placeholder = machineName == null,
         options = if (CreateSessionModel.machineChoosable(catalog)) machines.map { (id, name) ->
+            val offline = onlineMachines != null && id !in onlineMachines
             val unavailable = availableMachines != null && id !in availableMachines
             PickerOption(id, name, selected = id == target.machineId, icon = machineIcon(catalog, id),
-                subtitle = if (unavailable) unavailableMachine else "", disabled = unavailable)
+                subtitle = if (offline) offlineMachine else if (unavailable) unavailableMachine else "", disabled = offline || unavailable)
         } else emptyList(),
         open = open == MACHINE,
         onToggle = { toggle(MACHINE) },
