@@ -775,12 +775,12 @@ private fun Composer(
                 }
             },
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             ComposerButton(LodyIcons.Plus, stringResource(R.string.create_attach), onAttach)
             // The run-config chip: assistant mark + model · effort · mode (mode dimmed), as iOS.
             Row(
                 Modifier
-                    .weight(1f, fill = false)
+                    .weight(1f)
                     .heightIn(min = LodySize.controlMd)
                     .clip(RoundedCornerShape(LodyRadius.md))
                     .clickable(role = Role.Button, onClick = onRunConfig)
@@ -804,7 +804,6 @@ private fun Composer(
                 ModeMark(mode, modeLabel)
 
             }
-            Spacer(Modifier.weight(1f))
             val ready = enabled && prompt.isNotBlank()
             val send = stringResource(R.string.create_send)
             Box(
