@@ -152,7 +152,7 @@ class CreateSessionHostController: UIViewController {
       return options
     }
     controller.loadRoles = { [weak self] in
-      guard self != nil else { throw CancellationError() }
+      guard let self else { throw CancellationError() }
       return try await service.roles(workspaceId)
     }
     controller.loadRepositories = { [weak self] in
