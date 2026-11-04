@@ -308,7 +308,6 @@
     <string name="mention_loading">Loading…</string>
     <string name="mention_back">Back</string>
     <string name="mention_directory">Reference folder %1$s</string>
-    <string name="home_project_none">No chats</string>
     <string name="home_projects_source">Source</string>
     <string name="home_projects_source_all">All</string>
     <string name="home_projects_source_github">GitHub</string>

@@ -211,38 +211,40 @@ final class ProjectsListController: UIViewController, UICollectionViewDelegate {
   }
 }
 
-/// One project card (Android `ProjectCardView`). Line 1: the repository owner's avatar (GitHub)
-/// or a folder (local), the name, and when it last moved. Line 2, under the name: the computer
-/// (local) or GitHub, and the most pressing state of its open chats.
+/// One project card (Android `ProjectCardView`): a 40 pt logo centred on both lines (the GitHub
+/// owner's avatar, else the name's initial). Line 1: the name and when it last moved. Line 2: the
+/// computer (local) or GitHub, and the most pressing state of its open chats (nothing when none).
 struct ProjectCardView: View {
   let card: ProjectCard
   let now: Double
 
   var body: some View {
-    VStack(alignment: .leading, spacing: LodySpacing.xs) {
-      HStack(spacing: LodySpacing.md) {
-        mark
-        Text(card.title)
-          .lodyTextStyle(.headline)
-          .foregroundStyle(LodyColor.textPrimary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        if let updated = card.updatedAt {
-          Text(LodyRelativeTime.compact(updated, now: now))
+    // The logo is centred on both lines; the text column carries the name and the state.
+    HStack(spacing: LodySpacing.md) {
+      mark
+      VStack(alignment: .leading, spacing: LodySpacing.xxs) {
+        HStack(spacing: LodySpacing.sm) {
+          Text(card.title)
+            .lodyTextStyle(.headline)
+            .foregroundStyle(LodyColor.textPrimary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          if let updated = card.updatedAt {
+            Text(LodyRelativeTime.compact(updated, now: now))
+              .lodyTextStyle(.footnote)
+              .foregroundStyle(LodyColor.textTertiary)
+          }
+        }
+        HStack(spacing: LodySpacing.sm) {
+          Text(card.machine ?? (card.github ? "GitHub" : ""))
             .lodyTextStyle(.footnote)
-            .foregroundStyle(LodyColor.textTertiary)
+            .foregroundStyle(LodyColor.textSecondary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          status
         }
       }
-      HStack(spacing: LodySpacing.sm) {
-        Text(card.machine ?? (card.github ? "GitHub" : ""))
-          .lodyTextStyle(.footnote)
-          .foregroundStyle(LodyColor.textSecondary)
-          .lineLimit(1)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        status
-      }
-      .padding(.leading, LodySize.avatarMd + LodySpacing.md)
     }
     .padding(.horizontal, LodySpacing.lg)
     .padding(.vertical, LodySpacing.md)
@@ -252,24 +254,30 @@ struct ProjectCardView: View {
     .accessibilityAddTraits(.isButton)
   }
 
+  /// GitHub: the repository owner's avatar. Otherwise the project name's first letter.
   @ViewBuilder private var mark: some View {
     if card.github, let avatar = card.avatar, let url = URL(string: avatar) {
       AsyncImage(url: url) { image in
         image.resizable().scaledToFill()
       } placeholder: {
-        Circle().fill(LodyColor.fillSecondary)
+        monogram
       }
-      .frame(width: LodySize.avatarMd, height: LodySize.avatarMd)
+      .frame(width: LodySize.avatarLg, height: LodySize.avatarLg)
       .clipShape(Circle())
       .accessibilityHidden(true)
     } else {
-      Image(systemName: "folder.fill")
-        .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(LodyColor.iconSecondary)
-        .frame(width: LodySize.avatarMd, height: LodySize.avatarMd)
-        .background(LodyColor.fillSecondary, in: Circle())
-        .accessibilityHidden(true)
+      monogram
     }
+  }
+
+  private var monogram: some View {
+    let name = card.github ? (card.title.split(separator: "/").last.map(String.init) ?? card.title) : card.title
+    return Text(name.first.map { String($0).uppercased() } ?? "")
+      .lodyTextStyle(.headline)
+      .foregroundStyle(LodyColor.textSecondary)
+      .frame(width: LodySize.avatarLg, height: LodySize.avatarLg)
+      .background(LodyColor.fillSecondary, in: Circle())
+      .accessibilityHidden(true)
   }
 
   @ViewBuilder private var status: some View {
@@ -296,7 +304,7 @@ struct ProjectCardView: View {
       .attention: "home.projects.attention", .running: "home.projects.running", .finished: "home.projects.finished",
       .pullRequests: "home.projects.pullRequests", .open: "home.projects.open",
     ]
-    guard let key = keys[summary] else { return String(localized: "home.projects.none", bundle: .lody) }
+    guard let key = keys[summary] else { return "" }
     return String.localizedStringWithFormat(String(localized: String.LocalizationValue(key), bundle: .lody), count)
   }
 

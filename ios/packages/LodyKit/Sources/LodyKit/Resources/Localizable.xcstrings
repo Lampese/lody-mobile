@@ -22839,23 +22839,6 @@
         }
       }
     },
-    "home.projects.none": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No chats"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暂无对话"
-          }
-        }
-      }
-    },
     "home.projects.noMatch": {
       "extractionState": "manual",
       "localizations": {

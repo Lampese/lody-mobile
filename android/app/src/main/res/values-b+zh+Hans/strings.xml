@@ -307,7 +307,6 @@
     <string name="mention_loading">正在读取…</string>
     <string name="mention_back">返回</string>
     <string name="mention_directory">引用目录 %1$s</string>
-    <string name="home_project_none">暂无对话</string>
     <string name="home_projects_source">来源</string>
     <string name="home_projects_source_all">全部</string>
     <string name="home_projects_source_github">GitHub</string>

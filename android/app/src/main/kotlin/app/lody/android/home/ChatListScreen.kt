@@ -751,9 +751,9 @@ private fun ProjectCardList(cards: List<ProjectCard>, padding: PaddingValues, em
 }
 
 /**
- * Line 1: the repository owner's avatar (GitHub) or the project's folder (local), the name, and
- * when it last moved. Line 2: the computer (local) or "GitHub", and the most pressing state of its
- * open chats: needs you, running, just finished, open PRs, else how many there are.
+ * A 40 dp logo centred on both lines (the GitHub owner's avatar, else the name's initial). Line 1:
+ * the name and when it last moved. Line 2: the computer (local) or "GitHub", and the most pressing
+ * state of its open chats: needs you, running, just finished, open PRs, else how many there are.
  */
 @Composable
 private fun ProjectCardView(card: ProjectCard, now: Long, modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -768,7 +768,7 @@ private fun ProjectCardView(card: ProjectCard, now: Long, modifier: Modifier = M
         ProjectCard.Summary.Finished -> res.getQuantityString(R.plurals.home_project_finished, count, count)
         ProjectCard.Summary.PullRequests -> res.getQuantityString(R.plurals.home_project_prs, count, count)
         ProjectCard.Summary.Open -> res.getQuantityString(R.plurals.home_project_open, count, count)
-        ProjectCard.Summary.Empty -> stringResource(R.string.home_project_none)
+        ProjectCard.Summary.Empty -> ""
     }
     val summaryColor = when (summary) {
         ProjectCard.Summary.Attention -> colors.warningDefault
@@ -777,7 +777,8 @@ private fun ProjectCardView(card: ProjectCard, now: Long, modifier: Modifier = M
         ProjectCard.Summary.Empty -> colors.textTertiary
     }
     val place = card.machine ?: if (card.github) "GitHub" else ""
-    Column(
+    // The logo is centred on both lines; the text column carries the name and the state.
+    Row(
         modifier
             .fillMaxWidth()
             .clip(shape)
@@ -785,34 +786,35 @@ private fun ProjectCardView(card: ProjectCard, now: Long, modifier: Modifier = M
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {}
             .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.md),
-        verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
-            if (card.github) {
-                Avatar(card.avatar, card.title.take(1), LodySize.avatarMd)
-            } else {
-                Box(Modifier.size(LodySize.avatarMd).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
-                    Glyph(LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
-                }
+        // GitHub: the repository owner's avatar (its initial until it loads). Otherwise the
+        // project name's first letter.
+        val initial = (if (card.github) card.title.substringAfterLast('/') else card.title).take(1).uppercase()
+        if (card.github && card.avatar != null) {
+            Avatar(card.avatar, initial, LodySize.avatarLg)
+        } else {
+            Box(Modifier.size(LodySize.avatarLg).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
+                Text(initial, style = type.headline, color = colors.textSecondary)
             }
-            Text(card.title, style = type.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            card.updatedAt?.let { Text(ageText(it, now), style = type.footnote, color = colors.textTertiary) }
         }
-        Row(
-            // Line 2 starts under the name, past the avatar.
-            Modifier.padding(start = LodySize.avatarMd + LodySpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-        ) {
-            Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            when (summary) {
-                ProjectCard.Summary.Running -> LodyWorkingGrid()
-                ProjectCard.Summary.Attention -> Glyph(LodyIcons.Hand, colors.warningDefault, LodyIconSize.sm)
-                ProjectCard.Summary.Finished -> Box(Modifier.size(LodySpacing.sm).background(colors.accentDefault, CircleShape))
-                ProjectCard.Summary.PullRequests -> Glyph(LodyIcons.PullRequest, colors.iconSecondary, LodyIconSize.sm)
-                else -> Unit
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                Text(card.title, style = type.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                card.updatedAt?.let { Text(ageText(it, now), style = type.footnote, color = colors.textTertiary) }
             }
-            Text(summaryText, style = type.subhead, color = summaryColor, maxLines = 1)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                when (summary) {
+                    ProjectCard.Summary.Running -> LodyWorkingGrid()
+                    ProjectCard.Summary.Attention -> Glyph(LodyIcons.Hand, colors.warningDefault, LodyIconSize.sm)
+                    ProjectCard.Summary.Finished -> Box(Modifier.size(LodySpacing.sm).background(colors.accentDefault, CircleShape))
+                    ProjectCard.Summary.PullRequests -> Glyph(LodyIcons.PullRequest, colors.iconSecondary, LodyIconSize.sm)
+                    else -> Unit
+                }
+                if (summaryText.isNotEmpty()) Text(summaryText, style = type.subhead, color = summaryColor, maxLines = 1)
+            }
         }
     }
 }
