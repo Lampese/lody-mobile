@@ -230,8 +230,7 @@ struct ChatActionBarContent: View {
     var actions = context?.actions ?? []
     if let diff = state.diff, diff.tap == true {
       actions.insert(.init(
-        id: "diff", title: String(localized: "workspaceChanges.title", bundle: .lody), symbol: "plus.forwardslash.minus",
-        subtitle: "+\(diff.added) −\(diff.removed)"
+        id: "diff", title: "\(String(localized: "workspaceChanges.title", bundle: .lody)) +\(diff.added) −\(diff.removed)", symbol: "plus.forwardslash.minus"
       ), at: 0)
     }
     let label = HStack(spacing: 6) {
@@ -267,6 +266,7 @@ struct ChatActionBarContent: View {
     .buttonStyle(.plain)
     .glassEffect(.regular, in: .capsule)
     .accessibilityLabel([context?.accessibilityLabel, state.diff?.accessibilityLabel].compactMap { $0 }.joined(separator: ", "))
+    .menuOrder(.fixed)
     .accessibilityIdentifier("session-bar:context")
   }
 

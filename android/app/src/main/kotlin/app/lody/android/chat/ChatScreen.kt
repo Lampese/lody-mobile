@@ -41,6 +41,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import app.lody.android.R
 import app.lody.android.auth.Account
@@ -984,8 +987,20 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
             if (diff) {
                 // Display only until Android has a workspace changes page.
                 DropdownMenuItem(
-                    text = { Text(counts, style = type.body.copy(fontFeatureSettings = "tnum"), color = colors.textPrimary) },
-                    leadingIcon = { Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
+                    text = {
+                        Text(
+                            buildAnnotatedString {
+                                append(stringResource(R.string.bar_workspace_changes))
+                                append(" ")
+                                withStyle(SpanStyle(color = colors.diffAddedText)) { append("+${bar.added}") }
+                                append(" ")
+                                withStyle(SpanStyle(color = colors.diffRemovedText)) { append("−${bar.removed}") }
+                            },
+                            style = type.body.copy(fontFeatureSettings = "tnum"),
+                            color = colors.textPrimary,
+                        )
+                    },
+                    leadingIcon = { Icon(LodyIcons.Diff, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
                     onClick = { open = false },
                     enabled = false,
                 )

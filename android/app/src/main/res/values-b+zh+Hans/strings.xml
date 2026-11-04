@@ -286,4 +286,5 @@
         <item quantity="one">⋯ %d 行未改动</item>
         <item quantity="other">⋯ %d 行未改动</item>
     </plurals>
+    <string name="bar_workspace_changes">工作区变更</string>
 </resources>
