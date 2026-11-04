@@ -166,12 +166,12 @@ fun ChatTranscript(
     // The turn whose tasks / files a sheet shows, by id, so running tasks keep updating inside it.
     var shownTasks by remember { mutableStateOf<String?>(null) }
     val openTasks: (String) -> Unit = { shownTasks = it }
-    // The changed file whose diff the sheet shows: (turn id, path).
-    var shownDiff by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val openFile: ((String, String) -> Unit)? = if (loadDiff != null) ({ entryId, path -> shownDiff = entryId to path }) else null
-    shownDiff?.let { (entryId, path) ->
-        val file = (entries.firstOrNull { it.id == entryId } as? ChatEntry.Assistant)?.files?.firstOrNull { it.path == path }
-        if (file != null && loadDiff != null) DiffSheet(entryId, file, loadDiff) { shownDiff = null }
+    // The turn whose changed files the sheet shows.
+    var shownFiles by remember { mutableStateOf<String?>(null) }
+    val openFiles: (String) -> Unit = { shownFiles = it }
+    shownFiles?.let { id ->
+        val files = (entries.firstOrNull { it.id == id } as? ChatEntry.Assistant)?.files.orEmpty()
+        if (files.isNotEmpty()) FilesSheet(id, files, loadDiff) { shownFiles = null }
     }
     shownTasks?.let { id ->
         val tasks = entries.firstOrNull { it.id == id }.let { it as? ChatEntry.Assistant }?.layout?.tasks.orEmpty()
@@ -184,7 +184,7 @@ fun ChatTranscript(
     }
     LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
         keys.reset()
-        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFile) }
+        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFiles) }
     }
 }
 
@@ -224,7 +224,7 @@ private fun LazyListScope.transcriptRows(
     toggle: (String, Boolean) -> Unit,
     details: StepDetails,
     onOpenTasks: (String) -> Unit,
-    onOpenFile: ((String, String) -> Unit)?,
+    onOpenFiles: (String) -> Unit,
 ) {
         entries.forEach { entry ->
             when (entry) {
@@ -249,7 +249,7 @@ private fun LazyListScope.transcriptRows(
                         val thinking = last is TurnLayout.Activity && last.items.lastOrNull() is TurnItem.Thought
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
-                    turnOutput(entry, onOpenTasks, onOpenFile, open, toggle)
+                    turnOutput(entry, onOpenTasks, onOpenFiles)
                     turnFooter(entry)
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }

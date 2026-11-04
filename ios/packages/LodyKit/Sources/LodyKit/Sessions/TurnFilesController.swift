@@ -14,6 +14,7 @@ final class TurnFilesController: UIViewController, UICollectionViewDelegate {
 
   let entryId: String
   var onOpen: ((String) -> Void)?
+  var fileCount: Int { files.count }
   private var files: [File] = []
   private var byPath: [String: File] = [:]
   private lazy var collection = UICollectionView(frame: .zero, collectionViewLayout: {

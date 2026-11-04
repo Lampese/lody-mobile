@@ -233,18 +233,6 @@ extension LodyChatView {
         return ChatStream.deferringMarkdown(byEntry[row.entryID] ?? [], previous: frozen)
       }
     }
-    let filesByEntry = Dictionary(transcript.entries.map { ($0.id, ($0.fileDiffs ?? []).filter { !$0.path.isEmpty }) }, uniquingKeysWith: { _, latest in latest })
-    projected = projected.flatMap { row -> [ChatRow] in
-      guard row.kind == "changesHeader" else { return [row] }
-      var header = row
-      let expanded = expandedFileGroups.contains(row.entryID)
-      if expanded { header.group = row.group == "last" ? "middle" : "first" }
-      header.detail = expanded ? "expanded" : ""
-      guard expanded else { return [header] }
-      var list = ChatRow(id: row.entryID + ":changes:list", entryID: row.entryID, kind: "changesList", text: "")
-      list.fileDiffs = filesByEntry[row.entryID] ?? []
-      return [header, list]
-    }
     for index in projected.indices where projected[index].kind == "proposed_plan" {
       if let state = planDecisionState, state.entryId == projected[index].entryID, state.itemId == projected[index].itemID {
         projected[index].planDecision = state
@@ -319,7 +307,6 @@ extension LodyChatView {
     let entryIDsToRetain = Set(projected.map(\.entryID))
     expandedMessages.formIntersection(entryIDsToRetain)
     expandedAttachments.formIntersection(entryIDsToRetain)
-    expandedFileGroups.formIntersection(entryIDsToRetain)
     collapsedMessageHeights = collapsedMessageHeights.filter { entryIDsToRetain.contains($0.key) }
     for row in projected where row.kind == "user" && collapsedMessageHeights[row.entryID] == nil {
       if let height = ChatSendHandoff.sourceHeight(id: row.entryID) {

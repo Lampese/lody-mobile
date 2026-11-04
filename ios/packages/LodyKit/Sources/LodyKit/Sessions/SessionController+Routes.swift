@@ -84,7 +84,9 @@ extension SessionController {
       LodyShell.shared.pushNative("file-diff", title: (path as NSString).lastPathComponent,
         params: ["sessionId": self.sessionId, "entryId": entryId, "path": path], from: page)
     }
-    LodyShell.shared.presentNative(page, title: String(localized: "workspaceChanges.title", bundle: .lody), detents: [1], grabber: true)
+    // Titled like the row that opened it ("3 files").
+    let title = String.localizedStringWithFormat(String(localized: "native.chat.transcript.fileCount", bundle: .lody), page.fileCount)
+    LodyShell.shared.presentNative(page, title: title, detents: [1], grabber: true)
   }
 
   private func activity(entryId: String, itemId: String, from source: UIViewController? = nil) {

@@ -59,8 +59,7 @@ extension LodyChatView {
     }
     if row.kind == "changesHeader" {
       UISelectionFeedbackGenerator().selectionChanged()
-      if !expandedFileGroups.insert(row.entryID).inserted { expandedFileGroups.remove(row.entryID) }
-      applyRows()
+      onActivityPress(["entryId": row.entryID, "itemId": "", "processStartId": "__turnFiles__"])
       return
     }
     if row.kind == "tasksHeader" {
@@ -461,8 +460,7 @@ extension LodyChatView {
     if row.subagent != nil { return ChatSubagentCell.height(row, width: width, traits: traitCollection) }
     if row.kind == "meta" { return ChatMetaCell.height(for: row, width: width, traits: traitCollection, detailsEnabled: turnInfoEnabled) }
     if row.kind == "duration" { return ChatCell.processHeight(for: row, width: width, traits: traitCollection) }
-    if row.kind == "changesHeader" { return ChatFileCell.headerHeight }
-    if row.kind == "changesList" { return ChatFileListCell.height(count: row.fileDiffs.count) }
+    if row.kind == "changesHeader" { return ChatFileCell.headerHeight }  // Same height as the tasks row without a step.
     let measured = measure(row, width: width)
     if row.kind == "user" {
       return ChatMessageContent.height(textHeight: measured,

@@ -464,13 +464,12 @@ private const val OutputLines = 40
 private const val DiffLines = 60
 
 /**
- * The turn's output card: one raised card with a row per kind of output — its background tasks and
- * sub-agents (live spinner or stack glyph, "Waiting on N tasks" / "N tasks", the newest running
- * task's latest step) and its changed files ("3 files +135 −157"). Each row opens its own near
- * full-screen task sheet; changed files expand inline to at most six rows. Neutral tones; iOS
- * draws the same card.
+ * The turn's output card: one raised card with a row per kind of output, both drawn by the same
+ * [OutputRow] so the card reads as one component — its background tasks and sub-agents and its
+ * changed files. Each row opens its own near full-screen sheet ([TasksSheet], [FilesSheet]),
+ * where an item slides to its detail. Neutral tones; iOS draws the same card.
  */
-internal fun LazyListScope.turnOutput(entry: ChatEntry.Assistant, onOpenTasks: (String) -> Unit, onOpenFile: ((String, String) -> Unit)?, open: Map<String, Boolean>, toggle: (String, Boolean) -> Unit) {
+internal fun LazyListScope.turnOutput(entry: ChatEntry.Assistant, onOpenTasks: (String) -> Unit, onOpenFiles: (String) -> Unit) {
     val tasks = entry.layout.tasks
     val files = if (entry.working) emptyList() else entry.files
     if (tasks.isEmpty() && files.isEmpty()) return
@@ -482,13 +481,45 @@ internal fun LazyListScope.turnOutput(entry: ChatEntry.Assistant, onOpenTasks: (
     }
     if (files.isNotEmpty()) {
         item(key = "$key:files", contentType = "output-row") {
-            ChangedFilesCard(
-                files, open["$key:files"] ?: false, joinedTop = tasks.isNotEmpty(),
-                onOpenFile = onOpenFile?.let { opener -> { file -> opener(entry.id, file.path) } },
-            ) { toggle("$key:files", it) }
+            FilesRow(files, Modifier.animateItem().cardSegment(if (tasks.isEmpty()) Segment.Only else Segment.Last)) { onOpenFiles(entry.id) }
         }
     }
     item(key = "$key:end", contentType = "output-end") { androidx.compose.foundation.layout.Spacer(Modifier.padding(bottom = LodySpacing.md)) }
+}
+
+/**
+ * One row of the output card: a leading mark, the title with an optional second line, an
+ * optional trailing detail and the disclosure chevron. The second line and the mark animate in
+ * and out with the row's size.
+ */
+@Composable
+private fun OutputRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    detail: String? = null,
+    leading: @Composable () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
+    onOpen: () -> Unit,
+) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = onOpen)
+            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.size(LodyIconSize.md), contentAlignment = Alignment.Center) { leading() }
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f).animateContentSize()) {
+            Text(title, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            detail?.let { Text(it, style = type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.shimmer()) }
+        }
+        trailing?.invoke()
+        Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+    }
 }
 
 /**
@@ -514,40 +545,98 @@ internal fun LazyListScope.turnFooter(entry: ChatEntry.Assistant) {
 @Composable
 private fun FilesRow(files: List<app.lody.android.runtime.FileChange>, modifier: Modifier = Modifier, onOpen: () -> Unit) {
     val colors = LodyTheme.colors
-    val type = LodyTheme.typography
-    val digits = type.footnote.copy(fontFeatureSettings = "tnum")
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(role = Role.Button, onClick = onOpen)
-            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-    ) {
-        Icon(LodyIcons.Diff, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-        Text(pluralStringResource(R.plurals.chat_files_count, files.size, files.size), style = type.subhead, color = colors.textPrimary, modifier = Modifier.weight(1f))
-        Text("+${files.sumOf { it.added }}", style = digits, color = colors.diffAddedText)
-        Text("−${files.sumOf { it.removed }}", style = digits, color = colors.diffRemovedText)
-        Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
-    }
+    val digits = LodyTheme.typography.footnote.copy(fontFeatureSettings = "tnum")
+    OutputRow(
+        pluralStringResource(R.plurals.chat_files_count, files.size, files.size),
+        modifier,
+        leading = { Icon(LodyIcons.Diff, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm)) },
+        trailing = {
+            Text("+${files.sumOf { it.added }}", style = digits, color = colors.diffAddedText)
+            Text("−${files.sumOf { it.removed }}", style = digits, color = colors.diffRemovedText)
+        },
+        onOpen = onOpen,
+    )
 }
 
 /**
- * One changed file's diff in a near full-screen native sheet, opened from a row of the turn's
- * changed-files card ([DiffPage]); the back arrow, system Back and a swipe down close it.
+ * A turn's changed files in a near full-screen native sheet, the same shape as [TasksSheet]: the
+ * title and totals, then the files as one card of ruled rows (name in code type, folder, +/−); a
+ * row slides to that file's [DiffPage] inside the sheet and the back arrow or system Back slides
+ * back.
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun DiffSheet(
+internal fun FilesSheet(
     entryId: String,
-    file: app.lody.android.runtime.FileChange,
-    loadDiff: suspend (entryId: String, path: String) -> app.lody.android.runtime.FileDiff,
+    files: List<app.lody.android.runtime.FileChange>,
+    loadDiff: (suspend (entryId: String, path: String) -> app.lody.android.runtime.FileDiff)?,
     onDismiss: () -> Unit,
 ) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
     val sheet = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = LodyTheme.colors.bgBase) {
-        DiffPage(entryId, file, loadDiff, onDismiss)
+    var shown by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    androidx.activity.compose.BackHandler(enabled = shown != null) { shown = null }
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgBase) {
+        androidx.compose.animation.AnimatedContent(
+            targetState = shown,
+            transitionSpec = {
+                val forward = targetState != null
+                (androidx.compose.animation.slideInHorizontally { width -> if (forward) width / 3 else -width / 3 } + androidx.compose.animation.fadeIn())
+                    .togetherWith(androidx.compose.animation.slideOutHorizontally { width -> if (forward) -width / 3 else width / 3 } + androidx.compose.animation.fadeOut())
+            },
+            label = "files-sheet",
+        ) { path ->
+            val file = path?.let { wanted -> files.firstOrNull { it.path == wanted } }
+            if (file != null && loadDiff != null) {
+                DiffPage(entryId, file, loadDiff) { shown = null }
+                return@AnimatedContent
+            }
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.fillMaxWidth().fillMaxHeight(0.92f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = LodySpacing.xl),
+            ) {
+                item(key = "title") {
+                    Row(
+                        Modifier.padding(horizontal = TranscriptMargin).padding(bottom = LodySpacing.md),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                    ) {
+                        Text(pluralStringResource(R.plurals.chat_files_count, files.size, files.size), style = type.headline, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                        val digits = type.subhead.copy(fontFeatureSettings = "tnum")
+                        Text("+${files.sumOf { it.added }}", style = digits, color = colors.diffAddedText)
+                        Text("−${files.sumOf { it.removed }}", style = digits, color = colors.diffRemovedText)
+                    }
+                }
+                files.forEachIndexed { index, file ->
+                    item(key = file.path) {
+                        val segment = when {
+                            files.size == 1 -> Segment.Only
+                            index == 0 -> Segment.First
+                            index == files.lastIndex -> Segment.Last
+                            else -> Segment.Middle
+                        }
+                        Row(
+                            Modifier.animateItem().cardSegment(segment).fillMaxWidth().heightIn(min = 52.dp)
+                                .then(if (loadDiff != null) Modifier.clickable(role = Role.Button) { shown = file.path } else Modifier)
+                                .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                        ) {
+                            androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                                Text(file.path.substringAfterLast('/'), style = type.subhead.copy(fontFamily = type.code.fontFamily), color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                                val folder = file.path.substringBeforeLast('/', "")
+                                if (folder.isNotEmpty()) Text(folder, style = type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.StartEllipsis)
+                            }
+                            val digits = type.footnote.copy(fontFeatureSettings = "tnum")
+                            Text("+${file.added}", style = digits, color = colors.diffAddedText)
+                            Text("−${file.removed}", style = digits, color = colors.diffRemovedText)
+                            if (loadDiff != null) Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -697,29 +786,20 @@ private fun Modifier.cardSegment(segment: Segment): Modifier {
 @Composable
 private fun TaskCard(tasks: List<TurnItem.Task>, modifier: Modifier = Modifier, onOpen: () -> Unit) {
     val colors = LodyTheme.colors
-    val type = LodyTheme.typography
     val running = tasks.count { it.running }
-    val latest = tasks.lastOrNull { it.running && it.latest.isNotBlank() }?.latest
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(role = Role.Button, onClick = onOpen)
-            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-    ) {
-        // The mark and the copy cross-fade as tasks start and settle.
-        androidx.compose.animation.Crossfade(running > 0, label = "tasks-mark") { live ->
-            if (live) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm).padding(1.dp), color = colors.iconSecondary, strokeWidth = 1.5.dp)
-            else Icon(LodyIcons.Sessions, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-        }
-        androidx.compose.foundation.layout.Column(Modifier.weight(1f).animateContentSize()) {
-            Text(tasksLabel(tasks), style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            latest?.let { Text(it, style = type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.shimmer()) }
-        }
-        Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
-    }
+    OutputRow(
+        tasksLabel(tasks),
+        modifier,
+        detail = tasks.lastOrNull { it.running && it.latest.isNotBlank() }?.latest,
+        leading = {
+            // The mark cross-fades as tasks start and settle.
+            androidx.compose.animation.Crossfade(running > 0, label = "tasks-mark") { live ->
+                if (live) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm).padding(1.dp), color = colors.iconSecondary, strokeWidth = 1.5.dp)
+                else Icon(LodyIcons.Sessions, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+            }
+        },
+        onOpen = onOpen,
+    )
 }
 
 @Composable

@@ -127,7 +127,6 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var localAttachments: [String: [ChatMessageAttachment]] = [:]
   var expandedPlans = Set<String>()
   var expandedMessages = Set<String>()
-  var expandedFileGroups = Set<String>()
   /// Finished turns whose "Worked for …" fold the reader opened in place.
   var expandedWork = Set<String>()
   /// A row the reader just toggled: the next layout keeps it where it was on screen.
@@ -218,42 +217,16 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var composerHasAcknowledgedSend = false
   private var lastAcknowledgedDraftToken = 0
   private var lastRestoredDraftToken = 0
-  private let fileHeaderRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
-    let content = ChatFileCell.headerContent(for: row.text)
-    cell.directionalLayoutMargins.leading = content.directionalLayoutMargins.leading
-    cell.directionalLayoutMargins.trailing = content.directionalLayoutMargins.trailing
-    cell.contentConfiguration = content
-    cell.apply(group: row.group, selected: false)
-    cell.accessories = []
-    if let file = row.fileDiff {
-      let counts = UILabel()
-      counts.font = LodyDesign.mono(12, compatibleWith: cell.traitCollection)
-      let value = NSMutableAttributedString(string: "+\(file.add ?? 0)", attributes: [.foregroundColor: UIColor.systemGreen])
-      value.append(NSAttributedString(string: "  −\(file.del ?? 0)", attributes: [.foregroundColor: UIColor.systemRed]))
-      counts.attributedText = value
-      // The file summary expands a bounded list within the output card.
-      cell.accessories = [.customView(configuration: .init(customView: counts, placement: .trailing()))]
-      cell.accessibilityLabel = String.localizedStringWithFormat(String(localized: "native.chat.file.diffStats", bundle: .lody), String(describing: file.add ?? 0), String(describing: file.del ?? 0), String(describing: row.text))
-    }
-    cell.configurationUpdateHandler = { cell, state in
-      (cell as? ChatFileCell)?.apply(group: row.group, selected: state.isHighlighted)
-    }
-    cell.isAccessibilityElement = true
-    cell.accessibilityIdentifier = row.id
-    let chevron = UIImageView(image: UIImage(systemName: row.detail == "expanded" ? "chevron.down" : "chevron.right"))
-    chevron.tintColor = .secondaryLabel
-    cell.accessories.append(.customView(configuration: .init(customView: chevron, placement: .trailing())))
-    cell.accessibilityTraits = [.header, .button]
-  }
-
-  /// The task card: the same inset card as changed files, a live spinner or the stack glyph, the
-  /// count, the newest running task's latest step, and a chevron to the task sheet. A state change
-  /// on a visible card cross-fades instead of snapping.
-  private let taskHeaderRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
+  /// One row of the turn's output card. Tasks and changed files share it, so the card reads as
+  /// one component: a leading glyph (a spinner while tasks run), the title, an optional second
+  /// line, an optional trailing detail, and the system disclosure — each row opens its own sheet.
+  /// A state change on a visible row cross-fades instead of snapping.
+  private static func configureOutputRow(_ cell: ChatFileCell, row: ChatRow, symbol: String, live: Bool, trailing: UIView?) {
     var content = ChatFileCell.headerContent(for: row.text)
-    if !row.running { content.image = UIImage(systemName: "square.stack.3d.up") }
+    if !live { content.image = UIImage(systemName: symbol) }
     content.imageProperties.tintColor = .secondaryLabel
     content.imageProperties.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .subheadline, scale: .small)
+    content.imageProperties.reservedLayoutSize = CGSize(width: 22, height: 0)
     if !row.detail.isEmpty {
       content.secondaryText = row.detail
       content.secondaryTextProperties.font = .preferredFont(forTextStyle: .caption1)
@@ -268,12 +241,14 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       cell.contentConfiguration = content
     }
     cell.apply(group: row.group, selected: false)
-    var accessories: [UICellAccessory] = [.disclosureIndicator()]
-    if row.running {
+    var accessories: [UICellAccessory] = []
+    if let trailing { accessories.append(.customView(configuration: .init(customView: trailing, placement: .trailing()))) }
+    accessories.append(.disclosureIndicator())
+    if live {
       let spinner = UIActivityIndicatorView(style: .medium)
       spinner.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
       spinner.startAnimating()
-      accessories.append(.customView(configuration: .init(customView: spinner, placement: .leading())))
+      accessories.append(.customView(configuration: .init(customView: spinner, placement: .leading(), reservedLayoutWidth: .custom(22))))
     }
     cell.accessories = accessories
     cell.configurationUpdateHandler = { cell, state in
@@ -281,8 +256,32 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     }
     cell.isAccessibilityElement = true
     cell.accessibilityIdentifier = row.id
-    cell.accessibilityLabel = [row.text, row.detail].filter { !$0.isEmpty }.joined(separator: ", ")
     cell.accessibilityTraits = .button
+  }
+
+  /// The output card's changed-files row: the document glyph, "3 files" and the +/− totals; it
+  /// opens the files sheet (`TurnFilesController`), where a file pushes its diff.
+  private let fileHeaderRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
+    var counts: UILabel?
+    if let file = row.fileDiff {
+      let label = UILabel()
+      label.font = LodyDesign.mono(12, compatibleWith: cell.traitCollection)
+      let value = NSMutableAttributedString(string: "+\(file.add ?? 0)", attributes: [.foregroundColor: UIColor.systemGreen])
+      value.append(NSAttributedString(string: "  −\(file.del ?? 0)", attributes: [.foregroundColor: UIColor.systemRed]))
+      label.attributedText = value
+      counts = label
+    }
+    LodyChatView.configureOutputRow(cell, row: row, symbol: "doc.text", live: false, trailing: counts)
+    if let file = row.fileDiff {
+      cell.accessibilityLabel = String.localizedStringWithFormat(String(localized: "native.chat.file.diffStats", bundle: .lody), String(describing: file.add ?? 0), String(describing: file.del ?? 0), String(describing: row.text))
+    }
+  }
+
+  /// The output card's tasks row: a live spinner or the stack glyph, the count, and the newest
+  /// running task's latest step; it opens the task sheet (`TasksController`).
+  private let taskHeaderRegistration = UICollectionView.CellRegistration<ChatFileCell, ChatRow> { cell, _, row in
+    LodyChatView.configureOutputRow(cell, row: row, symbol: "square.stack.3d.up", live: row.running, trailing: nil)
+    cell.accessibilityLabel = [row.text, row.detail].filter { !$0.isEmpty }.joined(separator: ", ")
   }
 
   @available(*, unavailable)
@@ -347,7 +346,6 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       self.refreshFindHighlights()
     }
     collection.register(ChatMessageAttachmentsCell.self, forCellWithReuseIdentifier: "attachments")
-    collection.register(ChatFileListCell.self, forCellWithReuseIdentifier: "file-list")
     collection.register(ChatImageCell.self, forCellWithReuseIdentifier: "image")
     collection.register(ChatHistoryHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "history")
     collection.register(ChatErrorCell.self, forCellWithReuseIdentifier: "error")
@@ -390,12 +388,6 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
       }
       if row.kind == "tasksHeader" {
         return collection.dequeueConfiguredReusableCell(using: self.taskHeaderRegistration, for: index, item: row)
-      }
-      if row.kind == "changesList" {
-        let cell = collection.dequeueReusableCell(withReuseIdentifier: "file-list", for: index) as! ChatFileListCell
-        cell.configure(entryID: row.entryID, files: row.fileDiffs)
-        cell.onSelect = { [weak self] path in self?.onTurnChangesPress(["entryId": row.entryID, "path": path]) }
-        return cell
       }
       if row.kind == "attachments" {
         let cell = collection.dequeueReusableCell(withReuseIdentifier: "attachments", for: index) as! ChatMessageAttachmentsCell

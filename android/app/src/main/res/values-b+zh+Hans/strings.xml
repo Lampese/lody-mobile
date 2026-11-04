@@ -263,7 +263,6 @@
     <string name="chat_tab_creation_failed">无法创建 Tab 对话。</string>
     <string name="chat_tab_creation_unknown">创建结果暂未确认，再次点击可打开该对话。</string>
     <plurals name="chat_directory_tabs"><item quantity="one">%d 个当前目录对话</item><item quantity="other">%d 个当前目录对话</item></plurals>
-    <plurals name="chat_changed_files"><item quantity="one">%d 个文件</item><item quantity="other">%d 个文件</item></plurals>
     <string name="chat_tasks_subagents">子代理</string>
     <string name="chat_tasks_others">任务</string>
     <string name="chat_tasks_back">返回任务列表</string>
