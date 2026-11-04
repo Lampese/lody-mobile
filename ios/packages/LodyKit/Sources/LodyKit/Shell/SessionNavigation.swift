@@ -53,7 +53,15 @@ enum SessionNavigation {
         let session = created["session"] as! [String: Any]
         guard source.state.catalog.session(session["id"] as! String) != nil else { throw OutboxError.scopeExpired }
         let choice = ModelChoice(modelId: created["modelId"] as? String, effort: created["effort"] as? String, modeId: created["modeId"] as? String)
-        open(session["id"] as! String, choice: choice, source: source)
+        if params.pushed == true {
+          // Prepare Home's destination beneath the form without a second split-view animation.
+          UIView.performWithoutAnimation {
+            open(session["id"] as! String, choice: choice, source: source)
+            HomeController.current?.view.layoutIfNeeded()
+          }
+        } else {
+          open(session["id"] as! String, choice: choice, source: source)
+        }
       }
       if params.pushed == true,
         let page = LodyShell.shared.pushRootNative(content, title: String(localized: "create.title", bundle: .lody), headerShown: false) {
