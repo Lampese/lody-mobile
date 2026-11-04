@@ -94,14 +94,10 @@ final class ChatMentionPanel: UIView {
     root.panel = self
     navigation.setViewControllers([root], animated: false)
     navigation.view.backgroundColor = .clear
-    let appearance = UINavigationBarAppearance()
-    appearance.configureWithTransparentBackground()
-    navigation.navigationBar.standardAppearance = appearance
-    navigation.navigationBar.compactAppearance = appearance
-    navigation.navigationBar.scrollEdgeAppearance = appearance
-    navigation.navigationBar.prefersLargeTitles = false
-    navigation.navigationBar.isTranslucent = false
+    // Levels draw their own compact header; the system bar never shows.
     navigation.setNavigationBarHidden(true, animated: false)
+    // A hidden bar would otherwise disable the edge swipe back between levels.
+    navigation.interactivePopGestureRecognizer?.delegate = nil
     let separator = UIView()
     separator.backgroundColor = .separator
     separator.isUserInteractionEnabled = false
@@ -347,22 +343,29 @@ final class ChatMentionLevelController: UIViewController, UICollectionViewDelega
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    view.backgroundColor = .clear
-    // Lay out below the bar rather than under it: inside this short embedded panel the safe-area
-    // inset does not fully clear the bar, which covered the first row.
+    // Opaque, so the level being covered never shows through during the push.
+    view.backgroundColor = .systemBackground
     edgesForExtendedLayout = []
-    navigationItem.largeTitleDisplayMode = .never
     var config = UICollectionLayoutListConfiguration(appearance: .plain)
     config.backgroundColor = .clear
     config.showsSeparators = true
-    list = UICollectionView(frame: view.bounds, collectionViewLayout: UICollectionViewCompositionalLayout.list(using: config))
-    list.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    list = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewCompositionalLayout.list(using: config))
+    list.translatesAutoresizingMaskIntoConstraints = false
     list.backgroundColor = .clear
     list.keyboardDismissMode = .none
     list.contentInsetAdjustmentBehavior = .never
     list.delegate = self
     list.accessibilityIdentifier = "mention-list"
     view.addSubview(list)
+    // The system bar is much too tall for a 280 pt panel; deeper levels get a compact header
+    // (back chevron + title) and the stack keeps its native push / pop transitions.
+    let header = level == .root ? nil : makeHeader()
+    NSLayoutConstraint.activate([
+      list.topAnchor.constraint(equalTo: header?.bottomAnchor ?? view.topAnchor),
+      list.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      list.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      list.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+    ])
     let registration = UICollectionView.CellRegistration<UICollectionViewListCell, String> { [weak self] cell, _, id in
       guard let self else { return }
       if id == Self.folderRow, case .directory(let path) = self.level {
@@ -392,9 +395,54 @@ final class ChatMentionLevelController: UIViewController, UICollectionViewDelega
 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
-    // The categories need no bar; deeper levels get the native back button and their title.
-    navigationController?.setNavigationBarHidden(level == .root, animated: animated)
+    navigationController?.setNavigationBarHidden(true, animated: false)
     if isViewLoaded { reload(animated: false) }
+  }
+
+  /// 36 pt: a plain back chevron, the level's title, and a hairline under them.
+  private func makeHeader() -> UIView {
+    let header = UIView()
+    header.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(header)
+    let back = UIButton(type: .system)
+    var config = UIButton.Configuration.plain()
+    config.image = UIImage(systemName: "chevron.left", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
+    config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 8)
+    back.configuration = config
+    back.tintColor = .label
+    back.accessibilityLabel = String(localized: "native.chat.mention.back", bundle: .lody)
+    back.accessibilityIdentifier = "mention-back"
+    back.addAction(UIAction { [weak self] _ in self?.navigationController?.popViewController(animated: true) }, for: .touchUpInside)
+    let label = UILabel()
+    label.text = title
+    label.font = .dynamic(of: 15, weight: .semibold)
+    label.textColor = .label
+    label.lineBreakMode = .byTruncatingMiddle
+    label.accessibilityTraits = .header
+    let line = UIView()
+    line.backgroundColor = .separator
+    for child in [back, label, line] {
+      child.translatesAutoresizingMaskIntoConstraints = false
+      header.addSubview(child)
+    }
+    NSLayoutConstraint.activate([
+      header.topAnchor.constraint(equalTo: view.topAnchor),
+      header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      header.heightAnchor.constraint(equalToConstant: 36),
+      back.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+      back.topAnchor.constraint(equalTo: header.topAnchor),
+      back.bottomAnchor.constraint(equalTo: header.bottomAnchor),
+      back.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+      label.leadingAnchor.constraint(equalTo: back.trailingAnchor),
+      label.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -16),
+      label.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+      line.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+      line.trailingAnchor.constraint(equalTo: header.trailingAnchor),
+      line.bottomAnchor.constraint(equalTo: header.bottomAnchor),
+      line.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+    ])
+    return header
   }
 
   func reload(animated: Bool) {
