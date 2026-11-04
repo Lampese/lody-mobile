@@ -10,6 +10,7 @@ package app.lody.android.chat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
@@ -489,9 +490,9 @@ private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, curre
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
     ) {
-        RoundButton(LodyIcons.Back, stringResource(R.string.chat_back), onClick = onBack)
+        RoundButton(LodyIcons.Back, stringResource(R.string.chat_back), visualSize = LodySize.controlMd, onClick = onBack)
         Box(Modifier.weight(1f)) {
-            Column(Modifier.fillMaxWidth().heightIn(min = LodySize.touchTarget).clickable(role = Role.Button) { expanded = true }) {
+            Column(Modifier.fillMaxWidth().heightIn(min = LodySize.controlLg).clickable(role = Role.Button) { expanded = true }, verticalArrangement = Arrangement.Center) {
                 Text(title, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (tabs.size > 1) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
                     Text(androidx.compose.ui.res.pluralStringResource(R.plurals.chat_directory_tabs, tabs.size, tabs.size), modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis, style = LodyTheme.typography.footnote, color = colors.textSecondary)
@@ -514,20 +515,26 @@ private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, curre
 
 /** Web's round glass-like control (header back, scroll to latest). */
 @Composable
-private fun RoundButton(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun RoundButton(icon: ImageVector, label: String, modifier: Modifier = Modifier, visualSize: Dp = LodySize.controlLg, onClick: () -> Unit) {
     val colors = LodyTheme.colors
     Box(
         modifier
             .size(LodySize.controlLg)
-            .dropShadow(CircleShape, LodyElevations.sm.shadow())
             .clip(CircleShape)
-            .background(colors.bgOverlay)
-            .border(0.5.dp, colors.borderSubtle, CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
+        Box(
+            Modifier.size(visualSize)
+                .dropShadow(CircleShape, LodyElevations.sm.shadow())
+                .clip(CircleShape)
+                .background(colors.bgOverlay)
+                .border(0.5.dp, colors.borderSubtle, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
+        }
     }
 }
 
