@@ -20,6 +20,19 @@ class CreationJsonTest {
         assertEquals(options, CreationJson.options(JSONObject(CreationJson.encodeOptions(options).toString())))
     }
 
+    @Test fun planAndFastSwitchesAreReadAndSurvivePersistence() {
+        val options = CreationJson.options(JSONObject("""{"agents":[],"capabilities":[{"machineId":"m","cliType":"builtin","agentType":"codex","models":[],"modes":[],"reasoningEfforts":{},
+            "configOptions":[{"id":"reasoning_effort","type":"select","category":"thought_level","options":[{"id":"low","name":"Low"}]},
+            {"id":"collaboration_mode","type":"select","currentValue":"default","options":[{"id":"default","name":"Default"},{"id":"plan","name":"Plan"}]},
+            {"id":"fast","type":"boolean","currentValue":false}]}]}"""))
+        val capability = options.capabilities.single()
+        assertEquals(listOf("collaboration_mode", "fast"), capability.switches.map { it.id })
+        assertEquals(false, capability.planOn(emptyMap()))
+        assertEquals("collaboration_mode" to "plan", capability.planValue(true))
+        assertEquals("fast" to true, capability.fastValue(true))
+        assertEquals(options, CreationJson.options(JSONObject(CreationJson.encodeOptions(options).toString())))
+    }
+
     @Test fun providerCapabilityNeverFallsBackToAnotherProviderOfTheSameType() {
         val agent = CreationAgent("a", "A", "m", "builtin", "codex")
         val other = CreationCapability("m", "builtin", "codex", emptyList(), emptyList(), emptyMap(), "b")

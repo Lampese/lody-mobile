@@ -41,6 +41,10 @@ class ChatRepository(
     suspend fun options(scope: RuntimeScope, projectId: String?): CreationOptions =
         owner.use(scope) { (it.execute(RuntimeCommand.GetCreationOptions(projectId)) as RuntimeResult.Options).value }
 
+    /** Agent Roles readable by this user, for the conversation's Role row; a read. */
+    suspend fun roles(scope: RuntimeScope): List<AgentRole> =
+        owner.use(scope) { (it.execute(RuntimeCommand.ListAgentRoles) as RuntimeResult.Roles).value }
+
     /** Stops the running turn; never retried (a lost reply is reported, not replayed). */
     suspend fun stop(scope: RuntimeScope, sessionId: String, machineId: String, turnId: String) {
         owner.use(scope) { it.execute(RuntimeCommand.StopTurn(sessionId, machineId, turnId)) }

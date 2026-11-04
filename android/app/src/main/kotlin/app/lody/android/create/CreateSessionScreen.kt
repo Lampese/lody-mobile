@@ -709,7 +709,14 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
     }
 }
 
-internal data class RunConfigRow(val id: String, val label: String, val options: List<PickerOption>)
+/**
+ * One run-config row. [toggle] makes it a switch (web's Plan / Fast) that picks "on" / "off";
+ * a [locked] row shows its selected option and cannot be opened (the Agent in a conversation).
+ */
+internal data class RunConfigRow(val id: String, val label: String, val options: List<PickerOption>, val toggle: Boolean? = null, val locked: Boolean = false)
+
+internal const val RUN_CONFIG_ON = "on"
+internal const val RUN_CONFIG_OFF = "off"
 
 /** Web's run-config sheet as iOS draws it: label + value rows whose options expand in place. */
 @Composable
@@ -728,12 +735,27 @@ internal fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPi
         )
         rows.forEach { row ->
             val current = row.options.firstOrNull { it.selected }
+            if (row.toggle != null) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = LodySize.controlLg)
+                        .clip(RoundedCornerShape(LodyRadius.md))
+                        .clickable(role = Role.Switch) { onPick(row.id, if (row.toggle) RUN_CONFIG_OFF else RUN_CONFIG_ON) }
+                        .padding(horizontal = LodySpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(row.label, style = LodyTheme.typography.subhead, color = colors.textSecondary, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Switch(checked = row.toggle, onCheckedChange = { onPick(row.id, if (it) RUN_CONFIG_ON else RUN_CONFIG_OFF) })
+                }
+                return@forEach
+            }
             Row(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = LodySize.controlLg)
                     .clip(RoundedCornerShape(LodyRadius.md))
-                    .clickable(role = Role.Button) { open = if (open == row.id) null else row.id }
+                    .clickable(enabled = !row.locked, role = Role.Button) { open = if (open == row.id) null else row.id }
                     .padding(horizontal = LodySpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
@@ -748,7 +770,7 @@ internal fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPi
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                PopupIndicator()
+                if (!row.locked) PopupIndicator()
             }
             AnimatedVisibility(
                 open == row.id,

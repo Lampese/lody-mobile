@@ -30,6 +30,9 @@ const settingsWith = (value) => () => {
   flock.commit();
   return flock.exportFile();
 };
+// The second turn either dispatched (its RPC) or waits in the session's queue.
+const laterConfig = (f, calls) =>
+  calls[1]?.params.inputConfig ?? f.server.toJSON().mq?.at(-1)?.acpSessionConfig;
 const outcome = (result) => ({ state: result.state, reason: result.reason });
 const turn = {
   sessionId: 's1',
@@ -77,12 +80,61 @@ test('a first turn runs as the Role only while it is bound to the session and it
     assert.deepEqual(config.memory, { providerId: 'p', memoryId: 'mem' });
     assert.deepEqual(config.agentRoleSnapshot, { id: 'reviewer', revision: 3, name: 'Reviewer', emoji: '🪼' });
     assert.equal(JSON.stringify(config).includes('fixture-secret'), false);
+    // The composer reopens on the Role the latest turn ran as (web `sessionConversationConfig`).
+    assert.equal(f.runtime.projectSession(f.server, 'live').composer.agentRoleId, 'reviewer');
 
-    // A Role belongs to the first turn only.
-    assert.deepEqual(outcome(await f.runtime.sendTurn({ ...turn, queue: true })), {
-      state: 'not_sent',
-      reason: 'role_unavailable',
-    });
+  } finally {
+    f.close();
+  }
+});
+
+// Web's session composer: a Role picked mid-conversation runs the turn with its pins and
+// provenance, but its instruction only ever starts a conversation.
+test('a later turn runs as a Role without repeating its instruction', async () => {
+  const calls = [];
+  const f = await openTestSession({
+    settings: settingsWith(role()),
+    onRpc(request) {
+      calls.push(request);
+      return { result: { accepted: true } };
+    },
+  });
+  try {
+    const { agentRoleId: _, ...plain } = turn;
+    assert.equal((await f.runtime.sendTurn({ ...plain, text: 'First' })).state, 'accepted');
+    const later = await f.runtime.sendTurn({ ...turn, configOptionValues: { plan_mode: true }, text: 'Again', queue: true });
+    assert.notEqual(later.state, 'not_sent', later.reason);
+    const config = laterConfig(f, calls);
+    assert.ok(config, 'the later turn reached the session');
+    assert.equal(config.prompt, 'Again');
+    assert.equal(config.agentRoleId, 'reviewer');
+    assert.equal(config.agentRoleRevision, 3);
+    assert.deepEqual(config.memory, { providerId: 'p', memoryId: 'mem' });
+    assert.deepEqual(config.agentRoleSnapshot, { id: 'reviewer', revision: 3, name: 'Reviewer', emoji: '🪼' });
+  } finally {
+    f.close();
+  }
+});
+
+test('an explicit None ends the Role a conversation was running as', async () => {
+  const calls = [];
+  const f = await openTestSession({
+    settings: settingsWith(role()),
+    onRpc(request) {
+      calls.push(request);
+      return { result: { accepted: true } };
+    },
+  });
+  try {
+    assert.equal((await f.runtime.sendTurn({ ...turn, configOptionValues: { plan_mode: true } })).state, 'accepted');
+    const later = await f.runtime.sendTurn({ ...turn, agentRoleId: null, text: 'Plain', queue: true });
+    assert.notEqual(later.state, 'not_sent', later.reason);
+    const config = laterConfig(f, calls);
+    assert.ok(config, 'the later turn reached the session');
+    assert.equal(config.prompt, 'Plain');
+    assert.equal(config.agentRoleId, null);
+    assert.equal(config.agentRoleRevision, undefined);
+    assert.equal(config.agentRoleSnapshot, undefined);
   } finally {
     f.close();
   }

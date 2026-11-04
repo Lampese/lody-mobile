@@ -33,8 +33,6 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.layout.layoutId
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -190,20 +188,54 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     var options by remember(id, scope) { mutableStateOf<CreationOptions?>(null) }
     LaunchedEffect(scope, id, session?.projectId, status == "live") {
         if (session == null || status != "live") return@LaunchedEffect
-        try { options = repository.options(scope, session.projectId) }
+        // A plain chat's `<machine>:unassigned` project is not a real project (the runtime
+        // rejects it): read the workspace-wide options, as the new-chat page does for chats.
+        val project = session.projectId.takeUnless { app.lody.android.create.CreateSessionModel.isChat(it) }
+        try { options = repository.options(scope, project) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { /* The chip still shows the session's model; choices wait for the next load. */ }
     }
-    val capability = session?.let { options?.capability(it.machineId, it.cliType, it.agentType) }
+    val capability = session?.let { options?.capability(it.machineId, it.cliType, it.agentType, it.agentConfigId) }
     var chosen by rememberSaveable(id) { mutableStateOf(false) }
     var chosenModel by rememberSaveable(id) { mutableStateOf<String?>(null) }
     var chosenEffort by rememberSaveable(id) { mutableStateOf<String?>(null) }
     var chosenMode by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    // Agent switches (Plan, Fast, pinned Role options) the reader changed.
+    var chosenOptions by remember(id) { mutableStateOf<Map<String, Any>>(emptyMap()) }
     val modelId = if (chosen) chosenModel else snapshotChoice?.modelId
     val effort = if (chosen) chosenEffort else snapshotChoice?.effort
     val modeId = if (chosen) chosenMode else snapshotChoice?.modeId
+    val optionValues = if (chosen) chosenOptions else snapshotChoice?.configOptionValues.orEmpty()
     val choose: (model: String?, effort: String?, mode: String?) -> Unit = { m, e, o ->
+        if (!chosen) chosenOptions = snapshotChoice?.configOptionValues.orEmpty()
         chosenModel = m; chosenEffort = e; chosenMode = o; chosen = true
+    }
+    val chooseOption: (String, Any) -> Unit = { key, value ->
+        if (!chosen) { chosenModel = modelId; chosenEffort = effort; chosenMode = modeId; chosenOptions = optionValues; chosen = true }
+        chosenOptions = chosenOptions + (key to value)
+    }
+    // Agent Roles (web session composer): only those bound to this conversation's computer and
+    // agent config; the agent itself never changes here. The picked Role (or explicit None)
+    // holds until a newer turn lands with its own Role.
+    var roles by remember(scope) { mutableStateOf<List<AgentRole>?>(null) }
+    LaunchedEffect(scope, status == "live") {
+        if (status != "live" || roles != null) return@LaunchedEffect
+        try { roles = repository.roles(scope) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { /* No Role row until the list loads; turns inherit meanwhile. */ }
+    }
+    val durableRole = SessionRoles.durable(snapshotChoice)
+    var pickedRole by remember(id) { mutableStateOf<SessionRoles.Pick?>(null) }
+    LaunchedEffect(durableRole) { pickedRole = null }
+    val roleItems = session?.let { SessionRoles.items(roles.orEmpty(), it.machineId, it.agentConfigId, options?.agents.orEmpty()) }.orEmpty()
+    val runChoice = SessionRoles.Choice(modelId, effort, modeId, optionValues)
+    val activeRole = SessionRoles.active(roleItems, pickedRole, durableRole, session?.agentConfigId, runChoice)
+    val pickRole: (String?) -> Unit = pick@{ roleId ->
+        if (roleId == null) { pickedRole = SessionRoles.Pick.None; return@pick }
+        val item = roleItems.firstOrNull { it.role.id == roleId && it.unavailable == null } ?: return@pick
+        val next = SessionRoles.apply(item, runChoice, capability)
+        chosenModel = next.modelId; chosenEffort = next.effort; chosenMode = next.modeId; chosenOptions = next.options; chosen = true
+        pickedRole = SessionRoles.Pick.Role(roleId)
     }
     var runConfig by remember(id) { mutableStateOf(false) }
     val failedText = stringResource(R.string.chat_send_failed)
@@ -251,6 +283,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         outgoing = outgoing + Outgoing(turnId, text, Instant.now().toString(), Delivery.Sending, shown)
         val explicit = chosen
         val choice = Triple(modelId, modeId, effort)
+        val role = SessionRoles.send(roles != null, activeRole, pickedRole, durableRole)
+        val switches = if (chosen) chosenOptions else emptyMap()
         coroutines.launch {
             val queue = session.status in RunningStatuses
             val blocks = try { repository.upload(scope, id, files) }
@@ -266,6 +300,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 repository.send(scope, SendTextRequest(
                     id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = queue,
                     modelId = choice.first, modeId = choice.second, effort = choice.third, explicitChoice = explicit, attachments = blocks,
+                    role = role, agentConfigId = session.agentConfigId, configOptionValues = switches,
                 )).state
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { "unknown" }
@@ -442,10 +477,15 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 enabled = canSend,
                 agentCliType = session?.cliType,
                 agentType = session?.agentType,
+                roleEmoji = activeRole?.role?.emoji,
+                roleName = activeRole?.role?.name,
+                agentName = options?.agents?.firstOrNull { it.id == session?.agentConfigId }?.name ?: agentName.takeIf { it.isNotBlank() },
                 face = listOfNotNull(modelName, effort),
                 mode = modeId,
                 modeLabel = capability?.modes?.firstOrNull { it.id == modeId }?.name,
-                onRunConfig = if (capability != null && (capability.models.isNotEmpty() || capability.modes.isNotEmpty())) ({ runConfig = true }) else null,
+                plan = capability?.planOn(optionValues) == true,
+                fast = capability?.fastOn(optionValues) == true,
+                onRunConfig = if (session != null) ({ runConfig = true }) else null,
                 stoppable = runningTurn != null && status == "live",
                 stopping = stopping,
                 attachments = attachments,
@@ -459,36 +499,73 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             )
         }
     }
-    if (runConfig && capability != null) {
+    if (runConfig && session != null) {
         ModalBottomSheet(
             onDismissRequest = { runConfig = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = colors.bgBase,
         ) {
+            // Web's mobile run-config sheet in a conversation: Role, the conversation's Agent
+            // (locked), Model, Reasoning, Mode, then the Plan and Fast switches when offered.
+            val reasons = mapOf(
+                app.lody.android.create.CreateSessionModel.RoleUnavailable.Machine to stringResource(R.string.create_role_unavailable_machine),
+                app.lody.android.create.CreateSessionModel.RoleUnavailable.Agent to stringResource(R.string.create_role_unavailable_agent),
+                app.lody.android.create.CreateSessionModel.RoleUnavailable.Offline to stringResource(R.string.create_role_unavailable_offline),
+            )
+            val agent = options?.agents?.firstOrNull { it.id == session.agentConfigId }
             app.lody.android.create.RunConfigSheet(
                 rows = buildList {
-                    capability.models.takeIf { it.isNotEmpty() }?.let { models ->
+                    if (roles != null) {
+                        add(app.lody.android.create.RunConfigRow(RUN_ROLE, stringResource(R.string.create_role),
+                            // An empty glyph keeps None's title in line with the Roles' emoji.
+                            listOf(app.lody.android.create.PickerOption(RUN_ROLE_NONE, stringResource(R.string.create_role_none), activeRole == null, emoji = "")) +
+                                roleItems.map { item ->
+                                    app.lody.android.create.PickerOption(item.role.id, item.role.name, item.role.id == activeRole?.role?.id,
+                                        subtitle = item.unavailable?.let { reasons.getValue(it) }.orEmpty(),
+                                        disabled = item.unavailable != null, emoji = item.role.emoji)
+                                }))
+                    }
+                    add(app.lody.android.create.RunConfigRow(RUN_AGENT, stringResource(R.string.create_agent), listOf(
+                        app.lody.android.create.PickerOption(session.agentConfigId ?: "", agent?.name ?: agentName, true,
+                            agent = (session.cliType ?: "") to (session.agentType ?: "")),
+                    ), locked = true))
+                    capability?.models?.takeIf { it.isNotEmpty() }?.let { models ->
                         add(app.lody.android.create.RunConfigRow(RUN_MODEL, stringResource(R.string.create_model), models.map { app.lody.android.create.PickerOption(it.id, it.name, it.id == modelId) }))
                     }
-                    capability.effortsFor(modelId).takeIf { it.isNotEmpty() }?.let { efforts ->
+                    capability?.effortsFor(modelId)?.takeIf { it.isNotEmpty() }?.let { efforts ->
                         add(app.lody.android.create.RunConfigRow(RUN_EFFORT, stringResource(R.string.create_effort), efforts.map { app.lody.android.create.PickerOption(it, it, it == effort) }))
                     }
-                    capability.modes.takeIf { it.isNotEmpty() }?.let { modes ->
+                    capability?.modes?.takeIf { it.isNotEmpty() }?.let { modes ->
                         add(app.lody.android.create.RunConfigRow(RUN_MODE, stringResource(R.string.create_mode), modes.map { app.lody.android.create.PickerOption(it.id, it.name, it.id == modeId) }))
+                    }
+                    capability?.planOn(optionValues)?.let { on ->
+                        add(app.lody.android.create.RunConfigRow(RUN_PLAN, stringResource(R.string.run_config_plan), emptyList(), toggle = on))
+                    }
+                    capability?.fastOn(optionValues)?.let { on ->
+                        add(app.lody.android.create.RunConfigRow(RUN_FAST, stringResource(R.string.run_config_fast), emptyList(), toggle = on))
                     }
                 },
                 defaultLabel = stringResource(R.string.create_default),
             ) { row, value ->
+                val on = value == app.lody.android.create.RUN_CONFIG_ON
                 when (row) {
+                    RUN_ROLE -> pickRole(value.takeIf { it != RUN_ROLE_NONE })
                     RUN_MODEL -> choose(value, null, modeId)
                     RUN_EFFORT -> choose(modelId, value, modeId)
                     RUN_MODE -> choose(modelId, effort, value)
+                    RUN_PLAN -> capability?.planValue(on)?.let { (key, setting) -> chooseOption(key, setting) }
+                    RUN_FAST -> capability?.fastValue(on)?.let { (key, setting) -> chooseOption(key, setting) }
                 }
             }
         }
     }
 }
 
+private const val RUN_ROLE = "role"
+private const val RUN_ROLE_NONE = "__none__"
+private const val RUN_AGENT = "agent"
+private const val RUN_PLAN = "plan"
+private const val RUN_FAST = "fast"
 private const val RUN_MODEL = "model"
 private const val RUN_EFFORT = "effort"
 private const val RUN_MODE = "mode"
@@ -601,11 +678,11 @@ private fun turnTime(timestamp: String?): String {
 }
 
 /**
- * Web's mobile composer. At rest one capsule line — +, the prompt, the agent mark ⌄ (it opens the
- * run-config sheet), send. Focus opens the card: the prompt above, then + and the run-config chip
- * (the provider's mark, model · effort, the mode's glyph) leading and send trailing; the pieces
- * glide between the two layouts on one spring. While a turn runs and nothing is typed, send
- * becomes stop (typing again queues a turn).
+ * Web's mobile session composer, the same card as the new-chat page (`create/CreateSessionScreen`
+ * `Composer`): the prompt (one line at rest, three while editing), then + (photos / files), the
+ * run-config chip (the Role's emoji or the provider's mark, model · effort, the mode's glyph, Plan
+ * and Fast when on) opening the run-config sheet, and Send — which becomes Stop while a turn runs
+ * and nothing is typed (typing again queues a turn). No @ button, as web and iOS.
  */
 @Composable
 private fun ChatComposer(
@@ -614,9 +691,14 @@ private fun ChatComposer(
     enabled: Boolean,
     agentCliType: String?,
     agentType: String?,
+    roleEmoji: String?,
+    roleName: String?,
+    agentName: String?,
     face: List<String>,
     mode: String?,
     modeLabel: String?,
+    plan: Boolean,
+    fast: Boolean,
     onRunConfig: (() -> Unit)?,
     stoppable: Boolean,
     stopping: Boolean,
@@ -629,33 +711,29 @@ private fun ChatComposer(
 ) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
-    val placeholder = stringResource(if (enabled) R.string.chat_composer_placeholder else R.string.chat_composer_unavailable)
+    val shape = RoundedCornerShape(LodyRadius.xl)
+    // Web: "Work with <assistant>" — the Agent Role when one is, else the conversation's agent.
+    val workWith = roleName ?: agentName
+    val placeholder = when {
+        !enabled -> stringResource(R.string.chat_composer_unavailable)
+        workWith.isNullOrEmpty() -> stringResource(R.string.chat_composer_placeholder)
+        else -> stringResource(R.string.create_composer_placeholder_agent, workWith)
+    }
     var focused by remember { mutableStateOf(false) }
-    // At rest one capsule line (+, the prompt, the agent mark ⌄, send); focus — or attachments
-    // waiting to go — opens the full card. Every piece is placed by interpolating between its two
-    // spots on one spring, so they glide rather than swap, and the field (focus, keyboard) persists.
-    val expanded = focused || attachments.isNotEmpty()
-    val progress by androidx.compose.animation.core.animateFloatAsState(
-        if (expanded) 1f else 0f,
-        androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
-        label = "composer-open",
-    )
-    // Dismissing the keyboard (Back, swipe) also closes the card.
+    // Dismissing the keyboard (Back, swipe) also ends editing.
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     @OptIn(ExperimentalLayoutApi::class)
     val imeVisible = WindowInsets.isImeVisible
     LaunchedEffect(imeVisible) { if (!imeVisible && focused) focusManager.clearFocus() }
-    val rowHeight = LodySize.controlLg
-    val radius = androidx.compose.ui.unit.lerp(rowHeight / 2 + LodySpacing.xs, LodySpacing.xl, progress)
-    val shape = RoundedCornerShape(radius)
     Column(
         Modifier
-            .padding(horizontal = LodySpacing.md, vertical = LodySpacing.sm)
+            .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.sm)
             .fillMaxWidth()
+            .dropShadow(shape, LodyElevations.md.shadow())
             .clip(shape)
-            .background(colors.bgRaised, shape)
-            .border(0.5.dp, colors.borderSubtle, shape)
-            .padding(LodySpacing.xs),
+            .background(colors.bgOverlay, shape)
+            .animateContentSize()
+            .padding(LodySpacing.sm),
     ) {
         // Picked attachments, one removable chip each, above the prompt (web / iOS attachment stack).
         androidx.compose.animation.AnimatedVisibility(
@@ -665,7 +743,7 @@ private fun ChatComposer(
         ) {
             val remove = stringResource(R.string.chat_attach_remove)
             androidx.compose.foundation.lazy.LazyRow(
-                Modifier.fillMaxWidth().padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs),
+                Modifier.fillMaxWidth().padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
                 horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
             ) {
                 items(attachments, key = { it.id }) { item ->
@@ -684,143 +762,109 @@ private fun ChatComposer(
                 }
             }
         }
-        val runConfigLabel = stringResource(R.string.chat_run_config)
-        val showStop = stoppable && prompt.isBlank() && attachments.isEmpty()
-        val ready = if (showStop) !stopping else enabled && (prompt.isNotBlank() || attachments.isNotEmpty())
-        androidx.compose.ui.layout.Layout(
-            content = {
-                // +: the attachment menu, in both states.
-                Box(Modifier.layoutId(SLOT_PLUS)) {
-                    val attach = stringResource(R.string.create_attach)
-                    var attachMenu by remember { mutableStateOf(false) }
-                    IconButton(onClick = { attachMenu = true }, enabled = enabled, modifier = Modifier.semantics { contentDescription = attach }) {
-                        Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
-                    }
-                    DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_attach_photos)) },
-                            leadingIcon = { Icon(LodyIcons.Image, contentDescription = null) },
-                            onClick = { attachMenu = false; onPickPhotos() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_attach_files)) },
-                            leadingIcon = { Icon(LodyIcons.File, contentDescription = null) },
-                            onClick = { attachMenu = false; onPickFiles() },
-                        )
-                    }
-                }
-                BasicTextField(
-                    value = prompt,
-                    onValueChange = onPromptChange,
-                    enabled = enabled,
-                    textStyle = type.body.copy(color = colors.textPrimary),
-                    cursorBrush = SolidColor(colors.accentDefault),
-                    minLines = if (expanded) 2 else 1,
-                    maxLines = if (expanded) 10 else 1,
-                    modifier = Modifier
-                        .layoutId(SLOT_FIELD)
-                        .onFocusChanged { focused = it.isFocused }
-                        .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.sm)
-                        .semantics { contentDescription = placeholder },
-                    decorationBox = { inner ->
-                        Box {
-                            if (prompt.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            inner()
-                        }
-                    },
-                )
-                // Collapsed: the agent mark and a chevron; it opens the run config directly.
-                Row(
-                    Modifier
-                        .layoutId(SLOT_MARK)
-                        .graphicsLayer { alpha = 1f - progress }
-                        .heightIn(min = LodySize.controlMd)
-                        .clip(RoundedCornerShape(LodyRadius.md))
-                        .clickable(enabled = !expanded && onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
-                        .semantics { contentDescription = "$runConfigLabel: ${face.joinToString(", ")}" }
-                        .padding(horizontal = LodySpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
-                ) {
-                    AgentMark(agentCliType, agentType, colors.iconPrimary, Modifier.size(LodyIconSize.md))
-                    if (onRunConfig != null) Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                }
-                // Open: the full run-config chip (mark, model · effort, mode).
-                Row(
-                    Modifier
-                        .layoutId(SLOT_CHIP)
-                        .graphicsLayer { alpha = progress }
-                        .heightIn(min = LodySize.controlMd)
-                        .clip(RoundedCornerShape(LodyRadius.md))
-                        .clickable(enabled = expanded && onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
-                        .semantics { contentDescription = "$runConfigLabel: ${face.joinToString(", ")}" }
-                        .padding(horizontal = LodySpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-                ) {
-                    AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.md))
-                    Text(
-                        face.joinToString("  ·  "), style = type.subhead, color = colors.textSecondary,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
-                    )
-                    app.lody.android.create.ModeMark(mode, modeLabel)
-                }
-                // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs
-                // cross-fade and the fill follows, so the button never jumps.
-                val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
-                val fill by androidx.compose.animation.animateColorAsState(
-                    when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",
-                )
-                Box(
-                    Modifier
-                        .layoutId(SLOT_SEND)
-                        .padding(LodySpacing.xs / 2)
-                        .size(LodySize.controlLg - LodySpacing.xs)
-                        .clip(CircleShape)
-                        .background(fill)
-                        .clickable(enabled = ready, role = Role.Button, onClick = if (showStop) onStop else onSend)
-                        .semantics { contentDescription = label },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    androidx.compose.animation.Crossfade(showStop, label = "send-stop") { stop ->
-                        if (stop) Icon(LodyIcons.Stop, contentDescription = null, tint = colors.bgBase, modifier = Modifier.size(LodyIconSize.sm))
-                        else Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.md))
-                    }
+        BasicTextField(
+            value = prompt,
+            onValueChange = onPromptChange,
+            enabled = enabled,
+            textStyle = type.body.copy(color = colors.textPrimary),
+            cursorBrush = SolidColor(colors.accentDefault),
+            minLines = if (focused) 3 else 1,
+            maxLines = 10,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused }
+                .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs)
+                .semantics { contentDescription = placeholder },
+            decorationBox = { inner ->
+                Box {
+                    if (prompt.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    inner()
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
-        ) { measurables, constraints ->
-            val p = progress
-            fun slot(id: String) = measurables.first { it.layoutId == id }
-            val loose = Constraints()
-            val plus = slot(SLOT_PLUS).measure(loose)
-            val send = slot(SLOT_SEND).measure(loose)
-            val width = constraints.maxWidth
-            val mark = slot(SLOT_MARK).measure(Constraints(maxWidth = (width / 3).coerceAtLeast(0)))
-            val row = maxOf(plus.height, send.height, rowHeight.roundToPx())
-            // Collapsed the field sits between + and the mark; open it spans the card.
-            val fieldWidth = androidx.compose.ui.util.lerp((width - plus.width - mark.width - send.width).coerceAtLeast(0), width, p)
-            val field = slot(SLOT_FIELD).measure(Constraints.fixedWidth(fieldWidth))
-            val chip = slot(SLOT_CHIP).measure(Constraints(maxWidth = (width - plus.width - send.width).coerceAtLeast(0)))
-            val collapsedHeight = maxOf(row, if (expanded) 0 else field.height)
-            val height = androidx.compose.ui.util.lerp(collapsedHeight, field.height + row, p)
-            layout(width, height) {
-                val rowTop = androidx.compose.ui.util.lerp((collapsedHeight - row) / 2, field.height, p)
-                field.place(androidx.compose.ui.util.lerp(plus.width, 0, p), androidx.compose.ui.util.lerp((collapsedHeight - field.height) / 2, 0, p))
-                plus.place(0, rowTop + (row - plus.height) / 2)
-                send.place(width - send.width, rowTop + (row - send.height) / 2)
-                mark.place(width - send.width - mark.width, rowTop + (row - mark.height) / 2)
-                chip.place(plus.width, rowTop + (row - chip.height) / 2)
+        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // +: the attachment menu.
+            Box {
+                val attach = stringResource(R.string.create_attach)
+                var attachMenu by remember { mutableStateOf(false) }
+                IconButton(onClick = { attachMenu = true }, enabled = enabled, modifier = Modifier.semantics { contentDescription = attach }.widthIn(min = LodySize.controlMd)) {
+                    Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
+                }
+                DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_attach_photos)) },
+                        leadingIcon = { Icon(LodyIcons.Image, contentDescription = null) },
+                        onClick = { attachMenu = false; onPickPhotos() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.chat_attach_files)) },
+                        leadingIcon = { Icon(LodyIcons.File, contentDescription = null) },
+                        onClick = { attachMenu = false; onPickFiles() },
+                    )
+                }
+            }
+            // The run-config chip, as the new-chat page draws it.
+            val runConfigLabel = stringResource(R.string.chat_run_config)
+            val fastLabel = stringResource(R.string.run_config_fast)
+            Row(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = LodySize.controlMd)
+                    .clip(RoundedCornerShape(LodyRadius.md))
+                    .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
+                    .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
+                    .padding(horizontal = LodySpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+            ) {
+                // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
+                if (roleEmoji != null) Text(roleEmoji, style = type.subhead)
+                else AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
+                fun label(named: Boolean) = buildAnnotatedString {
+                    // With the Role's name, model · effort recede to secondary ink.
+                    if (named) withStyle(SpanStyle(color = colors.textPrimary)) { append(roleName.orEmpty()); append("   ") }
+                    face.forEachIndexed { index, part ->
+                        if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
+                        withStyle(SpanStyle(color = if (named) colors.textSecondary else colors.textPrimary)) { append(part) }
+                    }
+                }
+                // The Role's name only when the whole face fits; otherwise the emoji alone marks it.
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+                    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+                    val named = label(named = true)
+                    val fits = !roleName.isNullOrEmpty() &&
+                        measurer.measure(named, type.subhead, maxLines = 1).size.width <= constraints.maxWidth
+                    Text(if (fits) named else label(named = false), style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                app.lody.android.create.ModeMark(mode, modeLabel)
+                if (plan) Icon(LodyIcons.PermissionPlan, contentDescription = stringResource(R.string.run_config_plan), tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                if (fast) Text(fastLabel, style = type.caption, color = colors.accentFg)
+            }
+            // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs
+            // cross-fade and the fill follows, so the button never jumps.
+            val showStop = stoppable && prompt.isBlank() && attachments.isEmpty()
+            val ready = if (showStop) !stopping else enabled && (prompt.isNotBlank() || attachments.isNotEmpty())
+            val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
+            val fill by androidx.compose.animation.animateColorAsState(
+                when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",
+            )
+            Box(
+                Modifier
+                    .size(LodySize.controlSm)
+                    .clip(CircleShape)
+                    .background(fill)
+                    .clickable(enabled = ready, role = Role.Button, onClick = if (showStop) onStop else onSend)
+                    .semantics { contentDescription = label },
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.animation.Crossfade(showStop, label = "send-stop") { stop ->
+                    if (stop) Icon(LodyIcons.Stop, contentDescription = null, tint = colors.bgBase, modifier = Modifier.size(LodyIconSize.sm))
+                    else Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+                }
             }
         }
     }
 }
-
-private const val SLOT_PLUS = "plus"
-private const val SLOT_FIELD = "field"
-private const val SLOT_MARK = "mark"
-private const val SLOT_CHIP = "chip"
-private const val SLOT_SEND = "send"
 
 /**
  * Web `SessionInfoBar` above the composer as grouped capsules, so the composer stays the only

@@ -55,6 +55,12 @@ open class WebViewRuntime internal constructor(
                 payload.put("effort", request.effort ?: JSONObject.NULL)
             }
             request.modeId?.let { payload.put("modeId", it) }
+            when (val role = request.role) {
+                RoleSend.Inherit -> Unit
+                RoleSend.None -> payload.put("agentRoleId", JSONObject.NULL)
+                is RoleSend.Role -> payload.put("agentRoleId", role.id).put("agentConfigId", request.agentConfigId)
+            }
+            if (request.configOptionValues.isNotEmpty()) payload.put("configOptionValues", JSONObject(request.configOptionValues))
             if (request.attachments.isNotEmpty()) payload.put("attachments", JSONArray(request.attachments))
             val value = call("sendText", JSONArray().put(payload), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Sent(value.optString("state", "unknown"), value.optString("reason").ifBlank { null })

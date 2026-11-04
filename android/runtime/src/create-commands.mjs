@@ -34,6 +34,18 @@ export function createCommands(runtime, sendTurn, identity) {
     if(typeof input[key]!=='string' || !input[key] || input[key].length>128)throw Error('invalid_send');
     choice[field]=input[key];
    }
+   // The turn's Agent Role (web session composer): an id runs as that Role, bound to the
+   // conversation's own agent config; null is an explicit None; absent inherits the latest turn's.
+   if(input.agentRoleId!==undefined && input.agentRoleId!==null) {
+    if(typeof input.agentRoleId!=='string' || !input.agentRoleId || input.agentRoleId.length>4096 || typeof input.agentConfigId!=='string' || !input.agentConfigId)throw Error('invalid_send');
+    choice.agentRoleId=input.agentRoleId;choice.agentConfigId=input.agentConfigId;
+   } else if(input.agentRoleId===null)choice.agentRoleId=null;
+   // Agent switches the reader changed (Plan, Fast, permission selectors), as upstream validates them.
+   if(input.configOptionValues!==undefined) {
+    const values=input.configOptionValues;
+    if(!values || typeof values!=='object' || Array.isArray(values) || Object.keys(values).length>64 || Object.entries(values).some(([id,value])=>!id || id.length>128 || /(?:api[_-]?key|auth|bearer|credential|password|passwd|secret|token)/i.test(id) || !(typeof value==='boolean' || (typeof value==='string' && value.length>0 && value.length<=512))))throw Error('invalid_send');
+    choice.configOptionValues=values;
+   }
    const scope=identity();if(!scope?.userId)throw Error('not_connected');
    try {
     await runtime.ensureSession({sessionId:input.sessionId});

@@ -171,7 +171,8 @@ extension DataRuntime {
       turnCall(RuntimeContract.Calls.EditSession.self, payload, inject: inject, sink: sink, task: task)
       return
     }
-    for key in ["modelId", "reasoningEffort"] {
+    // Clearable on the wire: null clears (an explicit None Role, the agent's default model).
+    for key in ["modelId", "reasoningEffort", "agentRoleId"] {
       if let value = args[key] { inject[key] = ["value": value] }
     }
     let text = args["text"] as? String ?? ""

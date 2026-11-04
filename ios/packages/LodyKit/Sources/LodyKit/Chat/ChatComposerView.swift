@@ -664,7 +664,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   var displayError: String? { didSet { updateComposer() } }
   private var measuredWidth: CGFloat = 0
   /// Web's mobile composer card instead of the glass pill / keyboard sheet: always shows its
-  /// controls row and keeps @ visible. Set by the new-session page.
+  /// controls row (+, the run-config chip, Send) and has no @ button. Set by the new-session page
+  /// and the conversation.
   /// Card style: the run-config chip opens the host's sheet instead of the model popover.
   var onRunConfig: (() -> Void)?
   private var cardFocused = false
@@ -1416,6 +1417,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let sending = state.sending || pendingDraft != nil
     if !state.editable && input.isFirstResponder { input.resignFirstResponder() }
     let expanded = input.isFirstResponder || cardStyle
+    // The card always shows its controls; editing is what gives the bar's row to the editor.
+    let editing = input.isFirstResponder
     let expansionChanged = composerExpanded != expanded
     // The bottom anchor belongs to the host; animate its layout with the contents.
     let layoutRoot = window ?? superview ?? self
@@ -1461,7 +1464,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     queueView.render(queuedDrafts, enabled: state.canStop == true && !sending && state.controlling != true, steeringID: state.steerID ?? "", firstOnly: state.steerInterrupts == true)
     queueHeight.constant = queueView.panelHeight
     // The action bar stays while typing; expanded editing gives its row to the editor.
-    let showsBar = !expanded && ChatActionBarView.shows(state.actionBar, tasks: taskCount)
+    let showsBar = !editing && ChatActionBarView.shows(state.actionBar, tasks: taskCount)
     actionBar.render(state.actionBar, tasks: taskCount, visible: showsBar, animated: true)
     // One row of capsules; the stacked fallback at very large text is taller.
     actionBarHeight.constant = showsBar ? actionBar.fittingHeight(width: max(0, bounds.width - 32)) : 0
@@ -1482,12 +1485,12 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let quotaSize = quotaNotice.sizeThatFits(CGSize(width: max(1, quotaWidth), height: .greatestFiniteMagnitude))
     quotaNoticeHeight.constant = quotaNotice.isHidden ? 0 : max(quotaNotice.font.lineHeight, quotaSize.height)
     quotaGap.constant = quotaNotice.isHidden ? 8 : 6
-    if (fullScreen || dragProgress != nil) && (!allowsFullScreen || !expanded || !state.editable) {
+    if (fullScreen || dragProgress != nil) && (!allowsFullScreen || !editing || !state.editable) {
       fullScreen = false
       dragProgress = nil
       fullScreenDim.removeFromSuperview()
     }
-    let showsGrabber = expanded && allowsFullScreen
+    let showsGrabber = editing && allowsFullScreen
     grabber.isHidden = !showsGrabber
     grabberHeight.constant = showsGrabber ? ChatComposerGrabber.height : 0
     grabber.accessibilityLabel = String(localized: String.LocalizationValue(fullScreen ? "native.chat.composer.collapse" : "native.chat.composer.expand"), bundle: .lody)

@@ -132,11 +132,13 @@ export const SendTurnParams = z
     reasoningEffortConfigId: z.string().optional(),
     configOptionValues: z.record(z.string(), z.unknown()).optional(),
     /**
-     * A new session's first turn may run as an Agent Role. Only the id crosses:
-     * the runtime reads the Role row itself and applies its prompt prefix,
-     * memory and provenance, or refuses (`role_unavailable` / `role_changed`).
+     * The turn may run as an Agent Role (web session composer). Only the id
+     * crosses: the runtime reads the Role row itself and applies its memory and
+     * provenance — and, on a session's first turn only, its prompt prefix — or
+     * refuses (`role_unavailable` / `role_changed`). `{ value: null }` is an
+     * explicit None that ends the conversation's Role; omitted inherits it.
      */
-    agentRoleId: z.string().min(1).optional(),
+    agentRoleId: ClearableString.optional(),
     billingEntitlement: BillingEntitlement.nullable(),
   })
   .meta({ id: 'SendTurnParams' });

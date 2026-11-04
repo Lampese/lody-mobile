@@ -208,6 +208,7 @@ export function registerSessions(
       ...wire,
       modelId: cleared(wire.modelId),
       reasoningEffort: cleared(wire.reasoningEffort),
+      agentRoleId: cleared(wire.agentRoleId),
       agentConfigId:
         typeof meta?.agentConfigId === 'string' ? meta.agentConfigId : undefined,
     };

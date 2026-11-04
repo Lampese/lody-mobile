@@ -16,11 +16,21 @@ internal object CreationJson {
             val efforts = c.optJSONObject("reasoningEfforts") ?: JSONObject()
             CreationCapability(c.getString("machineId"), c.getString("cliType"), c.getString("agentType"), choices(c.optJSONArray("models")), choices(c.optJSONArray("modes")), efforts.keys().asSequence().associateWith { key ->
                 val a = efforts.getJSONArray(key); (0 until a.length()).map { a.getString(it) }
-            }, c.optString("agentConfigId").takeIf { it.isNotBlank() }, defaultModel, defaultEfforts)
+            }, c.optString("agentConfigId").takeIf { it.isNotBlank() }, defaultModel, defaultEfforts, switches(config))
         },
         value.optString("availability", "unknown"),
         value.optJSONArray("onlineMachineIds")?.let { ids -> (0 until ids.length()).map { ids.getString(it) }.toSet() },
     )
+    /** Plan and Fast candidates: boolean options and collaboration-mode selects (with their value ids). */
+    private fun switches(config: List<JSONObject>) = config.mapNotNull { option ->
+        val type = option.optString("type")
+        val collaboration = option.optString("id") == "collaboration_mode" || option.optString("category") == "collaboration_mode"
+        if (type != "boolean" && !(type == "select" && collaboration)) return@mapNotNull null
+        val current = option.opt("currentValue").takeIf { it is String || it is Boolean }
+        CreationConfigOption(option.getString("id"), option.optString("category").ifBlank { null }, type, current, choicesIds(option.optJSONArray("options")))
+    }
+    private fun choicesIds(array: JSONArray?) = array.objects().mapNotNull { it.optString("id").ifBlank { null } }
+
     fun encodeOptions(value: CreationOptions) = JSONObject().apply {
         put("availability", value.availability)
         fun choices(values: List<CreationChoice>) = JSONArray(values.map { JSONObject().put("id", it.id).put("name", it.name) })
@@ -29,6 +39,12 @@ internal object CreationJson {
             .put("configOptions", JSONArray().apply {
                 c.defaultModelId?.let { put(JSONObject().put("id", "model").put("category", "model").put("currentValue", it)) }
                 put(JSONObject().put("id", "reasoning_effort").put("type", "select").put("category", "thought_level").put("options", choices(c.defaultEfforts.map { CreationChoice(it, it) })))
+                c.switches.forEach { option ->
+                    put(JSONObject().put("id", option.id).put("type", option.type).apply {
+                        option.category?.let { put("category", it) }
+                        option.currentValue?.let { put("currentValue", it) }
+                    }.put("options", choices(option.options.map { CreationChoice(it, it) })))
+                }
             })
             .put("models", choices(c.models)).put("modes", choices(c.modes)).put("reasoningEfforts", JSONObject().apply { c.efforts.forEach { (model, levels) -> put(model, JSONArray(levels)) } }) }))
     }

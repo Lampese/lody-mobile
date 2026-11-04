@@ -2,8 +2,36 @@ package app.lody.android.runtime
 
 data class CreationChoice(val id: String, val name: String)
 data class CreationAgent(val id: String, val name: String, val machineId: String, val cliType: String, val agentType: String)
-data class CreationCapability(val machineId: String, val cliType: String, val agentType: String, val models: List<CreationChoice>, val modes: List<CreationChoice>, val efforts: Map<String, List<String>>, val agentConfigId: String? = null, val defaultModelId: String? = null, val defaultEfforts: List<String> = emptyList()) {
+/** An agent switch the composer may offer (ACP config option); [options] are a select's value ids. */
+data class CreationConfigOption(val id: String, val category: String?, val type: String, val currentValue: Any?, val options: List<String> = emptyList())
+data class CreationCapability(val machineId: String, val cliType: String, val agentType: String, val models: List<CreationChoice>, val modes: List<CreationChoice>, val efforts: Map<String, List<String>>, val agentConfigId: String? = null, val defaultModelId: String? = null, val defaultEfforts: List<String> = emptyList(), val switches: List<CreationConfigOption> = emptyList()) {
     fun effortsFor(modelId: String?): List<String> = efforts[modelId ?: defaultModelId] ?: defaultEfforts
+
+    /** Web's Plan switch: Lody's boolean `plan_mode`, or a collaboration mode with a `plan` value. */
+    val planSwitch: CreationConfigOption? get() = switches.firstOrNull {
+        (it.id == "plan_mode" && it.type == "boolean") ||
+            ((it.id == "collaboration_mode" || it.category == "collaboration_mode") && it.type == "select" && "plan" in it.options)
+    }
+
+    /** Web's Fast switch: a boolean `fast-mode` / `fast` option. */
+    val fastSwitch: CreationConfigOption? get() = switches.firstOrNull { it.id in setOf("fast-mode", "fast") && it.type == "boolean" }
+
+    /** Whether [option] is on given the chosen values (else the agent's current value). */
+    fun switchOn(option: CreationConfigOption, values: Map<String, Any>): Boolean {
+        val value = values[option.id] ?: option.currentValue
+        return value == true || value == "plan"
+    }
+
+    /** The value that turns [option] on or off (`plan` / `default` for a collaboration mode). */
+    fun switchValue(option: CreationConfigOption, on: Boolean): Any = if (option.type == "boolean") on else if (on) "plan" else "default"
+
+    /** Plan / Fast state for the chip and sheet; null when the agent offers no such switch. */
+    fun planOn(values: Map<String, Any>): Boolean? = planSwitch?.let { switchOn(it, values) }
+    fun fastOn(values: Map<String, Any>): Boolean? = fastSwitch?.let { switchOn(it, values) }
+
+    /** The option id and value that set Plan / Fast; null when not offered. */
+    fun planValue(on: Boolean): Pair<String, Any>? = planSwitch?.let { it.id to switchValue(it, on) }
+    fun fastValue(on: Boolean): Pair<String, Any>? = fastSwitch?.let { it.id to switchValue(it, on) }
 }
 data class CreationOptions(val agents: List<CreationAgent>, val capabilities: List<CreationCapability>, val availability: String = "online", val onlineMachineIds: Set<String>? = null) {
     fun capability(agent: CreationAgent?): CreationCapability? {
@@ -12,8 +40,12 @@ data class CreationOptions(val agents: List<CreationAgent>, val capabilities: Li
             ?: capabilities.firstOrNull { it.machineId == agent.machineId && it.agentConfigId == null && it.cliType == agent.cliType && it.agentType == agent.agentType }
     }
 
-    /** A running session's provider choices: its computer's capability for the session's agent type. */
-    fun capability(machineId: String, cliType: String?, agentType: String?): CreationCapability? {
+    /**
+     * A running session's provider choices: the capability probed for its own Agent Config, as
+     * web; sessions or runtimes without one fall back to the computer's agent type.
+     */
+    fun capability(machineId: String, cliType: String?, agentType: String?, agentConfigId: String? = null): CreationCapability? {
+        if (agentConfigId != null) capabilities.firstOrNull { it.machineId == machineId && it.agentConfigId == agentConfigId }?.let { return it }
         val matching = capabilities.filter { it.machineId == machineId && it.cliType == cliType && it.agentType == agentType }
         return matching.firstOrNull { it.agentConfigId == null } ?: matching.firstOrNull()
     }

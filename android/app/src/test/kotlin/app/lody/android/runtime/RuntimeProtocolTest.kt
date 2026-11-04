@@ -23,10 +23,18 @@ class RuntimeProtocolTest {
   assertEquals(9, messages.single().files.size)
   assertEquals(FileChange("src/file8.kt", 8, 2), messages.single().files.last())
  }
+ @Test fun composerRoleIsKnownOnlyWhenTheLatestTurnSaysSo() {
+  fun composer(json: String) = (RuntimeProtocol.event(JSONObject().put("type","session").put("sessionId","s")
+   .put("session","""{"v":1,"status":"live","composer":$json,"entries":[]}""")) as RuntimeEvent.SessionUpdated).snapshot.composer!!
+  assertEquals(RunChoice(agentRoleId = "r", roleKnown = true), composer("""{"agentRoleId":"r"}"""))
+  assertEquals(RunChoice(roleKnown = true), composer("""{"agentRoleId":null}"""))
+  assertEquals(RunChoice(), composer("""{}"""))
+ }
  @Test fun composerChoiceAndUserAttachmentsAreParsed() {
   val body="""{"v":1,"status":"live","composer":{"modelId":"gpt","modeId":"plan","effort":"high","configOptionValues":{"fast":true}},"entries":[{"id":"u","role":"user","finished":true,"items":[{"type":"image_group","images":[{"id":"i1","fileName":"a.png"},{"id":"i2","fileName":"b.png"}]},{"type":"file","file":{"id":"f1","fileName":"notes.md"}}]}]}"""
   val snapshot=(RuntimeProtocol.event(JSONObject().put("type","session").put("sessionId","s").put("session",body)) as RuntimeEvent.SessionUpdated).snapshot
-  assertEquals(RunChoice("gpt","plan","high"),snapshot.composer)
+  // Agent switches (Fast) come back so the chip and sheet reopen on them; no Role was said.
+  assertEquals(RunChoice("gpt","plan","high",mapOf("fast" to true)),snapshot.composer)
   // An attachment-only user turn stays in the transcript.
   assertEquals(listOf(MessageAttachment("a.png",true),MessageAttachment("b.png",true),MessageAttachment("notes.md",false)),snapshot.messages.single().attachments)
  }

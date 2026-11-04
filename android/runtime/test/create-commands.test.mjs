@@ -90,3 +90,26 @@ test('a new chat can start as an Agent Role bound to the chosen agent, with prov
  assert.equal(calls.filter(x=>x[0]==='create').length,1);
  await assert.rejects(c.createAndSend({...other,agentRoleId:undefined,configOptionValues:{x:{}}}),/invalid_creation/);
 });
+// Web's session composer: any turn may run as a Role bound to the conversation's own agent
+// config, an explicit None (null) ends it, and omitting it inherits the latest turn's.
+test('a conversation turn carries its Role, an explicit None, or nothing to inherit',async()=>{
+ const {c,calls}=fixture();const turn={sessionId:'s1',turnId:input.turnId,text:'hi',machineId:'m',cliType:'builtin',agentType:'codex'};
+ const last=()=>calls.filter(x=>x[0]==='send').at(-1)[1];
+ await c.sendText({...turn,agentRoleId:'reviewer',agentConfigId:'a'});
+ assert.equal(last().agentRoleId,'reviewer');assert.equal(last().agentConfigId,'a');
+ await c.sendText({...turn,agentRoleId:null});
+ assert.equal('agentRoleId' in last(),true);assert.equal(last().agentRoleId,null);
+ await c.sendText(turn);assert.equal('agentRoleId' in last(),false);
+ const before=calls.length;
+ await assert.rejects(c.sendText({...turn,agentRoleId:'reviewer'}),/invalid_send/,'a Role needs the session agent config');
+ await assert.rejects(c.sendText({...turn,agentRoleId:''}),/invalid_send/);
+ assert.equal(calls.length,before,'refusals write nothing');
+});
+test('a conversation turn carries the agent switches it changed (Plan, Fast)',async()=>{
+ const {c,calls}=fixture();const turn={sessionId:'s1',turnId:input.turnId,text:'hi',machineId:'m',cliType:'builtin',agentType:'codex'};
+ await c.sendText({...turn,configOptionValues:{plan_mode:true,collaboration_mode:'plan'}});
+ assert.deepEqual(calls.filter(x=>x[0]==='send').at(-1)[1].configOptionValues,{plan_mode:true,collaboration_mode:'plan'});
+ await assert.rejects(c.sendText({...turn,configOptionValues:{api_token:'x'}}),/invalid_send/);
+ await assert.rejects(c.sendText({...turn,configOptionValues:{fast:7}}),/invalid_send/);
+ await assert.rejects(c.sendText({...turn,configOptionValues:['x']}),/invalid_send/);
+});

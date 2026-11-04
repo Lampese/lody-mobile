@@ -113,6 +113,8 @@ export type Envelope = {
     modeId?: string;
     effort?: string;
     configOptionValues?: Record<string, string | boolean>;
+    /** The Role the latest turn ran as; null after an explicit None (web). */
+    agentRoleId?: string | null;
   };
   entries: EntrySummary[];
 };
@@ -611,6 +613,9 @@ export function projectSession(
             ...(typeof effort === 'string' ? { effort } : {}),
             ...(Object.keys(composerValues).length
               ? { configOptionValues: composerValues }
+              : {}),
+            ...(typeof input.agentRoleId === 'string' || input.agentRoleId === null
+              ? { agentRoleId: input.agentRoleId }
               : {}),
           },
         }

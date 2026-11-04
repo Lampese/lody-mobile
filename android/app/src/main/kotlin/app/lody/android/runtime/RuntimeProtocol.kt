@@ -61,7 +61,13 @@ internal object RuntimeProtocol {
             }
             val composer = envelope.optJSONObject("composer")?.let { value ->
                 fun field(key: String) = (value.opt(key) as? String)?.takeIf { it.isNotBlank() }
-                RunChoice(field("modelId"), field("modeId"), field("effort"))
+                val options = value.optJSONObject("configOptionValues")?.let { values ->
+                    values.keys().asSequence().mapNotNull { key -> (values.get(key) as? String ?: values.get(key) as? Boolean)?.let { key to it } }.toMap()
+                }.orEmpty()
+                RunChoice(
+                    field("modelId"), field("modeId"), field("effort"), options,
+                    agentRoleId = field("agentRoleId"), roleKnown = value.has("agentRoleId"),
+                )
             }
             RuntimeEvent.SessionUpdated(SessionSnapshot(message.text("sessionId"), envelope.text("status"), entries, composer))
         }

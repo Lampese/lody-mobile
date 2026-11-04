@@ -98,6 +98,7 @@ checks = {
     'live-activity': ['LiveActivity/LodyActivityAttributes.swift', 'LiveActivity/LiveActivityCatalog.swift'],
     'page-progress': ['List/LodyPageProgress.swift'],
     'create-session': ['LodyLocalization.swift', 'CreateSession/CreateSessionForm.swift'],
+    'session-roles': ['LodyLocalization.swift', 'CreateSession/CreateSessionForm.swift', 'Sessions/SessionRoles.swift'],
     'unified-patch': ['Diff/UnifiedPatch.swift'],
     'create-draft': ['LodyLocalization.swift', 'CreateSession/CreateSessionForm.swift', 'Outbox/OutboxRecord.swift', 'CreateSession/CreateDraftRecord.swift'],
     'share-ingest': ['LodyLocalization.swift', 'Chat/ChatAttachments.swift', 'CreateSession/CreateSessionForm.swift', 'CreateSession/ShareStore.swift', str(root / 'apps/ios/Extensions/Share/ShareIngest.swift')],

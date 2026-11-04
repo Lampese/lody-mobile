@@ -1,4 +1,6 @@
 import LodyCore
+import LodyDesignSystem
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -55,10 +57,14 @@ extension SessionController {
     chat.onSend = { [weak self] body in
       guard let self, !SessionActions.isDeleting(self.source.state.workspaceId, self.sessionId), !self.planDecision.pending
       else { return }
-      self.sender?.submit(body, choice: self.composerModel.sendChoice)
+      self.sender?.submit(body, choice: self.composerModel.sendChoice, role: self.composerModel.sendRole)
     }
     chat.onRetrySend = { [weak self] _ in self?.sender?.retry() }
     chat.onComposerOptionChange = { [weak self] body in self?.composerModel.change(body) }
+    // The conversation composer is the new-chat composer (web's mobile session page): a card
+    // with +, the run-config chip and Send, no @ button; the chip opens the run-config sheet.
+    chat.composer.cardStyle = true
+    chat.composer.onRunConfig = { [weak self] in self?.presentRunConfig() }
     chat.onStop = { [weak self] _ in self?.controlTurn("stop") }
     chat.onSteer = { [weak self] body in self?.controlTurn("steer", messageId: body["id"] as? String) }
   }
@@ -80,7 +86,8 @@ extension SessionController {
     let state = source.state, live = feed.status == "live"
     composerModel.hydrate(
       pending: sender?.record, ready: sender?.ready == true,
-      snapshot: feed.composerJSON.flatMap { CreateJSON.decode(ModelChoice.self, $0) }
+      snapshot: feed.composerJSON.flatMap { CreateJSON.decode(ModelChoice.self, $0) },
+      role: Self.composerRole(feed.composerJSON)
     )
     let project = state.catalog.projects.first { $0.id == session.projectId }
     composerModel.load(workspaceId: state.workspaceId, projectId: project?.id, session: session)
@@ -143,7 +150,54 @@ extension SessionController {
   private func placeholder(_ session: SessionItem, locked: Bool) -> String {
     if session.archived { return String(localized: "chat.composer.archived", bundle: .lody) }
     if locked { return "" }
-    return String(localized: "chat.composer.placeholder", bundle: .lody)
+    // Web: "Work with <assistant>" — the Agent Role when one is, else the conversation's agent.
+    guard let name = composerModel.activeRole?.role.name ?? composerModel.agentName, !name.isEmpty else {
+      return String(localized: "chat.composer.placeholder", bundle: .lody)
+    }
+    return String.localizedStringWithFormat(String(localized: "create.composer.placeholderAgent", bundle: .lody), name)
+  }
+
+  /// The Role the latest turn ran as, from the runtime's composer projection: absent is unknown,
+  /// null an explicit None.
+  static func composerRole(_ json: String?) -> String?? {
+    guard let data = json?.data(using: .utf8),
+          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let value = object["agentRoleId"] else { return nil }
+    if let id = value as? String, !id.isEmpty { return .some(id) }
+    return value is NSNull ? .some(nil) : nil
+  }
+
+  /// Web's mobile run-config sheet from the composer chip, the same sheet as a new chat.
+  func presentRunConfig() {
+    guard presentedViewController == nil else { return }
+    let rows = composerModel.runConfig
+    guard !rows.isEmpty else { return }
+    chat.endEditing(true)
+    let state = CreatePanelState()
+    state.runConfig = rows
+    state.onPick = { [weak self, weak state] row, option in
+      guard let self else { return }
+      self.composerModel.pick(row, option)
+      state?.runConfig = self.composerModel.runConfig
+    }
+    let sheet = UIHostingController(rootView: CreateRunConfigSheet(state: state))
+    var contentHeight = CGFloat(rows.count) * (LodySize.controlMd + LodySpacing.xs * 2)
+      + LodySpacing.xl + LodySize.controlMd + LodySpacing.lg
+    sheet.rootView = CreateRunConfigSheet(state: state, onHeightChange: { [weak sheet] height in
+      guard height > 0, abs(contentHeight - height) > 1 else { return }
+      contentHeight = height
+      sheet?.sheetPresentationController?.animateChanges {
+        sheet?.sheetPresentationController?.invalidateDetents()
+      }
+    })
+    if let presentation = sheet.sheetPresentationController {
+      presentation.detents = [.custom(identifier: .init("runConfigContent")) { context in
+        min(contentHeight, context.maximumDetentValue)
+      }]
+      presentation.prefersGrabberVisible = true
+    }
+    sheet.view.accessibilityIdentifier = "session-run-config"
+    present(sheet, animated: true)
   }
 
   private func quotaNotice(_ count: Int?, live: Bool) -> String {

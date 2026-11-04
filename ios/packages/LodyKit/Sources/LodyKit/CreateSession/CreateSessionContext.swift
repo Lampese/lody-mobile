@@ -49,6 +49,8 @@ struct CreatePicker: Identifiable, Equatable {
   /// Search runs over these instead of `options` when present (every project, not just recent).
   var searchOptions: [CreateOption]?
   var searchPlaceholder = ""
+  /// A run-config switch (web's Plan / Fast) instead of a list; picks report "on" / "off".
+  var toggle: Bool?
   var searchable: Bool { searchOptions != nil || options.count > 8 }
 }
 
@@ -266,11 +268,14 @@ enum CreateSessionContext {
   }
 
   static let roleNoneOption = "__none__"
+  static let toggleOn = "on"
+  static let toggleOff = "off"
 
   private static let runConfigLabels = [
     "role": "create.runConfig.role",
     "agent": "create.runConfig.agent", "model": "create.runConfig.model",
     "effort": "create.runConfig.reasoning", "permission": "create.runConfig.mode",
+    "plan": "create.runConfig.plan", "fast": "create.runConfig.fast",
   ]
 
   static func runConfigLabel(_ id: String) -> String { text(runConfigLabels[id] ?? "create.runConfig.mode") }
@@ -571,7 +576,24 @@ struct CreateRunConfigSheet: View {
     .background(LodyColor.bgBase)
   }
 
+  @ViewBuilder
   private func rowFace(_ row: CreatePicker) -> some View {
+    if let on = row.toggle {
+      Toggle(isOn: Binding(get: { on }, set: { state.onPick(row.id, $0 ? CreateSessionContext.toggleOn : CreateSessionContext.toggleOff) })) {
+        Text(CreateSessionContext.runConfigLabel(row.id))
+          .lodyTextStyle(.subhead)
+          .foregroundStyle(LodyColor.textSecondary)
+      }
+      .tint(LodyColor.accentDefault)
+      .frame(minHeight: LodySize.controlMd)
+      .padding(.vertical, LodySpacing.xs)
+      .accessibilityIdentifier("run-config-" + row.id)
+    } else {
+      listFace(row)
+    }
+  }
+
+  private func listFace(_ row: CreatePicker) -> some View {
     HStack(spacing: LodySpacing.md) {
       Text(CreateSessionContext.runConfigLabel(row.id))
         .lodyTextStyle(.subhead)

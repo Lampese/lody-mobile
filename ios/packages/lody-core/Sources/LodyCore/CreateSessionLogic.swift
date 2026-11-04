@@ -64,6 +64,27 @@ public enum CreateLogic {
     return next
   }
 
+  /// Web's Plan switch (`isAcpPlanModeConfigOption`): Lody's boolean `plan_mode`, or a
+  /// collaboration mode whose `plan` value turns it on and `default` off.
+  public static func planMode(_ capability: Capability?, _ choice: ModelChoice) -> (id: String, enabled: Bool)? {
+    guard let option = capability?.configOptions?.first(where: { option in
+      (option.id == "plan_mode" && option.type == "boolean")
+        || ((option.id == "collaboration_mode" || option.category == "collaboration_mode") && option.type == "select"
+          && option.options.contains { $0.id == "plan" })
+    }) else { return nil }
+    let value = choice.configOptionValues?[option.id] ?? option.currentValue
+    return (option.id, value == .bool(true) || value == .string("plan"))
+  }
+
+  public static func withPlanMode(_ capability: Capability?, _ choice: ModelChoice, enabled: Bool) -> ModelChoice {
+    guard let mode = planMode(capability, choice),
+          let option = capability?.configOptions?.first(where: { $0.id == mode.id }) else { return choice }
+    let value: ConfigValue = option.type == "boolean" ? .bool(enabled) : .string(enabled ? "plan" : "default")
+    var next = choice
+    next.configOptionValues = (choice.configOptionValues ?? [:]).merging([mode.id: value]) { $1 }
+    return next
+  }
+
   // Same precedence as OSS resolvePermissionModeFace and the chat projection.
   public static func permissionMode(_ capability: Capability?, _ choice: ModelChoice)
     -> (options: [CapabilityChoice], value: String?, configId: String?)?

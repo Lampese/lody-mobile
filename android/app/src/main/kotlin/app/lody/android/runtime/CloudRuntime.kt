@@ -73,6 +73,8 @@ data class CatalogSession(
     val cliType: String? = null,
     val agentType: String? = null,
     val resume: String? = null,
+    /** The session's own Agent Config (ACP provider); its Roles bind to it. */
+    val agentConfigId: String? = null,
     /** The last model's display name, for the agent's header. */
     val modelName: String? = null,
     /** Working tree vs base (`diffStats.allChange`) and git publish state, for the action bar. */
@@ -189,10 +191,30 @@ data class SendTextRequest(
     val explicitChoice: Boolean = false,
     /** Uploaded attachment blocks (`image` / `file`, server references only), in order. */
     val attachments: List<org.json.JSONObject> = emptyList(),
+    /** The turn's Agent Role (web session composer); [RoleSend.Inherit] omits it. */
+    val role: RoleSend = RoleSend.Inherit,
+    /** The session's own Agent Config, which a Role must be bound to. */
+    val agentConfigId: String? = null,
+    /** Agent switches the reader changed (Plan, Fast); empty sends none. */
+    val configOptionValues: Map<String, Any> = emptyMap(),
 )
+/** What a turn says about its Agent Role: inherit the latest turn's, an explicit None, or a Role. */
+sealed interface RoleSend {
+    data object Inherit : RoleSend
+    data object None : RoleSend
+    data class Role(val id: String) : RoleSend
+}
 data class MessageAttachment(val name: String, val image: Boolean)
-/** The latest user turn's run config (runtime session `composer`), what the next turn would use. */
-data class RunChoice(val modelId: String? = null, val modeId: String? = null, val effort: String? = null)
+/**
+ * The latest user turn's run config (runtime session `composer`), what the next turn would use.
+ * [roleKnown] is false when the turn says nothing about a Role; then [agentRoleId] null is
+ * unknown rather than an explicit None.
+ */
+data class RunChoice(
+    val modelId: String? = null, val modeId: String? = null, val effort: String? = null,
+    val configOptionValues: Map<String, Any> = emptyMap(),
+    val agentRoleId: String? = null, val roleKnown: Boolean = false,
+)
 data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>, val composer: RunChoice? = null)
 sealed interface RuntimeEvent {
     data class CreationChanged(val key: String = "") : RuntimeEvent

@@ -4849,9 +4849,9 @@ extension RuntimeContract {
     public var reasoningEffort: ClearableString?
     public var reasoningEffortConfigId: String?
     public var configOptionValues: [String: JSONValue]?
-    public var agentRoleId: String?
+    public var agentRoleId: ClearableString?
     public var billingEntitlement: BillingEntitlement?
-    public init(sessionId: String, id: String? = nil, backgroundTaskId: String? = nil, queue: Bool? = nil, guide: Bool? = nil, machineId: String, userId: String? = nil, text: String, attachmentBlocks: [[String: JSONValue]]? = nil, cliType: String? = nil, agentType: String? = nil, resume: String? = nil, modelId: ClearableString? = nil, modeId: String? = nil, reasoningEffort: ClearableString? = nil, reasoningEffortConfigId: String? = nil, configOptionValues: [String: JSONValue]? = nil, agentRoleId: String? = nil, billingEntitlement: BillingEntitlement?) {
+    public init(sessionId: String, id: String? = nil, backgroundTaskId: String? = nil, queue: Bool? = nil, guide: Bool? = nil, machineId: String, userId: String? = nil, text: String, attachmentBlocks: [[String: JSONValue]]? = nil, cliType: String? = nil, agentType: String? = nil, resume: String? = nil, modelId: ClearableString? = nil, modeId: String? = nil, reasoningEffort: ClearableString? = nil, reasoningEffortConfigId: String? = nil, configOptionValues: [String: JSONValue]? = nil, agentRoleId: ClearableString? = nil, billingEntitlement: BillingEntitlement?) {
       self.sessionId = sessionId
       self.id = id
       self.backgroundTaskId = backgroundTaskId
@@ -4891,7 +4891,7 @@ extension RuntimeContract {
       self.reasoningEffort = try c.decodeIfPresent(ClearableString.self, forKey: Key("reasoningEffort"))
       self.reasoningEffortConfigId = try c.decodeIfPresent(String.self, forKey: Key("reasoningEffortConfigId"))
       self.configOptionValues = try c.decodeIfPresent([String: JSONValue].self, forKey: Key("configOptionValues"))
-      self.agentRoleId = try c.decodeIfPresent(String.self, forKey: Key("agentRoleId"))
+      self.agentRoleId = try c.decodeIfPresent(ClearableString.self, forKey: Key("agentRoleId"))
       self.billingEntitlement = try c.decode(BillingEntitlement?.self, forKey: Key("billingEntitlement"))
     }
     public func encode(to encoder: any Encoder) throws {

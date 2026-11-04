@@ -21,6 +21,7 @@ object CatalogJson {
         cliType = json.optText("cliType"),
         agentType = json.optText("agentType"),
         resume = json.optText("resume"),
+        agentConfigId = json.optText("agentConfigId"),
         modelName = json.optJSONObject("lastModel")?.let { it.optText("name") ?: it.optText("modelId") },
         lastMessageAt = json.optMillis("lastMessageAt"),
         lastReadAt = json.optMillis("lastReadAt"),
@@ -59,6 +60,7 @@ object CatalogJson {
         session.cliType?.let { put("cliType", it) }
         session.agentType?.let { put("agentType", it) }
         session.resume?.let { put("resume", it) }
+        session.agentConfigId?.let { put("agentConfigId", it) }
         session.modelName?.let { put("lastModel", JSONObject().put("name", it)) }
         session.lastMessageAt?.let { put("lastMessageAt", it) }
         session.lastReadAt?.let { put("lastReadAt", it) }

@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "create.runConfig.plan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划"
+          }
+        }
+      }
+    },
+    "create.runConfig.fast": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速"
+          }
+        }
+      }
+    },
     "create.runConfig.role": {
       "extractionState": "manual",
       "localizations": {

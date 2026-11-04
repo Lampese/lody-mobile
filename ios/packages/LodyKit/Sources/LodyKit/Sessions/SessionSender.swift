@@ -87,7 +87,7 @@ final class SessionSender {
     settle()
   }
 
-  func submit(_ event: [String: Any], choice: [String: OutboxValue]) {
+  func submit(_ event: [String: Any], choice: [String: OutboxValue], role: OutboxValue? = nil) {
     let current = record
     guard let store, ready, !dispatching, !sending, !inputs.context.overflow, inputs.session?.archived != true,
           !inputs.userId.isEmpty, let session = inputs.session?.outboxValue ?? current?.session,
@@ -101,6 +101,8 @@ final class SessionSender {
       choice["configOptionValues"] = current?.send["choice"]?.object?["configOptionValues"]
     }
     send["choice"] = .object(choice)
+    // The turn's Agent Role (web session composer); absent inherits the latest turn's.
+    send["agentRoleId"] = role
     send["guide"] = .bool(send["guide"] == .bool(true) && inputs.context.steerable)
     send["creation"] = current?.send["creation"]
     send["phase"] = .string("waiting")

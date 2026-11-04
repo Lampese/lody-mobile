@@ -2461,7 +2461,7 @@
           "propertyNames": { "type": "string" },
           "additionalProperties": {}
         },
-        "agentRoleId": { "type": "string", "minLength": 1 },
+        "agentRoleId": { "$ref": "ClearableString" },
         "billingEntitlement": {
           "anyOf": [{ "$ref": "BillingEntitlement" }, { "type": "null" }]
         }

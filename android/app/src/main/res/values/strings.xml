@@ -128,6 +128,8 @@
     <string name="create_role_unavailable_offline">Its agent is offline</string>
     <string name="create_model">Model</string>
     <string name="create_effort">Reasoning</string>
+    <string name="run_config_plan">Plan</string>
+    <string name="run_config_fast">Fast</string>
     <string name="create_mode">Mode</string>
     <string name="create_extras_unavailable">Attachments and mentions are not available yet.</string>
     <string name="create_search_machines">Search computers</string>

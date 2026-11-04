@@ -532,8 +532,11 @@ export async function sendTurn(
     reasoningEffort?: string | null;
     reasoningEffortConfigId?: string;
     configOptionValues?: Record<string, unknown>;
-    /** A new session's first turn runs as this Role (resolved here, see `resolveTurnRole`). */
-    agentRoleId?: string;
+    /**
+     * The Role this turn runs as (resolved here, see `resolveTurnRole`); null is an explicit
+     * None that ends the conversation's Role, and undefined inherits it.
+     */
+    agentRoleId?: string | null;
     /** The session's own Agent Config, from trusted state (meta / the creator), never the wire. */
     agentConfigId?: string;
     billingEntitlement?: BillingEntitlement | null;
@@ -661,14 +664,14 @@ export async function sendTurn(
       if (args.reasoningEffort === null) delete configOptionValues[id];
       else configOptionValues[id] = args.reasoningEffort;
     }
-    // A Role belongs to a session's FIRST turn (web): its prompt prefix starts the
-    // conversation, and it runs only while every value it pins is what will run.
+    // A Role runs a turn only while every value it pins is what will run (web). Any turn
+    // may pick one, but its prompt prefix only ever starts the conversation.
     let role: TurnRole | undefined;
-    if (args.agentRoleId !== undefined) {
-      const started = ((state.doc.toJSON().history as any[] | undefined) ?? []).some(
-        (entry) => entry.role === 'user',
-      );
-      if (started || typeof args.agentRoleId !== 'string' || !args.agentConfigId)
+    const started = ((state.doc.toJSON().history as any[] | undefined) ?? []).some(
+      (entry) => entry.role === 'user',
+    );
+    if (args.agentRoleId !== undefined && args.agentRoleId !== null) {
+      if (typeof args.agentRoleId !== 'string' || !args.agentRoleId || !args.agentConfigId)
         throw new Error('role_unavailable');
       role = await resolveTurnRole(
         {
@@ -703,7 +706,9 @@ export async function sendTurn(
       agentType: args.agentType,
       // Web `buildAgentPrompt`: the Role's instruction, then the task. The visible
       // input stays the user's own text.
-      prompt: [role?.promptPrefix ?? '', text].filter((part) => part.trim()).join('\n\n'),
+      prompt: [started ? '' : (role?.promptPrefix ?? ''), text]
+        .filter((part) => part.trim())
+        .join('\n\n'),
       inputBlocks: [...(text ? [{ type: 'text', text }] : []), ...attachments],
       // An explicit pick wins; otherwise the turn inherits what the session
       // already used, and an unset value leaves the machine on its default.
@@ -730,7 +735,11 @@ export async function sendTurn(
         : {}),
       resume: args.resume,
     };
-    if (!role && previous.agentRoleId) {
+    if (args.agentRoleId === null) {
+      // An explicit None: the conversation no longer runs as its Role.
+      inputConfig.agentRoleId = null;
+      inputConfig.agentRoleRevision = undefined;
+    } else if (!role && previous.agentRoleId) {
       const previousOptions = previous.configOptionValues ?? {};
       const changed =
         ['cliType', 'agentType', 'modelId', 'modeId'].some(

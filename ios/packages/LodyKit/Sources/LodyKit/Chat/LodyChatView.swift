@@ -965,6 +965,9 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     incoming.onComposerOptionChange = old.onComposerOptionChange
     incoming.onDraftChange = old.onDraftChange
     incoming.allowsFullScreen = old.allowsFullScreen
+    // The conversation's run config, not the creation page's, answers the chip from here on.
+    incoming.onRunConfig = old.onRunConfig
+    incoming.cardStyle = old.cardStyle
     incoming.setInputIdentifier("session-input")
     NSLayoutConstraint.deactivate(links)
     old.removeFromSuperview()

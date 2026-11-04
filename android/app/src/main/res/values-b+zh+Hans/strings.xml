@@ -127,6 +127,8 @@
     <string name="create_role_unavailable_offline">它绑定的助手当前离线</string>
     <string name="create_model">模型</string>
     <string name="create_effort">推理强度</string>
+    <string name="run_config_plan">计划</string>
+    <string name="run_config_fast">快速</string>
     <string name="create_mode">模式</string>
     <string name="create_extras_unavailable">附件和引用暂未接入。</string>
     <string name="create_search_machines">搜索电脑</string>
