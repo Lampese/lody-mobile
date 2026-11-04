@@ -78,3 +78,5 @@
 - The Chats bottom bar collapses after a user scroll passes the shared spacing threshold: hide tab labels and inactive tabs, contract the capsule toward the leading edge to show only the active icon, and shrink the separate create button. Keep it compact while scrolling back; restore only at the list top. Other tabs use the expanded bar. Retain accessibility labels and stable bottom content insets during the animation.
 
 - A parent chat always retains its own status. When its children are folded, show the most urgent child status between the family chevron and child count; never replace the parent status with a child status.
+
+- On the creation page, tapping outside the composer or opening/selecting a context option dismisses the keyboard. Picker search fields must still accept focus, and a dismissal tap must not swallow the option action. Opening run configuration also clears composer focus.

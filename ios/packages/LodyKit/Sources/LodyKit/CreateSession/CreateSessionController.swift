@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 
 @MainActor
-final class CreateSessionController: UIViewController {
+final class CreateSessionController: UIViewController, UIGestureRecognizerDelegate {
   var form = CreateSessionForm()
   var loadCachedOptions: (() async -> CreationOptions?)?
   var loadOptions: (() async throws -> CreationOptions)?
@@ -67,6 +67,10 @@ final class CreateSessionController: UIViewController {
     }
 
     view.backgroundColor = LodyUIColor.bgBase
+    let dismissKeyboard = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+    dismissKeyboard.cancelsTouchesInView = false
+    dismissKeyboard.delegate = self
+    view.addGestureRecognizer(dismissKeyboard)
     panelState.onPick = { [weak self] id, option in self?.optionPicked(id, option) }
     panelState.onWorktree = { [weak self] on in
       guard let self, !self.sending else { return }
@@ -115,6 +119,21 @@ final class CreateSessionController: UIViewController {
     fetchBranches()
   }
 
+  @objc private func dismissKeyboard() { view.endEditing(true) }
+
+  func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    guard let target = touch.view, !target.isDescendant(of: host) else { return false }
+    // Search fields in expanded pickers must still be able to take focus.
+    var ancestor: UIView? = target
+    while let current = ancestor {
+      if current is UITextInput { return false }
+      ancestor = current.superview
+    }
+    return true
+  }
+
+  func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
+
   func setComposerHeight(_ height: CGFloat) {
     guard hostHeight.constant != height else { return }
     hostHeight.constant = height
@@ -139,6 +158,7 @@ final class CreateSessionController: UIViewController {
   /// Reasoning and Mode rows that expand in place.
   private func presentRunConfig() {
     guard !sending, runConfigSheet == nil, !panelState.runConfig.isEmpty else { return }
+    view.endEditing(true)
     panelState.openInSheet = nil
     let sheet = UIHostingController(rootView: CreateRunConfigSheet(state: panelState))
     var contentHeight = CGFloat(panelState.runConfig.count) * (LodySize.controlMd + LodySpacing.xs * 2)

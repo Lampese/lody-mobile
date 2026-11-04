@@ -100,3 +100,5 @@
 
 - The Chats bottom bar uses UIKit `tabBarMinimizeBehavior = .onScrollDown`; other tabs use `.never`. Bind the actual active list as the content scroll view. UIKit owns the compact active icon and expansion behavior; never mutate tab items, frames, or transforms to animate minimization.
 - The conversation composer rests as one Liquid Glass line: +, the prompt, the agent mark ⌄ (`collapsedMark`, the session's provider mark tinted in label ink with a chevron; tapping it opens the composer and then the model panel) and Send, which stays in place, dimmed until there is something to send. Focus opens it as before; the mark fades out and the expanded controls fade in on the expansion's own curve.
+
+- On the creation page, tapping outside the composer or opening/selecting a context option dismisses the keyboard. Picker search fields must still accept focus, and a dismissal tap must not swallow the option action. Opening run configuration also clears composer focus.

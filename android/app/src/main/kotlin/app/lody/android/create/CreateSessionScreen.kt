@@ -26,6 +26,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
 
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 
 import androidx.compose.animation.animateContentSize
 
@@ -112,6 +116,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService, runtimeScope: RuntimeScope, onCreated: (String, String) -> Unit, onBack: () -> Unit) {
+    val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
     val catalog = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
     var target by remember(catalog.revision == 0L) { mutableStateOf(CreateSessionModel.initial(catalog)) }
@@ -239,7 +244,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .pointerInput(dismissKeyboard) { detectTapGestures(onTap = { dismissKeyboard() }) },
         ) {
             // Bottom-aligned above the composer; an expanded list grows upward and, once the
             // panel outgrows the space, scrolls (anchored at its bottom).
@@ -277,7 +283,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 prompt,
                 onPromptChange = { if (!attempted && it.length <= 32000) prompt = it },
                 onAttach = notice,
-                onRunConfig = { if (!attempted) runConfig = true },
+                onRunConfig = { dismissKeyboard(); if (!attempted) runConfig = true },
                 onSend = send,
                 enabled = canSend,
                 agentReady = agent != null,
@@ -339,7 +345,8 @@ private const val MODE = "mode"
 private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
     // One list open at a time, as web's picker coordinator.
     var open by remember { mutableStateOf<String?>(null) }
-    val toggle = { id: String -> open = if (open == id) null else id }
+    val dismissKeyboard = rememberKeyboardDismissal()
+    val toggle = { id: String -> dismissKeyboard(); open = if (open == id) null else id }
 
     val machines = CreateSessionModel.machines(catalog)
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
@@ -390,7 +397,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, availab
     )
 
     val local = !target.chat && project != null && !CreateSessionModel.isGithub(project.id)
-    if (local) WorktreeChip(target.worktree) { onChange(target.copy(worktree = it)) }
+    if (local) WorktreeChip(target.worktree) { dismissKeyboard(); onChange(target.copy(worktree = it)) }
 }
 
 /** iOS draws SF Symbols by OS; Android uses the matching Lucide marks. */
@@ -506,6 +513,7 @@ private fun OptionList(
     expandAllOn: String?,
     expandsToContent: Boolean = false,
 ) {
+    val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     var query by remember { mutableStateOf("") }
@@ -546,7 +554,7 @@ private fun OptionList(
                         .fillMaxWidth()
                         .heightIn(min = LodySize.listRow)
                         .clip(RoundedCornerShape(LodyRadius.md))
-                        .clickable(enabled = !option.disabled, role = Role.Button) { if (option.id == expandAllOn) all = true; onPick(option.id) }
+                        .clickable(enabled = !option.disabled, role = Role.Button) { dismissKeyboard(); if (option.id == expandAllOn) all = true; onPick(option.id) }
                         .semantics { selected = option.selected }
                         .padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
@@ -605,9 +613,10 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
 private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, enabled: Boolean, onChange: (String) -> Unit, onMore: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
     Column {
-        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { open = !open }
+        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { dismissKeyboard(); open = !open }
             .padding(horizontal = LodySpacing.xs), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
             Icon(LodyIcons.Branch, null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
@@ -623,7 +632,7 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
                 decorationBox = { field -> Box { if (query.isEmpty()) Text(stringResource(R.string.create_search_branches), style = LodyTheme.typography.body, color = colors.textPlaceholder); field() } })
             LazyColumn(Modifier.heightIn(max = LodySize.controlMd * 6)) {
               items(state.page?.names.orEmpty().filter { it.contains(query.trim(), ignoreCase = true) }, key = { it }) { name ->
-                Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { onChange(name); open = false }
+                Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlMd).clickable(enabled = enabled) { dismissKeyboard(); onChange(name); open = false }
                     .padding(horizontal = LodySpacing.sm), verticalAlignment = Alignment.CenterVertically) {
                     Text(name, style = LodyTheme.typography.body, color = colors.textPrimary, modifier = Modifier.weight(1f))
                     if (name == state.selected) Icon(LodyIcons.Check, null, tint = colors.accentFg, modifier = Modifier.size(LodyIconSize.sm))
@@ -631,7 +640,7 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
             }
             }
             if (failed || state.page?.nextPage != null || (loading && state.page == null)) {
-                TextButton(onClick = onMore, enabled = enabled && !loading) {
+                TextButton(onClick = { dismissKeyboard(); onMore() }, enabled = enabled && !loading) {
                     if (loading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm))
                     else Text(stringResource(if (failed) R.string.chat_retry else R.string.create_more_branches))
                 }
@@ -818,4 +827,12 @@ private fun ComposerButton(icon: ImageVector, label: String, onClick: () -> Unit
     IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = label }.widthIn(min = LodySize.controlMd)) {
         Icon(icon, contentDescription = null, tint = LodyTheme.colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
     }
+}
+
+/** Clear focus as well as hiding IME so it does not reopen after a picker closes. */
+@Composable
+private fun rememberKeyboardDismissal(): () -> Unit {
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    return remember(focus, keyboard) { { focus.clearFocus(); keyboard?.hide(); Unit } }
 }
