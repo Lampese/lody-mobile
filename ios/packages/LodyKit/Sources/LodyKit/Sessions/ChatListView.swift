@@ -189,7 +189,9 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     entries = next
     titles = nextTitles
     snapshot.reconfigureItems(Array(changed))
-    dataSource.apply(snapshot, animatingDifferences: window != nil && !UIAccessibility.isReduceMotionEnabled)
+    dataSource.apply(snapshot, animatingDifferences: window != nil && !UIAccessibility.isReduceMotionEnabled) { [weak self] in
+      self?.updateBackdrop()
+    }
     updateBackdrop()
     updatePlaceholder()
   }
@@ -211,29 +213,24 @@ final class ChatListView: UIView, UICollectionViewDelegate {
     // At rest the first label already sits at the top edge; it only counts as pinned (and
     // brings the blur) once content has actually scrolled under it.
     let scrolled = top > 0.5
-    let paths = collection.indexPathsForVisibleSupplementaryElements(ofKind: UICollectionView.elementKindSectionHeader)
-    let active = paths.compactMap { path -> UICollectionViewLayoutAttributes? in
-      guard pinsGroupLabels, scrolled,
-            let id = dataSource.sectionIdentifier(for: path.section), !(titles[id] ?? "").isEmpty,
-            let attributes = collection.layoutAttributesForSupplementaryElement(ofKind: UICollectionView.elementKindSectionHeader, at: path)
-      else { return nil }
-      return attributes.frame.minY <= top + 1 ? attributes : nil
-    }.max { $0.indexPath.section < $1.indexPath.section }
-    // Once pushed above the pinned slot, a departing header becomes background
-    // content too. Restore its foreground layer when scrolling back down.
-    for path in paths {
-      guard let header = collection.supplementaryView(forElementKind: UICollectionView.elementKindSectionHeader, at: path),
-            let attributes = collection.layoutAttributesForSupplementaryElement(ofKind: UICollectionView.elementKindSectionHeader, at: path)
-      else { continue }
-      header.layer.zPosition = pinsGroupLabels && attributes.frame.minY < top - 1 ? 0 : 2
+    // During a diffable update UIKit can still display headers from the old snapshot.
+    // Their index paths are not valid in the new layout. Read the actual visible views'
+    // frames instead of asking UICollectionView to resolve transitional index paths.
+    let headers = collection.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionHeader)
+    let active = headers.filter { header in
+      pinsGroupLabels && scrolled && header.frame.minY <= top + 1
+    }.max { $0.frame.minY < $1.frame.minY }
+    // A departing header falls behind the continuous backdrop as it moves above the slot.
+    for header in headers {
+      header.layer.zPosition = pinsGroupLabels && header.frame.minY < top - 1 ? 0 : 2
     }
     // A second system edge would introduce a seam in the middle of the gradient.
     collection.topEdgeEffect.isHidden = active != nil
     topBackdrop.isHidden = active == nil
-    if let attributes = active {
+    if let header = active {
       topBackdrop.frame = CGRect(x: collection.bounds.minX, y: collection.bounds.minY,
                                 width: collection.bounds.width,
-                                height: collection.adjustedContentInset.top + attributes.frame.height + LodySpacing.xxl)
+                                height: collection.adjustedContentInset.top + header.frame.height + LodySpacing.xxl)
     }
   }
 
