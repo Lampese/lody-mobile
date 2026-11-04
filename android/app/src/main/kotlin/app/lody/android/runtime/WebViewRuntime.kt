@@ -49,6 +49,9 @@ open class WebViewRuntime internal constructor(
                 .put("machineId", request.machineId).put("cliType", request.cliType).put("agentType", request.agentType)
                 .put("queue", request.queue)
             request.resume?.let { payload.put("resume", it) }
+            request.modelId?.let { payload.put("modelId", it) }
+            request.modeId?.let { payload.put("modeId", it) }
+            request.effort?.let { payload.put("effort", it) }
             val value = call("sendText", JSONArray().put(payload), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Sent(value.optString("state", "unknown"), value.optString("reason").ifBlank { null })
         }
@@ -67,6 +70,10 @@ open class WebViewRuntime internal constructor(
         is RuntimeCommand.TurnDiff -> {
             val value = call("turnDiff", JSONArray().put(command.sessionId).put(command.entryId).put(command.path), CommandDeadline.QUERY)
             RuntimeResult.Diff(RuntimeProtocol.diff(value as JSONObject))
+        }
+        is RuntimeCommand.StopTurn -> {
+            call("controlTurn", JSONArray().put(command.sessionId).put(command.machineId).put(command.turnId), CommandDeadline.WRITE)
+            RuntimeResult.Accepted
         }
         RuntimeCommand.Ping -> RuntimeResult.Pong(call("ping") as? Boolean ?: throw RuntimeException(runtimeFault("invalid_ping_reply")))
         RuntimeCommand.InspectSchema -> {

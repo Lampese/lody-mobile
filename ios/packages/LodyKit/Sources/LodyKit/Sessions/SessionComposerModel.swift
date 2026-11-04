@@ -26,6 +26,8 @@ final class SessionComposerModel {
   var changed: (() -> Void)?
   private(set) var capability: Capability?
   private(set) var tier: String?
+  /// The session's provider mark; the composer's model chip leads with it (web's run-config chip).
+  private(set) var agentAsset: String?
   private let service: SessionComposerService
   private var choice: ModelChoice
   private var hydrated: Bool
@@ -67,6 +69,7 @@ final class SessionComposerModel {
   func load(workspaceId: String, projectId: String?, session: SessionItem) {
     let key = [workspaceId, projectId ?? "", session.machineId, session.agentConfigId ?? "", session.cliType, session.agentType].joined(separator: "\n")
     guard key != capabilityKey else { return }
+    agentAsset = LodyAgentIcon.asset(cliType: session.cliType, agentType: session.agentType)
     capabilityKey = key
     capabilityTask?.cancel()
     guard !workspaceId.isEmpty, let projectId, !session.cliType.isEmpty, !session.agentType.isEmpty else {
@@ -122,6 +125,7 @@ final class SessionComposerModel {
       "efforts": CreateLogic.effortsFor(capability, modelId: value.modelId).map { ["id": $0, "title": $0] },
     ]
     options["fast"] = CreateLogic.fastMode(capability, value)?.enabled
+    options["agentAsset"] = agentAsset
     return SessionController.json(options)
   }
 

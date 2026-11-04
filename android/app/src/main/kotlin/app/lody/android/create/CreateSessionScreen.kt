@@ -13,6 +13,7 @@
 package app.lody.android.create
 
 import app.lody.android.designsystem.shadow
+import app.lody.android.home.AgentMark
 
 import app.lody.android.designsystem.LodyElevations
 
@@ -280,6 +281,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 onSend = send,
                 enabled = canSend,
                 agentReady = agent != null,
+                agentCliType = agent?.cliType,
+                agentType = agent?.agentType,
                 face = listOfNotNull(modelName ?: agent?.name, effort),
                 mode = modeId,
                 modeLabel = modeName,
@@ -303,7 +306,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
             }
             RunConfigSheet(
                 rows = buildList {
-                    if (agents.isNotEmpty()) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, icon = LodyIcons.Agent) }))
+                    if (agents.isNotEmpty()) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, agent = it.cliType to it.agentType) }))
                     capability?.models?.takeIf { it.isNotEmpty() }?.let { models ->
                         add(RunConfigRow(MODEL, stringResource(R.string.create_model), models.map { PickerOption(it.id, it.name, it.id == modelId) }))
                     }
@@ -402,14 +405,26 @@ private const val PROJECT = "project"
 private const val CHAT = "chat"
 private const val MORE = "more"
 
-private data class PickerOption(
+internal data class PickerOption(
     val id: String,
     val title: String,
     val selected: Boolean,
     val subtitle: String = "",
     val icon: ImageVector? = null,
     val disabled: Boolean = false,
+    /** An agent's provider (cliType to agentType): leads with its mark instead of [icon]. */
+    val agent: Pair<String, String>? = null,
 )
+
+/** The option's leading mark: the agent's provider mark, else its icon. */
+@Composable
+private fun OptionMark(option: PickerOption, size: androidx.compose.ui.unit.Dp) {
+    val tint = LodyTheme.colors.iconSecondary
+    when {
+        option.agent != null -> AgentMark(option.agent.first, option.agent.second, tint, Modifier.size(size))
+        option.icon != null -> Icon(option.icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
+    }
+}
 
 private fun CatalogProject.option(target: CreateTarget) = PickerOption(
     id = id,
@@ -537,7 +552,7 @@ private fun OptionList(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
                 ) {
-                    option.icon?.let { Icon(it, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) }
+                    OptionMark(option, LodyIconSize.md)
                     Column(Modifier.weight(1f)) {
                         Text(option.title, style = type.body, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (option.subtitle.isNotEmpty()) {
@@ -625,11 +640,11 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
     }
 }
 
-private data class RunConfigRow(val id: String, val label: String, val options: List<PickerOption>)
+internal data class RunConfigRow(val id: String, val label: String, val options: List<PickerOption>)
 
 /** Web's run-config sheet as iOS draws it: label + value rows whose options expand in place. */
 @Composable
-private fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPick: (String, String) -> Unit) {
+internal fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPick: (String, String) -> Unit) {
     val colors = LodyTheme.colors
     var open by remember { mutableStateOf<String?>(null) }
     Column(
@@ -655,7 +670,7 @@ private fun RunConfigSheet(rows: List<RunConfigRow>, defaultLabel: String, onPic
                 horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
             ) {
                 Text(row.label, style = LodyTheme.typography.subhead, color = colors.textSecondary, modifier = Modifier.widthIn(min = RunConfigLabelWidth))
-                current?.icon?.let { Icon(it, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm)) }
+                if (current != null) OptionMark(current, LodyIconSize.sm)
                 Text(
                     current?.title ?: defaultLabel,
                     style = LodyTheme.typography.body,
@@ -693,6 +708,8 @@ private fun Composer(
     onSend: () -> Unit,
     enabled: Boolean,
     agentReady: Boolean,
+    agentCliType: String?,
+    agentType: String?,
     face: List<String>,
     mode: String?,
     modeLabel: String?,
@@ -745,7 +762,7 @@ private fun Composer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
             ) {
-                Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
                 val label = buildAnnotatedString {
                     if (!agentReady || face.isEmpty()) {
                         withStyle(SpanStyle(color = colors.textTertiary)) { append(waiting) }
@@ -758,17 +775,7 @@ private fun Composer(
                     }
                 }
                 Text(label, style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                val warning = mode in listOf("agent-full-access", "danger-full-access", "dontAsk", "bypassPermissions", "yolo", "always-approve")
-                val modeIcon = when {
-                    warning -> LodyIcons.PermissionWarning
-                    mode == "agent" || mode == "default" -> LodyIcons.PermissionDefault
-                    mode == "read-only" -> LodyIcons.Eye
-                    mode == "acceptEdits" -> LodyIcons.Edit
-                    mode == "plan" -> LodyIcons.PermissionPlan
-                    else -> null
-                }
-                if (modeIcon != null) Icon(modeIcon, contentDescription = modeLabel, tint = if (warning) colors.warningDefault else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                if (mode == "auto" || mode == "agent-auto-review") Text(stringResource(R.string.create_mode_auto), style = type.caption, color = colors.textSecondary)
+                ModeMark(mode, modeLabel)
 
             }
             Spacer(Modifier.weight(1f))
@@ -787,6 +794,23 @@ private fun Composer(
             }
         }
     }
+}
+
+/** The run-config chip's permission face: a glyph per known mode, `Auto` for auto modes, else nothing. */
+@Composable
+internal fun ModeMark(mode: String?, label: String?) {
+    val colors = LodyTheme.colors
+    val warning = mode in listOf("agent-full-access", "danger-full-access", "dontAsk", "bypassPermissions", "yolo", "always-approve")
+    val icon = when {
+        warning -> LodyIcons.PermissionWarning
+        mode == "agent" || mode == "default" -> LodyIcons.PermissionDefault
+        mode == "read-only" -> LodyIcons.Eye
+        mode == "acceptEdits" -> LodyIcons.Edit
+        mode == "plan" -> LodyIcons.PermissionPlan
+        else -> null
+    }
+    if (icon != null) Icon(icon, contentDescription = label, tint = if (warning) colors.warningDefault else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+    if (mode == "auto" || mode == "agent-auto-review") Text(stringResource(R.string.create_mode_auto), style = LodyTheme.typography.caption, color = colors.textSecondary)
 }
 
 @Composable

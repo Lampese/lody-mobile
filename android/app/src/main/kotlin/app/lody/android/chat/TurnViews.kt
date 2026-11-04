@@ -536,7 +536,7 @@ internal fun LazyListScope.turnFooter(entry: ChatEntry.Assistant) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
         ) {
-            Icon(LodyIcons.Agent, contentDescription = null, tint = LodyTheme.colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+            app.lody.android.home.AgentMark(entry.agentCliType, entry.agentType, LodyTheme.colors.iconTertiary, Modifier.size(LodyIconSize.sm))
             Text(text, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

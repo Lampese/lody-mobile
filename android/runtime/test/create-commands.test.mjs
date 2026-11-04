@@ -62,3 +62,11 @@ test('thought-level choices validate and send without a per-model catalog',async
  assert.equal((await commands.createAndSend({...input,effort:'high'})).state,'accepted');
  assert.equal(sent.reasoningEffort,'high');assert.equal(sent.reasoningEffortConfigId,'thinking');
 });
+test('a conversation turn carries only the explicit run-config choice',async()=>{
+ const {c,calls}=fixture();const turn={sessionId:'s1',turnId:input.turnId,text:'hi',machineId:'m',cliType:'builtin',agentType:'codex'};
+ assert.equal((await c.sendText({...turn,modelId:'gpt',effort:'high',reasoningEffortConfigId:'reasoning_effort',modeId:null})).state,'accepted');
+ const sent=calls.find(x=>x[0]==='send')[1];
+ assert.equal(sent.modelId,'gpt');assert.equal(sent.reasoningEffort,'high');assert.equal(sent.reasoningEffortConfigId,'reasoning_effort');assert.equal('modeId' in sent,false);
+ await c.sendText(turn);assert.equal('modelId' in calls.filter(x=>x[0]==='send')[1][1],false);
+ await assert.rejects(c.sendText({...turn,modelId:7}),/invalid_send/);
+});

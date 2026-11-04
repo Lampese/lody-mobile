@@ -28,6 +28,8 @@ sealed interface RuntimeCommand {
     data class ItemDetail(val sessionId: String, val entryId: String, val itemId: String) : RuntimeCommand
     /** One changed file's diff for one turn, from the session's computer. Read only. */
     data class TurnDiff(val sessionId: String, val entryId: String, val path: String) : RuntimeCommand
+    /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
+    data class StopTurn(val sessionId: String, val machineId: String, val turnId: String) : RuntimeCommand
     data object Ping : RuntimeCommand
     data object InspectSchema : RuntimeCommand
 }
@@ -171,6 +173,10 @@ data class SendTextRequest(
     val agentType: String,
     val resume: String? = null,
     val queue: Boolean = false,
+    /** The composer's explicit run-config choice; null keeps the session's previous one. */
+    val modelId: String? = null,
+    val modeId: String? = null,
+    val effort: String? = null,
 )
 data class SessionSnapshot(val id: String, val status: String, val messages: List<SessionMessage>)
 sealed interface RuntimeEvent {

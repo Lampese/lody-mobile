@@ -720,6 +720,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
     super.traitCollectionDidChange(previousTraitCollection)
+    // The agent mark in the model chip is drawn in resolved ink.
+    if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection), composerOptions.agentAsset != nil {
+      updateComposerOptions()
+    }
     guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory else { return }
     input.font = .dynamic(of: 17, compatibleWith: traitCollection)
     hint.font = input.font
@@ -1610,8 +1614,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       title.append(dot)
       title.append(NSAttributedString(attachment: symbol))
     }
-    if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: nil) {
-      let attachment = NSTextAttachment(image: mark.withRenderingMode(.alwaysOriginal))
+    if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: traitCollection) {
+      // Marks are template images: draw them in the title's ink so they read in dark mode.
+      let attachment = NSTextAttachment(image: mark.withTintColor(.label.resolvedColor(with: traitCollection), renderingMode: .alwaysOriginal))
       attachment.bounds = CGRect(x: 0, y: font.descender, width: font.lineHeight, height: font.lineHeight)
       let prefix = NSMutableAttributedString(attachment: attachment)
       prefix.append(NSAttributedString(string: "  "))

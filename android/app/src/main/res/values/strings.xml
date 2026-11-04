@@ -138,6 +138,9 @@
     <string name="chat_worked_for">Worked for %1$s</string>
     <string name="chat_composer_placeholder">Reply…</string>
     <string name="chat_composer_unavailable">Waiting for the conversation to connect…</string>
+    <string name="chat_stop">Stop</string>
+    <string name="chat_stop_failed">Couldn’t stop the turn. Try again.</string>
+    <string name="chat_run_config">Model and mode</string>
     <string name="create_search_branches">Search branches</string>
     <string name="create_more_branches">More branches…</string>
     <string name="create_mode_auto">Auto</string>

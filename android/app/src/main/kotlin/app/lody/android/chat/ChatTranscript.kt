@@ -91,6 +91,9 @@ sealed interface ChatEntry {
         val worked: String = "",
         val working: Boolean = false,
         val files: List<app.lody.android.runtime.FileChange> = emptyList(),
+        /** The session's provider (cliType, agentType); the footer leads with its mark. */
+        val agentCliType: String? = null,
+        val agentType: String? = null,
     ) : ChatEntry {
         companion object {
             /** A turn that is only prose (the stream probe, older projections). */

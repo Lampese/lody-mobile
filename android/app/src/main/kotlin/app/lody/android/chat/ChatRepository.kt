@@ -32,6 +32,15 @@ class ChatRepository(
     suspend fun markReady(scope: RuntimeScope, repository: String, number: Int) =
         pullRequests.write(scope, repository, number, null)
 
+    /** The project's provider choices (models, efforts, modes) for the composer's run config; a read. */
+    suspend fun options(scope: RuntimeScope, projectId: String?): CreationOptions =
+        owner.use(scope) { (it.execute(RuntimeCommand.GetCreationOptions(projectId)) as RuntimeResult.Options).value }
+
+    /** Stops the running turn; never retried (a lost reply is reported, not replayed). */
+    suspend fun stop(scope: RuntimeScope, sessionId: String, machineId: String, turnId: String) {
+        owner.use(scope) { it.execute(RuntimeCommand.StopTurn(sessionId, machineId, turnId)) }
+    }
+
     /** Sends one text turn on the scope's lease. Never retried: an uncertain write is `unknown`. */
     suspend fun send(scope: RuntimeScope, request: SendTextRequest): RuntimeResult.Sent =
         owner.use(scope) { it.execute(RuntimeCommand.SendText(request)) as RuntimeResult.Sent }

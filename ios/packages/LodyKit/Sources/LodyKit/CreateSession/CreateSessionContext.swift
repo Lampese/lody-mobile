@@ -221,9 +221,9 @@ enum CreateSessionContext {
     var rows: [CreatePicker] = []
     if !page.agents.isEmpty {
       rows.append(CreatePicker(
-        id: "agent", glyph: agentGlyph(page.agent?.agentType), title: page.agent?.name ?? text("create.row.selectAgent"),
+        id: "agent", glyph: agentGlyph(page.agent?.cliType, page.agent?.agentType), title: page.agent?.name ?? text("create.row.selectAgent"),
         placeholder: page.agent == nil,
-        options: page.agents.map { CreateOption(id: $0.key, title: $0.name, glyph: agentGlyph($0.agentType), selected: $0.key == page.agentKey) }))
+        options: page.agents.map { CreateOption(id: $0.key, title: $0.name, glyph: agentGlyph($0.cliType, $0.agentType), selected: $0.key == page.agentKey) }))
     }
     guard let capability = page.capability else { return rows }
     if !capability.models.isEmpty {
@@ -255,8 +255,12 @@ enum CreateSessionContext {
 
   static func runConfigLabel(_ id: String) -> String { text(runConfigLabels[id] ?? "create.runConfig.mode") }
 
-  private static func agentGlyph(_ agentType: String?) -> CreateGlyph {
-    LodyAgentIcon.asset(modelId: agentType, name: nil).map(CreateGlyph.asset) ?? .lody(.agent)
+  private static func agentGlyph(_ cliType: String?, _ agentType: String?) -> CreateGlyph {
+    switch LodyAgentIcon.mark(cliType: cliType, agentType: agentType) {
+    case .asset(let name): .asset(name)
+    case .terminal: .lody(.terminal)
+    case .generic: .lody(.agent)
+    }
   }
 }
 

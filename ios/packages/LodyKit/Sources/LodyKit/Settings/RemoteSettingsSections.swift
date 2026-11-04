@@ -98,16 +98,10 @@ enum RemoteSettingsSections {
   private static let paceTolerance = 0.02
   private static let agentNames = ["claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code", "kimi-code": "Kimi Code",
                                    "opencode": "OpenCode"]
-  private static let iconKinds: Set<String> = [
-    "claude", "codex", "kimi", "grok", "deepseek", "minimax", "glm", "mimo", "opencode", "gemini", "openai",
-  ]
 
   static func agentName(_ type: String) -> String { agentNames[type] ?? type }
 
-  static func agentIcon(_ type: String) -> String {
-    let kind = ["claude-p": "claude", "kimi-code": "kimi"][type] ?? type
-    return iconKinds.contains(kind) ? "lody-agent-\(kind)" : ""
-  }
+  static func agentIcon(_ type: String) -> String { LodyAgentIcon.asset(cliType: nil, agentType: type) ?? "" }
 
   static func machineState(_ presence: SettingsMachinePresence, _ id: String) -> String { presence.status(of: id) }
 

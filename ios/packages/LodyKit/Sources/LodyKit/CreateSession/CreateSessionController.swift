@@ -212,7 +212,7 @@ final class CreateSessionController: UIViewController {
     }
     if let fast { options["fast"] = fast.enabled }
     if let agent = page.agent { options["agentName"] = agent.name }
-    if let asset = LodyAgentIcon.asset(modelId: page.agent?.agentType, name: nil) { options["agentAsset"] = asset }
+    if let asset = LodyAgentIcon.asset(cliType: page.agent?.cliType, agentType: page.agent?.agentType) { options["agentAsset"] = asset }
     composer.setComposerOptions(Self.json(options))
     composer.setComposerState(Self.json([
       "editable": true, "canSend": form.canSend, "sending": sending, "notice": form.notice,
@@ -343,7 +343,8 @@ final class CreateSessionController: UIViewController {
     push(CreateChoiceController(
       title: String(localized: "create.row.selectAgent", bundle: .lody), header: String(localized: "create.label.agent", bundle: .lody),
       placeholder: String(localized: "create.picker.agent.placeholder", bundle: .lody),
-      options: page.agents.map { ($0.key, $0.name, $0.machineName) }, selected: page.agentKey
+      options: page.agents.map { ($0.key, $0.name, $0.machineName) }, selected: page.agentKey,
+      marks: Dictionary(page.agents.map { ($0.key, LodyAgentIcon.mark(cliType: $0.cliType, agentType: $0.agentType)) }, uniquingKeysWith: { first, _ in first })
     ) { [weak self] key in
       self?.form.selectAgent(key)
       self?.changed()

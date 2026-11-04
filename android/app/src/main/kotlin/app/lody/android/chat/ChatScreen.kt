@@ -42,6 +42,7 @@ import app.lody.android.R
 import app.lody.android.auth.Account
 import app.lody.android.designsystem.*
 import app.lody.android.runtime.*
+import app.lody.android.home.AgentMark
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.time.Instant
@@ -131,6 +132,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                     worked(message, workedFormat),
                                     working = message.streaming,
                                     files = message.files,
+                                    agentCliType = context.session?.cliType,
+                                    agentType = context.session?.agentType,
                                 )
                             }
                         }.also { rendered[message.id] = message to it }
@@ -156,6 +159,21 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     val session = context.session
     val canSend = status == "live" && session?.cliType != null && session.agentType != null
+    // The composer's run config (web's mobile run-config chip): the session's provider choices,
+    // read once the conversation is live. A choice applies from the next turn on; nothing chosen
+    // keeps the session's previous model, effort and mode (upstream `sendTurn`).
+    var options by remember(id, scope) { mutableStateOf<CreationOptions?>(null) }
+    LaunchedEffect(scope, id, session?.projectId, status == "live") {
+        if (session == null || status != "live") return@LaunchedEffect
+        try { options = repository.options(scope, session.projectId) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { /* The chip still shows the session's model; choices wait for the next load. */ }
+    }
+    val capability = session?.let { options?.capability(it.machineId, it.cliType, it.agentType) }
+    var modelId by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var effort by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var modeId by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var runConfig by remember(id) { mutableStateOf(false) }
     val failedText = stringResource(R.string.chat_send_failed)
     val attachText = stringResource(R.string.chat_attach_unavailable)
     val snackbar = remember { SnackbarHostState() }
@@ -196,7 +214,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         coroutines.launch {
             val queue = session.status in RunningStatuses
             val result = try {
-                repository.send(scope, SendTextRequest(id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = queue)).state
+                repository.send(scope, SendTextRequest(id, turnId, text, session.machineId, session.cliType!!, session.agentType!!, session.resume, queue = queue, modelId = modelId, modeId = modeId, effort = effort)).state
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { "unknown" }
             val delivery = when (result) {
@@ -215,6 +233,24 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             sendText(text)
             prompt = ""
         }
+    }
+    // Stop the running turn (web's composer stop button); one request at a time, never retried.
+    val runningTurn = messages.lastOrNull { it.role != "user" && it.streaming }?.id
+    var stopping by remember(id) { mutableStateOf(false) }
+    val stopFailed = stringResource(R.string.chat_stop_failed)
+    val stopHaptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val stop = {
+        if (runningTurn != null && session != null && status == "live" && !stopping) {
+            stopping = true
+            stopHaptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
+            coroutines.launch {
+                try { repository.stop(scope, id, session.machineId, runningTurn) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { snackbar.showSnackbar(stopFailed) }
+                finally { stopping = false }
+            }
+        }
+        Unit
     }
     val bar = session?.let { SessionInfoBar.of(it, context.repository, busy = running || !canSend) }
     // Merge / Ready for review go straight to GitHub, one at a time, never retried.
@@ -327,17 +363,58 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     onCopied = { coroutines.launch { snackbar.showSnackbar(it) } },
                 )
             }
+            val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name ?: session?.modelName ?: agentName
             ChatComposer(
                 prompt,
                 onPromptChange = { if (it.length <= 32000) prompt = it },
                 enabled = canSend,
-                model = session?.modelName,
+                agentCliType = session?.cliType,
+                agentType = session?.agentType,
+                face = listOfNotNull(modelName, effort),
+                mode = modeId,
+                modeLabel = capability?.modes?.firstOrNull { it.id == modeId }?.name,
+                onRunConfig = if (capability != null && (capability.models.isNotEmpty() || capability.modes.isNotEmpty())) ({ runConfig = true }) else null,
+                stoppable = runningTurn != null && status == "live",
+                stopping = stopping,
                 onAttach = { coroutines.launch { snackbar.showSnackbar(attachText) } },
                 onSend = send,
+                onStop = stop,
             )
         }
     }
+    if (runConfig && capability != null) {
+        ModalBottomSheet(
+            onDismissRequest = { runConfig = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = colors.bgBase,
+        ) {
+            app.lody.android.create.RunConfigSheet(
+                rows = buildList {
+                    capability.models.takeIf { it.isNotEmpty() }?.let { models ->
+                        add(app.lody.android.create.RunConfigRow(RUN_MODEL, stringResource(R.string.create_model), models.map { app.lody.android.create.PickerOption(it.id, it.name, it.id == modelId) }))
+                    }
+                    capability.effortsFor(modelId).takeIf { it.isNotEmpty() }?.let { efforts ->
+                        add(app.lody.android.create.RunConfigRow(RUN_EFFORT, stringResource(R.string.create_effort), efforts.map { app.lody.android.create.PickerOption(it, it, it == effort) }))
+                    }
+                    capability.modes.takeIf { it.isNotEmpty() }?.let { modes ->
+                        add(app.lody.android.create.RunConfigRow(RUN_MODE, stringResource(R.string.create_mode), modes.map { app.lody.android.create.PickerOption(it.id, it.name, it.id == modeId) }))
+                    }
+                },
+                defaultLabel = stringResource(R.string.create_default),
+            ) { row, value ->
+                when (row) {
+                    RUN_MODEL -> { modelId = value; effort = null }
+                    RUN_EFFORT -> effort = value
+                    RUN_MODE -> modeId = value
+                }
+            }
+        }
+    }
 }
+
+private const val RUN_MODEL = "model"
+private const val RUN_EFFORT = "effort"
+private const val RUN_MODE = "mode"
 
 private val RunningStatuses = setOf("running", "initializing", "processing", "in_progress", "queued")
 
@@ -440,11 +517,28 @@ private fun turnTime(timestamp: String?): String {
 }
 
 /**
- * Web's mobile composer card: the prompt, then + and the run-config chip (agent mark + model)
- * leading and send trailing. One line at rest, two while editing.
+ * Web's mobile composer card: the prompt, then + and the run-config chip (the provider's mark,
+ * model · effort, the mode's glyph; it opens the run-config sheet) leading and send trailing.
+ * While a turn runs and the prompt is empty, send becomes stop (typing again queues a turn).
+ * One line at rest, two while editing.
  */
 @Composable
-private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabled: Boolean, model: String?, onAttach: () -> Unit, onSend: () -> Unit) {
+private fun ChatComposer(
+    prompt: String,
+    onPromptChange: (String) -> Unit,
+    enabled: Boolean,
+    agentCliType: String?,
+    agentType: String?,
+    face: List<String>,
+    mode: String?,
+    modeLabel: String?,
+    onRunConfig: (() -> Unit)?,
+    stoppable: Boolean,
+    stopping: Boolean,
+    onAttach: () -> Unit,
+    onSend: () -> Unit,
+    onStop: () -> Unit,
+) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val shape = RoundedCornerShape(LodySpacing.xl)
@@ -485,30 +579,49 @@ private fun ChatComposer(prompt: String, onPromptChange: (String) -> Unit, enabl
             IconButton(onClick = onAttach, modifier = Modifier.semantics { contentDescription = attach }) {
                 Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
             }
-            // The one flexible slot: the model takes the middle and Send stays on the trailing edge.
+            // The one flexible slot: the chip takes the middle and Send stays on the trailing edge.
             // (Two weighted children split the free space, which left Send short of the edge.)
-            Row(
-                Modifier.weight(1f).padding(horizontal = LodySpacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-            ) {
-                if (model != null) {
-                    Icon(LodyIcons.Agent, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
-                    Text(model, style = type.subhead, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Box(Modifier.weight(1f)) {
+                val runConfigLabel = stringResource(R.string.chat_run_config)
+                Row(
+                    Modifier
+                        .heightIn(min = LodySize.controlMd)
+                        .clip(RoundedCornerShape(LodyRadius.md))
+                        .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
+                        .semantics { contentDescription = "$runConfigLabel: ${face.joinToString(", ")}" }
+                        .padding(horizontal = LodySpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                ) {
+                    AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.md))
+                    Text(
+                        face.joinToString("  ·  "), style = type.subhead, color = colors.textSecondary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                    )
+                    app.lody.android.create.ModeMark(mode, modeLabel)
                 }
             }
-            val ready = enabled && prompt.isNotBlank()
-            val send = stringResource(R.string.create_send)
+            // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs
+            // cross-fade and the fill follows, so the button never jumps.
+            val showStop = stoppable && prompt.isBlank()
+            val ready = if (showStop) !stopping else enabled && prompt.isNotBlank()
+            val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
+            val fill by androidx.compose.animation.animateColorAsState(
+                when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",
+            )
             Box(
                 Modifier
                     .size(LodySize.controlLg - LodySpacing.xs)
                     .clip(CircleShape)
-                    .background(if (ready) colors.accentSolid else colors.fillSecondary)
-                    .clickable(enabled = ready, role = Role.Button, onClick = onSend)
-                    .semantics { contentDescription = send },
+                    .background(fill)
+                    .clickable(enabled = ready, role = Role.Button, onClick = if (showStop) onStop else onSend)
+                    .semantics { contentDescription = label },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.md))
+                androidx.compose.animation.Crossfade(showStop, label = "send-stop") { stop ->
+                    if (stop) Icon(LodyIcons.Stop, contentDescription = null, tint = colors.bgBase, modifier = Modifier.size(LodyIconSize.sm))
+                    else Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.md))
+                }
             }
         }
     }

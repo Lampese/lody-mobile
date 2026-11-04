@@ -137,6 +137,9 @@
     <string name="chat_worked_for">工作了 %1$s</string>
     <string name="chat_composer_placeholder">回复…</string>
     <string name="chat_composer_unavailable">正在连接对话…</string>
+    <string name="chat_stop">停止</string>
+    <string name="chat_stop_failed">未能停止本轮，请重试。</string>
+    <string name="chat_run_config">模型与模式</string>
     <string name="create_search_branches">搜索分支</string>
     <string name="create_more_branches">更多分支…</string>
     <string name="create_mode_auto">Auto</string>

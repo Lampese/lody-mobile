@@ -15,11 +15,18 @@ export function createCommands(runtime, sendTurn, identity) {
    signal?.throwIfAborted();
    if(!input || !uuid.test(input.turnId) || typeof input.sessionId!=='string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(input.sessionId) || typeof input.text!=='string' || !input.text.trim() || input.text.length>32000)throw Error('invalid_send');
    for(const key of ['machineId','cliType','agentType'])if(typeof input[key]!=='string' || !input[key])throw Error('invalid_send');
+   // The composer's explicit run-config choice; an omitted field keeps the session's previous one.
+   const choice={};
+   for(const [key,field] of [['modelId','modelId'],['modeId','modeId'],['effort','reasoningEffort'],['reasoningEffortConfigId','reasoningEffortConfigId']]) {
+    if(input[key]===undefined || input[key]===null)continue;
+    if(typeof input[key]!=='string' || !input[key] || input[key].length>128)throw Error('invalid_send');
+    choice[field]=input[key];
+   }
    const scope=identity();if(!scope?.userId)throw Error('not_connected');
    try {
     await runtime.ensureSession({sessionId:input.sessionId});
     signal?.throwIfAborted();
-    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:input.machineId,userId:scope.userId,text:input.text,cliType:input.cliType,agentType:input.agentType,...(input.resume?{resume:input.resume}:{}),...(input.queue?{queue:true}:{})});
+    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:input.machineId,userId:scope.userId,text:input.text,cliType:input.cliType,agentType:input.agentType,...choice,...(input.resume?{resume:input.resume}:{}),...(input.queue?{queue:true}:{})});
     return {state:sent.state,reason:sent.reason};
    } catch {return {state:'unknown'};}
   },

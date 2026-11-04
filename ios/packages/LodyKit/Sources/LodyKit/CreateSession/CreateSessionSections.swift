@@ -40,11 +40,20 @@ enum CreateSessionSections {
   private static func text(_ key: String) -> String { String(localized: String.LocalizationValue(key), bundle: .lody) }
 
   static func choices(
-    _ options: [(id: String, title: String, subtitle: String)], header: String, selected: String?
+    _ options: [(id: String, title: String, subtitle: String)], header: String, selected: String?,
+    marks: [String: LodyAgentIcon.Mark] = [:]
   ) -> [LodyListSection] {
     [.group("options", header: header, options.map { option in
-      .item(
-        option.id, option.title, subtitle: option.subtitle, selected: option.id == selected,
+      // Agents lead with their provider's mark (web `AgentIcon`).
+      var image = "", asset = ""
+      switch marks[option.id] {
+      case .asset(let name): asset = name
+      case .terminal: image = "apple.terminal"
+      case .generic: image = "sparkles"
+      case nil: break
+      }
+      return .item(
+        option.id, option.title, subtitle: option.subtitle, image: image, imageAsset: asset, selected: option.id == selected,
         accessibilityValue: option.id == selected ? text("settings.history.selected") : "")
     })]
   }

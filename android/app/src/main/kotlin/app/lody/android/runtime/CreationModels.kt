@@ -11,6 +11,12 @@ data class CreationOptions(val agents: List<CreationAgent>, val capabilities: Li
         return capabilities.firstOrNull { it.machineId == agent.machineId && it.agentConfigId == agent.id }
             ?: capabilities.firstOrNull { it.machineId == agent.machineId && it.agentConfigId == null && it.cliType == agent.cliType && it.agentType == agent.agentType }
     }
+
+    /** A running session's provider choices: its computer's capability for the session's agent type. */
+    fun capability(machineId: String, cliType: String?, agentType: String?): CreationCapability? {
+        val matching = capabilities.filter { it.machineId == machineId && it.cliType == cliType && it.agentType == agentType }
+        return matching.firstOrNull { it.agentConfigId == null } ?: matching.firstOrNull()
+    }
 }
 data class CreateRequest(val sessionId: String, val turnId: String, val projectId: String?, val machineId: String, val agentConfigId: String, val text: String, val branch: String?, val worktree: Boolean, val modelId: String?, val modeId: String?, val effort: String?)
 data class CreationReceipt(val sessionId: String, val state: String)

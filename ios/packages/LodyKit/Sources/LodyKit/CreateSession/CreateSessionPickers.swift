@@ -25,15 +25,18 @@ final class CreateChoiceController: CreateListController {
   private let placeholder: String
   private let options: [(id: String, title: String, subtitle: String)]
   private let selected: String?
+  private let marks: [String: LodyAgentIcon.Mark]
   private let onPick: (String) -> Void
 
   init(
     title: String, header: String, placeholder: String,
-    options: [(id: String, title: String, subtitle: String)], selected: String?, onPick: @escaping (String) -> Void
+    options: [(id: String, title: String, subtitle: String)], selected: String?,
+    marks: [String: LodyAgentIcon.Mark] = [:], onPick: @escaping (String) -> Void
   ) {
     self.header = header
     self.placeholder = placeholder
     self.options = options
+    self.marks = marks
     self.selected = selected
     self.onPick = onPick
     super.init(nibName: nil, bundle: nil)
@@ -46,7 +49,7 @@ final class CreateChoiceController: CreateListController {
   override func viewDidLoad() {
     super.viewDidLoad()
     list.setPlaceholder(placeholder)
-    list.setSections(CreateSessionSections.choices(options, header: header, selected: selected))
+    list.setSections(CreateSessionSections.choices(options, header: header, selected: selected, marks: marks))
   }
 
   override func event(_ name: String, _ body: [String: Any]) {
