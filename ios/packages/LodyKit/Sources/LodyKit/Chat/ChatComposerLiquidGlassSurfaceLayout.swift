@@ -12,6 +12,8 @@ final class ChatComposerLiquidGlassSurfaceLayout: ChatComposerSurfaceLayout {
   /// The new-session page's composer: the same Liquid Glass surface, but it stays a rounded card
   /// while typing (no keyboard-sheet morph), with its controls row always shown.
   private var card = false
+  /// Room kept below the surface for the mention panel docked on the keyboard.
+  private var bottomInset: CGFloat = 0
 
   init(container: UIVisualEffectView, inputSurface: UIVisualEffectView) {
     self.inputSurface = inputSurface
@@ -37,6 +39,20 @@ final class ChatComposerLiquidGlassSurfaceLayout: ChatComposerSurfaceLayout {
   func activate() {
     NSLayoutConstraint.activate(pill)
     applyCorners()
+  }
+
+  /// With the mention panel docked, the surface ends above it (no keyboard bleed).
+  func setBottomInset(_ inset: CGFloat) {
+    guard bottomInset != inset else { return }
+    bottomInset = inset
+    applyBottom()
+  }
+
+  private func applyBottom() {
+    for constraint in pill where constraint.firstAttribute == .bottom { constraint.constant = -8 - bottomInset }
+    for constraint in sheet where constraint.firstAttribute == .bottom {
+      constraint.constant = bottomInset > 0 ? -bottomInset : Self.sheetBleed
+    }
   }
 
   func setCard(_ on: Bool) {

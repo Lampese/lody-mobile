@@ -39,6 +39,21 @@ open class WebViewRuntime internal constructor(
         }
         is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL).put(command.agentConfigId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
         RuntimeCommand.ListAgentRoles -> RuntimeResult.Roles(CreationJson.roles(call("agentRoles", deadline = CommandDeadline.QUERY) as JSONObject))
+        is RuntimeCommand.MentionCatalog -> {
+            val args = JSONArray().put(command.category).put(command.sessionId ?: JSONObject.NULL)
+                .put(command.cliType ?: JSONObject.NULL).put(command.agentType ?: JSONObject.NULL)
+            val value = call("mentionCatalog", args, CommandDeadline.QUERY) as JSONObject
+            val items = value.optJSONArray("items") ?: JSONArray()
+            RuntimeResult.Mentions(MentionCatalogPage(
+                (0 until items.length()).map { items.getJSONObject(it) }.map {
+                    MentionCandidate(
+                        it.getString("path"), it.optString("name", it.getString("path")), it.optString("kind", "file"),
+                        it.optString("subtitle"), it.optString("insertText").ifBlank { null },
+                    )
+                },
+                value.optBoolean("truncated"), value.optBoolean("incomplete"),
+            ))
+        }
         is RuntimeCommand.CreateAndSend -> {
             val value = call("createAndSend", JSONArray().put(CreationJson.request(command.request)), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Created(CreationReceipt(value.getString("sessionId"), value.getString("state")))

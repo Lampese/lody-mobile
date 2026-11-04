@@ -82,6 +82,12 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     // Turns this page sent that the transcript has not shown yet (optimistic, never resent).
     var outgoing by remember(id, scope) { mutableStateOf(emptyList<Outgoing>()) }
     var prompt by rememberSaveable(id) { mutableStateOf("") }
+    // The field with its caret and IME composition; the @ panel reads the trigger at the caret.
+    var field by remember(id) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(prompt, androidx.compose.ui.text.TextRange(prompt.length))) }
+    LaunchedEffect(prompt) {
+        if (field.text != prompt) field = androidx.compose.ui.text.input.TextFieldValue(prompt, androidx.compose.ui.text.TextRange(prompt.length))
+    }
+    var composerFocused by remember(id) { mutableStateOf(false) }
     val appContext = LocalContext.current.applicationContext
     val coroutines = rememberCoroutineScope()
     val agentName = agentLabel(context.session)
@@ -329,6 +335,29 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         attachments = merged.filter { it in kept }
         if (kept.size < merged.size) coroutines.launch { snackbar.showSnackbar(attachLimit) }
     }
+    // @ references (iOS `ChatMentionPanel`, Notion-style): every category is read once the
+    // conversation is live; a trigger at the caret opens the panel docked on the keyboard.
+    var mentionCatalogs by remember(id, scope) { mutableStateOf(emptyMap<String, MentionCatalogPage>()) }
+    var mentionPending by remember(id, scope) { mutableStateOf(Mentions.categories.toSet()) }
+    LaunchedEffect(scope, id, status == "live", session?.cliType, session?.agentType) {
+        if (session == null || status != "live") return@LaunchedEffect
+        Mentions.categories.forEach { category ->
+            launch {
+                try {
+                    val page = repository.mentions(scope, category, session)
+                    mentionCatalogs = mentionCatalogs + (category to page)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* That category shows as empty; the others still work. */ }
+                finally { mentionPending = mentionPending - category }
+            }
+        }
+    }
+    var mentionStack by remember(id) { mutableStateOf(listOf<MentionLevel>(MentionLevel.Root)) }
+    val mentionTrigger = if (composerFocused && canSend) Mentions.trigger(field) else null
+    // Leaving the trigger (sent, deleted, caret moved) starts the next one at the categories.
+    LaunchedEffect(mentionTrigger == null) { if (mentionTrigger == null) mentionStack = listOf(MentionLevel.Root) }
+    val showMentions = mentionTrigger != null &&
+        (mentionStack.size > 1 || Mentions.rows(MentionLevel.Root, mentionCatalogs, mentionTrigger).isNotEmpty())
     val resolver = appContext.contentResolver
     val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(8),
@@ -472,8 +501,9 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             }
             val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name ?: session?.modelName ?: agentName
             ChatComposer(
-                prompt,
-                onPromptChange = { if (it.length <= 32000) prompt = it },
+                field,
+                onPromptChange = { if (it.text.length <= 32000) { field = it; prompt = it.text } },
+                onFocusChange = { composerFocused = it },
                 enabled = canSend,
                 agentCliType = session?.cliType,
                 agentType = session?.agentType,
@@ -497,6 +527,35 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 onSend = send,
                 onStop = stop,
             )
+            // Docked between the prompt and the keyboard; rows never take focus, so the keyboard stays.
+            androidx.compose.animation.AnimatedVisibility(
+                showMentions,
+                enter = androidx.compose.animation.expandVertically(expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically(shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut(),
+            ) {
+                val trigger = mentionTrigger
+                MentionPanel(
+                    stack = mentionStack,
+                    rowsFor = { level -> if (trigger == null) emptyList() else Mentions.rows(level, mentionCatalogs, trigger) },
+                    loading = { level ->
+                        when (level) {
+                            is MentionLevel.Category -> level.category in mentionPending
+                            is MentionLevel.Directory -> "file" in mentionPending
+                            MentionLevel.Root -> mentionPending.isNotEmpty()
+                        }
+                    },
+                    onPush = { mentionStack = mentionStack + it },
+                    onPop = { if (mentionStack.size > 1) mentionStack = mentionStack.dropLast(1) },
+                    onInsert = { item ->
+                        val current = Mentions.trigger(field)
+                        if (current != null) {
+                            val next = Mentions.insert(field, current, item)
+                            if (next.text.length <= 32000) { field = next; prompt = next.text }
+                        }
+                        mentionStack = listOf(MentionLevel.Root)
+                    },
+                )
+            }
         }
     }
     if (runConfig && session != null) {
@@ -686,8 +745,9 @@ private fun turnTime(timestamp: String?): String {
  */
 @Composable
 private fun ChatComposer(
-    prompt: String,
-    onPromptChange: (String) -> Unit,
+    prompt: androidx.compose.ui.text.input.TextFieldValue,
+    onPromptChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
+    onFocusChange: (Boolean) -> Unit,
     enabled: Boolean,
     agentCliType: String?,
     agentType: String?,
@@ -772,12 +832,12 @@ private fun ChatComposer(
             maxLines = 10,
             modifier = Modifier
                 .fillMaxWidth()
-                .onFocusChanged { focused = it.isFocused }
+                .onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) }
                 .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs)
                 .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
                 Box {
-                    if (prompt.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (prompt.text.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     inner()
                 }
             },
@@ -842,8 +902,8 @@ private fun ChatComposer(
             }
             // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs
             // cross-fade and the fill follows, so the button never jumps.
-            val showStop = stoppable && prompt.isBlank() && attachments.isEmpty()
-            val ready = if (showStop) !stopping else enabled && (prompt.isNotBlank() || attachments.isNotEmpty())
+            val showStop = stoppable && prompt.text.isBlank() && attachments.isEmpty()
+            val ready = if (showStop) !stopping else enabled && (prompt.text.isNotBlank() || attachments.isNotEmpty())
             val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
             val fill by androidx.compose.animation.animateColorAsState(
                 when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",

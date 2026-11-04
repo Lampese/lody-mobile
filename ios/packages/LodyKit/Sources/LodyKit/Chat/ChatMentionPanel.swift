@@ -35,48 +35,72 @@ struct ChatMentionItem: Decodable, Equatable {
   }
 }
 
-/// Typing completes in place; explicit category selection delegates to a page sheet.
-final class ChatMentionPanel: CKGlassSurface, UICollectionViewDataSource, UICollectionViewDelegate {
-  private let list: UICollectionView
-  private var showing: Bool { materialVisible }
-  private var rows: [ChatMentionItem] = []
+/// One level of the mention panel: the categories (or typed matches), one category, or a folder.
+enum ChatMentionLevel: Hashable {
+  case root
+  case category(String)
+  case directory(String)
+}
+
+/// Notion-style mention panel, docked between the prompt and the keyboard: the prompt stays
+/// above it and keeps focus (typing after the trigger filters the visible level), and choosing a
+/// category or folder pushes the next level on a native navigation stack.
+final class ChatMentionPanel: UIView {
+  /// The panel's height while shown; the keyboard sits right below it.
+  static let dockHeight: CGFloat = 280
+  private let navigation = UINavigationController()
+  private let root: ChatMentionLevelController
   private var catalog: [ChatMentionItem] = []
-  private var query = ""
+  private(set) var query = ""
+  private(set) var scoped: String?
   private var applyingEdit = false
   private var range: NSRange?
   private var dismissedText: String?
   private var browserDraft: (text: String, range: NSRange)?
   private weak var input: UITextView?
+  private(set) var showing = false
   var onChange: (() -> Void)?
+  /// Kept for hosts that still route a category to a page; the docked panel never asks.
   var onBrowse: (([String: String]) -> Void)?
   private(set) var panelHeight: CGFloat = 0
 
-  init(frame: CGRect) {
-    var config = UICollectionLayoutListConfiguration(appearance: .plain)
-    config.backgroundColor = .clear
-    config.showsSeparators = false
-    list = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewCompositionalLayout.list(using: config))
-    super.init(material: false)
-    self.frame = frame
-    onHidden = { [weak self] in
-      guard let self else { return }
-      self.panelHeight = 0
-      self.onChange?()
-    }
+  override init(frame: CGRect) {
+    root = ChatMentionLevelController(level: .root)
+    super.init(frame: frame)
     accessibilityIdentifier = "mention-panel"
     isHidden = true
-    list.backgroundColor = .clear
-    list.contentInsetAdjustmentBehavior = .never
-    list.contentInset = UIEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
-    list.keyboardDismissMode = .none
-    list.dataSource = self
-    list.delegate = self
-    list.register(UICollectionViewListCell.self, forCellWithReuseIdentifier: "candidate")
-    contentView.addSubview(list)
-    list.translatesAutoresizingMaskIntoConstraints = false
+    alpha = 0
+    backgroundColor = .systemBackground
+    layer.cornerRadius = 20
+    layer.cornerCurve = .continuous
+    layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    clipsToBounds = true
+    root.panel = self
+    navigation.setViewControllers([root], animated: false)
+    navigation.view.backgroundColor = .clear
+    let appearance = UINavigationBarAppearance()
+    appearance.configureWithTransparentBackground()
+    navigation.navigationBar.standardAppearance = appearance
+    navigation.navigationBar.compactAppearance = appearance
+    navigation.navigationBar.scrollEdgeAppearance = appearance
+    navigation.navigationBar.prefersLargeTitles = false
+    navigation.setNavigationBarHidden(true, animated: false)
+    let separator = UIView()
+    separator.backgroundColor = .separator
+    separator.isUserInteractionEnabled = false
+    for view in [navigation.view!, separator] {
+      addSubview(view)
+      view.translatesAutoresizingMaskIntoConstraints = false
+    }
     NSLayoutConstraint.activate([
-      list.topAnchor.constraint(equalTo: contentView.topAnchor), list.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-      list.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), list.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+      navigation.view.topAnchor.constraint(equalTo: topAnchor),
+      navigation.view.bottomAnchor.constraint(equalTo: bottomAnchor),
+      navigation.view.leadingAnchor.constraint(equalTo: leadingAnchor),
+      navigation.view.trailingAnchor.constraint(equalTo: trailingAnchor),
+      separator.topAnchor.constraint(equalTo: topAnchor),
+      separator.leadingAnchor.constraint(equalTo: leadingAnchor),
+      separator.trailingAnchor.constraint(equalTo: trailingAnchor),
+      separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
     ])
   }
 
@@ -84,9 +108,26 @@ final class ChatMentionPanel: CKGlassSurface, UICollectionViewDataSource, UIColl
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
-    guard window == nil else { return }
-    setVisible(false, animated: false)
-    panelHeight = 0
+    if window == nil {
+      navigation.willMove(toParent: nil)
+      navigation.removeFromParent()
+      reset(animated: false)
+      return
+    }
+    // Proper containment so the stack gets appearance callbacks and its push transitions.
+    var responder: UIResponder? = next
+    while let current = responder {
+      if let controller = current as? UIViewController {
+        if navigation.parent !== controller {
+          navigation.willMove(toParent: nil)
+          navigation.removeFromParent()
+          controller.addChild(navigation)
+          navigation.didMove(toParent: controller)
+        }
+        break
+      }
+      responder = current.next
+    }
   }
 
   // NSString ranges match UITextView selections, including emoji before the trigger.
@@ -111,12 +152,12 @@ final class ChatMentionPanel: CKGlassSurface, UICollectionViewDataSource, UIColl
     }
     guard input.isFirstResponder, input.markedTextRange == nil, browserDraft == nil,
           enabled, let range, dismissedText != input.text else {
-      setVisible(false)
+      reset(animated: true)
       return
     }
     query = ((input.text ?? "") as NSString).substring(with: NSRange(location: range.location + 1, length: range.length - 1))
     let trigger = ((input.text ?? "") as NSString).substring(with: NSRange(location: range.location, length: 1))
-    var scoped: String?
+    scoped = nil
     if trigger == "$" { scoped = "skill" }
     if trigger == "/" { scoped = "cmd" }
     if trigger == "@", let colon = query.firstIndex(of: ":") {
@@ -126,37 +167,102 @@ final class ChatMentionPanel: CKGlassSurface, UICollectionViewDataSource, UIColl
         query = String(query[query.index(after: colon)...])
       }
     }
-    let nextRows: [ChatMentionItem]
-    if query.isEmpty && scoped == nil {
-      let provided = items.filter { $0.kind == "category" }
-      if !provided.isEmpty { nextRows = provided }
-      else {
-        nextRows = ChatMentionItem.categories.filter { category in
-          category == "file" || category == "skill" || items.contains { $0.category == category }
-        }.map { category in
-          ChatMentionItem(path: category, name: String(localized: String.LocalizationValue("native.chat.mention." + (ChatMentionItem.labels[category] ?? category)), bundle: .lody), kind: "category", subtitle: "")
-        }
-      }
-    } else {
-      nextRows = items.filter { $0.kind != "category" && (scoped == nil || $0.category == scoped) && $0.matches(query) }
-    }
-    guard !nextRows.isEmpty else {
-      setVisible(false)
+    // At the root nothing to offer closes the panel; a pushed level shows its own empty state.
+    if navigation.viewControllers.count <= 1 && rows(for: .root).isEmpty {
+      reset(animated: true)
       return
     }
-    panelHeight = min(240, CGFloat(nextRows.count) * (nextRows.first?.kind == "category" ? 50 : 58) + 12)
-    if rows != nextRows {
-      rows = nextRows
-      if showing && !isTransitioning {
-        UIView.transition(with: list, duration: 0.09, options: [.transitionCrossDissolve, .beginFromCurrentState, .allowAnimatedContent]) {
-          self.list.reloadData()
-        }
-      } else {
-        list.reloadData()
-      }
+    for controller in navigation.viewControllers {
+      (controller as? ChatMentionLevelController)?.reload(animated: controller === navigation.topViewController && showing)
     }
-    if !showing { list.setContentOffset(CGPoint(x: 0, y: -list.adjustedContentInset.top), animated: false) }
-    setVisible(true)
+    setShowing(true)
+  }
+
+  /// The rows one level shows for the current query.
+  func rows(for level: ChatMentionLevel) -> [ChatMentionItem] {
+    let items = catalog.filter { $0.kind != "category" }
+    switch level {
+    case .root:
+      guard query.isEmpty && scoped == nil else {
+        return items.filter { (scoped == nil || $0.category == scoped) && $0.matches(query) }
+      }
+      let provided = catalog.filter { $0.kind == "category" }
+      if !provided.isEmpty { return provided }
+      return ChatMentionItem.categories.filter { category in
+        category == "file" || category == "skill" || items.contains { $0.category == category }
+      }.map { category in
+        ChatMentionItem(path: category, name: Self.title(category), kind: "category", subtitle: "")
+      }
+    case .category(let category):
+      let scopedItems = items.filter { $0.category == category }
+      if category == "file" && query.isEmpty { return scopedItems.filter { Self.parent($0.path).isEmpty } }
+      return scopedItems.filter { $0.matches(query) }
+    case .directory(let path):
+      let files = items.filter { $0.category == "file" }
+      if query.isEmpty { return files.filter { Self.parent($0.path) == path } }
+      return files.filter { $0.path.hasPrefix(path + "/") && $0.matches(query) }
+    }
+  }
+
+  static func title(_ category: String) -> String {
+    String(localized: String.LocalizationValue("native.chat.mention." + (ChatMentionItem.labels[category] ?? category)), bundle: .lody)
+  }
+
+  private static func parent(_ path: String) -> String { (path as NSString).deletingLastPathComponent }
+
+  /// A row was chosen: categories and folders open their level; anything else is inserted.
+  func choose(_ item: ChatMentionItem) {
+    if item.kind == "category" {
+      push(.category(item.path), title: item.name)
+    } else if item.kind == "directory" {
+      push(.directory(item.path), title: (item.path as NSString).lastPathComponent)
+    } else {
+      insert(item)
+    }
+  }
+
+  /// A folder level's own row: reference the folder itself.
+  func chooseDirectory(_ path: String) {
+    let item = catalog.first { $0.path == path && $0.kind == "directory" }
+      ?? ChatMentionItem(path: path, name: (path as NSString).lastPathComponent, kind: "directory", subtitle: "")
+    insert(item)
+  }
+
+  private func push(_ level: ChatMentionLevel, title: String) {
+    let controller = ChatMentionLevelController(level: level)
+    controller.panel = self
+    controller.title = title
+    UISelectionFeedbackGenerator().selectionChanged()
+    navigation.pushViewController(controller, animated: !UIAccessibility.isReduceMotionEnabled)
+  }
+
+  private func insert(_ item: ChatMentionItem) {
+    guard let input, let range else { return }
+    insert(item, into: input, range: range)
+  }
+
+  private func setShowing(_ value: Bool, animated: Bool = true) {
+    let height = value ? Self.dockHeight : 0
+    let changed = showing != value || panelHeight != height
+    showing = value
+    panelHeight = height
+    if value { isHidden = false }
+    guard changed else { return }
+    let apply = { self.alpha = value ? 1 : 0 }
+    if animated && window != nil && !UIAccessibility.isReduceMotionEnabled {
+      UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState, .curveEaseOut], animations: apply) { _ in
+        if !self.showing { self.isHidden = true }
+      }
+    } else {
+      apply()
+      isHidden = !value
+    }
+  }
+
+  /// Hide and return to the categories, so the next trigger starts at the top.
+  private func reset(animated: Bool) {
+    setShowing(false, animated: animated)
+    if navigation.viewControllers.count > 1 { navigation.popToRootViewController(animated: false) }
   }
 
   func open(input: UITextView) {
@@ -188,6 +294,7 @@ final class ChatMentionPanel: CKGlassSurface, UICollectionViewDataSource, UIColl
     let text = (item.insertText ?? ("@" + item.path)) + " "
     let currentLength = ((input.text ?? "") as NSString).length
     guard NSMaxRange(range) <= currentLength, currentLength - range.length + (text as NSString).length <= 32000 else { return }
+    UIImpactFeedbackGenerator(style: .light).impactOccurred()
     applyingEdit = true
     if let composer = input as? ChatComposerInput {
       composer.insertReference(String(text.dropLast()), replacing: range)
@@ -202,51 +309,116 @@ final class ChatMentionPanel: CKGlassSurface, UICollectionViewDataSource, UIColl
     input.typingAttributes[.foregroundColor] = UIColor.label
     onChange?()
   }
+}
 
-  func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { rows.count }
-  func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-    let item = rows[indexPath.item]
-    let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "candidate", for: indexPath) as! UICollectionViewListCell
+/// One level of the panel: a native list (diffable data source) on the panel's navigation stack.
+/// Rows never take focus, so the prompt keeps the keyboard while the reader moves through levels.
+final class ChatMentionLevelController: UIViewController, UICollectionViewDelegate {
+  let level: ChatMentionLevel
+  weak var panel: ChatMentionPanel?
+  private var list: UICollectionView!
+  private var data: UICollectionViewDiffableDataSource<Int, String>!
+  private var rows: [String: ChatMentionItem] = [:]
+  private static let folderRow = "\u{0}folder"
+
+  init(level: ChatMentionLevel) {
+    self.level = level
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    view.backgroundColor = .clear
+    var config = UICollectionLayoutListConfiguration(appearance: .plain)
+    config.backgroundColor = .clear
+    config.showsSeparators = true
+    list = UICollectionView(frame: view.bounds, collectionViewLayout: UICollectionViewCompositionalLayout.list(using: config))
+    list.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    list.backgroundColor = .clear
+    list.keyboardDismissMode = .none
+    list.delegate = self
+    list.accessibilityIdentifier = "mention-list"
+    view.addSubview(list)
+    let registration = UICollectionView.CellRegistration<UICollectionViewListCell, String> { [weak self] cell, _, id in
+      guard let self else { return }
+      if id == Self.folderRow, case .directory(let path) = self.level {
+        var content = UIListContentConfiguration.cell()
+        content.text = String.localizedStringWithFormat(
+          String(localized: "native.chat.mention.directory", bundle: .lody), (path as NSString).lastPathComponent)
+        content.textProperties.color = .lodyAccent
+        content.textProperties.font = .dynamic(of: 16, weight: .medium)
+        content.image = UIImage(systemName: "folder.badge.plus")
+        content.imageProperties.tintColor = .lodyAccent
+        content.imageProperties.reservedLayoutSize = CGSize(width: 32, height: 32)
+        cell.contentConfiguration = content
+        cell.accessories = []
+        cell.accessibilityIdentifier = "mention-use-directory"
+        return
+      }
+      guard let item = self.rows[id] else { return }
+      cell.contentConfiguration = Self.content(item)
+      cell.accessibilityIdentifier = "mention-item:" + item.path
+      cell.accessories = item.kind == "category" || item.kind == "directory" ? [.disclosureIndicator()] : []
+    }
+    data = UICollectionViewDiffableDataSource(collectionView: list) { collection, indexPath, id in
+      collection.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: id)
+    }
+    reload(animated: false)
+  }
+
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    // The categories need no bar; deeper levels get the native back button and their title.
+    navigationController?.setNavigationBarHidden(level == .root, animated: animated)
+    if isViewLoaded { reload(animated: false) }
+  }
+
+  func reload(animated: Bool) {
+    guard isViewLoaded, let panel else { return }
+    let items = panel.rows(for: level)
+    rows = Dictionary(items.map { ($0.path + "\n" + $0.kind, $0) }, uniquingKeysWith: { first, _ in first })
+    var seen = Set<String>()
+    // Diffable identifiers must be unique; the catalog can repeat a path.
+    var ids = items.map { $0.path + "\n" + $0.kind }.filter { seen.insert($0).inserted }
+    if case .directory = level, panel.query.isEmpty { ids.insert(Self.folderRow, at: 0) }
+    var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
+    snapshot.appendSections([0])
+    snapshot.appendItems(ids)
+    snapshot.reconfigureItems(ids)
+    data.apply(snapshot, animatingDifferences: animated)
+    if ids.isEmpty {
+      var empty = UIContentUnavailableConfiguration.empty()
+      empty.text = String(localized: "native.chat.mention.empty", bundle: .lody)
+      empty.textProperties.font = .dynamic(of: 15)
+      empty.textProperties.color = .secondaryLabel
+      contentUnavailableConfiguration = empty
+    } else {
+      contentUnavailableConfiguration = nil
+    }
+  }
+
+  func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    collectionView.deselectItem(at: indexPath, animated: true)
+    guard let id = data.itemIdentifier(for: indexPath), let panel else { return }
+    if id == Self.folderRow, case .directory(let path) = level { return panel.chooseDirectory(path) }
+    if let item = rows[id] { panel.choose(item) }
+  }
+
+  private static func content(_ item: ChatMentionItem) -> UIListContentConfiguration {
     var content = item.content
     if item.kind == "category" {
       content.secondaryText = item.subtitle.isEmpty ? nil : item.subtitle
-      content.textProperties.font = .dynamic(of: 15)
+      content.textProperties.font = .dynamic(of: 16)
       let glyph = ChatMentionItem.glyphs[item.path] ?? "folder"
-      content.image = UIImage(systemName: glyph, withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .regular))
-      content.imageProperties.maximumSize = CGSize(width: 16, height: 16)
-      content.imageProperties.reservedLayoutSize = CGSize(width: 20, height: 20)
-      content.imageToTextPadding = 12
-      content.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 15, leading: 16, bottom: 15, trailing: 16)
+      content.image = UIImage(systemName: glyph, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .regular))
+      content.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
     } else {
-      content.text = item.name
-      if item.kind == "file" || item.kind == "directory" { content.text = "@" + item.path }
+      if item.kind == "file" || item.kind == "directory" { content.text = (item.path as NSString).lastPathComponent }
       if item.kind == "skill" || item.kind == "cmd" { content.text = item.insertText ?? item.name }
     }
-    cell.contentConfiguration = content
-    cell.backgroundConfiguration = .clear()
-    cell.accessibilityIdentifier = "mention-item:" + item.path
-    cell.accessories = []
-    if item.kind == "category" {
-      let arrow = UIImageView(image: UIImage(systemName: "chevron.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .regular)))
-      arrow.tintColor = .tertiaryLabel
-      arrow.contentMode = .center
-      arrow.frame = CGRect(x: 0, y: 0, width: 16, height: 16)
-      cell.accessories = [.customView(configuration: .init(customView: arrow, placement: .trailing()))]
-    }
-    return cell
-  }
-  func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-    collectionView.deselectItem(at: indexPath, animated: true)
-    guard let input, let range else { return }
-    let item = rows[indexPath.item]
-    if item.kind == "category" {
-      browserDraft = (input.text ?? "", range)
-      input.resignFirstResponder()
-      onChange?()
-      onBrowse?(["category": item.path, "query": query])
-    } else {
-      insert(item, into: input, range: range)
-    }
+    return content
   }
 }
 

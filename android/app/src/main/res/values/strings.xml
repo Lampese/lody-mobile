@@ -297,4 +297,15 @@
     </plurals>
     <string name="bar_workspace_changes">Changes</string>
     <string name="create_machine_no_agents">No available assistants</string>
+    <string name="mention_files">Files and folders</string>
+    <string name="mention_skills">Skills</string>
+    <string name="mention_sessions">Sessions</string>
+    <string name="mention_roles">Agent Roles</string>
+    <string name="mention_issues">Issues</string>
+    <string name="mention_prs">Pull Requests</string>
+    <string name="mention_commands">Commands</string>
+    <string name="mention_empty">No matching references</string>
+    <string name="mention_loading">Loading…</string>
+    <string name="mention_back">Back</string>
+    <string name="mention_directory">Reference folder %1$s</string>
 </resources>

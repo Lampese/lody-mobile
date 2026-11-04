@@ -40,6 +40,8 @@ export function contractBridge(runtime, emit) {
   createTab:args=>invoke('createTab',args),
   // Agent Roles readable by this user, listed for the new-chat Role row.
   agentRoles:args=>invoke('agentRoles',args),
+  // The composer's @ panel: one mention category for a session.
+  mentionCatalog:args=>invoke('mentionCatalog',args),
   // A changed file's text before and after one turn, read from the session's computer.
   turnDiff:args=>invoke('turnDiff',args),
   grant(value){for(const e of grants.values())receive(value?{...e,kind:'result',payload:value}:{...e,kind:'error',payload:undefined,error:{code:'grant_unavailable',retryable:true}});grants.clear();return true;},

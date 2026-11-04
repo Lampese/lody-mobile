@@ -15,6 +15,12 @@ export function createCommands(runtime, sendTurn, identity) {
   creationOptions:options,
   // The workspace's Agent Roles (emoji, per-machine targets and what each pins); a read.
   agentRoles:async()=>({roles:await roles()}),
+  // One mention category for the composer's @ panel (shared runtime `mentionCatalog`); a read.
+  async mentionCatalog(category,sessionId,cliType,agentType) {
+   const scope=identity();if(!scope?.userId)throw Error('not_connected');
+   if(!['file','skill','session','role','issue','pr','cmd'].includes(category))throw Error('invalid_category');
+   return runtime.mentionCatalog({workspaceId:scope.workspaceId,userId:scope.userId,category,...(typeof sessionId==='string'&&sessionId?{sessionId}:{}),...(typeof cliType==='string'&&cliType?{cliType}:{}),...(typeof agentType==='string'&&agentType?{agentType}:{})});
+  },
   // A text turn in an existing conversation. The stable turn id lets upstream reject a
   // duplicate; nothing here retries, and an uncertain write reports `unknown`.
   async sendText(input,signal) {

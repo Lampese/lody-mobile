@@ -296,4 +296,15 @@
     </plurals>
     <string name="bar_workspace_changes">变更</string>
     <string name="create_machine_no_agents">无可用助手</string>
+    <string name="mention_files">文件与目录</string>
+    <string name="mention_skills">技能</string>
+    <string name="mention_sessions">会话</string>
+    <string name="mention_roles">Agent Role</string>
+    <string name="mention_issues">Issue</string>
+    <string name="mention_prs">Pull Request</string>
+    <string name="mention_commands">命令</string>
+    <string name="mention_empty">没有匹配的引用</string>
+    <string name="mention_loading">正在读取…</string>
+    <string name="mention_back">返回</string>
+    <string name="mention_directory">引用目录 %1$s</string>
 </resources>

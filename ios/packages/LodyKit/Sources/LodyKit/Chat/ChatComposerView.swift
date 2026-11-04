@@ -593,8 +593,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private var quotaGap: NSLayoutConstraint!
   private var attachmentHeight: NSLayoutConstraint!
   private var attachmentTop: NSLayoutConstraint!
+  /// Docked between the prompt and the keyboard (Notion-style); the prompt rises above it.
   private let mentionPanel = ChatMentionPanel(frame: .zero)
-  private let mentionSeparator = UIView()
   private var separateMentionItems: [ChatMentionItem]?
   private var usesSeparateMentionItems = false
   private var activeMentionItems: [ChatMentionItem]? { usesSeparateMentionItems ? separateMentionItems : state.mentionItems }
@@ -840,8 +840,6 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     fullScreenDim.backgroundColor = UIColor.black.withAlphaComponent(0.22)
     fullScreenDim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     fullScreenDim.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(toggleFullScreen)))
-    mentionSeparator.backgroundColor = .separator
-    mentionSeparator.isUserInteractionEnabled = false
     mentionPanel.onChange = { [weak self] in self?.updateComposer() }
     attachmentBar.onHeightChange = { [weak self] in self?.updateComposer() }
     queueView.onHeightChange = { [weak self] in self?.updateComposer() }
@@ -868,10 +866,12 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     controls.alignment = .center
     controls.spacing = 0
     for view in [mentionButton, modelButton, permissionButton] { controls.addArrangedSubview(view) }
-    for view in [mentionPanel, mentionSeparator, attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, controls, collapsedMark, send, grabber] {
+    // Above the composer's glass, on the keyboard: not part of the merged glass surface.
+    addSubview(mentionPanel)
+    for view in [attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, controls, collapsedMark, send, grabber] {
       inputSurface.contentView.addSubview(view)
     }
-    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, actionBar, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, collapsedMark, grabber] {
+    for view in [composer, mentionPanel, mentionButton, permissionButton, queueView, actionBar, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, collapsedMark, grabber] {
       view.translatesAutoresizingMaskIntoConstraints = false
     }
     inputHeight = editorView.heightAnchor.constraint(equalToConstant: 48)
@@ -884,7 +884,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     quotaGap = inputSurface.topAnchor.constraint(equalTo: quotaNotice.bottomAnchor)
     attachmentHeight = attachmentBar.heightAnchor.constraint(equalToConstant: 0)
     grabberHeight = grabber.heightAnchor.constraint(equalToConstant: 0)
-    attachmentTop = attachmentBar.topAnchor.constraint(equalTo: mentionPanel.bottomAnchor)
+    attachmentTop = attachmentBar.topAnchor.constraint(equalTo: grabber.bottomAnchor)
     queueHeight = queueView.heightAnchor.constraint(equalToConstant: 0)
     queueGap = queueView.topAnchor.constraint(equalTo: actionBar.bottomAnchor)
     actionBarHeight = actionBar.heightAnchor.constraint(equalToConstant: 0)
@@ -898,13 +898,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       grabber.topAnchor.constraint(equalTo: inputSurface.contentView.topAnchor),
       grabber.leadingAnchor.constraint(equalTo: inputSurface.contentView.leadingAnchor),
       grabber.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor), grabberHeight,
-      mentionPanel.topAnchor.constraint(equalTo: grabber.bottomAnchor),
-      mentionPanel.leadingAnchor.constraint(equalTo: inputSurface.contentView.leadingAnchor),
-      mentionPanel.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor), mentionHeight,
-      mentionSeparator.topAnchor.constraint(equalTo: mentionPanel.bottomAnchor),
-      mentionSeparator.leadingAnchor.constraint(equalTo: inputSurface.contentView.leadingAnchor, constant: 20),
-      mentionSeparator.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor, constant: -20),
-      mentionSeparator.heightAnchor.constraint(equalToConstant: 0.5),
+      mentionPanel.leadingAnchor.constraint(equalTo: leadingAnchor),
+      mentionPanel.trailingAnchor.constraint(equalTo: trailingAnchor),
+      mentionPanel.bottomAnchor.constraint(equalTo: bottomAnchor), mentionHeight,
       queueView.leadingAnchor.constraint(equalTo: composer.leadingAnchor, constant: 16),
       queueView.trailingAnchor.constraint(equalTo: composer.trailingAnchor, constant: -16), queueHeight, queueGap,
       actionBar.topAnchor.constraint(equalTo: notice.bottomAnchor),
@@ -1409,8 +1405,15 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   }
   private func updateComposer() {
     mentionPanel.update(input: input, items: activeMentionItems ?? [], enabled: activeMentionItems != nil)
+    let dockChanged = mentionHeight.constant != mentionPanel.panelHeight
     mentionHeight.constant = mentionPanel.panelHeight
-    mentionSeparator.alpha = mentionPanel.panelHeight > 0 ? 1 : 0
+    // The prompt (and everything above it) sits on top of the docked panel.
+    (surfaceLayout as? ChatComposerLiquidGlassSurfaceLayout)?.setBottomInset(mentionPanel.panelHeight)
+    if dockChanged && window != nil && !UIAccessibility.isReduceMotionEnabled {
+      UIView.animate(springDuration: 0.32, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+        (self.window ?? self.superview ?? self).layoutIfNeeded()
+      }
+    }
     // Card style (new session) has no @ button, like web: typing @ still opens mentions.
     mentionButton.isHidden = cardStyle || activeMentionItems == nil || !input.isFirstResponder
     mentionButton.isEnabled = state.editable && !state.sending && pendingDraft == nil

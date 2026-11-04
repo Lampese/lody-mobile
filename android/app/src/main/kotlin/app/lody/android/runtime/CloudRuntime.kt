@@ -30,6 +30,8 @@ sealed interface RuntimeCommand {
     data class ItemDetail(val sessionId: String, val entryId: String, val itemId: String) : RuntimeCommand
     /** One changed file's diff for one turn, from the session's computer. Read only. */
     data class TurnDiff(val sessionId: String, val entryId: String, val path: String) : RuntimeCommand
+    /** One mention category for the composer's @ panel (upstream `mentionCatalog`). Read only. */
+    data class MentionCatalog(val category: String, val sessionId: String?, val cliType: String?, val agentType: String?) : RuntimeCommand
     /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
     data class StopTurn(val sessionId: String, val machineId: String, val turnId: String) : RuntimeCommand
     data object Ping : RuntimeCommand
@@ -38,6 +40,7 @@ sealed interface RuntimeCommand {
 sealed interface RuntimeResult {
     data class Options(val value: CreationOptions) : RuntimeResult
     data class Roles(val value: List<AgentRole>) : RuntimeResult
+    data class Mentions(val value: MentionCatalogPage) : RuntimeResult
     data class Created(val value: CreationReceipt) : RuntimeResult
     /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult
@@ -267,3 +270,10 @@ data class FileDiff(
     val removed: Int? = null,
     val unavailable: String? = null,
 )
+
+/** One mention candidate (upstream `MentionCatalog` item); [insertText] defaults to `@path`. */
+data class MentionCandidate(val path: String, val name: String, val kind: String, val subtitle: String = "", val insertText: String? = null) {
+    /** Folders browse with the files. */
+    val category: String get() = if (kind == "directory") "file" else kind
+}
+data class MentionCatalogPage(val items: List<MentionCandidate>, val truncated: Boolean = false, val incomplete: Boolean = false)

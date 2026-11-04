@@ -45,6 +45,12 @@ class ChatRepository(
     suspend fun roles(scope: RuntimeScope): List<AgentRole> =
         owner.use(scope) { (it.execute(RuntimeCommand.ListAgentRoles) as RuntimeResult.Roles).value }
 
+    /** One mention category for the composer's @ panel; a read, safe to retry. */
+    suspend fun mentions(scope: RuntimeScope, category: String, session: CatalogSession?): MentionCatalogPage =
+        owner.use(scope) {
+            (it.execute(RuntimeCommand.MentionCatalog(category, session?.id, session?.cliType, session?.agentType)) as RuntimeResult.Mentions).value
+        }
+
     /** Stops the running turn; never retried (a lost reply is reported, not replayed). */
     suspend fun stop(scope: RuntimeScope, sessionId: String, machineId: String, turnId: String) {
         owner.use(scope) { it.execute(RuntimeCommand.StopTurn(sessionId, machineId, turnId)) }
