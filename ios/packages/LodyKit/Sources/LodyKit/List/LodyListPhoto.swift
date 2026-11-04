@@ -8,6 +8,8 @@ enum LodyListPhoto {
   private static let cache = NSCache<NSURL, UIImage>()
   private static let originals = NSCache<NSURL, UIImage>()
   private static var waiters: [URL: [(UIImage?) -> Void]] = [:]
+  private static let disk = PhotoDiskCache(directory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("avatars-v1"))
+  private static let photoIO = DispatchQueue(label: "ai.lody.avatar-cache", qos: .utility)
   private static var tasks: [URL: URLSessionDataTask] = [:]
 
   static func url(_ value: String) -> URL? {
@@ -57,19 +59,43 @@ enum LodyListPhoto {
       completion(image)
       return
     }
+    let loading = waiters[url] != nil
     waiters[url, default: []].append(completion)
-    if tasks[url] != nil { return }
-    var request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
+    if loading { return }
+    let disk = Self.disk
+    photoIO.async {
+      let thumbnail = disk.read(url).flatMap(decode)
+      let fresh = disk.isFresh(url)
+      DispatchQueue.main.async {
+        if let thumbnail, fresh { finish(url, thumbnail: thumbnail) }
+        else {
+          if let thumbnail {
+            let image = store(thumbnail, for: url)
+            waiters[url]?.forEach { $0(image) }
+          }
+          download(url)
+        }
+      }
+    }
+  }
+
+  private static func finish(_ url: URL, thumbnail: UIImage?) {
+    tasks[url] = nil
+    let image = thumbnail.map { store($0, for: url) }
+    let callbacks = waiters.removeValue(forKey: url) ?? []
+    callbacks.forEach { $0(image) }
+  }
+
+  private static func download(_ url: URL) {
+    let disk = Self.disk
+    let io = photoIO
+    var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
     request.setValue("image/*", forHTTPHeaderField: "Accept")
     let task = URLSession.shared.dataTask(with: request) { data, response, _ in
       let valid = (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
       let thumbnail = valid ? data.flatMap(decode) : nil
-      DispatchQueue.main.async {
-        tasks[url] = nil
-        let image = thumbnail.map { store($0, for: url) }
-        let callbacks = waiters.removeValue(forKey: url) ?? []
-        callbacks.forEach { $0(image) }
-      }
+      if thumbnail != nil, let data { io.async { disk.write(data, for: url) } }
+      DispatchQueue.main.async { finish(url, thumbnail: thumbnail) }
     }
     tasks[url] = task
     task.resume()

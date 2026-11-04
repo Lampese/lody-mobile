@@ -295,12 +295,13 @@ extension LodyChatView {
     let signedInUser = AuthSession.shared.snapshot.account?.user
     for index in projected.indices where !projected[index].author.isEmpty {
       let author = projected[index].author
-      if let user = signedInUser, author == ChatAuthors.unknownSender || author == user.id {
-        projected[index].authorName = user.name
-        projected[index].authorImage = user.image ?? ""
-      } else if let member = members[author] {
+      let memberID = author == ChatAuthors.unknownSender ? signedInUser?.id : author
+      if let memberID, let member = members[memberID] {
         projected[index].authorName = member.name
         projected[index].authorImage = member.image ?? ""
+      } else if let user = signedInUser, author == ChatAuthors.unknownSender || author == user.id {
+        projected[index].authorName = user.name
+        projected[index].authorImage = user.image ?? ""
       }
     }
     updateWorkDurationTimer(rows: projected)

@@ -136,6 +136,7 @@ targets:
           - List/LodyListCellBackground.swift
           - List/LodyFlatRows.swift
           - List/LodyListPhoto.swift
+          - List/PhotoDiskCache.swift
           - List/LodyListRowInteractions.swift
           - List/LodyListSectionAnimation.swift
           - List/LodyProgressRowView.swift

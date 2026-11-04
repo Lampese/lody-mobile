@@ -172,10 +172,10 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val all = entries.map { entry ->
         if (entry is ChatEntry.User) {
             val userId = authorsByMessage[entry.id]
-            entry.copy(who = senderIdentity(userId, context.me, members[userId], memberLabel, entry.who.time))
+            entry.copy(who = senderIdentity(userId, context.me, members[userId ?: context.me?.id], memberLabel, entry.who.time))
         } else entry
     } + pending.map {
-        ChatEntry.User(it.turnId, it.text, TurnIdentity(meName, context.me?.image, turnTime(it.at)), it.delivery, it.attachments)
+        ChatEntry.User(it.turnId, it.text, senderIdentity(null, context.me, members[context.me?.id], memberLabel, turnTime(it.at)), it.delivery, it.attachments)
     }
     val creationUnconfirmed = creation != null && creation.state !in setOf("accepted", "queued") && creation.request.turnId !in authorsByMessage
     val creationNotice = if (creationUnconfirmed && creation?.state != "sending") {
@@ -572,8 +572,9 @@ internal fun delivery(status: String) = when (status) {
 
 /** Resolve once at display time so member refreshes do not rebuild Markdown. */
 internal fun senderIdentity(userId: String?, me: Account?, member: app.lody.android.auth.WorkspaceMember?, fallback: String, time: String): TurnIdentity {
+    if (member != null && member.id == (userId ?: me?.id)) return TurnIdentity(member.name.ifBlank { fallback }, member.image, time)
     if (me != null && (userId == null || userId == me.id)) return TurnIdentity(me.name, me.image, time)
-    return TurnIdentity(member?.name?.ifBlank { fallback } ?: fallback, member?.image, time)
+    return TurnIdentity(fallback, time = time)
 }
 
 /** The session's assistant, by its last model or its agent type ("claude-code" → "Claude Code"). */

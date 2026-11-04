@@ -39,6 +39,7 @@ open class LodyApplication : Application() {
     protected open fun createOfflineRuntime(scope: RuntimeScope): CloudRuntime = WebViewRuntime(this, scope)
     override fun onCreate() {
         super.onCreate()
+        app.lody.android.home.AvatarImages.initialize(this)
         runtimeOwner = RuntimeOwner(::createRuntime, Dispatchers.Main.immediate)
         val cache = AtomicCatalogStore(this)
         val branches = app.lody.android.create.GitHubBranches()

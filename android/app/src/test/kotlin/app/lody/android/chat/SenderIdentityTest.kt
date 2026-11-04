@@ -11,9 +11,11 @@ class SenderIdentityTest {
         val member = WorkspaceMember("other", "Alice", "https://example.com/avatar.png")
         assertEquals(TurnIdentity("Alice", member.image, "18:36"), senderIdentity("other", null, member, "Member", "18:36"))
     }
-    @Test fun currentAccountWinsOverOlderMemberCache() {
+    @Test fun workspaceMemberRefreshReplacesLoginSnapshot() {
         val me = Account("me", "Current", emptyList(), "https://example.com/current.png")
-        val stale = WorkspaceMember("me", "Old")
-        assertEquals(TurnIdentity(me.name, me.image, "now"), senderIdentity("me", me, stale, "Member", "now"))
+        val fresh = WorkspaceMember("me", "Updated", "https://example.com/updated.png")
+        assertEquals(TurnIdentity(fresh.name, fresh.image, "now"), senderIdentity("me", me, fresh, "Member", "now"))
+        assertEquals(TurnIdentity(fresh.name, fresh.image, "now"), senderIdentity(null, me, fresh, "Member", "now"))
+        assertEquals(TurnIdentity("Member", time = "now"), senderIdentity("different", me, fresh, "Member", "now"))
     }
 }
