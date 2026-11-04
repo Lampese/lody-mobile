@@ -182,7 +182,9 @@ class SessionController: UIViewController {
     let tabs = DirectoryTabs.sessions(current: session, all: state.catalog.sessions)
     let caption = tabs.count > 1 ? String(format: String(localized: "session.tabs.count", bundle: .lody), tabs.count) : ""
     chat.setDirectoryTabs(caption, symbol: DirectoryTabs.symbol(tabs))
-    chat.setTitleMenu(titleMenu(tabs))
+    // The title opens the Tabs panel below the header (a title menu grew over the title).
+    directoryTabs = tabs
+    chat.setTitleMenu("[]")
     chat.mentionRepository = session.projectId.hasPrefix("github:") ? String(session.projectId.dropFirst(7)) : ""
     renderMentions(state, session)
     renderFeed(session)
@@ -222,15 +224,28 @@ class SessionController: UIViewController {
 
   private var creatingTab = false
   private var attemptedTab: String?
+  /// The conversation's Tabs (itself first), for the title's panel.
+  private var directoryTabs: [SessionItem] = []
 
-  private func titleMenu(_ tabs: [SessionItem]) -> String {
-    var items: [[String: Any]] = []
-    if tabs.count > 1 {
-      items = tabs.map { ["id": "tab:" + $0.id, "title": $0.title, "symbol": DirectoryTabs.symbol([$0]), "selected": $0.id == sessionId] }
-    }
-    items.append(["id": "newTab", "title": String(localized: "session.tabs.new", bundle: .lody), "symbol": "plus", "group": 1, "disabled": creatingTab])
-    guard let data = try? JSONSerialization.data(withJSONObject: items) else { return "[]" }
-    return String(decoding: data, as: UTF8.self)
+  /// The title's Tabs panel, hanging below the header: each Tab with the Chats list's status
+  /// mark, the current one checked, then New Tab.
+  private func presentTabs() {
+    let host: UIViewController = parent ?? self
+    guard host.presentedViewController == nil else { return }
+    let tabs = directoryTabs.count > 1 ? directoryTabs : []
+    let items = tabs.map { ChatTabItem(id: $0.id, title: $0.title, attention: Attention($0), current: $0.id == sessionId) }
+    let panel = ChatTabsPanel(
+      tabs: items, creating: creatingTab,
+      onSelect: { [weak self, weak host] id in
+        host?.dismiss(animated: true)
+        self?.titleMenuSelected("tab:" + id)
+      },
+      onNew: { [weak self, weak host] in
+        host?.dismiss(animated: true)
+        self?.titleMenuSelected("newTab")
+      }
+    )
+    ChatTabsPopover.present(panel, tabs: items.count, from: host, below: host.navigationController?.navigationBar, fallback: chat.titleView)
   }
 
   private func createTab() {
@@ -303,6 +318,7 @@ class SessionController: UIViewController {
   private func wireEvents() {
     chat.onReconnect = { [weak self] _ in self?.feed?.reconnect() }
     chat.onTitleMenu = { [weak self] body in self?.titleMenuSelected(body["id"] as? String ?? "") }
+    chat.onTitlePress = { [weak self] _ in self?.presentTabs() }
   }
 
   private func titleMenuSelected(_ id: String) {

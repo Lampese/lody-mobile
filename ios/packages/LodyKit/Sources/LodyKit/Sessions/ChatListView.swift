@@ -413,9 +413,14 @@ private final class ChatBlurMask: UIView {
 
 /// The status mark a chat shows, matching the web `SessionRowStatusIndicator` and its priority:
 /// failed (circle alert, danger) > waiting for permission (hand) > working (grid) > unread (dot).
-/// Idle and done chats show nothing.
-private enum Attention {
+/// Idle and done chats show nothing. Shared with the conversation's Tabs panel.
+enum Attention {
   case failed, waiting, working, unread
+
+  /// A session's mark, as its row in the Chats list shows it.
+  init?(_ session: SessionItem) {
+    self.init(tint: SessionState(session).tint, unread: SessionRows.needsEmphasis(session))
+  }
 
   init?(tint: String, unread: Bool) {
     switch tint {
@@ -442,7 +447,7 @@ private struct Glyph: View {
   }
 }
 
-private struct AttentionGlyph: View {
+struct AttentionGlyph: View {
   let attention: Attention
 
   var body: some View {
