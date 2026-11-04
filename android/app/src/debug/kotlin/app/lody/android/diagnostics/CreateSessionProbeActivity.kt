@@ -38,7 +38,7 @@ class CreateSessionProbeActivity : ComponentActivity() {
             override suspend fun create(scope: RuntimeScope, request: CreateRequest): CreationReceipt {
                 check(++calls == 1) { "Duplicate creation" }
                 check(request.text.isNotBlank())
-                delay(700)
+                delay(intent.getLongExtra("sendDelay", 700))
                 return CreationReceipt(request.sessionId, result)
             }
         }
@@ -49,9 +49,18 @@ class CreateSessionProbeActivity : ComponentActivity() {
         ) else baseCatalog
         setContent {
             LodyTheme {
-                var receipt by remember { mutableStateOf<String?>(null) }
-                if (receipt == null) CreateSessionScreen(catalog, service, RuntimeScope("fixture", "workspace"), onCreated = { _, title -> receipt = "Created: $title" }, onBack = { finish() })
-                else Box(Modifier.fillMaxSize().statusBarsPadding().padding(LodyLayout.screenPaddingX)) { Text(receipt!!, style = LodyTheme.typography.body) }
+                val tasks = rememberCoroutineScope()
+                val submissions = remember { CreationSubmissions(tasks, service::create) }
+                val entries by submissions.state.collectAsState()
+                val entry = entries.values.firstOrNull()
+                val applicationOwner = application as app.lody.android.LodyApplication
+                val chat = remember { app.lody.android.chat.ChatRepository(applicationOwner.runtimeOwner) }
+                androidx.compose.animation.AnimatedContent(targetState = entry?.request?.sessionId, label = "create-probe") { id ->
+                    if (id == null) CreateSessionScreen(catalog, service, RuntimeScope("fixture", "workspace"), onSubmit = { submissions.submit(RuntimeScope("fixture", "workspace"), it) }, onBack = { finish() })
+                    else app.lody.android.chat.ChatScreen(chat, RuntimeScope("fixture", "workspace"), id,
+                        app.lody.android.chat.ChatContext(entry!!.session.title, session = entry.session),
+                        onBack = { finish() }, creation = entry)
+                }
             }
         }
     }

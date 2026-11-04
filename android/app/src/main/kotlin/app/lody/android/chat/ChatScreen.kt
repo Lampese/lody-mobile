@@ -73,7 +73,7 @@ data class ChatContext(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, context: ChatContext, onBack: () -> Unit, onSelectTab: (String) -> Unit = {}) {
+fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, context: ChatContext, onBack: () -> Unit, onSelectTab: (String) -> Unit = {}, creation: app.lody.android.create.CreationSubmissions.Submission? = null) {
     BackHandler(onBack = onBack)
     var retry by remember(id, scope) { mutableIntStateOf(0) }
     var status by remember(id, scope) { mutableStateOf("syncing") }
@@ -97,7 +97,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     val memberLabel = stringResource(R.string.chat_member)
     val workedFormat = stringResource(R.string.chat_worked_for)
-    LaunchedEffect(scope, id, retry) {
+    LaunchedEffect(scope, id, retry, creation?.state) {
+        if (creation?.state in setOf("sending", "rejected")) return@LaunchedEffect
         val repair = QuickJsMarkdownRepair.fromAssets(appContext)
         val rendered = mutableMapOf<String, Pair<SessionMessage, ChatEntry>>()
         // Prose items keep their Markdown while their text is unchanged, so a streaming turn
@@ -159,7 +160,15 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     // A sent turn leaves the optimistic list once the transcript carries its id.
     val authorsByMessage = remember(messages) { messages.associate { it.id to it.userId } }
-    val pending = outgoing.filter { it.turnId !in authorsByMessage }
+    val firstTurn = creation?.let {
+        Outgoing(it.request.turnId, it.request.text, it.at, when (it.state) {
+            "sending" -> Delivery.Sending
+            "accepted" -> Delivery.Sent
+            "queued" -> Delivery.Queued
+            else -> Delivery.Failed
+        })
+    }
+    val pending = (listOfNotNull(firstTurn) + outgoing).filter { it.turnId !in authorsByMessage }
     val all = entries.map { entry ->
         if (entry is ChatEntry.User) {
             val userId = authorsByMessage[entry.id]
@@ -168,8 +177,12 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     } + pending.map {
         ChatEntry.User(it.turnId, it.text, TurnIdentity(meName, context.me?.image, turnTime(it.at)), it.delivery, it.attachments)
     }
+    val creationUnconfirmed = creation != null && creation.state !in setOf("accepted", "queued") && creation.request.turnId !in authorsByMessage
+    val creationNotice = if (creationUnconfirmed && creation?.state != "sending") {
+        stringResource(if (creation?.state == "rejected") R.string.create_result_rejected else R.string.create_result_unknown)
+    } else null
     val session = context.session
-    val canSend = status == "live" && session?.cliType != null && session.agentType != null
+    val canSend = !creationUnconfirmed && status == "live" && session?.cliType != null && session.agentType != null
     // The composer's run config (web's mobile run-config chip): the session's provider choices,
     // read once the conversation is live. Until the reader changes it the chip shows the latest
     // turn's config from the snapshot and sends nothing (upstream keeps it); the first change
@@ -378,13 +391,18 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 } else {
                     // The transcript scrolls under the floating header.
                     ChatTranscript(
-                        all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top, bottom = LodySpacing.md), state = listState,
+                        all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top + if (creationNotice != null) LodySize.controlLg else LodySpacing.none, bottom = LodySpacing.md), state = listState,
                         loadDetail = { entryId, itemId -> repository.detail(scope, id, entryId, itemId) },
                         loadDiff = { entryId, path -> repository.turnDiff(scope, id, entryId, path) },
                     )
                 }
                 ChatHeader(context.title, context.tabs, id, creatingTab, onBack, onSelectTab, createTab)
-                if (status == "offline") {
+                if (creationNotice != null) {
+                    Text(creationNotice,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = top).padding(horizontal = TranscriptMargin),
+                        style = LodyTheme.typography.footnote, color = colors.textSecondary)
+                }
+                if (status == "offline" && !creationUnconfirmed) {
                     Row(
                         Modifier.align(Alignment.TopCenter).padding(top = top).padding(horizontal = TranscriptMargin).fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,

@@ -59,7 +59,7 @@ class CreationLoadingTest {
                     LodyTheme {
                         CreateSessionScreen(
                             CatalogSnapshot(1, emptyList(), emptyList(), listOf("machine")), service,
-                            RuntimeScope("fixture", "workspace"), onCreated = { _, _ -> }, onBack = {},
+                            RuntimeScope("fixture", "workspace"), onSubmit = {}, onBack = {},
                         )
                     }
                 }

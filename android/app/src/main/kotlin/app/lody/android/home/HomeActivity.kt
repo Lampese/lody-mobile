@@ -29,6 +29,8 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import app.lody.android.chat.ChatRepository
 import app.lody.android.chat.ChatScreen
 import app.lody.android.create.CreateSessionScreen
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import app.lody.android.runtime.RuntimeScope
 import androidx.compose.runtime.getValue
@@ -43,6 +45,7 @@ import app.lody.android.R
 import app.lody.android.auth.AuthState
 import app.lody.android.catalog.CatalogState
 import app.lody.android.catalog.ConnectionPhase
+import app.lody.android.designsystem.LodyMotion
 import app.lody.android.designsystem.LodyLayout
 import app.lody.android.designsystem.LodyRadius
 import app.lody.android.designsystem.LodySize
@@ -60,7 +63,14 @@ class HomeActivity : ComponentActivity() {
         setContent {
             LodyTheme {
                 val account by app.account.state.collectAsState()
-                val catalog by app.cloud.state.collectAsState()
+                val remoteCatalog by app.cloud.state.collectAsState()
+                val submissions by app.submissions.state.collectAsState()
+                val activeScope = account.account?.id?.let { userId -> remoteCatalog.workspace?.id?.let { RuntimeScope(userId, it) } }
+                LaunchedEffect(activeScope) { app.submissions.activate(activeScope) }
+                val pending = submissions.values.filter { it.scope == activeScope }
+                val catalog = remoteCatalog.copy(snapshot = remoteCatalog.snapshot?.let { snapshot ->
+                    snapshot.copy(sessions = snapshot.sessions + pending.map { it.session }.filter { local -> snapshot.sessions.none { it.id == local.id } })
+                })
                 val user = account.account
                 var selectedId by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf<String?>(null) }
                 var selectedTitle by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf("") }
@@ -82,21 +92,29 @@ class HomeActivity : ComponentActivity() {
                     )
                 } else {
                     val workspace = catalog.workspace
-                    val id = selectedId
-                    if (id != null && workspace != null) {
-                        ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, chatContext(catalog, id, selectedTitle, user), onBack = { selectedId = null }, onSelectTab = { selectedId = it; selectedTitle = "" })
-                    } else if (creating && workspace != null) {
-                        // Like web, new session is its own full screen over Home; back returns.
-                        BackHandler { creating = false }
-                        CreateSessionScreen(catalog.snapshot, creator, RuntimeScope(user.id, workspace.id), onCreated = { sessionId, title -> selectedId = sessionId; selectedTitle = title; creating = false }, onBack = { creating = false })
-                    } else screens.SaveableStateProvider("list/${user.id}/${workspace?.id}") {
-                        ChatListScreen(
-                            state = uiState(account, catalog),
-                            onSelectWorkspace = { app.cloud.select(it) },
-                            onSignOut = { app.account.logout() },
-                            onOpenChat = { selectedTitle = it.title; selectedId = it.id },
-                            onNewChat = { creating = true },
-                        )
+                    val route = selectedId ?: if (creating) "create" else "home"
+                    AnimatedContent(targetState = route, transitionSpec = {
+                        if (initialState == "create" && targetState != "home") {
+                            (slideInHorizontally(tween(LodyMotion.slowMillis)) { it } + fadeIn(tween(LodyMotion.baseMillis))) togetherWith
+                                fadeOut(tween(LodyMotion.fastMillis))
+                        } else EnterTransition.None togetherWith ExitTransition.None
+                    }, label = "session-navigation") { destination ->
+                        val id = destination.takeUnless { it == "create" || it == "home" }
+                        if (id != null && workspace != null) {
+                            ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, chatContext(catalog, id, selectedTitle, user), onBack = { selectedId = null }, onSelectTab = { selectedId = it; selectedTitle = "" }, creation = submissions[id]?.takeIf { it.scope == activeScope })
+                        } else if (destination == "create" && workspace != null) {
+                            // Like web, new session is its own full screen over Home; back returns.
+                            BackHandler { creating = false }
+                            CreateSessionScreen(catalog.snapshot, creator, RuntimeScope(user.id, workspace.id), onSubmit = { request -> app.submissions.submit(RuntimeScope(user.id, workspace.id), request); selectedId = request.sessionId; selectedTitle = request.text.take(200); creating = false }, onBack = { creating = false })
+                        } else screens.SaveableStateProvider("list/${user.id}/${workspace?.id}") {
+                            ChatListScreen(
+                                state = uiState(account, catalog),
+                                onSelectWorkspace = { app.cloud.select(it) },
+                                onSignOut = { app.account.logout() },
+                                onOpenChat = { selectedTitle = it.title; selectedId = it.id },
+                                onNewChat = { creating = true },
+                            )
+                        }
                     }
                 }
             }

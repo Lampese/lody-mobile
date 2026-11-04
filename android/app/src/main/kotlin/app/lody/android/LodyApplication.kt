@@ -18,6 +18,7 @@ open class LodyApplication : Application() {
     lateinit var cloud: CatalogRepository
         private set
     lateinit var creation: app.lody.android.create.CreationService
+    val submissions by lazy { app.lody.android.create.CreationSubmissions(applicationScope) { scope, request -> creation.create(scope, request) } }
     lateinit var pullRequests: app.lody.android.chat.PullRequestWriter
     lateinit var attachments: app.lody.android.chat.AttachmentUploader
         private set
@@ -57,6 +58,7 @@ open class LodyApplication : Application() {
         }
         account = AccountController(CloudAuthHttp(OkHttpAuthTransport()), KeystoreCredentialStore(this), applicationScope, cache) {
             prepared = null
+            submissions.activate(null)
             cloud.disconnect()
         }
         members = WorkspaceMembers(cache, account::members)

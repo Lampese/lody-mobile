@@ -112,7 +112,9 @@ class CreateSessionHostController: UIViewController {
     navigation.didMove(toParent: self)
   }
 
-  var relays: Bool { params.relay == true && params.sendHandoff != false }
+  // A pushed form covers Home's destination: waiting for its viewDidAppear to adopt the
+  // composer would deadlock navigation. Close the form with the native transition instead.
+  var relays: Bool { params.relay == true && params.sendHandoff != false && params.pushed != true }
 
   private func wire() {
     input.forwarded = { [weak self] name, body in

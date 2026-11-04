@@ -82,3 +82,5 @@
 - On the creation page, tapping outside the composer or opening/selecting a context option dismisses the keyboard. Picker search fields must still accept focus, and a dismissal tap must not swallow the option action. Opening run configuration also clears composer focus. A blank-area tap also closes the expanded context picker; controls and search fields retain their own tap handling.
 
 - Creation picker search (computer/project/branch) owns the keyboard space: keep the composer covered beneath the keyboard and let the context list reach its top. Composer editing still lifts the composer above the keyboard; focus changes and dismissal restore the normal layout without losing the draft.
+
+- Creating a conversation navigates immediately with the local first turn. `CreationSubmissions` owns the single write in application scope; the form never waits for network acceptance, and leaving the form/chat must not cancel or replay it. Scope changes fence and clear its projection. Keep unknown/rejected results visible on the conversation and deduplicate the first turn by its stable turn ID when the transcript arrives.

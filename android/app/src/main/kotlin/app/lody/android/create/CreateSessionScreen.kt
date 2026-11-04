@@ -121,7 +121,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService, runtimeScope: RuntimeScope, onCreated: (String, String) -> Unit, onBack: () -> Unit) {
+fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService, runtimeScope: RuntimeScope, onSubmit: (CreateRequest) -> Unit, onBack: () -> Unit) {
     val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
     val catalog = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
@@ -163,7 +163,6 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val turnId = rememberSaveable { UUID.randomUUID().toString() }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    var outcome by rememberSaveable { mutableStateOf<String?>(null) }
     val agents = options?.agents.orEmpty().filter { it.machineId == target.machineId }
     val agent = agents.firstOrNull { it.id == agentId } ?: agents.firstOrNull()
     val capability = options?.capability(agent)
@@ -181,8 +180,6 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val github = CreateSessionModel.isGithub(target.projectId) && !target.chat
     val canSend = optionsFresh && agent != null && !attempted && !busy && (!github || branch.isNotBlank())
     val waitingText = stringResource(R.string.create_agent)
-    val unknownText = stringResource(R.string.create_result_unknown)
-    val rejectedText = stringResource(R.string.create_result_rejected)
     LaunchedEffect(runtimeScope, target.machineId) {
         // A Role binds one machine's agent exactly, so another computer clears it (web).
         agentId = null; modelId = null; modeId = null; effort = null; roleId = null
@@ -237,15 +234,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 agentRoleId = activeRole?.role?.id,
                 configOptionValues = activeRole?.let { CreateSessionModel.roleChoice(it.target).options }.orEmpty(),
             )
-            scope.launch {
-                try {
-                    val receipt = repository.create(runtimeScope, request)
-                    if (receipt.state == "accepted" || receipt.state == "queued") onCreated(receipt.sessionId, prompt.take(200))
-                    else outcome = if (receipt.state == "rejected") rejectedText else unknownText
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { outcome = unknownText }
-                finally { busy = false }
-            }
+            dismissKeyboard()
+            onSubmit(request)
         }
         Unit
     }
@@ -301,10 +291,6 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                             }
                         },
                         onMore = { if (!branchLoading) { if (!branchFailed) branchPage = branches.page?.nextPage ?: 1; branchAttempt++ } })
-                    if (attempted) {
-                        Text(if (busy) stringResource(R.string.create_sending) else outcome ?: unknownText, style = LodyTheme.typography.footnote, color = colors.textSecondary)
-                        if (!busy && outcome != rejectedText) TextButton(onClick = { onCreated(sessionId, prompt.take(200)) }) { Text(stringResource(R.string.create_open_result)) }
-                    }
                 }
             }
             val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name
