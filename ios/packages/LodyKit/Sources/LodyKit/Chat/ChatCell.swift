@@ -389,6 +389,12 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   }
 
   static func processTitle(_ row: ChatRow, traits: UITraitCollection) -> NSAttributedString {
+    if !row.running && !row.attention {
+      return NSAttributedString(string: row.text, attributes: [
+        .font: LodyDesign.mono(12, compatibleWith: traits),
+        .foregroundColor: UIColor.lodySecondary,
+      ])
+    }
     let title = NSMutableAttributedString(string: row.text, attributes: [
       .font: LodyDesign.font(.subheadline, size: 14.5, weight: .semibold, compatibleWith: traits),
       .foregroundColor: UIColor.lodyInk,
@@ -408,7 +414,10 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   }
 
   private static func processLines(_ row: ChatRow, traits: UITraitCollection) -> (title: CGFloat, detail: CGFloat) {
-    let title = ceil(LodyDesign.font(.subheadline, size: 14.5, weight: .semibold, compatibleWith: traits).lineHeight)
+    let font = !row.running && !row.attention
+      ? LodyDesign.mono(12, compatibleWith: traits)
+      : LodyDesign.font(.subheadline, size: 14.5, weight: .semibold, compatibleWith: traits)
+    let title = ceil(font.lineHeight)
     let detail = row.detail.isEmpty ? 0 : ceil(detailFont(traits).lineHeight) + 2
     return (title, detail)
   }
