@@ -29,6 +29,9 @@ export type CreateSessionArgs = {
   branch?: string;
   /** Local projects: start in a new git worktree (web `project.useWorktree`). */
   useWorktree?: boolean;
+  /** Provenance only (web): the Role this session starts as, at the revision it ran. */
+  agentRoleId?: string;
+  agentRoleRevision?: number;
   billingEntitlement?: BillingEntitlement | null;
   tabContext?: {
     parentSessionId: string;
@@ -276,7 +279,13 @@ export async function createSession(
     (github &&
       (typeof args.branch !== 'string' ||
         !args.branch.trim() ||
-        args.branch.length > 255))
+        args.branch.length > 255)) ||
+    (args.agentRoleId !== undefined &&
+      (typeof args.agentRoleId !== 'string' ||
+        !args.agentRoleId ||
+        args.agentRoleId.length > 4096 ||
+        !Number.isInteger(args.agentRoleRevision) ||
+        args.agentRoleRevision! < 1))
   )
     throw new Error('invalid_session');
   const room = `session-${args.sessionId}`;
@@ -320,6 +329,9 @@ export async function createSession(
     cliType: agent.cliType,
     agentType: agent.agentType,
     agentConfigId: agent.id,
+    ...(args.agentRoleId
+      ? { agentRoleId: args.agentRoleId, agentRoleRevision: args.agentRoleRevision }
+      : {}),
     ...(project ? { project } : {}),
     ...(tab
       ? {

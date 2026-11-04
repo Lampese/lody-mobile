@@ -108,6 +108,8 @@ export const AgentRoleItem = z
     name: z.string(),
     description: z.string(),
     promptPrefix: z.string(),
+    /** The Role's glyph (web `getAgentRoleEmoji`: the stored one, else the default). */
+    emoji: z.string().optional(),
     revision: z.number().int(),
     updatedAt: z.number(),
     targets: z.array(
@@ -115,6 +117,15 @@ export const AgentRoleItem = z
         machineId: z.string().min(1),
         agentConfigId: z.string().min(1),
         alias: z.string().optional(),
+        /** What this target pins; secret-shaped option keys never leave the row. */
+        runConfig: z
+          .object({
+            modelId: z.string().optional(),
+            modeId: z.string().optional(),
+            // Strings or booleans only (the runtime filters); Swift reads JSONValue.
+            configOptionValues: z.record(z.string(), z.unknown()).optional(),
+          })
+          .optional(),
         machineName: z.string(),
         agentName: z.string(),
         state: z.enum(['configured', 'machineUnavailable', 'agentUnavailable']),

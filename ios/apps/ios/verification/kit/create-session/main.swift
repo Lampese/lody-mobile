@@ -310,3 +310,50 @@ do {
   check(form.current.choice.modelId == "opus" && form.current.agent == claude, "project changes preserve the active run configuration")
   check(form.draft(sessionId: "one")?.projectId == nil && form.canSend, "No project creates a chat without another options request")
 }
+
+// Agent Roles (web chat landing): offered per computer, picking one sets its agent and pins,
+// it names the composer only while still applied, and another computer clears it.
+do {
+  func target(_ machine: String, _ config: String, _ state: RuntimeContract.AgentRoleItemTargetsItemState = .configured) -> RuntimeContract.AgentRoleItemTargetsItem {
+    .init(machineId: machine, agentConfigId: config,
+          runConfig: .init(modelId: "opus", modeId: "plan", configOptionValues: ["reasoning_effort": .string("high"), "plan_mode": .bool(true)]),
+          machineName: machine, agentName: config, state: state)
+  }
+  func role(_ id: String, _ name: String, _ targets: [RuntimeContract.AgentRoleItemTargetsItem], emoji: String? = nil) -> RuntimeContract.AgentRoleItem {
+    .init(id: id, ownerUserId: "u", visibility: .workspace, name: name, description: "", promptPrefix: "Review.", emoji: emoji, revision: 4, updatedAt: 1, targets: targets)
+  }
+  var form = CreateSessionForm(userId: "u", workspaceId: "w")
+  form.open(projectId: nil, context: "chat")
+  form.applyOptions(options)
+  form.selectMachine("m2")
+  form.roles = [
+    role("reviewer", "Reviewer", [target("m2", "c2")], emoji: "🧪"),
+    role("gone", "Gone", [target("m2", "missing", .agentUnavailable)]),
+    role("elsewhere", "Elsewhere", [target("m9", "c9")]),
+  ]
+  check(form.roleItems.map(\.role.id) == ["gone", "reviewer"], "only Roles bound to this computer, sorted by name")
+  check(form.roleItems.first?.unavailable != nil, "an unavailable Role stays listed with its reason")
+  form.selectRole("gone")
+  check(form.current.roleId.isEmpty && form.activeRole == nil, "an unavailable Role is never picked")
+
+  form.selectRole("reviewer")
+  check(form.current.agent == claude, "picking a Role selects its agent")
+  check(form.current.choice.modelId == "opus" && form.current.choice.modeId == "plan" && form.current.choice.effort == "high",
+        "picking a Role seeds what it pins (the reasoning option as effort)")
+  check(form.activeRole?.role.id == "reviewer" && form.roleItems.last?.glyph == "🧪", "the composer is the Role")
+  var draft = form.draft(sessionId: "s1")
+  check(draft?.agentRoleId == "reviewer" && draft?.agentRoleRevision == 4, "the draft carries the Role and its revision")
+
+  form.current.choice.configOptionValues?["plan_mode"] = .bool(false)
+  check(form.activeRole != nil, "an independent Plan toggle keeps the Role")
+  form.current.choice.modelId = "other"
+  check(form.activeRole == nil && form.draft(sessionId: "s2")?.agentRoleId == nil, "moving a pinned value ends the Role")
+
+  form.selectRole("reviewer")
+  form.selectRole(nil)
+  check(form.activeRole == nil && form.current.choice.modelId == "opus", "None clears the name, not the values")
+  form.selectRole("reviewer")
+  form.selectMachine("m1")
+  draft = form.draft(sessionId: "s3")
+  check(form.current.roleId.isEmpty && draft?.agentRoleId == nil, "another computer clears the Role")
+}

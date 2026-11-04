@@ -8,6 +8,9 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
   var form = CreateSessionForm()
   var loadCachedOptions: (() async -> CreationOptions?)?
   var loadOptions: (() async throws -> CreationOptions)?
+  /// The workspace's Agent Roles; the run config shows no Role row until they are listed.
+  var loadRoles: (() async throws -> [RuntimeContract.AgentRoleItem])?
+  private var rolesTask: Task<Void, Never>?
   var loadRepositories: (() async throws -> [CreateProject])?
   var loadCachedBranches: ((_ repo: String) async -> CreateBranches?)?
   var loadBranches: ((_ repo: String, _ page: Int) async throws -> CreateBranches)?
@@ -129,6 +132,7 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
     // One workspace-wide snapshot; cached options render before the complete runtime response.
     load()
     fetchBranches()
+    loadAgentRoles()
   }
 
   @objc private func searchFocusChanged(_ notification: Notification) {
@@ -232,6 +236,9 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
     case ("agent", _):
       form.selectAgent(option)
       changed()
+    case ("role", _):
+      form.selectRole(option == CreateSessionContext.roleNoneOption ? nil : option)
+      changed()
     default:
       break
     }
@@ -302,6 +309,16 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
         self.form.failOptions()
         self.changed(prefs: false)
       }
+    }
+  }
+
+  /// Roles are read once per page; a failure simply leaves the Role row out.
+  private func loadAgentRoles() {
+    rolesTask?.cancel()
+    rolesTask = Task { [weak self] in
+      guard let roles = try? await self?.loadRoles?(), let self, !Task.isCancelled else { return }
+      self.form.roles = roles
+      self.render()
     }
   }
 

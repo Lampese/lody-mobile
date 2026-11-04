@@ -38,6 +38,7 @@ open class WebViewRuntime internal constructor(
             RuntimeResult.Created(CreationReceipt(command.id, value.getString("state")))
         }
         is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL).put(command.agentConfigId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
+        RuntimeCommand.ListAgentRoles -> RuntimeResult.Roles(CreationJson.roles(call("agentRoles", deadline = CommandDeadline.QUERY) as JSONObject))
         is RuntimeCommand.CreateAndSend -> {
             val value = call("createAndSend", JSONArray().put(CreationJson.request(command.request)), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Created(CreationReceipt(value.getString("sessionId"), value.getString("state")))

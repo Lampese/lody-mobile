@@ -119,6 +119,11 @@
     <string name="create_sending">正在创建对话并发送…</string>
     <string name="create_open_result">打开对话</string>
     <string name="create_agent">助手</string>
+    <string name="create_role">角色</string>
+    <string name="create_role_none">无</string>
+    <string name="create_role_unavailable_machine">这台电脑已不在工作区中</string>
+    <string name="create_role_unavailable_agent">它绑定的助手已从这台电脑移除</string>
+    <string name="create_role_unavailable_offline">它绑定的助手当前离线</string>
     <string name="create_model">模型</string>
     <string name="create_effort">推理强度</string>
     <string name="create_mode">模式</string>

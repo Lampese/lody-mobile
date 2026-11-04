@@ -8,6 +8,8 @@ struct CreateSessionSelection: Equatable {
   var machineId = ""
   var agentKey = ""
   var choice = ModelChoice()
+  /// The Agent Role last picked; it names the composer only while still applied (`activeRole`).
+  var roleId = ""
   var branch = ""
   var branches: CreateBranches?
   var branchesStale = false
@@ -62,6 +64,9 @@ struct CreateSessionDraft: Codable, Equatable {
   var agent: CreationAgent
   var choice: ModelChoice
   var reasoningEffortConfigId: String?
+  /// The Role the first turn runs as; the runtime re-reads its row (web: provenance at its revision).
+  var agentRoleId: String?
+  var agentRoleRevision: Int?
   /// Local project in a new git worktree; nil keeps drafts saved before the field decodable.
   var useWorktree: Bool?
 }
@@ -74,6 +79,8 @@ struct CreateSessionForm {
   /// Computer id to OS, for the computer's icon.
   var machineOs: [String: String] = [:]
   var prefs: CreatePrefs?
+  /// The workspace's Agent Roles readable by this user; nil until listed (no Role row then).
+  var roles: [RuntimeContract.AgentRoleItem]?
   var locked = false
   // Share Extension: a selection without cached options is sent and finished in the app.
   var deferUnresolved = false
@@ -177,6 +184,8 @@ struct CreateSessionForm {
   }
 
   mutating func selectMachine(_ id: String) {
+    // A Role binds one machine's agent exactly, so another computer clears it (web).
+    current.roleId = ""
     current.machineId = id
     let first = current.options?.agents.first { $0.machineId == id }
     current.agentKey = first?.key ?? ""
@@ -233,7 +242,104 @@ struct CreateSessionForm {
       agent: agent,
       choice: page.choice,
       reasoningEffortConfigId: page.capability?.reasoningEffortConfigId,
+      agentRoleId: activeRole?.role.id,
+      agentRoleRevision: activeRole?.role.revision,
       useWorktree: page.local && page.worktree ? true : nil
     )
+  }
+}
+
+/// A Role offered on the selected computer (web `buildComposerAgentRoleItems`): bound to that
+/// machine's target, listed even when it cannot run, with the reason.
+struct CreateRoleItem: Equatable {
+  let role: RuntimeContract.AgentRoleItem
+  let target: RuntimeContract.AgentRoleItemTargetsItem
+  /// Localization key of why it cannot run here; nil when it can.
+  let unavailable: String?
+  var glyph: String { role.emoji.flatMap { $0.isEmpty ? nil : $0 } ?? "🪼" }
+}
+
+extension CreateSessionForm {
+  var roleItems: [CreateRoleItem] {
+    guard let roles, let machine = current.machine else { return [] }
+    return roles.compactMap { role -> CreateRoleItem? in
+      guard let target = role.targets.first(where: { $0.machineId == machine.id }) else { return nil }
+      var reason: String?
+      switch target.state {
+      case .machineUnavailable: reason = "create.role.unavailable.machine"
+      case .agentUnavailable: reason = "create.role.unavailable.agent"
+      default:
+        let online = current.agents.contains { $0.id == target.agentConfigId }
+        if !online { reason = "create.role.unavailable.offline" }
+      }
+      return CreateRoleItem(role: role, target: target, unavailable: reason)
+    }
+    .sorted { lhs, rhs in
+      let order = lhs.role.name.localizedCompare(rhs.role.name)
+      return order == .orderedSame ? lhs.role.id < rhs.role.id : order == .orderedAscending
+    }
+  }
+
+  /// The Role the composer IS, not merely the last picked (web `isComposerAgentRoleApplied`):
+  /// its agent and every value it pins are still what will run.
+  var activeRole: CreateRoleItem? {
+    guard !current.roleId.isEmpty, let item = roleItems.first(where: { $0.role.id == current.roleId }),
+          item.unavailable == nil, let agent = current.agent,
+          agent.id == item.target.agentConfigId, agent.machineId == item.target.machineId else { return nil }
+    return Self.applied(item.target.runConfig, to: current.choice, effortId: current.capability?.reasoningEffortConfigId) ? item : nil
+  }
+
+  /// Picking a Role sets exactly what it says: its agent, then the values it pins. None clears
+  /// only the name; the values it seeded stay the user's own (web).
+  mutating func selectRole(_ id: String?) {
+    guard let id else { current.roleId = ""; return }
+    guard let item = roleItems.first(where: { $0.role.id == id }), item.unavailable == nil,
+          let agent = current.agents.first(where: { $0.id == item.target.agentConfigId }) else { return }
+    current.agentKey = agent.key
+    let capability = CreateLogic.capabilityFor(current.options, agent)
+    updateChoice(Self.choice(item.target.runConfig, effortId: capability?.reasoningEffortConfigId))
+    current.roleId = id
+  }
+
+  /// A target's pins as the composer's choice; the reasoning option becomes `effort`.
+  static func choice(_ pinned: RuntimeContract.AgentRoleItemTargetsItemRunConfig?, effortId: String?) -> ModelChoice {
+    let effortKey = effortId ?? "reasoning_effort"
+    var effort: String?
+    var options: [String: ConfigValue] = [:]
+    for (key, value) in pinned?.configOptionValues ?? [:] {
+      switch value {
+      case .string(let text) where key == effortKey: effort = text
+      case .string(let text): options[key] = .string(text)
+      case .bool(let flag): options[key] = .bool(flag)
+      default: continue
+      }
+    }
+    return ModelChoice(modelId: pinned?.modelId, effort: effort, modeId: pinned?.modeId, configOptionValues: options.isEmpty ? nil : options)
+  }
+
+  /// Runtime `roleRunConfigApplied` on the composer's choice: unpinned values are the agent's
+  /// own, and independent Plan toggles keep the Role.
+  static func applied(_ pinned: RuntimeContract.AgentRoleItemTargetsItemRunConfig?, to choice: ModelChoice, effortId: String?) -> Bool {
+    guard let pinned else { return true }
+    if let mode = pinned.modeId, choice.modeId != mode { return false }
+    if let model = pinned.modelId, choice.modelId != model { return false }
+    let effortKey = effortId ?? "reasoning_effort"
+    for (key, value) in pinned.configOptionValues ?? [:] {
+      let selected: RuntimeContract.JSONValue?
+      if key == effortKey {
+        selected = choice.effort.map { .string($0) }
+      } else {
+        switch choice.configOptionValues?[key] {
+        case .string(let text): selected = .string(text)
+        case .bool(let flag): selected = .bool(flag)
+        case nil: selected = nil
+        }
+      }
+      if key == "plan_mode", case .bool(_) = value, case .bool(_)? = selected { continue }
+      let plan: (RuntimeContract.JSONValue?) -> Bool = { $0 == .string("plan") || $0 == .string("default") }
+      if key == "collaboration_mode", plan(value), plan(selected) { continue }
+      if selected != value { return false }
+    }
+    return true
   }
 }

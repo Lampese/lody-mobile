@@ -6,6 +6,8 @@ import { identityAt, itemRev, projectSession } from './project';
 import type { SteerReceipt } from './execution';
 import { machineRpc, type RpcReply } from './machine-rpc';
 import { retrySessionRead } from './session-read';
+import { resolveTurnRole, type TurnRole } from './agent-roles';
+import { roleRunConfigApplied } from '../protocol/agent-roles';
 import type {
   CheckTurnQuotaResult,
   ControlTurnResult,
@@ -530,6 +532,10 @@ export async function sendTurn(
     reasoningEffort?: string | null;
     reasoningEffortConfigId?: string;
     configOptionValues?: Record<string, unknown>;
+    /** A new session's first turn runs as this Role (resolved here, see `resolveTurnRole`). */
+    agentRoleId?: string;
+    /** The session's own Agent Config, from trusted state (meta / the creator), never the wire. */
+    agentConfigId?: string;
     billingEntitlement?: BillingEntitlement | null;
   },
   expand: (text: string) => Promise<string> = async (text) => text,
@@ -655,6 +661,35 @@ export async function sendTurn(
       if (args.reasoningEffort === null) delete configOptionValues[id];
       else configOptionValues[id] = args.reasoningEffort;
     }
+    // A Role belongs to a session's FIRST turn (web): its prompt prefix starts the
+    // conversation, and it runs only while every value it pins is what will run.
+    let role: TurnRole | undefined;
+    if (args.agentRoleId !== undefined) {
+      const started = ((state.doc.toJSON().history as any[] | undefined) ?? []).some(
+        (entry) => entry.role === 'user',
+      );
+      if (started || typeof args.agentRoleId !== 'string' || !args.agentConfigId)
+        throw new Error('role_unavailable');
+      role = await resolveTurnRole(
+        {
+          workspaceId: state.workspace,
+          roleId: args.agentRoleId,
+          userId: args.userId!,
+          machineId: args.machineId,
+          agentConfigId: args.agentConfigId,
+        },
+        state.getGrant,
+        AbortSignal.any([state.controller.signal, AbortSignal.timeout(30000)]),
+      );
+      if (sessions.get(state.id) !== state || !state.ready)
+        throw new Error('session_not_ready');
+      const applied = roleRunConfigApplied(role.runConfig, {
+        modelId: args.modelId === null ? null : (args.modelId ?? previous.modelId),
+        modeId: args.modeId ?? previous.modeId,
+        configOptionValues,
+      });
+      if (!applied) throw new Error('role_changed');
+    }
     const pendingQueue = (state.doc.toJSON().mq ?? []) as any[];
     const mcpServerIds = await selectMcp(
       pendingQueue.findLast((item) =>
@@ -666,7 +701,9 @@ export async function sendTurn(
     const inputConfig = {
       cliType: args.cliType,
       agentType: args.agentType,
-      prompt: text,
+      // Web `buildAgentPrompt`: the Role's instruction, then the task. The visible
+      // input stays the user's own text.
+      prompt: [role?.promptPrefix ?? '', text].filter((part) => part.trim()).join('\n\n'),
       inputBlocks: [...(text ? [{ type: 'text', text }] : []), ...attachments],
       // An explicit pick wins; otherwise the turn inherits what the session
       // already used, and an unset value leaves the machine on its default.
@@ -678,11 +715,22 @@ export async function sendTurn(
         : undefined,
       mcpServerIds,
       taskToolsEnabled: previous.taskToolsEnabled ?? false,
-      agentRoleId: previous.agentRoleId,
-      agentRoleRevision: previous.agentRoleRevision,
+      agentRoleId: role ? role.id : previous.agentRoleId,
+      agentRoleRevision: role ? role.revision : previous.agentRoleRevision,
+      ...(role?.runConfig.memory ? { memory: role.runConfig.memory } : {}),
+      ...(role
+        ? {
+            agentRoleSnapshot: {
+              id: role.id,
+              revision: role.revision,
+              name: role.name,
+              emoji: role.emoji,
+            },
+          }
+        : {}),
       resume: args.resume,
     };
-    if (previous.agentRoleId) {
+    if (!role && previous.agentRoleId) {
       const previousOptions = previous.configOptionValues ?? {};
       const changed =
         ['cliType', 'agentType', 'modelId', 'modeId'].some(

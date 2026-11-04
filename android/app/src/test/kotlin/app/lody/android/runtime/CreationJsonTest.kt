@@ -40,4 +40,21 @@ class CreationJsonTest {
         assertEquals("中文", json.getString("text")); assertTrue(json.getBoolean("worktree"))
         assertFalse(json.has("userId")); assertFalse(json.has("workspaceId")); assertFalse(json.has("projectId"))
     }
+
+    @Test fun agentRolesKeepPinsAsStringsOrBooleansAndDefaultTheEmoji() {
+        val json = JSONObject("""{"roles":[{"id":"r","name":"Reviewer","revision":3,"targets":[{"machineId":"m","agentConfigId":"a","state":"configured",
+          "runConfig":{"modelId":"opus","configOptionValues":{"reasoning_effort":"high","plan_mode":true,"nested":{"x":1}}}}]}]}""")
+        val role = CreationJson.roles(json).single()
+        assertEquals("🪼", role.emoji)
+        assertEquals(3, role.revision)
+        assertEquals(RoleRunConfig("opus", null, mapOf("reasoning_effort" to "high", "plan_mode" to true)), role.targets.single().runConfig)
+    }
+
+    @Test fun aRoleCreationCarriesItsIdAndPinnedOptions() {
+        val request = CreateRequest("s", "t", null, "m", "a", "hi", null, false, "opus", null, "high", agentRoleId = "r", configOptionValues = mapOf("plan_mode" to true))
+        val json = CreationJson.request(request)
+        assertEquals("r", json.getString("agentRoleId"))
+        assertEquals(true, json.getJSONObject("configOptionValues").getBoolean("plan_mode"))
+        assertFalse(CreationJson.request(request.copy(agentRoleId = null, configOptionValues = emptyMap())).has("agentRoleId"))
+    }
 }

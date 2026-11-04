@@ -75,3 +75,18 @@ test('a conversation turn carries only the explicit run-config choice',async()=>
  await c.sendText(turn);assert.equal('modelId' in calls.filter(x=>x[0]==='send').at(-1)[1],false);
  await assert.rejects(c.sendText({...turn,modelId:7}),/invalid_send/);
 });
+test('a new chat can start as an Agent Role bound to the chosen agent, with provenance and the first turn Role',async()=>{
+ const calls=[];
+ const reviewer={id:'reviewer',revision:4,targets:[{machineId:'m',agentConfigId:'a',state:'configured'}]};
+ const runtime={creationOptions:()=>({agents:[{id:'a',machineId:'m',cliType:'builtin',agentType:'codex'}],capabilities:[]}),agentRoles:async args=>{calls.push(['roles',args]);return {roles:[reviewer,{id:'elsewhere',revision:1,targets:[{machineId:'m',agentConfigId:'other',state:'configured'}]}]}},createSession:async a=>{calls.push(['create',a]);return {state:'created'}},ensureSession:async()=>calls.push(['ensure'])};
+ const c=createCommands(runtime,async a=>{calls.push(['send',a]);return {state:'accepted'}},()=>({workspaceId:'w',userId:'u'}));
+ assert.deepEqual((await c.agentRoles()).roles.map(r=>r.id),['reviewer','elsewhere']);
+ assert.equal((await c.createAndSend({...input,agentRoleId:'reviewer',configOptionValues:{plan_mode:true}})).state,'accepted');
+ const create=calls.find(x=>x[0]==='create')[1], send=calls.find(x=>x[0]==='send')[1];
+ assert.equal(create.agentRoleId,'reviewer');assert.equal(create.agentRoleRevision,4);
+ assert.equal(send.agentRoleId,'reviewer');assert.equal(send.agentConfigId,'a');assert.deepEqual(send.configOptionValues,{plan_mode:true});
+ const other={...input,sessionId:'33333333-3333-4333-8333-333333333333',agentRoleId:'elsewhere'};
+ await assert.rejects(c.createAndSend(other),/role_unavailable/,'a Role bound to another agent is refused before any write');
+ assert.equal(calls.filter(x=>x[0]==='create').length,1);
+ await assert.rejects(c.createAndSend({...other,agentRoleId:undefined,configOptionValues:{x:{}}}),/invalid_creation/);
+});

@@ -10,6 +10,29 @@ extension RuntimeContract {
     case workspace = "workspace"
   }
 
+  public struct AgentRoleItemTargetsItemRunConfig: Codable, Sendable, Equatable {
+    public var modelId: String?
+    public var modeId: String?
+    public var configOptionValues: [String: JSONValue]?
+    public init(modelId: String? = nil, modeId: String? = nil, configOptionValues: [String: JSONValue]? = nil) {
+      self.modelId = modelId
+      self.modeId = modeId
+      self.configOptionValues = configOptionValues
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.modelId = try c.decodeIfPresent(String.self, forKey: Key("modelId"))
+      self.modeId = try c.decodeIfPresent(String.self, forKey: Key("modeId"))
+      self.configOptionValues = try c.decodeIfPresent([String: JSONValue].self, forKey: Key("configOptionValues"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encodeIfPresent(self.modelId, forKey: Key("modelId"))
+      try c.encodeIfPresent(self.modeId, forKey: Key("modeId"))
+      try c.encodeIfPresent(self.configOptionValues, forKey: Key("configOptionValues"))
+    }
+  }
+
   public enum AgentRoleItemTargetsItemState: String, Codable, Sendable, Equatable, CaseIterable {
     case configured = "configured"
     case machineUnavailable = "machineUnavailable"
@@ -20,13 +43,15 @@ extension RuntimeContract {
     public var machineId: String
     public var agentConfigId: String
     public var alias: String?
+    public var runConfig: AgentRoleItemTargetsItemRunConfig?
     public var machineName: String
     public var agentName: String
     public var state: AgentRoleItemTargetsItemState
-    public init(machineId: String, agentConfigId: String, alias: String? = nil, machineName: String, agentName: String, state: AgentRoleItemTargetsItemState) {
+    public init(machineId: String, agentConfigId: String, alias: String? = nil, runConfig: AgentRoleItemTargetsItemRunConfig? = nil, machineName: String, agentName: String, state: AgentRoleItemTargetsItemState) {
       self.machineId = machineId
       self.agentConfigId = agentConfigId
       self.alias = alias
+      self.runConfig = runConfig
       self.machineName = machineName
       self.agentName = agentName
       self.state = state
@@ -36,6 +61,7 @@ extension RuntimeContract {
       self.machineId = try c.decode(String.self, forKey: Key("machineId"))
       self.agentConfigId = try c.decode(String.self, forKey: Key("agentConfigId"))
       self.alias = try c.decodeIfPresent(String.self, forKey: Key("alias"))
+      self.runConfig = try c.decodeIfPresent(AgentRoleItemTargetsItemRunConfig.self, forKey: Key("runConfig"))
       self.machineName = try c.decode(String.self, forKey: Key("machineName"))
       self.agentName = try c.decode(String.self, forKey: Key("agentName"))
       self.state = try c.decode(AgentRoleItemTargetsItemState.self, forKey: Key("state"))
@@ -45,6 +71,7 @@ extension RuntimeContract {
       try c.encode(self.machineId, forKey: Key("machineId"))
       try c.encode(self.agentConfigId, forKey: Key("agentConfigId"))
       try c.encodeIfPresent(self.alias, forKey: Key("alias"))
+      try c.encodeIfPresent(self.runConfig, forKey: Key("runConfig"))
       try c.encode(self.machineName, forKey: Key("machineName"))
       try c.encode(self.agentName, forKey: Key("agentName"))
       try c.encode(self.state, forKey: Key("state"))
@@ -58,16 +85,18 @@ extension RuntimeContract {
     public var name: String
     public var description: String
     public var promptPrefix: String
+    public var emoji: String?
     public var revision: Int
     public var updatedAt: Double
     public var targets: [AgentRoleItemTargetsItem]
-    public init(id: String, ownerUserId: String, visibility: AgentRoleItemVisibility, name: String, description: String, promptPrefix: String, revision: Int, updatedAt: Double, targets: [AgentRoleItemTargetsItem]) {
+    public init(id: String, ownerUserId: String, visibility: AgentRoleItemVisibility, name: String, description: String, promptPrefix: String, emoji: String? = nil, revision: Int, updatedAt: Double, targets: [AgentRoleItemTargetsItem]) {
       self.id = id
       self.ownerUserId = ownerUserId
       self.visibility = visibility
       self.name = name
       self.description = description
       self.promptPrefix = promptPrefix
+      self.emoji = emoji
       self.revision = revision
       self.updatedAt = updatedAt
       self.targets = targets
@@ -80,6 +109,7 @@ extension RuntimeContract {
       self.name = try c.decode(String.self, forKey: Key("name"))
       self.description = try c.decode(String.self, forKey: Key("description"))
       self.promptPrefix = try c.decode(String.self, forKey: Key("promptPrefix"))
+      self.emoji = try c.decodeIfPresent(String.self, forKey: Key("emoji"))
       self.revision = try c.decode(Int.self, forKey: Key("revision"))
       self.updatedAt = try c.decode(Double.self, forKey: Key("updatedAt"))
       self.targets = try c.decode([AgentRoleItemTargetsItem].self, forKey: Key("targets"))
@@ -92,6 +122,7 @@ extension RuntimeContract {
       try c.encode(self.name, forKey: Key("name"))
       try c.encode(self.description, forKey: Key("description"))
       try c.encode(self.promptPrefix, forKey: Key("promptPrefix"))
+      try c.encodeIfPresent(self.emoji, forKey: Key("emoji"))
       try c.encode(self.revision, forKey: Key("revision"))
       try c.encode(self.updatedAt, forKey: Key("updatedAt"))
       try c.encode(self.targets, forKey: Key("targets"))
@@ -841,8 +872,10 @@ extension RuntimeContract {
     public var userId: String
     public var title: String
     public var branch: String?
+    public var agentRoleId: String?
+    public var agentRoleRevision: Int?
     public var billingEntitlement: BillingEntitlement?
-    public init(workspaceId: String, projectId: String? = nil, sessionId: String, machineId: String, agentConfigId: String, userId: String, title: String, branch: String? = nil, billingEntitlement: BillingEntitlement?) {
+    public init(workspaceId: String, projectId: String? = nil, sessionId: String, machineId: String, agentConfigId: String, userId: String, title: String, branch: String? = nil, agentRoleId: String? = nil, agentRoleRevision: Int? = nil, billingEntitlement: BillingEntitlement?) {
       self.workspaceId = workspaceId
       self.projectId = projectId
       self.sessionId = sessionId
@@ -851,6 +884,8 @@ extension RuntimeContract {
       self.userId = userId
       self.title = title
       self.branch = branch
+      self.agentRoleId = agentRoleId
+      self.agentRoleRevision = agentRoleRevision
       self.billingEntitlement = billingEntitlement
     }
     public init(from decoder: any Decoder) throws {
@@ -863,6 +898,8 @@ extension RuntimeContract {
       self.userId = try c.decode(String.self, forKey: Key("userId"))
       self.title = try c.decode(String.self, forKey: Key("title"))
       self.branch = try c.decodeIfPresent(String.self, forKey: Key("branch"))
+      self.agentRoleId = try c.decodeIfPresent(String.self, forKey: Key("agentRoleId"))
+      self.agentRoleRevision = try c.decodeIfPresent(Int.self, forKey: Key("agentRoleRevision"))
       self.billingEntitlement = try c.decode(BillingEntitlement?.self, forKey: Key("billingEntitlement"))
     }
     public func encode(to encoder: any Encoder) throws {
@@ -875,6 +912,8 @@ extension RuntimeContract {
       try c.encode(self.userId, forKey: Key("userId"))
       try c.encode(self.title, forKey: Key("title"))
       try c.encodeIfPresent(self.branch, forKey: Key("branch"))
+      try c.encodeIfPresent(self.agentRoleId, forKey: Key("agentRoleId"))
+      try c.encodeIfPresent(self.agentRoleRevision, forKey: Key("agentRoleRevision"))
       try c.encode(self.billingEntitlement, forKey: Key("billingEntitlement"))
     }
   }
@@ -4806,8 +4845,9 @@ extension RuntimeContract {
     public var reasoningEffort: ClearableString?
     public var reasoningEffortConfigId: String?
     public var configOptionValues: [String: JSONValue]?
+    public var agentRoleId: String?
     public var billingEntitlement: BillingEntitlement?
-    public init(sessionId: String, id: String? = nil, backgroundTaskId: String? = nil, queue: Bool? = nil, guide: Bool? = nil, machineId: String, userId: String? = nil, text: String, attachmentBlocks: [[String: JSONValue]]? = nil, cliType: String? = nil, agentType: String? = nil, resume: String? = nil, modelId: ClearableString? = nil, modeId: String? = nil, reasoningEffort: ClearableString? = nil, reasoningEffortConfigId: String? = nil, configOptionValues: [String: JSONValue]? = nil, billingEntitlement: BillingEntitlement?) {
+    public init(sessionId: String, id: String? = nil, backgroundTaskId: String? = nil, queue: Bool? = nil, guide: Bool? = nil, machineId: String, userId: String? = nil, text: String, attachmentBlocks: [[String: JSONValue]]? = nil, cliType: String? = nil, agentType: String? = nil, resume: String? = nil, modelId: ClearableString? = nil, modeId: String? = nil, reasoningEffort: ClearableString? = nil, reasoningEffortConfigId: String? = nil, configOptionValues: [String: JSONValue]? = nil, agentRoleId: String? = nil, billingEntitlement: BillingEntitlement?) {
       self.sessionId = sessionId
       self.id = id
       self.backgroundTaskId = backgroundTaskId
@@ -4825,6 +4865,7 @@ extension RuntimeContract {
       self.reasoningEffort = reasoningEffort
       self.reasoningEffortConfigId = reasoningEffortConfigId
       self.configOptionValues = configOptionValues
+      self.agentRoleId = agentRoleId
       self.billingEntitlement = billingEntitlement
     }
     public init(from decoder: any Decoder) throws {
@@ -4846,6 +4887,7 @@ extension RuntimeContract {
       self.reasoningEffort = try c.decodeIfPresent(ClearableString.self, forKey: Key("reasoningEffort"))
       self.reasoningEffortConfigId = try c.decodeIfPresent(String.self, forKey: Key("reasoningEffortConfigId"))
       self.configOptionValues = try c.decodeIfPresent([String: JSONValue].self, forKey: Key("configOptionValues"))
+      self.agentRoleId = try c.decodeIfPresent(String.self, forKey: Key("agentRoleId"))
       self.billingEntitlement = try c.decode(BillingEntitlement?.self, forKey: Key("billingEntitlement"))
     }
     public func encode(to encoder: any Encoder) throws {
@@ -4867,6 +4909,7 @@ extension RuntimeContract {
       try c.encodeIfPresent(self.reasoningEffort, forKey: Key("reasoningEffort"))
       try c.encodeIfPresent(self.reasoningEffortConfigId, forKey: Key("reasoningEffortConfigId"))
       try c.encodeIfPresent(self.configOptionValues, forKey: Key("configOptionValues"))
+      try c.encodeIfPresent(self.agentRoleId, forKey: Key("agentRoleId"))
       try c.encode(self.billingEntitlement, forKey: Key("billingEntitlement"))
     }
   }

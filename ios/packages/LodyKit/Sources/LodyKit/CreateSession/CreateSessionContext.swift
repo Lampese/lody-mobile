@@ -23,6 +23,8 @@ enum CreateGlyph: Equatable {
   /// An agent mark from the app's asset catalog, drawn in its own colours.
   case asset(String)
   case symbol(String)
+  /// An Agent Role's emoji.
+  case emoji(String)
 }
 
 struct CreateOption: Identifiable, Equatable {
@@ -219,6 +221,20 @@ enum CreateSessionContext {
   static func runConfig(_ form: CreateSessionForm) -> [CreatePicker] {
     let page = form.current
     var rows: [CreatePicker] = []
+    // Role sits above Agent because a Role answers every row under it (web). Shown whenever the
+    // Roles are listed, even with none to pick: then it reads None.
+    if form.roles != nil, !page.agents.isEmpty {
+      let active = form.activeRole
+      let none = CreateOption(id: roleNoneOption, title: text("create.role.none"), selected: active == nil)
+      rows.append(CreatePicker(
+        id: "role", glyph: active.map { CreateGlyph.emoji($0.glyph) } ?? .lody(.user), title: active?.role.name ?? text("create.role.none"),
+        placeholder: active == nil,
+        options: [none] + form.roleItems.map { item in
+          CreateOption(
+            id: item.role.id, title: item.role.name, subtitle: item.unavailable.map(text) ?? "",
+            glyph: .emoji(item.glyph), selected: item.role.id == active?.role.id, disabled: item.unavailable != nil)
+        }))
+    }
     if !page.agents.isEmpty {
       rows.append(CreatePicker(
         id: "agent", glyph: agentGlyph(page.agent?.cliType, page.agent?.agentType), title: page.agent?.name ?? text("create.row.selectAgent"),
@@ -248,7 +264,10 @@ enum CreateSessionContext {
     return rows
   }
 
+  static let roleNoneOption = "__none__"
+
   private static let runConfigLabels = [
+    "role": "create.runConfig.role",
     "agent": "create.runConfig.agent", "model": "create.runConfig.model",
     "effort": "create.runConfig.reasoning", "permission": "create.runConfig.mode",
   ]
@@ -504,6 +523,8 @@ struct GlyphView: View {
       Image(name, bundle: .main).resizable().scaledToFit().frame(width: size, height: size)
     case .symbol(let name):
       Image(systemName: name).font(.system(size: size * 0.8)).frame(width: size, height: size).foregroundStyle(LodyColor.iconSecondary)
+    case .emoji(let glyph):
+      Text(glyph).font(.system(size: size * 0.85)).frame(width: size, height: size).accessibilityHidden(true)
     }
   }
 }

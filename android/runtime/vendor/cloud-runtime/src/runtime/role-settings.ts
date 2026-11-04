@@ -6,9 +6,11 @@ import type {
   RoleAgent,
 } from '../models/agent-roles';
 import {
+  DEFAULT_ROLE_EMOJI,
   readRole,
   readableRole,
   record,
+  roleRunConfig,
   roleSlug,
 } from '../protocol/agent-roles';
 import { encodeFrame } from '../frames';
@@ -35,6 +37,7 @@ export function roleSnapshot(
       name: role.name,
       description: role.description ?? '',
       promptPrefix: role.promptPrefix ?? '',
+      emoji: role.emoji ?? DEFAULT_ROLE_EMOJI,
       revision: role.revision,
       updatedAt: role.updatedAt,
       targets: role.targets.map((target) => {
@@ -46,10 +49,13 @@ export function roleSnapshot(
         let state: AgentRoleItem['targets'][number]['state'] = 'configured';
         if (!machines.has(target.machineId)) state = 'machineUnavailable';
         else if (!agent) state = 'agentUnavailable';
+        // Memory stays out of the listing; the runtime applies it when the Role runs.
+        const { memory: _memory, ...pinned } = roleRunConfig(target.runConfig);
         return {
           machineId: target.machineId,
           agentConfigId: target.agentConfigId,
           ...(target.alias ? { alias: target.alias } : {}),
+          ...(Object.keys(pinned).length ? { runConfig: pinned } : {}),
           machineName: agent?.machineName ?? target.machineId,
           agentName: agent?.name ?? target.agentConfigId,
           state,

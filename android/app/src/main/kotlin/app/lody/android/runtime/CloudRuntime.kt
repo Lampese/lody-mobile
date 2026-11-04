@@ -20,6 +20,8 @@ data class RuntimeScope(val accountId: String, val workspaceId: String) {
 sealed interface RuntimeCommand {
     data class CreateTab(val parentId: String, val id: String, val title: String) : RuntimeCommand
     data class GetCreationOptions(val projectId: String?, val agentConfigId: String? = null) : RuntimeCommand
+    /** The workspace's Agent Roles readable by this user. Read only. */
+    data object ListAgentRoles : RuntimeCommand
     data class CreateAndSend(val request: CreateRequest) : RuntimeCommand
     data class SendText(val request: SendTextRequest) : RuntimeCommand
     data class WatchSession(val id: String) : RuntimeCommand
@@ -35,6 +37,7 @@ sealed interface RuntimeCommand {
 }
 sealed interface RuntimeResult {
     data class Options(val value: CreationOptions) : RuntimeResult
+    data class Roles(val value: List<AgentRole>) : RuntimeResult
     data class Created(val value: CreationReceipt) : RuntimeResult
     /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult

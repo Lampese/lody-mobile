@@ -39,6 +39,12 @@ struct CreateDraftRecord {
     if let projectId = draft.projectId, !projectId.isEmpty { creation.append(("projectId", Self.string(projectId))) }
     if let branch = draft.branch, !branch.isEmpty { creation.append(("branch", Self.string(branch))) }
     if draft.useWorktree == true { creation.append(("useWorktree", "true")) }
+    // The Role the session starts as: provenance on its metadata, and the first turn's Role,
+    // which the runtime re-reads and applies (prompt prefix, memory) or refuses.
+    if let role = draft.agentRoleId, let revision = draft.agentRoleRevision {
+      creation.append(("agentRoleId", Self.string(role)))
+      creation.append(("agentRoleRevision", String(revision)))
+    }
     let choiceFields = Self.fields(CreateJSON.encode(draft.choice))
     var sendChoice = choiceFields
     if let effort = draft.reasoningEffortConfigId { sendChoice.append(("reasoningEffortConfigId", Self.string(effort))) }
@@ -50,7 +56,7 @@ struct CreateDraftRecord {
       ("phase", Self.string("waiting")),
       ("choice", Self.object(sendChoice)),
       ("creation", Self.string(Self.object(creation))),
-    ])
+    ] + (draft.agentRoleId.map { [("agentRoleId", Self.string($0))] } ?? []))
     recordJSON = Self.object([("session", session), ("send", send)])
     let projectName = draft.projectId?.isEmpty == false ? draft.projectName : label("inbox.section.chat")
     createdJSON = Self.object([

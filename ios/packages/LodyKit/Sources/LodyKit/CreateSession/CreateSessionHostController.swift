@@ -151,6 +151,10 @@ class CreateSessionHostController: UIViewController {
       if service.persistShare { try? ShareStore.writeOptions(options, target: CreateLogic.chatTarget) }
       return options
     }
+    controller.loadRoles = { [weak self] in
+      guard self != nil else { throw CancellationError() }
+      return try await service.roles(workspaceId)
+    }
     controller.loadRepositories = { [weak self] in
       guard let self else { throw CancellationError() }
       return try await service.repositories(workspaceId).compactMap(CreateSessionService.githubProject)

@@ -44,6 +44,9 @@ export const CreateSessionParams = z
     userId: z.string(),
     title: z.string(),
     branch: z.string().optional(),
+    /** Provenance only (web): the Role this session starts as, frozen at its revision. */
+    agentRoleId: z.string().min(1).optional(),
+    agentRoleRevision: z.number().int().positive().optional(),
     billingEntitlement: BillingEntitlement.nullable(),
   })
   .meta({ id: 'CreateSessionParams' });
@@ -128,6 +131,12 @@ export const SendTurnParams = z
     reasoningEffort: ClearableString.optional(),
     reasoningEffortConfigId: z.string().optional(),
     configOptionValues: z.record(z.string(), z.unknown()).optional(),
+    /**
+     * A new session's first turn may run as an Agent Role. Only the id crosses:
+     * the runtime reads the Role row itself and applies its prompt prefix,
+     * memory and provenance, or refuses (`role_unavailable` / `role_changed`).
+     */
+    agentRoleId: z.string().min(1).optional(),
     billingEntitlement: BillingEntitlement.nullable(),
   })
   .meta({ id: 'SendTurnParams' });

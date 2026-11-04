@@ -120,6 +120,11 @@
     <string name="create_sending">Creating conversation and sending…</string>
     <string name="create_open_result">Open conversation</string>
     <string name="create_agent">Assistant</string>
+    <string name="create_role">Role</string>
+    <string name="create_role_none">None</string>
+    <string name="create_role_unavailable_machine">This computer is no longer in the workspace</string>
+    <string name="create_role_unavailable_agent">Its agent was removed from this computer</string>
+    <string name="create_role_unavailable_offline">Its agent is offline</string>
     <string name="create_model">Model</string>
     <string name="create_effort">Reasoning</string>
     <string name="create_mode">Mode</string>

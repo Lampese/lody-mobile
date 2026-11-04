@@ -35,5 +35,25 @@ internal object CreationJson {
         put("sessionId", value.sessionId); put("turnId", value.turnId); put("projectId", value.projectId)
         put("machineId", value.machineId); put("agentConfigId", value.agentConfigId); put("text", value.text)
         put("branch", value.branch); put("worktree", value.worktree); put("modelId", value.modelId); put("modeId", value.modeId); put("effort", value.effort)
+        value.agentRoleId?.let { put("agentRoleId", it) }
+        if (value.configOptionValues.isNotEmpty()) put("configOptionValues", JSONObject(value.configOptionValues))
+    }
+
+    /** Runtime `agentRoles` list: only string / boolean pinned values are kept. */
+    fun roles(value: JSONObject): List<AgentRole> = value.optJSONArray("roles").objects().map { role ->
+        AgentRole(
+            role.getString("id"), role.getString("name"),
+            role.optString("emoji").ifBlank { "🪼" }, role.optInt("revision", 1),
+            role.optJSONArray("targets").objects().map { target ->
+                val run = target.optJSONObject("runConfig")
+                val options = run?.optJSONObject("configOptionValues")?.let { values ->
+                    values.keys().asSequence().mapNotNull { key -> (values.get(key) as? String ?: values.get(key) as? Boolean)?.let { key to it } }.toMap()
+                }.orEmpty()
+                AgentRoleTarget(
+                    target.getString("machineId"), target.getString("agentConfigId"), target.optString("state", "configured"),
+                    RoleRunConfig(run?.optString("modelId")?.ifBlank { null }, run?.optString("modeId")?.ifBlank { null }, options),
+                )
+            },
+        )
     }
 }

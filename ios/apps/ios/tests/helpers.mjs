@@ -55,6 +55,8 @@ export async function openTestSession({
   failAppend = () => false,
   markDispatch = async () => {},
   onRpc,
+  /** Bytes of the workspace settings Flock (`w1:wf:workspace`), e.g. Agent Role rows. */
+  settings,
 } = {}) {
   const server = new LoroDoc();
   const ok = (result) => ({ ok: true, result });
@@ -67,6 +69,14 @@ export async function openTestSession({
       this.url = decodeURIComponent(url);
     }
     async bootstrap() {
+      if (this.url.includes(':wf:') && settings)
+        return ok({
+          snapshotOffset: '1',
+          nextOffset: '1',
+          upToDate: true,
+          snapshot: { body: settings() },
+          updates: [],
+        });
       return ok({
         snapshotOffset: '1',
         nextOffset: '1',

@@ -169,9 +169,16 @@ function catalog() {
       runtime.workspaceRoleMentions('w', 'me', machines, grant, () => presence),
   };
 }
-test('discovery filters private rows, keeps broken targets visible, and projects no launch configuration', async () => {
+test('discovery filters private rows, keeps broken targets visible, and lists only safe pinned run config', async () => {
   const c = catalog();
-  c.put('mine');
+  c.put('mine', {
+    emoji: '🧪',
+    runConfig: {
+      modelId: 'model',
+      configOptionValues: { safe: 'yes', api_key: 'fixture-secret' },
+      memory: { providerId: 'p', memoryId: 'fixture-memory' },
+    },
+  });
   c.put('shared', { ownerUserId: 'other', visibility: 'workspace' });
   c.put('hidden', { ownerUserId: 'other' });
   c.put('broken', { agentConfigId: 'deleted' });
@@ -188,7 +195,13 @@ test('discovery filters private rows, keeps broken targets visible, and projects
   );
   assert.equal(snapshot.roles[0].targets[0].state, 'agentUnavailable');
   assert.equal(JSON.stringify(snapshot).includes('fixture-secret'), false);
-  assert.equal(JSON.stringify(snapshot).includes('configOptionValues'), false);
+  // The new-chat Role row seeds the composer from what a target pins (web), so the
+  // safe pinned values are listed; secret-shaped keys and memory never leave the row.
+  const mine = snapshot.roles.find((role) => role.id === 'mine');
+  assert.deepEqual(mine.targets[0].runConfig, { modelId: 'model', configOptionValues: { safe: 'yes' } });
+  assert.equal(mine.emoji, '🧪');
+  assert.equal(snapshot.roles.find((role) => role.id === 'shared').emoji, '🪼');
+  assert.equal(JSON.stringify(snapshot).includes('fixture-memory'), false);
   assert.deepEqual(
     (await c.mentions()).items.map((x) => x.path),
     ['mine', 'shared'],

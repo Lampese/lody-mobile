@@ -1,7 +1,13 @@
 import type { Flock } from '@loro-dev/flock-wasm/base64';
 import type { MentionCatalog, MentionItem } from '../models/mentions';
 import { openSettings } from './settings';
-import { readRole, readableRole } from '../protocol/agent-roles';
+import {
+  DEFAULT_ROLE_EMOJI,
+  readRole,
+  readableRole,
+  roleRunConfig,
+  type RoleRunConfig,
+} from '../protocol/agent-roles';
 import type { MachinePresence } from '../models/machines';
 
 // Shared workspace catalog owner for Role consumers. Authorization is checked
@@ -70,4 +76,55 @@ export function roleMentions(
     (a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path),
   );
   return { items, truncated: false, incomplete: false };
+}
+
+/** A Role as one session's first turn runs it (web `bindAgentRoleTarget` + snapshot). */
+export type TurnRole = {
+  id: string;
+  revision: number;
+  name: string;
+  emoji: string;
+  promptPrefix: string;
+  runConfig: RoleRunConfig;
+};
+
+/**
+ * Resolve a Role for a session's first turn from the fresh workspace row, never
+ * from anything the UI supplies: it must be readable by this user and bound, on
+ * the session's machine, to exactly the session's Agent Config. A Role never
+ * falls back to another target or config (web `bindAgentRoleTarget`).
+ */
+export async function resolveTurnRole(
+  args: {
+    workspaceId: string;
+    roleId: string;
+    userId: string;
+    machineId: string;
+    agentConfigId: string;
+  },
+  getGrant: Parameters<typeof openSettings>[1],
+  signal: AbortSignal,
+  open: typeof openSettings = openSettings,
+): Promise<TurnRole> {
+  const { flock } = await open(`${args.workspaceId}:wf:workspace`, getGrant, signal);
+  return bindTurnRole(flock.get(['agentRole', args.roleId]), args);
+}
+
+export function bindTurnRole(
+  row: unknown,
+  args: { roleId: string; userId: string; machineId: string; agentConfigId: string },
+): TurnRole {
+  const role = readRole(row, args.roleId);
+  if (!role || !readableRole(role, args.userId)) throw new Error('role_unavailable');
+  const target = role.targets.find((entry) => entry.machineId === args.machineId);
+  if (!target || target.agentConfigId !== args.agentConfigId)
+    throw new Error('role_unavailable');
+  return {
+    id: role.id,
+    revision: role.revision,
+    name: role.name,
+    emoji: role.emoji ?? DEFAULT_ROLE_EMOJI,
+    promptPrefix: role.promptPrefix ?? '',
+    runConfig: roleRunConfig(target.runConfig),
+  };
 }

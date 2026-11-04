@@ -7,8 +7,14 @@ export function createCommands(runtime, sendTurn, identity) {
   const scope=identity();if(!scope?.userId)throw Error('not_connected');
   return runtime.creationOptions({workspaceId:scope.workspaceId,...(projectId?{projectId}:{}),...(typeof agentConfigId==='string'?{agentConfigId}:{})});
  }
+ async function roles() {
+  const scope=identity();if(!scope?.userId)throw Error('not_connected');
+  return (await runtime.agentRoles({action:'list',workspaceId:scope.workspaceId,userId:scope.userId})).roles;
+ }
  return {
   creationOptions:options,
+  // The workspace's Agent Roles (emoji, per-machine targets and what each pins); a read.
+  agentRoles:async()=>({roles:await roles()}),
   // A text turn in an existing conversation. The stable turn id lets upstream reject a
   // duplicate; nothing here retries, and an uncertain write reports `unknown`.
   async sendText(input,signal) {
@@ -47,15 +53,26 @@ export function createCommands(runtime, sendTurn, identity) {
    if(input.modelId && !capability?.models.some(m=>m.id===input.modelId))throw Error('invalid_model');
    if(input.modeId && !capability?.modes.some(m=>m.id===input.modeId))throw Error('invalid_mode');
    if(input.effort && !effortsFor(capability, input.modelId).includes(input.effort))throw Error('invalid_effort');
+   // A Role binds this computer's agent exactly (web): re-read it to freeze its revision as
+   // provenance; the first turn's send re-reads it again and applies it or refuses.
+   const pinned=input.configOptionValues;
+   if(pinned!==undefined && (!pinned || typeof pinned!=='object' || Array.isArray(pinned) || Object.keys(pinned).length>64 || Object.entries(pinned).some(([k,v])=>!k || k.length>128 || !['string','boolean'].includes(typeof v) || (typeof v==='string' && v.length>128))))throw Error('invalid_creation');
+   let role;
+   if(input.agentRoleId!==undefined) {
+    if(typeof input.agentRoleId!=='string' || !input.agentRoleId)throw Error('invalid_creation');
+    role=(await roles()).find(r=>r.id===input.agentRoleId);
+    const target=role?.targets.find(t=>t.machineId===agent.machineId);
+    if(!target || target.agentConfigId!==agent.id || target.state!=='configured')throw Error('role_unavailable');
+   }
    attempted.add(input.sessionId);
    try {
-    const result=await runtime.createSession({workspaceId:scope.workspaceId,userId:scope.userId,sessionId:input.sessionId,machineId:agent.machineId,agentConfigId:agent.id,projectId:input.projectId,branch:input.branch,useWorktree:input.worktree===true,title:input.text.trim().slice(0,200)});
+    const result=await runtime.createSession({workspaceId:scope.workspaceId,userId:scope.userId,sessionId:input.sessionId,machineId:agent.machineId,agentConfigId:agent.id,projectId:input.projectId,branch:input.branch,useWorktree:input.worktree===true,title:input.text.trim().slice(0,200),...(role?{agentRoleId:role.id,agentRoleRevision:role.revision}:{})});
     if(result.state!=='created')return {state:result.state==='unknown'?'unknown':'rejected',sessionId:input.sessionId};
     signal?.throwIfAborted();
     await runtime.ensureSession({sessionId:input.sessionId});
     signal?.throwIfAborted();
-    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:agent.machineId,userId:scope.userId,text:input.text,cliType:agent.cliType,agentType:agent.agentType,modelId:input.modelId,modeId:input.modeId,reasoningEffort:input.effort,reasoningEffortConfigId:capability?.reasoningEffortConfigId});
-    return {state:sent.state,sessionId:input.sessionId};
+    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:agent.machineId,userId:scope.userId,text:input.text,cliType:agent.cliType,agentType:agent.agentType,modelId:input.modelId,modeId:input.modeId,reasoningEffort:input.effort,reasoningEffortConfigId:capability?.reasoningEffortConfigId,...(pinned?{configOptionValues:pinned}:{}),...(role?{agentRoleId:role.id,agentConfigId:agent.id}:{})});
+    return {state:sent.state,sessionId:input.sessionId,...(sent.state==='not_sent'&&sent.reason?{reason:sent.reason}:{})};
    } catch {return {state:'unknown',sessionId:input.sessionId};}
   },
  };

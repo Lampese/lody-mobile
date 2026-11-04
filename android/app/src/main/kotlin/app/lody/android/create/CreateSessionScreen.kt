@@ -14,6 +14,7 @@ package app.lody.android.create
 
 import app.lody.android.designsystem.shadow
 import app.lody.android.home.AgentMark
+import app.lody.android.runtime.AgentRole
 
 import app.lody.android.designsystem.LodyElevations
 
@@ -141,6 +142,15 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     var modelId by rememberSaveable { mutableStateOf<String?>(null) }
     var modeId by rememberSaveable { mutableStateOf<String?>(null) }
     var effort by rememberSaveable { mutableStateOf<String?>(null) }
+    // Agent Roles (web chat landing): listed once per runtime; the picked Role names the
+    // composer only while it is still what will run (`CreateSessionModel.roleApplied`).
+    var roles by remember(runtimeScope) { mutableStateOf<List<AgentRole>?>(null) }
+    var roleId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(runtimeScope) {
+        roles = try { repository.roles(runtimeScope) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { null }
+    }
     val branchRepo = target.projectId.orEmpty().removePrefix("github:")
     var branches by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(BranchState()) }
     var branchLoading by remember(runtimeScope, target.projectId, target.chat) { mutableStateOf(false) }
@@ -156,6 +166,9 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val agents = options?.agents.orEmpty().filter { it.machineId == target.machineId }
     val agent = agents.firstOrNull { it.id == agentId } ?: agents.firstOrNull()
     val capability = options?.capability(agent)
+    val roleItems = CreateSessionModel.roleItems(roles.orEmpty(), target.machineId, agents)
+    val activeRole = roleItems.firstOrNull { it.role.id == roleId }
+        ?.takeIf { CreateSessionModel.roleApplied(it, agent?.id, modelId, modeId, effort) }
     LaunchedEffect(runtimeScope, agent?.id, optionsFresh, capability != null) {
         val selected = agent ?: return@LaunchedEffect
         if (optionsFresh && capability == null) {
@@ -170,7 +183,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val unknownText = stringResource(R.string.create_result_unknown)
     val rejectedText = stringResource(R.string.create_result_rejected)
     LaunchedEffect(runtimeScope, target.machineId) {
-        agentId = null; modelId = null; modeId = null; effort = null
+        // A Role binds one machine's agent exactly, so another computer clears it (web).
+        agentId = null; modelId = null; modeId = null; effort = null; roleId = null
     }
     LaunchedEffect(runtimeScope) {
         optionsFresh = false
@@ -216,7 +230,11 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         val chosen = agent
         if (canSend && !attempted && !busy && prompt.isNotBlank()) {
             attempted = true; busy = true
-            val request = CreateRequest(sessionId, turnId, target.projectId.takeUnless { target.chat }, chosen.machineId, chosen.id, prompt, branch.takeIf { github }, target.worktree, modelId, modeId, effort)
+            val request = CreateRequest(
+                sessionId, turnId, target.projectId.takeUnless { target.chat }, chosen.machineId, chosen.id, prompt, branch.takeIf { github }, target.worktree, modelId, modeId, effort,
+                agentRoleId = activeRole?.role?.id,
+                configOptionValues = activeRole?.let { CreateSessionModel.roleChoice(it.target).options }.orEmpty(),
+            )
             scope.launch {
                 try {
                     val receipt = repository.create(runtimeScope, request)
@@ -327,6 +345,22 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
             }
             RunConfigSheet(
                 rows = buildList {
+                    // Role sits above Agent because a Role answers every row under it (web). Shown
+                    // once Roles are listed, even with none to pick: then it reads None.
+                    if (roles != null && agents.isNotEmpty()) {
+                        val reasons = mapOf(
+                            CreateSessionModel.RoleUnavailable.Machine to stringResource(R.string.create_role_unavailable_machine),
+                            CreateSessionModel.RoleUnavailable.Agent to stringResource(R.string.create_role_unavailable_agent),
+                            CreateSessionModel.RoleUnavailable.Offline to stringResource(R.string.create_role_unavailable_offline),
+                        )
+                        add(RunConfigRow(ROLE, stringResource(R.string.create_role),
+                            listOf(PickerOption(ROLE_NONE, stringResource(R.string.create_role_none), activeRole == null)) +
+                                roleItems.map { item ->
+                                    PickerOption(item.role.id, item.role.name, item.role.id == activeRole?.role?.id,
+                                        subtitle = item.unavailable?.let { reasons.getValue(it) }.orEmpty(),
+                                        disabled = item.unavailable != null, emoji = item.role.emoji)
+                                }))
+                    }
                     if (agents.isNotEmpty()) add(RunConfigRow(AGENT, stringResource(R.string.create_agent), agents.map { PickerOption(it.id, it.name, it.id == agent?.id, agent = it.cliType to it.agentType) }))
                     capability?.models?.takeIf { it.isNotEmpty() }?.let { models ->
                         add(RunConfigRow(MODEL, stringResource(R.string.create_model), models.map { PickerOption(it.id, it.name, it.id == modelId) }))
@@ -341,6 +375,13 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 defaultLabel = stringResource(R.string.create_default),
             ) { row, id ->
                 when (row) {
+                    // None clears the name, not the values it seeded; picking a Role sets its
+                    // agent and exactly what it pins.
+                    ROLE -> if (id == ROLE_NONE) roleId = null else roleItems.firstOrNull { it.role.id == id && it.unavailable == null }?.let { item ->
+                        val choice = CreateSessionModel.roleChoice(item.target)
+                        agentId = item.target.agentConfigId; modelId = choice.modelId; modeId = choice.modeId; effort = choice.effort
+                        roleId = item.role.id
+                    }
                     AGENT -> { agentId = id; modelId = null; modeId = null; effort = null }
                     MODEL -> { modelId = id; effort = null }
                     EFFORT -> effort = id
@@ -351,6 +392,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     }
 }
 
+private const val ROLE = "role"
+private const val ROLE_NONE = "__none__"
 private const val AGENT = "agent"
 private const val MODEL = "model"
 private const val EFFORT = "effort"
@@ -437,6 +480,8 @@ internal data class PickerOption(
     val disabled: Boolean = false,
     /** An agent's provider (cliType to agentType): leads with its mark instead of [icon]. */
     val agent: Pair<String, String>? = null,
+    /** An Agent Role's emoji, shown instead of an icon. */
+    val emoji: String? = null,
 )
 
 /** The option's leading mark: the agent's provider mark, else its icon. */
@@ -444,6 +489,9 @@ internal data class PickerOption(
 private fun OptionMark(option: PickerOption, size: androidx.compose.ui.unit.Dp) {
     val tint = LodyTheme.colors.iconSecondary
     when {
+        option.emoji != null -> Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            Text(option.emoji, fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size * 0.85f).toSp() })
+        }
         option.agent != null -> AgentMark(option.agent.first, option.agent.second, tint, Modifier.size(size))
         option.icon != null -> Icon(option.icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
     }

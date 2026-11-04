@@ -2,6 +2,9 @@ package app.lody.android.create
 
 import app.lody.android.runtime.CatalogProject
 import app.lody.android.runtime.CatalogSnapshot
+import app.lody.android.runtime.AgentRole
+import app.lody.android.runtime.AgentRoleTarget
+import app.lody.android.runtime.CreationAgent
 
 /**
  * Where a new session would run; iOS counterpart: `CreateSessionForm` + `CreateSessionContext`.
@@ -96,5 +99,51 @@ object CreateSessionModel {
             "linux" -> MachineKind.Server
             else -> MachineKind.Laptop
         }
+    }
+
+    // ── Agent Roles (web chat landing, `composer-agent-roles.ts`) ──
+
+    enum class RoleUnavailable { Machine, Agent, Offline }
+
+    /** A Role offered on the selected computer: bound to that machine's target, listed even when it cannot run. */
+    data class RoleItem(val role: AgentRole, val target: AgentRoleTarget, val unavailable: RoleUnavailable?)
+
+    /** What picking a Role sets: its pinned model, mode and reasoning, and any other pinned options. */
+    data class RoleChoice(val modelId: String?, val modeId: String?, val effort: String?, val options: Map<String, Any>)
+
+    /** The reasoning option a Role pins; Android sends it as `effort` (runtime `reasoning_effort`). */
+    const val EFFORT_OPTION = "reasoning_effort"
+
+    /** Roles with a target on [machineId], by name; one whose agent is gone or offline says why. */
+    fun roleItems(roles: List<AgentRole>, machineId: String?, onlineAgents: List<CreationAgent>): List<RoleItem> {
+        if (machineId == null) return emptyList()
+        return roles.mapNotNull { role ->
+            val target = role.targets.firstOrNull { it.machineId == machineId } ?: return@mapNotNull null
+            val reason = when {
+                target.state == "machineUnavailable" -> RoleUnavailable.Machine
+                target.state == "agentUnavailable" -> RoleUnavailable.Agent
+                onlineAgents.none { it.machineId == machineId && it.id == target.agentConfigId } -> RoleUnavailable.Offline
+                else -> null
+            }
+            RoleItem(role, target, reason)
+        }.sortedWith(compareBy<RoleItem, String>(String.CASE_INSENSITIVE_ORDER) { it.role.name }.thenBy { it.role.id })
+    }
+
+    fun roleChoice(target: AgentRoleTarget): RoleChoice {
+        val pinned = target.runConfig
+        return RoleChoice(pinned.modelId, pinned.modeId, pinned.options[EFFORT_OPTION] as? String, pinned.options - EFFORT_OPTION)
+    }
+
+    /**
+     * Web `isComposerAgentRoleApplied`: the Role names the composer only while its agent and every
+     * value it pins are what will run. Its other pinned options are sent as-is, so they hold.
+     */
+    fun roleApplied(item: RoleItem, agentId: String?, modelId: String?, modeId: String?, effort: String?): Boolean {
+        if (item.unavailable != null || agentId != item.target.agentConfigId) return false
+        val pinned = item.target.runConfig
+        if (pinned.modelId != null && pinned.modelId != modelId) return false
+        if (pinned.modeId != null && pinned.modeId != modeId) return false
+        val pinnedEffort = pinned.options[EFFORT_OPTION]
+        return pinnedEffort == null || pinnedEffort == effort
     }
 }
