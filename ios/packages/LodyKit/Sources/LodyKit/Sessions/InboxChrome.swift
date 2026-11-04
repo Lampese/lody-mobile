@@ -22,6 +22,8 @@ final class InboxChrome {
   var openDebug: (() -> Void)?
   var newSession: (() -> Void)?
   var searchChanged: ((String) -> Void)?
+  /// Replaces the iPhone view menu (the Projects tab has its own choices).
+  var compactMenu: (() -> UIMenu)?
 
   static let editId = "workspace:edit"
   private static let views = [
@@ -125,7 +127,7 @@ final class InboxChrome {
     let filter = filterItem ?? UIBarButtonItem(image: UIImage(systemName: "line.3.horizontal.decrease"), menu: nil)
     filter.tintColor = .label
     filter.accessibilityLabel = String(localized: "inbox.settings.section.view", bundle: .lody)
-    filter.menu = regular ? filterMenu(mode: model.mode, sort: model.sort) : compactViewMenu()
+    filter.menu = regular ? filterMenu(mode: model.mode, sort: model.sort) : (compactMenu?() ?? compactViewMenu())
     let settingsItem = self.settingsItem ?? UIBarButtonItem(customView: settingsSlot)
     // iPad keeps integrated search in the navigation bar, so the sidebar hosts its own bottom field.
     if regular, header.search === search { header.search = nil }

@@ -284,7 +284,8 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     if let page = tabPages[tab] { return page }
     let (content, title): (UIViewController, String) = switch tab {
     case .chats: (inbox, "")
-    case .projects: (ProjectsListController(source: source), tab.title)
+    // Projects shares the Chats header (workspace capsule, search, view menu): no title.
+    case .projects: (ProjectsListController(source: source), "")
     case .settings: (SettingsController(), tab.title)
     }
     let next = page(content, title: title)

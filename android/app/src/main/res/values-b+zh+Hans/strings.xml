@@ -307,4 +307,26 @@
     <string name="mention_loading">正在读取…</string>
     <string name="mention_back">返回</string>
     <string name="mention_directory">引用目录 %1$s</string>
+    <string name="home_project_none">暂无对话</string>
+    <string name="home_projects_source">来源</string>
+    <string name="home_projects_source_all">全部</string>
+    <string name="home_projects_source_github">GitHub</string>
+    <string name="home_projects_source_local">本地</string>
+    <string name="home_projects_hide_empty">隐藏没有对话的项目</string>
+    <plurals name="home_project_attention">
+        <item quantity="other">%d 个对话需要你处理</item>
+    </plurals>
+    <plurals name="home_project_running">
+        <item quantity="other">%d 个运行中</item>
+    </plurals>
+    <plurals name="home_project_finished">
+        <item quantity="other">%d 个刚完成</item>
+    </plurals>
+    <plurals name="home_project_prs">
+        <item quantity="other">%d 个 PR 进行中</item>
+    </plurals>
+    <plurals name="home_project_open">
+        <item quantity="other">共 %d 个对话</item>
+    </plurals>
+    <string name="home_projects_search_empty">没有匹配“%1$s”的项目</string>
 </resources>

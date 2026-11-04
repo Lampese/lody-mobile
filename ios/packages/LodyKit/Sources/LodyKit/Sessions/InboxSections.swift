@@ -203,27 +203,6 @@ enum InboxSections {
   }
 
   /// iPhone Projects tab: one row per project with its open chat count and most urgent state.
-  static func projectIndex(_ catalog: SessionCatalog) -> [LodyListSection] {
-    let live = catalog.sessions.filter { !$0.archived }
-    let rows = sortProjects(catalog.projects, sessions: live, sort: .name).map { project -> LodyListRow in
-      let sessions = live.filter { $0.projectId == project.id }
-      let states = sessions.map(SessionState.init)
-      var row = LodyListRow()
-      row.id = "project:\(project.id)"
-      row.title = project.name
-      row.subtitle = project.rootPath
-      row.image = "folder"
-      row.action = true
-      row.navigates = true
-      row.disclosure = true
-      row.menuActions = SessionRows.projectMenu(project)
-      row.badge = sessions.isEmpty ? "" : String(sessions.count)
-      row.imageTint = [SessionState.attention, .failed, .live].first(where: states.contains)?.tint ?? ""
-      return row
-    }
-    return rows.isEmpty ? [] : [section("projects", rows: rows)]
-  }
-
   static func search(
     _ catalog: SessionCatalog, hits: InboxSearchHits, query: String = "", now: Double = LodyRelativeTime.now()
   ) -> [LodyListSection] {

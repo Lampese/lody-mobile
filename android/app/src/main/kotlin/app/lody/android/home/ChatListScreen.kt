@@ -185,7 +185,9 @@ fun ChatListScreen(
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var projectId by rememberSaveable { mutableStateOf<String?>(null) }
+    // A project without open chats still opens (to its empty list).
     val project = state.projects.firstOrNull { it.id == projectId }
+        ?: state.snapshot?.projects?.firstOrNull { it.id == projectId }?.let { ChatGroup(it.id, it.name, ChatGroup.Kind.Project, emptyList()) }
     val snackbar = remember { SnackbarHostState() }
     val closeSearch = { searching = false; query = "" }
     val context = LocalContext.current
@@ -201,6 +203,14 @@ fun ChatListScreen(
     var idleExpanded by rememberSaveable { mutableStateOf(false) }
     val owner = state.userId.takeIf { scope == HomeScope.Mine }
     val sections = remember(state.snapshot, grouping, owner) { state.snapshot?.let { ChatListModel.home(it, grouping, owner) }.orEmpty() }
+    // Projects: newest activity first; the view menu picks the source and hides empty projects,
+    // search filters the cards in place.
+    var projectSource by remember { mutableStateOf(ProjectViewPrefs.source(context)) }
+    var hideEmpty by remember { mutableStateOf(ProjectViewPrefs.hideEmpty(context)) }
+    val projectQuery = if (searching && tab == HomeTab.Projects) query else ""
+    val cards = remember(state.snapshot, owner, projectSource, hideEmpty, projectQuery) {
+        state.snapshot?.let { ProjectCards.build(it, owner, projectSource, hideEmpty, projectQuery) }.orEmpty()
+    }
 
     BackHandler(enabled = searching || project != null) {
         if (searching) closeSearch() else projectId = null
@@ -215,7 +225,20 @@ fun ChatListScreen(
                 searching -> SearchTopBar(query, onQueryChange = { query = it }, onClose = closeSearch)
                 project != null -> TitleTopBar(project.name, onBack = { projectId = null })
                 tab == HomeTab.Chats -> Box {
-                    ChatsTopBar(state, scope, selectScope, grouping, selectGrouping, details, onToggleDetail = toggleDetail, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace)
+                    HomeTopBar(state, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace) {
+                        ViewMenu(scope, selectScope, grouping, selectGrouping, details, toggleDetail)
+                    }
+                    HomeSyncPill(state.sync, Modifier.align(Alignment.Center).statusBarsPadding())
+                }
+                // Projects keeps the Chats header (workspace, sync, search, view) without a title.
+                tab == HomeTab.Projects -> Box {
+                    HomeTopBar(state, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace) {
+                        ProjectsViewMenu(
+                            scope, selectScope,
+                            projectSource, { next -> projectSource = next; ProjectViewPrefs.saveSource(context, next) },
+                            hideEmpty, { next -> hideEmpty = next; ProjectViewPrefs.saveHideEmpty(context, next) },
+                        )
+                    }
                     HomeSyncPill(state.sync, Modifier.align(Alignment.Center).statusBarsPadding())
                 }
                 else -> TitleTopBar(stringResource(tab.label), onBack = null)
@@ -233,6 +256,10 @@ fun ChatListScreen(
         },
     ) { padding ->
         when {
+            searching && tab == HomeTab.Projects -> ProjectCardList(
+                cards, padding, empty = if (query.isBlank()) "" else stringResource(R.string.home_projects_search_empty, query.trim()),
+                onOpen = { projectId = it.id; closeSearch() },
+            )
             searching -> HomeList(
                 ChatListModel.searchTimeline(state.timeline, query).map { HomeSection("bucket-${it.bucket}", HomeSection.Header.Bucket(it.bucket), it.chats) },
                 details, padding, empty = stringResource(R.string.home_search_empty, query.trim()).takeIf { query.isNotBlank() },
@@ -250,7 +277,7 @@ fun ChatListScreen(
                 onToggleIdle = { idleExpanded = !idleExpanded },
                 onOpenChat = onOpenChat,
             )
-            tab == HomeTab.Projects -> ProjectList(state.projects, padding, onOpen = { projectId = it.id })
+            tab == HomeTab.Projects -> ProjectCardList(cards, padding, empty = stringResource(R.string.home_projects_empty), onOpen = { projectId = it.id })
             else -> SettingsList(state, padding, onSelectWorkspace, onSignOut)
         }
     }
@@ -260,16 +287,11 @@ fun ChatListScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatsTopBar(
+private fun HomeTopBar(
     state: ChatListUiState,
-    scope: HomeScope,
-    onSelectScope: (HomeScope) -> Unit,
-    grouping: HomeGrouping,
-    onSelectGrouping: (HomeGrouping) -> Unit,
-    details: Set<ChatRowDetail>,
-    onToggleDetail: (ChatRowDetail) -> Unit,
     onSearch: () -> Unit,
     onSelectWorkspace: (Workspace) -> Unit,
+    menu: @Composable () -> Unit,
 ) {
     val colors = LodyTheme.colors
     TopAppBar(
@@ -279,7 +301,7 @@ private fun ChatsTopBar(
             IconButton(onClick = onSearch, modifier = Modifier.semantics { contentDescription = search }) {
                 Glyph(LodyIcons.Search, colors.iconPrimary)
             }
-            ViewMenu(scope, onSelectScope, grouping, onSelectGrouping, details, onToggleDetail)
+            menu()
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.bgBase, scrolledContainerColor = colors.bgBase),
     )
@@ -707,17 +729,149 @@ private val TimeBucket.label: Int
         TimeBucket.Older -> R.string.home_bucket_older
     }
 
+/** Projects as cards (iOS `ProjectCardView`), newest activity first. */
 @Composable
-private fun ProjectList(projects: List<ChatGroup>, padding: PaddingValues, onOpen: (ChatGroup) -> Unit) {
-    val projectsOnly = projects.filter { it.kind == ChatGroup.Kind.Project }
-    if (projectsOnly.isEmpty()) {
-        EmptyText(stringResource(R.string.home_projects_empty), padding)
+private fun ProjectCardList(cards: List<ProjectCard>, padding: PaddingValues, empty: String, onOpen: (ProjectCard) -> Unit) {
+    if (cards.isEmpty()) {
+        EmptyText(empty, padding)
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        items(projectsOnly, key = { it.id }) { project -> ProjectRow(project) { onOpen(project) } }
+    val now = System.currentTimeMillis()
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            top = padding.calculateTopPadding() + LodySpacing.xs,
+            bottom = padding.calculateBottomPadding() + LodySpacing.lg,
+            start = LodyLayout.screenPaddingX, end = LodyLayout.screenPaddingX,
+        ),
+        verticalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+    ) {
+        items(cards, key = { it.id }) { card -> ProjectCardView(card, now, Modifier.animateItem()) { onOpen(card) } }
     }
 }
+
+/**
+ * Line 1: the repository owner's avatar (GitHub) or the project's folder (local), the name, and
+ * when it last moved. Line 2: the computer (local) or "GitHub", and the most pressing state of its
+ * open chats: needs you, running, just finished, open PRs, else how many there are.
+ */
+@Composable
+private fun ProjectCardView(card: ProjectCard, now: Long, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val colors = LodyTheme.colors
+    val type = LodyTheme.typography
+    val shape = RoundedCornerShape(LodyRadius.xl)
+    val (summary, count) = card.summary
+    val res = LocalContext.current.resources
+    val summaryText = when (summary) {
+        ProjectCard.Summary.Attention -> res.getQuantityString(R.plurals.home_project_attention, count, count)
+        ProjectCard.Summary.Running -> res.getQuantityString(R.plurals.home_project_running, count, count)
+        ProjectCard.Summary.Finished -> res.getQuantityString(R.plurals.home_project_finished, count, count)
+        ProjectCard.Summary.PullRequests -> res.getQuantityString(R.plurals.home_project_prs, count, count)
+        ProjectCard.Summary.Open -> res.getQuantityString(R.plurals.home_project_open, count, count)
+        ProjectCard.Summary.Empty -> stringResource(R.string.home_project_none)
+    }
+    val summaryColor = when (summary) {
+        ProjectCard.Summary.Attention -> colors.warningDefault
+        ProjectCard.Summary.Running, ProjectCard.Summary.Finished -> colors.accentFg
+        ProjectCard.Summary.PullRequests, ProjectCard.Summary.Open -> colors.textSecondary
+        ProjectCard.Summary.Empty -> colors.textTertiary
+    }
+    val place = card.machine ?: if (card.github) "GitHub" else ""
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(colors.bgSunken, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) {}
+            .padding(horizontal = LodySpacing.lg, vertical = LodySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
+            if (card.github) {
+                Avatar(card.avatar, card.title.take(1), LodySize.avatarMd)
+            } else {
+                Box(Modifier.size(LodySize.avatarMd).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
+                    Glyph(LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
+                }
+            }
+            Text(card.title, style = type.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            card.updatedAt?.let { Text(ageText(it, now), style = type.footnote, color = colors.textTertiary) }
+        }
+        Row(
+            // Line 2 starts under the name, past the avatar.
+            Modifier.padding(start = LodySize.avatarMd + LodySpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+        ) {
+            Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            when (summary) {
+                ProjectCard.Summary.Running -> LodyWorkingGrid()
+                ProjectCard.Summary.Attention -> Glyph(LodyIcons.Hand, colors.warningDefault, LodyIconSize.sm)
+                ProjectCard.Summary.Finished -> Box(Modifier.size(LodySpacing.sm).background(colors.accentDefault, CircleShape))
+                ProjectCard.Summary.PullRequests -> Glyph(LodyIcons.PullRequest, colors.iconSecondary, LodyIconSize.sm)
+                else -> Unit
+            }
+            Text(summaryText, style = type.subhead, color = summaryColor, maxLines = 1)
+        }
+    }
+}
+
+/** The Projects view menu: scope (shared with Chats), source, and whether empty projects show. */
+@Composable
+private fun ProjectsViewMenu(
+    scope: HomeScope,
+    onSelectScope: (HomeScope) -> Unit,
+    source: ProjectSource,
+    onSelectSource: (ProjectSource) -> Unit,
+    hideEmpty: Boolean,
+    onHideEmpty: (Boolean) -> Unit,
+) {
+    val colors = LodyTheme.colors
+    var open by remember { mutableStateOf(false) }
+    val label = stringResource(R.string.home_view)
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.semantics { contentDescription = label }) {
+            Glyph(LodyIcons.Filter, colors.iconPrimary)
+        }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(LodyRadius.lg),
+            containerColor = colors.bgOverlay,
+            tonalElevation = 0.dp,
+            shadowElevation = LodyElevations.md.blur / 2,
+            border = BorderStroke(0.5.dp, colors.borderSubtle),
+            modifier = Modifier.width(MenuWidth),
+        ) {
+            MenuHeading(stringResource(R.string.home_view_scope))
+            Segmented(HomeScope.entries, scope, { stringResource(it.label) }, onSelectScope)
+            MenuHeading(stringResource(R.string.home_projects_source))
+            Segmented(ProjectSource.entries, source, { stringResource(it.label) }, onSelectSource)
+            HorizontalDivider(Modifier.padding(top = LodySpacing.md), thickness = 0.5.dp, color = colors.borderSubtle)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = LodySize.controlMd)
+                    .toggleable(value = hideEmpty, role = Role.Checkbox) { onHideEmpty(!hideEmpty) }
+                    .padding(horizontal = LodySpacing.lg),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
+            ) {
+                Text(stringResource(R.string.home_projects_hide_empty), style = LodyTheme.typography.body, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                Glyph(LodyIcons.Check, if (hideEmpty) colors.accentFg else Color.Transparent, LodyIconSize.sm)
+            }
+            Spacer(Modifier.height(LodySpacing.xs))
+        }
+    }
+}
+
+private val ProjectSource.label: Int
+    get() = when (this) {
+        ProjectSource.All -> R.string.home_projects_source_all
+        ProjectSource.GitHub -> R.string.home_projects_source_github
+        ProjectSource.Local -> R.string.home_projects_source_local
+    }
 
 @Composable
 private fun ProjectChatList(project: ChatGroup, details: Set<ChatRowDetail>, padding: PaddingValues, onOpenChat: (ChatItem) -> Unit) {
@@ -989,33 +1143,6 @@ private fun ageText(at: Long, now: Long): String = when (val age = ChatListModel
     is ChatListModel.Age.Date -> {
         val locale = LocalConfiguration.current.locales[0]
         remember(locale) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale) }.format(age.date)
-    }
-}
-
-@Composable
-private fun ProjectRow(project: ChatGroup, onClick: () -> Unit) {
-    val colors = LodyTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = LodySize.listRow)
-            .clickable(onClick = onClick)
-            .padding(horizontal = LodyLayout.screenPaddingX),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LodyLayout.listRowGap),
-    ) {
-        Glyph(LodyIcons.Folder, colors.iconPrimary)
-        Text(
-            project.name,
-            style = LodyTheme.typography.bodyEmphasis,
-            color = colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        project.mostUrgent?.let { AttentionGlyph(it) }
-        Text("${project.chats.size}", style = LodyTheme.typography.footnote, color = colors.textTertiary)
-        Glyph(LodyIcons.Forward, colors.iconTertiary, LodyIconSize.sm)
     }
 }
 
