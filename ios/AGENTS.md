@@ -102,3 +102,5 @@
 - The conversation composer rests as one Liquid Glass line: +, the prompt, the agent mark ⌄ (`collapsedMark`, the session's provider mark tinted in label ink with a chevron; tapping it opens the composer and then the model panel) and Send, which stays in place, dimmed until there is something to send. Focus opens it as before; the mark fades out and the expanded controls fade in on the expansion's own curve.
 
 - On the creation page, tapping outside the composer or opening/selecting a context option dismisses the keyboard. Picker search fields must still accept focus, and a dismissal tap must not swallow the option action. Opening run configuration also clears composer focus. A blank-area tap also closes the expanded context picker; controls and search fields retain their own tap handling.
+
+- Creation picker search (computer/project/branch) owns the keyboard space: keep the composer covered beneath the keyboard and let the context list reach its top. Composer editing still lifts the composer above the keyboard; focus changes and dismissal restore the normal layout without losing the draft.

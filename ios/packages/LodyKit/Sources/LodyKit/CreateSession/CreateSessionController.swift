@@ -36,6 +36,8 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
   private let signedOutLabel = UILabel()
   private lazy var hostHeight = host.heightAnchor.constraint(equalToConstant: 64)
   private var optionsTask: Task<Void, Never>?
+  private var composingConstraints: [NSLayoutConstraint] = []
+  private var searchingConstraints: [NSLayoutConstraint] = []
   isolated deinit {
     branchTask?.cancel()
     optionsTask?.cancel()
@@ -96,27 +98,45 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
     view.addSubview(host)
     let keyboard = host.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -LodySpacing.sm)
     keyboard.priority = .defaultHigh
+    composingConstraints = [keyboard, context.view.bottomAnchor.constraint(equalTo: host.topAnchor)]
+    let searchBottom = context.view.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -LodySpacing.sm)
+    searchBottom.priority = .defaultHigh
+    searchingConstraints = [
+      host.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -LodySpacing.sm),
+      searchBottom,
+      context.view.bottomAnchor.constraint(lessThanOrEqualTo: host.topAnchor),
+    ]
+    NotificationCenter.default.addObserver(self, selector: #selector(searchFocusChanged(_:)), name: UITextField.textDidBeginEditingNotification, object: nil)
+    NotificationCenter.default.addObserver(self, selector: #selector(searchFocusChanged(_:)), name: UITextField.textDidEndEditingNotification, object: nil)
     NSLayoutConstraint.activate([
       host.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       host.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       host.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -16),
-      keyboard, hostHeight,
+      hostHeight,
       // The context fills the space above the composer, bottom-aligned within thumb reach, and
       // rides up with it; expanded lists grow upward and scroll when they run out of room.
       context.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
       context.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
-      context.view.bottomAnchor.constraint(equalTo: host.topAnchor),
       context.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
       signedOutLabel.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
       signedOutLabel.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: LodyLayout.screenPaddingX * 2),
       signedOutLabel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -LodyLayout.screenPaddingX * 2),
     ])
+    NSLayoutConstraint.activate(composingConstraints)
     composer.setInputIdentifier("create-session-input")
     composer.setComposerState(CreateJSON.encode(["placeholder": String(localized: "create.composer.placeholder", bundle: .lody)]))
     render()
     // One workspace-wide snapshot; cached options render before the complete runtime response.
     load()
     fetchBranches()
+  }
+
+  @objc private func searchFocusChanged(_ notification: Notification) {
+    guard let field = notification.object as? UITextField, field.isDescendant(of: context.view) else { return }
+    let searching = notification.name == UITextField.textDidBeginEditingNotification
+    NSLayoutConstraint.deactivate(searching ? composingConstraints : searchingConstraints)
+    NSLayoutConstraint.activate(searching ? searchingConstraints : composingConstraints)
+    view.setNeedsLayout()
   }
 
   @objc private func dismissKeyboard() { view.endEditing(true) }

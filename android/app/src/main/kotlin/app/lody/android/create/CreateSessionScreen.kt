@@ -25,6 +25,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 
 import androidx.compose.ui.text.SpanStyle
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -123,6 +128,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     var prompt by rememberSaveable { mutableStateOf("") }
     var runConfig by remember { mutableStateOf(false) }
     var openContext by remember { mutableStateOf<String?>(null) }
+    var searchFocused by remember { mutableStateOf(false) }
+    val coverComposer = searchFocused && WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val unavailable = stringResource(R.string.create_extras_unavailable)
@@ -258,11 +265,11 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                         .padding(horizontal = LodyLayout.screenPaddingX),
                     verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
-                    ContextPanel(catalog, target, open = openContext, onOpenChange = { openContext = it },
+                    ContextPanel(catalog, target, onSearchFocus = { searchFocused = it }, open = openContext, onOpenChange = { openContext = it },
                         availableMachines = options?.agents?.map { it.machineId }?.toSet().takeIf { optionsFresh },
                         onChange = { if (!attempted) { targetChosen = true; target = it } })
                     if (github) BranchLine(branches, branchLoading, branchFailed, enabled = !attempted,
-                        open = openContext == "branch", onOpenChange = { openContext = if (it) "branch" else null },
+                        onSearchFocus = { searchFocused = it }, open = openContext == "branch", onOpenChange = { openContext = if (it) "branch" else null },
                         onChange = { name ->
                             branches = branches.select(name)
                             val selectedRepo = branchRepo
@@ -281,21 +288,27 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
             }
             val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name
             val modeName = capability?.modes?.firstOrNull { it.id == modeId }?.name
-            Composer(
-                prompt,
-                onPromptChange = { if (!attempted && it.length <= 32000) prompt = it },
-                onAttach = notice,
-                onRunConfig = { dismissKeyboard(); if (!attempted) runConfig = true },
-                onSend = send,
-                enabled = canSend,
-                agentReady = agent != null,
-                agentCliType = agent?.cliType,
-                agentType = agent?.agentType,
-                face = listOfNotNull(modelName ?: agent?.name, effort),
-                mode = modeId,
-                modeLabel = modeName,
-                waiting = waitingText,
-            )
+            // Keep composer state mounted, but place it under the IME during picker search.
+            Box(Modifier.graphicsLayer { alpha = if (coverComposer) 0f else 1f }.layout { measurable, constraints ->
+                val child = measurable.measure(constraints)
+                layout(child.width, if (coverComposer) 0 else child.height) { child.placeRelative(0, 0) }
+            }) {
+                Composer(
+                    prompt,
+                    onPromptChange = { if (!attempted && it.length <= 32000) prompt = it },
+                    onAttach = notice,
+                    onRunConfig = { dismissKeyboard(); if (!attempted) runConfig = true },
+                    onSend = send,
+                    enabled = canSend,
+                    agentReady = agent != null,
+                    agentCliType = agent?.cliType,
+                    agentType = agent?.agentType,
+                    face = listOfNotNull(modelName ?: agent?.name, effort),
+                    mode = modeId,
+                    modeLabel = modeName,
+                    waiting = waitingText,
+                )
+            }
         }
     }
     if (runConfig) {
@@ -344,7 +357,7 @@ private const val EFFORT = "effort"
 private const val MODE = "mode"
 
 @Composable
-private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, open: String?, onOpenChange: (String?) -> Unit, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
+private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearchFocus: (Boolean) -> Unit, open: String?, onOpenChange: (String?) -> Unit, availableMachines: Set<String>?, onChange: (CreateTarget) -> Unit) {
     // One list open at a time, as web's picker coordinator.
     val dismissKeyboard = rememberKeyboardDismissal()
     val toggle = { id: String -> dismissKeyboard(); onOpenChange(if (open == id) null else id) }
@@ -353,6 +366,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, open: S
     val machineName = machines.firstOrNull { it.first == target.machineId }?.second
     val unavailableMachine = stringResource(R.string.create_no_available_agents)
     PickerCard(
+        onSearchFocus = onSearchFocus,
         icon = machineIcon(catalog, target.machineId),
         title = machineName ?: stringResource(R.string.create_pick_machine),
         placeholder = machineName == null,
@@ -373,6 +387,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, open: S
     val chatOption = PickerOption(CHAT, chatLabel, selected = target.chat, icon = LodyIcons.Close)
     val usable = projects.filter { CreateSessionModel.isGithub(it.id) || target.machineId == null || it.machineId == target.machineId }
     PickerCard(
+        onSearchFocus = onSearchFocus,
         icon = when {
             target.chat -> LodyIcons.Close
             CreateSessionModel.isGithub(project?.id) -> LodyIcons.Github
@@ -459,6 +474,7 @@ private fun PickerCard(
     searchOptions: List<PickerOption>? = null,
     searchPlaceholder: String = "",
     expandAllOn: String? = null,
+    onSearchFocus: (Boolean) -> Unit = {},
 ) {
     val colors = LodyTheme.colors
     Column {
@@ -489,7 +505,7 @@ private fun PickerCard(
             enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
             exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
         ) {
-            OptionList(options, searchOptions, searchPlaceholder, onPick, expandAllOn)
+            OptionList(options, searchOptions, searchPlaceholder, onPick, expandAllOn, onSearchFocus = onSearchFocus)
         }
     }
 }
@@ -513,6 +529,7 @@ private fun OptionList(
     onPick: (String) -> Unit,
     expandAllOn: String?,
     expandsToContent: Boolean = false,
+    onSearchFocus: (Boolean) -> Unit = {},
 ) {
     val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
@@ -539,7 +556,7 @@ private fun OptionList(
                     singleLine = true,
                     textStyle = type.body.copy(color = colors.textPrimary),
                     cursorBrush = SolidColor(colors.accentDefault),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).onFocusChanged { onSearchFocus(it.isFocused) },
                     decorationBox = { inner ->
                         Box {
                             if (query.isEmpty()) Text(searchPlaceholder, style = type.body, color = colors.textPlaceholder)
@@ -611,7 +628,7 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** Cached choices stay interactive while the next snapshot loads. */
 @Composable
-private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, enabled: Boolean, open: Boolean, onOpenChange: (Boolean) -> Unit, onChange: (String) -> Unit, onMore: () -> Unit) {
+private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, enabled: Boolean, onSearchFocus: (Boolean) -> Unit, open: Boolean, onOpenChange: (Boolean) -> Unit, onChange: (String) -> Unit, onMore: () -> Unit) {
     var query by remember { mutableStateOf("") }
     val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
@@ -628,7 +645,7 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
         if (open) {
             BasicTextField(value = query, onValueChange = { query = it }, singleLine = true,
                 textStyle = LodyTheme.typography.body.copy(color = colors.textPrimary),
-                modifier = Modifier.fillMaxWidth().padding(LodySpacing.sm),
+                modifier = Modifier.fillMaxWidth().padding(LodySpacing.sm).onFocusChanged { onSearchFocus(it.isFocused) },
                 decorationBox = { field -> Box { if (query.isEmpty()) Text(stringResource(R.string.create_search_branches), style = LodyTheme.typography.body, color = colors.textPlaceholder); field() } })
             LazyColumn(Modifier.heightIn(max = LodySize.controlMd * 6)) {
               items(state.page?.names.orEmpty().filter { it.contains(query.trim(), ignoreCase = true) }, key = { it }) { name ->
