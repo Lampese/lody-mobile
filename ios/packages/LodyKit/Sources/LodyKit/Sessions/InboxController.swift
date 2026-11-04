@@ -57,6 +57,7 @@ final class InboxController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    LodyScrollEdges.bind(list.scrollView, to: self)
     chrome.layout()
   }
 

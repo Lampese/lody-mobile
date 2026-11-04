@@ -6,7 +6,6 @@ import UIKit
 final class SessionListView: UIView {
   private let grouped = ChatListView(frame: .zero)
   private let sidebar = LodySidebar(frame: .zero)
-  var onScroll: ((Double, Bool) -> Void)? { didSet { grouped.onScroll = onScroll } }
   var forwarded: ((String, [String: Any]) -> Void)?
   var selectedSessionId = "" { didSet { sidebar.setSelectedRowId(selectedSessionId) } }
   private var sections: [LodyListSection] = []
@@ -30,6 +29,7 @@ final class SessionListView: UIView {
     active.frame = bounds; active.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     render()
   }
+  var scrollView: UIScrollView { regular ? sidebar.scrollView : grouped.collection }
   var sidebarScrollView: UIScrollView { sidebar.scrollView }
   func setContentStyle(_ value: Bool) {}
   func setPreviewUserId(_ value: String) { sidebar.previewUserId = value }

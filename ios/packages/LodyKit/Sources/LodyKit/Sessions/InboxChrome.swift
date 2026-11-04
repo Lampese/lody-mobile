@@ -70,7 +70,7 @@ final class InboxChrome {
     settings.held = { [weak self] in self?.openDebug?() }
     // iPhone: a search button that expands into the field (iOS 26 integratedButton); iPad uses padBar.
     // No toolbar integration: with a toolbar-less page UIKit otherwise drops the button to the
-    // bottom edge, under HomeTabBar. `update` places it in the trailing nav items instead.
+    // bottom edge, under the system tab bar. `update` places it in the trailing nav items instead.
     search.configure(LodyNavigationSearch.Config(
       placeholder: String(localized: "search.field.placeholder", bundle: .lody), placement: "integratedButton", hideWhenScrolling: false,
       allowToolbarIntegration: false
@@ -176,7 +176,7 @@ final class InboxChrome {
     }
     let regular = host.traitCollection.horizontalSizeClass == .regular
     showPadBar(regular)
-    // iPhone's search lives in the navigation bar and new chat in HomeTabBar, so no bottom toolbar on either layout.
+    // iPhone's search lives in the navigation bar and new chat in the system tab bar, so no bottom toolbar on either layout.
     if !toolbar.isEmpty, host.toolbarItems ?? [] == toolbar { host.setToolbarItems(nil, animated: false) }
     toolbar = []
     if let navigation = host.navigationController, navigation.topViewController === host {

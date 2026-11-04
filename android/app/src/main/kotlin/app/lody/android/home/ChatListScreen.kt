@@ -556,7 +556,7 @@ private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (Home
             .height(BarHeight),
     ) {
         val expandedWidth = maxWidth - BarHeight - LodySpacing.md
-        val compactWidth = LodySize.controlLg * HomeTab.entries.size + LodySpacing.xs * 2
+        val compactWidth = LodySize.controlLg
         val width = expandedWidth + (compactWidth - expandedWidth) * progress
         Row(
             modifier = Modifier.align(Alignment.CenterStart).width(width).height(height)
@@ -566,13 +566,16 @@ private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (Home
         ) {
             HomeTab.entries.forEach { tab ->
                 val isSelected = tab == selected
+                if (!isSelected && progress >= 1f) return@forEach
                 val tint = if (isSelected) colors.accentFg else colors.iconSecondary
                 val label = stringResource(tab.label)
                 Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight().clip(CircleShape)
+                    modifier = Modifier.weight(if (isSelected) 1f else (1 - progress).coerceAtLeast(0.001f))
+                        .fillMaxHeight().clip(CircleShape)
+                        .graphicsLayer { alpha = if (isSelected) 1f else 1 - shrink }
                         .background(if (isSelected) colors.fillSelected else Color.Transparent)
-                        .selectable(selected = isSelected, role = Role.Tab) { onSelect(tab) }
-                        .semantics { contentDescription = label },
+                        .selectable(selected = isSelected, enabled = !collapsed || isSelected, role = Role.Tab) { onSelect(tab) }
+                        .then(if (collapsed && !isSelected) Modifier.clearAndSetSemantics {} else Modifier.semantics { contentDescription = label }),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {

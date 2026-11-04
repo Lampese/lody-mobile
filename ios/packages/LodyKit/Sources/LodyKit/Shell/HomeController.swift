@@ -14,10 +14,10 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
   /// iPhone tabs: each root page is built on first use and kept, so lists keep their scroll and state.
   private var selectedTab: HomeTab = .chats
   private var tabPages: [HomeTab: LodyPageController] = [:]
-  private var tabBar: HomeTabBar?
-  private let tabNavigation = HomeTabNavigationDelegate()
-  private var changingTab = false
-  private var pendingTab: HomeTab?
+  private let tabsHost = HomeTabsController()
+  private let compactNavigation = HomeCompactNavigation()
+  private var tabNavigations: [HomeTab: UINavigationController] = [:]
+  private var compactTabsInstalled = false
   private var session: SessionController?
   private var scope = ""
   private var observers: [NSObjectProtocol] = []
@@ -109,7 +109,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     view.accessibilityIdentifier = traitCollection.horizontalSizeClass == .regular ? "ipad-home" : "home"
     // Tabs exist only on compact width; a wide layout lists chats in its sidebar.
     if traitCollection.horizontalSizeClass == .regular, selectedTab != .chats { selectTab(.chats) }
-    updateTabBar(for: primary.topViewController)
+    updateTabContainer()
     layoutColumns()
   }
   private func scopeChanged() {
@@ -122,7 +122,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     reset()
   }
   func reset() {
-    primary.popToRootViewController(animated: false)
+    for navigation in Set(tabNavigations.values).union([primary]) { navigation.popToRootViewController(animated: false) }
     clearSession()
   }
   private func clearSession() {
@@ -131,7 +131,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     secondary.setViewControllers([placeholder()], animated: false)
     updateBookSidebar()
     inbox.list.selectedSessionId = ""
-    primary.viewControllers.flatMap(\.children).compactMap { $0 as? ProjectController }.forEach { $0.list.selectedSessionId = "" }
+    tabNavigations.values.flatMap(\.viewControllers).flatMap(\.children).compactMap { $0 as? ProjectController }.forEach { $0.list.selectedSessionId = "" }
     layoutColumns()
     if split.isCollapsed { split.show(.primary) }
   }
@@ -149,7 +149,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
       updateBookSidebar()
     } else if !query.isEmpty { session?.find(query: query, keyboard: false) }
     inbox.list.selectedSessionId = id
-    primary.viewControllers.flatMap(\.children).compactMap { $0 as? ProjectController }.forEach { $0.list.selectedSessionId = id }
+    tabNavigations.values.flatMap(\.viewControllers).flatMap(\.children).compactMap { $0 as? ProjectController }.forEach { $0.list.selectedSessionId = id }
     layoutColumns()
     if !folded, !panelOpen { split.show(.secondary) }
   }
@@ -231,65 +231,53 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     controller.contentUnavailableConfiguration = configuration
     return controller
   }
-  private var barScroll = HomeBarScrollState()
-
   private func configureTabs() {
-    inbox.list.onScroll = { [weak self] offset, scrolling in
-      guard let self, self.selectedTab == .chats else { return }
-      self.barScroll.update(offset: offset, scrolling: scrolling, threshold: Double(LodySpacing.xxl))
-      self.tabBar?.setCollapsed(self.barScroll.collapsed)
-    }
-    tabBar = HomeTabBar(page: primary, selected: selectedTab, actions: HomeTabBar.Actions(
-      select: { [weak self] in self?.selectTab($0) },
-      create: { [weak self] in self?.inbox.newSession() },
-      openDebug: { [weak self] in
-        guard let self else { return }
-        LodyShell.shared.openPage("debug", from: self.tabPages[.settings])
-      }
-    ))
-    tabNavigation.forwarded = primary.delegate
-    tabNavigation.duration = LodyMotion.slow
-    tabNavigation.index = { [weak self] controller in
-      guard let self, let tab = HomeTab.allCases.first(where: { self.tabPages[$0] === controller }) else { return nil }
-      return HomeTab.allCases.firstIndex(of: tab)
-    }
-    tabNavigation.willShow = { [weak self] controller, _ in self?.updateTabBar(for: controller) }
-    tabNavigation.didShow = { [weak self] controller in
+    tabsHost.onSelect = { [weak self] in self?.selectedTab = $0 }
+    tabsHost.onCreate = { [weak self] in self?.inbox.newSession() }
+    tabsHost.onDebug = { [weak self] in
       guard let self else { return }
-      self.updateTabBar(for: controller)
-      self.changingTab = false
-      // UIKit may still expose the finishing transition coordinator in didShow.
-      let next = self.pendingTab
-      self.pendingTab = nil
-      if let next { DispatchQueue.main.async { [weak self] in self?.selectTab(next) } }
-      else { self.tabBar?.show(self.selectedTab) }
+      LodyShell.shared.openPage("debug", from: self.tabPages[.settings])
     }
-    primary.delegate = tabNavigation
-    updateTabBar(for: primary.topViewController)
+    tabNavigations[.chats] = primary
+    updateTabContainer()
   }
 
-  private func updateTabBar(for controller: UIViewController?) {
-    let root = tabPages.values.first { $0 === controller }
-    tabBar?.setCollapsed(selectedTab == .chats && barScroll.collapsed)
-    tabBar?.display(content: root?.children.first, visible: root != nil)
+  /// Keep iPad's existing split/fold navigation; only compact Home uses system tabs.
+  private func updateTabContainer() {
+    let compact = traitCollection.horizontalSizeClass != .regular
+    guard compact != compactTabsInstalled else { return }
+    if folded { setFolded(false) }
+    split.setViewController(nil, for: .primary)
+    if compact {
+      tabsHost.install { [weak self] destination in
+        guard let self else { return UINavigationController() }
+        return self.tabNavigation(destination)
+      }
+      tabsHost.show(selectedTab)
+      compactNavigation.setViewControllers([tabsHost], animated: false)
+      compactNavigation.setNavigationBarHidden(true, animated: false)
+      split.setViewController(compactNavigation, for: .primary)
+    } else {
+      compactNavigation.setViewControllers([], animated: false)
+      tabsHost.tabs = []
+      selectedTab = .chats
+      split.setViewController(primary, for: .primary)
+    }
+    compactTabsInstalled = compact
+  }
+
+  private func tabNavigation(_ destination: HomeTab) -> UINavigationController {
+    if let navigation = tabNavigations[destination] { return navigation }
+    let navigation = UINavigationController(rootViewController: tabPage(destination))
+    LodyShell.shared.configureNavigation(navigation)
+    tabNavigations[destination] = navigation
+    return navigation
   }
 
   func selectTab(_ next: HomeTab) {
-    if changingTab || primary.transitionCoordinator != nil {
-      pendingTab = next
-      return
-    }
-    guard next != selectedTab else {
-      primary.popToRootViewController(animated: !UIAccessibility.isReduceMotionEnabled)
-      return
-    }
+    if next == selectedTab { tabNavigations[next]?.popToRootViewController(animated: !UIAccessibility.isReduceMotionEnabled) }
     selectedTab = next
-    let page = tabPage(next)
-    tabBar?.show(next)
-    changingTab = true
-    let animated = view.window != nil && traitCollection.horizontalSizeClass != .regular && !UIAccessibility.isReduceMotionEnabled
-    primary.setViewControllers([page], animated: animated)
-    if !animated { changingTab = false; updateTabBar(for: page) }
+    if compactTabsInstalled { tabsHost.show(next) }
   }
 
   private func tabPage(_ tab: HomeTab) -> LodyPageController {
@@ -300,6 +288,7 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     case .settings: (SettingsController(), tab.title)
     }
     let next = page(content, title: title)
+    next.hidesBottomBarWhenPushed = false
     tabPages[tab] = next
     return next
   }
