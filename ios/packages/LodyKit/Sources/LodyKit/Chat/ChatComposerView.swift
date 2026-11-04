@@ -575,6 +575,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private var sheetContentBottom: NSLayoutConstraint!
   private let accessoryBar = UIView()
   private let modelButton = UIButton(type: .system)
+  /// The collapsed one-line composer's run-config affordance: the agent mark and a chevron beside
+  /// Send. Tapping it opens the composer and then its model panel.
+  private let collapsedMark = UIButton(type: .system)
   private weak var optionsPopover: ChatComposerModelPanel?
   private let attachmentBar = ChatAttachmentBar()
   private let attachmentStack = ChatComposerAttachmentStack()
@@ -796,6 +799,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
 #endif
     modelButton.accessibilityIdentifier = "session-model"
     modelButton.addTarget(self, action: #selector(presentComposerOptions), for: .touchUpInside)
+    collapsedMark.accessibilityIdentifier = "session-model-collapsed"
+    collapsedMark.addTarget(self, action: #selector(openFromCollapsedMark), for: .touchUpInside)
     modelButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     filePicker.onPick = { [weak self] picked in self?.addAttachments(picked) }
     libraryPicker.onPick = { [weak self] picked in self?.addAttachments(picked) }
@@ -862,10 +867,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     controls.alignment = .center
     controls.spacing = 0
     for view in [mentionButton, modelButton, permissionButton] { controls.addArrangedSubview(view) }
-    for view in [mentionPanel, mentionSeparator, attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, controls, send, grabber] {
+    for view in [mentionPanel, mentionSeparator, attachmentBar, editorView, hint, formatBar, accessoryBar, attach, attachmentStack, controls, collapsedMark, send, grabber] {
       inputSurface.contentView.addSubview(view)
     }
-    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, actionBar, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, grabber] {
+    for view in [composer, mentionPanel, mentionSeparator, mentionButton, permissionButton, queueView, actionBar, inputSurface, attachmentStack, notice, attachmentBar, quotaNotice, editorView, hint, formatBar, accessoryBar, send, attach, modelButton, controls, collapsedMark, grabber] {
       view.translatesAutoresizingMaskIntoConstraints = false
     }
     inputHeight = editorView.heightAnchor.constraint(equalToConstant: 48)
@@ -928,7 +933,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       accessoryBar.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor),
       accessoryBar.bottomAnchor.constraint(equalTo: sheetContent.bottomAnchor), accessoryHeight,
       hintLeading, hintTop,
-      hint.trailingAnchor.constraint(lessThanOrEqualTo: send.leadingAnchor),
+      hint.trailingAnchor.constraint(lessThanOrEqualTo: collapsedMark.leadingAnchor),
       send.trailingAnchor.constraint(equalTo: inputSurface.contentView.trailingAnchor, constant: -2),
       send.bottomAnchor.constraint(equalTo: sheetContent.bottomAnchor, constant: -2),
       send.widthAnchor.constraint(equalToConstant: 44), send.heightAnchor.constraint(equalToConstant: 44),
@@ -938,6 +943,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       mentionButton.widthAnchor.constraint(equalToConstant: 44), mentionButton.heightAnchor.constraint(equalToConstant: 44),
       permissionButton.widthAnchor.constraint(equalToConstant: 44), permissionButton.heightAnchor.constraint(equalToConstant: 44),
       modelButton.heightAnchor.constraint(equalToConstant: 44),
+      collapsedMark.trailingAnchor.constraint(equalTo: send.leadingAnchor),
+      collapsedMark.centerYAnchor.constraint(equalTo: send.centerYAnchor),
+      collapsedMark.heightAnchor.constraint(equalToConstant: 44),
     ])
     attachLeading = attach.leadingAnchor.constraint(equalTo: inputSurface.contentView.leadingAnchor, constant: 2)
     attachLeading.isActive = true
@@ -1388,8 +1396,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   }
   func setComposerOptions(_ json: String) {
     guard let value = try? JSONDecoder().decode(ChatComposerOptions.self, from: Data(json.utf8)) else { return }
+    // A mark arriving or leaving changes the collapsed line's insets, so lay the composer out again.
+    let markChanged = composerOptions.agentAsset != value.agentAsset
     composerOptions = value
-    updateComposerOptions()
+    if markChanged { updateComposer() } else { updateComposerOptions() }
   }
   func setQueue(_ drafts: [ChatQueuedDraft]) {
     guard queuedDrafts != drafts else { return }
@@ -1446,7 +1456,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     sendVisual.render(actionMode)
     sendVisual.isHidden = false
     sendVisual.alpha = send.isEnabled || loading ? 1 : 0.35
-    send.isHidden = !expanded && !hasContent && !stop && !loading
+    // The one-line composer keeps Send in place (dimmed until there is something to send).
+    send.isHidden = false
     queueView.render(queuedDrafts, enabled: state.canStop == true && !sending && state.controlling != true, steeringID: state.steerID ?? "", firstOnly: state.steerInterrupts == true)
     queueHeight.constant = queueView.panelHeight
     // The action bar stays while typing; expanded editing gives its row to the editor.
@@ -1496,7 +1507,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     }
     input.textContainer.maximumNumberOfLines = expanded ? 0 : 1
     input.textContainer.lineBreakMode = expanded ? .byWordWrapping : .byTruncatingTail
-    var trailingInset: CGFloat = send.isHidden ? 16 : 46
+    renderCollapsedMark()
+    let showsMark = showsCollapsedMark(expanded: expanded)
+    var trailingInset: CGFloat = 46
+    if showsMark { trailingInset += collapsedMarkWidth }
     if expanded { trailingInset = 20 }
     input.textContainerInset = UIEdgeInsets(top: topInset, left: leadingInset, bottom: verticalInset, right: trailingInset)
     hintLeading.constant = leadingInset + 5
@@ -1534,19 +1548,69 @@ final class ChatComposerView: UIView, UITextViewDelegate {
         (self.window ?? self.superview ?? self).layoutIfNeeded()
       }
     }
+    // Collapsed mark out, expanded controls in (and back), on the expansion's own curve.
+    let markAlpha: CGFloat = showsMark ? 1 : 0
+    let controlsAlpha: CGFloat = expanded ? 1 : 0
     if expansionChanged {
       if window != nil && !UIAccessibility.isReduceMotionEnabled {
         UIView.animate(withDuration: 0.24, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
           self.surfaceLayout.update(isFocused: expanded)
+          self.collapsedMark.alpha = markAlpha
+          self.controls.alpha = controlsAlpha
           layoutRoot.layoutIfNeeded()
         } completion: { finished in
           if finished && self.composerExpanded == expanded { self.surfaceLayout.completeTransition() }
         }
       } else {
         surfaceLayout.update(isFocused: expanded)
+        collapsedMark.alpha = markAlpha
+        controls.alpha = controlsAlpha
         layoutRoot.layoutIfNeeded()
         surfaceLayout.completeTransition()
       }
+    } else {
+      collapsedMark.alpha = markAlpha
+      controls.alpha = cardStyle ? 1 : controlsAlpha
+    }
+    collapsedMark.isUserInteractionEnabled = showsMark
+    collapsedMark.accessibilityElementsHidden = !showsMark
+    collapsedMark.isAccessibilityElement = showsMark
+  }
+
+  /// Width the collapsed mark takes beside Send (mark, chevron and their padding).
+  private var collapsedMarkWidth: CGFloat { collapsedMark.intrinsicContentSize.width }
+
+  private func showsCollapsedMark(expanded: Bool) -> Bool {
+    !expanded && !cardStyle && composerOptions.agentAsset != nil
+  }
+
+  /// The collapsed face of the run-config chip: the agent mark tinted like text, then a small chevron.
+  private func renderCollapsedMark() {
+    guard let asset = composerOptions.agentAsset,
+          let mark = UIImage(named: asset, in: .main, compatibleWith: traitCollection) else { return }
+    let chevron = UIImage(systemName: "chevron.down", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+    let side: CGFloat = 20, gap: CGFloat = 5
+    let chevronSize = chevron?.size ?? .zero
+    let size = CGSize(width: side + gap + chevronSize.width, height: side)
+    let face = UIGraphicsImageRenderer(size: size).image { _ in
+      mark.withTintColor(.label.resolvedColor(with: traitCollection)).draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+      chevron?.withTintColor(.secondaryLabel.resolvedColor(with: traitCollection))
+        .draw(in: CGRect(x: side + gap, y: (side - chevronSize.height) / 2, width: chevronSize.width, height: chevronSize.height))
+    }
+    var configuration = UIButton.Configuration.plain()
+    configuration.image = face.withRenderingMode(.alwaysOriginal)
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 6)
+    collapsedMark.configuration = configuration
+    collapsedMark.isEnabled = modelButton.isEnabled
+    collapsedMark.accessibilityLabel = modelButton.accessibilityLabel
+  }
+
+  @objc private func openFromCollapsedMark() {
+    guard state.editable, input.becomeFirstResponder() else { return }
+    // Opening runs on the expansion's curve; the panel follows once the chip has landed.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in
+      guard let self, self.composerExpanded, !self.composerOptions.models.isEmpty else { return }
+      self.presentComposerOptions()
     }
   }
   private func updateComposerOptions() {
@@ -1633,6 +1697,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     modelButton.accessibilityValue = composerOptions.fast == true ? String(localized: "native.chat.composer.fast", bundle: .lody) + ": " + String(localized: "native.chat.composer.fastOn", bundle: .lody) : nil
     optionsPopover?.render(composerOptions)
     if !modelButton.isEnabled { optionsPopover?.dismiss(animated: true) }
+    renderCollapsedMark()
   }
   @objc private func presentComposerOptions() {
     if cardStyle, let onRunConfig {
