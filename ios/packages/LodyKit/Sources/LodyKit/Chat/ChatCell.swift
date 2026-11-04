@@ -356,7 +356,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
 
   private func applyProcess(_ row: ChatRow) {
     let rail = row.kind == "duration"
-    processGlyph.isHidden = !rail
+    processGlyph.isHidden = !rail || (!row.running && !row.attention)
     processTitle.isHidden = !rail
     processDetail.isHidden = !rail || row.detail.isEmpty
     processChevron.isHidden = !(row.actionable && (rail || row.kind == "summary"))
@@ -425,7 +425,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
   private func layoutProcess(_ row: ChatRow, width: CGFloat) {
     let height = contentView.bounds.height
     let lines = Self.processLines(row, traits: traitCollection)
-    let x = LodyDesign.Rail.text - ChatReadingColumn.cellMargin
+    let x = processGlyph.isHidden ? 0 : LodyDesign.Rail.text - ChatReadingColumn.cellMargin
     let textWidth = max(1, width - x - (processChevron.isHidden ? 0 : Self.chevronSlot))
     let top = floor((height - lines.title - lines.detail) / 2)
     processTitle.frame = CGRect(x: x, y: top, width: textWidth, height: lines.title)
@@ -434,7 +434,7 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     processGlyph.frame = CGRect(x: Self.railCenter - glyph / 2, y: processTitle.frame.midY - glyph / 2, width: glyph, height: glyph)
     processChevron.frame = CGRect(x: width - 16, y: (height - 16) / 2, width: 16, height: 16)
     let path = UIBezierPath()
-    if row.treeDown {
+    if row.treeDown && !processGlyph.isHidden {
       path.move(to: CGPoint(x: Self.railCenter, y: processGlyph.frame.maxY + 3))
       path.addLine(to: CGPoint(x: Self.railCenter, y: height))
     }

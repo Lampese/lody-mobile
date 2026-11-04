@@ -246,8 +246,8 @@ assert(timedThoughtRow.text == String.localizedStringWithFormat(String(localized
 ))), "Completed thought-only work shows elapsed time without a redundant thought label or separator")
 assert(timedThoughtRow.actionable && timedThoughtTranscript.rows(processEntryID: "timed-finished").first?.text == "Analyze",
   "The duration must still open the original thought content")
-assert(finishedDurationRow?.detail.isEmpty == false && finishedDurationRow?.text.contains(" · ") == false,
-  "The folded process title is line two of the work row")
+assert(finishedDurationRow?.detail.isEmpty == true && finishedDurationRow?.text.contains(" · ") == false,
+  "Completed work keeps the tool summary inside its expanded content")
 assert(
   ChatWorkDuration.format(3_665_999, hour: "h", minute: "m", second: "s") == "1h 01m 05s",
   "Duration formatting must match the OSS compact format"

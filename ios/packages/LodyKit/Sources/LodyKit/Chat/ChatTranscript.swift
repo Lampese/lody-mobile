@@ -481,7 +481,7 @@ struct ChatTranscript {
         if flatItems {
           visible = entry.items.indices.filter { !entry.items[$0].hidesFromTranscript }
         } else if !processStartID.isEmpty, let start = entry.items.firstIndex(where: { $0.itemId == processStartID }) {
-          let toolGroup = entry.items[start].type == "tool_call" && !folds
+          let toolGroup = entry.items[start].type == "tool_call"
           let end = entry.items.indices.dropFirst(start + 1).first {
             let item = entry.items[$0]
             if toolGroup { return item.type != "tool_call" || item.kind == "switch_mode" }
@@ -549,11 +549,9 @@ struct ChatTranscript {
             row.actionable = true
             row.processStartID = "__work__"
             row.disclosed = expandedWork.contains(entry.id)
-            if let first = groups.keys.min(), let indices = groups[first] {
-              let process = indices.map { entry.items[$0] }
-              row.detail = ChatProcessSummary.title(items: process, running: false, includesThought: false)
-              absorbed = first
-            }
+            // Only the collapsed whole-turn placeholder belongs to the duration row.
+            // Expanded tool groups stay after their preceding prose and open their own calls.
+            if !row.disclosed { absorbed = groups.keys.min() }
           } else if !entry.finished, entry.holdOpen != true, entry.executionId == nil,
                     let first = visible.first(where: { entry.items[$0].type != "subagent_task" }),
                     let indices = groups[first] {
@@ -579,7 +577,7 @@ struct ChatTranscript {
           let firstGroup = index == groups.keys.min()
           let attention = needsPermission || failed
           var title = ChatProcessSummary.title(items: process, running: running)
-          if !running, let duration = process.first?.processDurationMs {
+          if !running, !folds, let duration = process.first?.processDurationMs {
             let summary = ChatProcessSummary.title(items: process, running: false, includesThought: false)
             title = ChatWorkDuration.title(duration, running: false)
             if !summary.isEmpty { title += " · " + summary }
@@ -587,7 +585,7 @@ struct ChatTranscript {
           result.append(ChatRow(id: entry.id + ":process" + (firstGroup ? "" : ":" + entry.items[index].itemId), entryID: entry.id, kind: "summary",
             text: title,
             symbol: ChatProcessSummary.mark(attention: attention),
-            processStartID: folds ? "" : entry.items[index].itemId,
+            processStartID: folds && !expandedWork.contains(entry.id) ? "" : entry.items[index].itemId,
             actionable: true, running: running, attention: attention))
           continue
         }

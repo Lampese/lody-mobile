@@ -7,7 +7,7 @@ final class SessionPreviewController: SessionController {
   private let probe = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
 
   init(scenario: String) {
-    let fixture = SessionPreviewFixture(offline: scenario == "offline")
+    let fixture = SessionPreviewFixture(offline: scenario == "offline", tools: LodyUIVerify.has("--ui-verify-process-tools"))
     self.fixture = fixture
     super.init(
       sessionId: SessionPreviewFixture.sessionId, findQuery: scenario == "find" ? "needle" : "",
@@ -63,12 +63,14 @@ private final class SessionPreviewFixture {
   private(set) var log: [String] = []
   var changed: (() -> Void)?
   private let offline: Bool
+  private let tools: Bool
   private var catalog: SessionCatalog
   private var receive: (@MainActor (SessionRuntimeEvent) -> Void)?
   private var revision = 1
 
-  init(offline: Bool, now: Double = LodyRelativeTime.now()) {
+  init(offline: Bool, tools: Bool = false, now: Double = LodyRelativeTime.now()) {
     self.offline = offline
+    self.tools = tools
     catalog = SessionCatalog(
       projects: [SessionProject(id: "preview-lody", name: "Lody", rootPath: "/Users/preview/lody")],
       sessions: [
@@ -127,7 +129,7 @@ private final class SessionPreviewFixture {
 
   private func emit(forceLive: Bool = false) {
     let status = offline && !forceLive ? "offline" : "live"
-    let session = Self.envelope(status: status, revision: revision, reply: "Live reply with a needle")
+    let session = Self.envelope(status: status, revision: revision, reply: "Live reply with a needle", tools: tools)
     // Deliver after the cached frame, the way the runtime answers an open.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
       MainActor.assumeIsolated {
@@ -147,8 +149,8 @@ private final class SessionPreviewFixture {
     changed?()
   }
 
-  nonisolated static func envelope(status: String, revision: Int, reply: String) -> String? {
-    let object: [String: Any] = [
+  nonisolated static func envelope(status: String, revision: Int, reply: String, tools: Bool = false) -> String? {
+    var object: [String: Any] = [
       "v": 1, "status": status, "revision": revision,
       "preview": ["label": "localhost:5173", "active": true],
       "entries": [
@@ -169,6 +171,16 @@ private final class SessionPreviewFixture {
         ],
       ],
     ]
+    if tools {
+      var entries = object["entries"] as! [[String: Any]]
+      entries[1]["items"] = [
+        ["itemId": "intro", "type": "text", "text": "I'll update the session branch name first."],
+        ["itemId": "command", "type": "tool_call", "kind": "execute", "status": "completed", "hasDetail": true,
+         "title": "git branch -m session/example fix/keep-tool-calls-after-prose-and-display-one-line\nprintf 'ready'"],
+        ["itemId": "answer", "type": "text", "text": "Hi! What would you like to work on?"],
+      ]
+      object["entries"] = entries
+    }
     return (try? JSONSerialization.data(withJSONObject: object)).map { String(decoding: $0, as: UTF8.self) }
   }
 }
