@@ -70,7 +70,8 @@ enum ProjectCards {
   static func build(
     _ catalog: SessionCatalog, owner: String?, source: ProjectSource, hideEmpty: Bool, query: String = ""
   ) -> [ProjectCard] {
-    let live = catalog.sessions.filter { !$0.archived && (owner == nil || $0.userId == owner) }
+    // Tabs belong to their parent conversation, so they never count on their own.
+    let live = catalog.sessions.filter { !$0.archived && !SessionRows.isTab($0) && (owner == nil || $0.userId == owner) }
     let byProject = Dictionary(grouping: live, by: \.projectId)
     let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
     let cards = catalog.projects.compactMap { project -> ProjectCard? in

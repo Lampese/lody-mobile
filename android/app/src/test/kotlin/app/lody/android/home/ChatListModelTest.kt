@@ -22,7 +22,8 @@ class ChatListModelTest {
         val child = session("child", "p-alpha", status = "running", at = "2026-10-06T00:00:00Z").copy(openedBySessionId = "parent")
         val tab = session("tab", "p-alpha", status = "waiting", at = "2026-10-06T00:00:00Z").copy(parentSessionId = "parent")
         val data = snapshot.copy(sessions = listOf(child, tab, parent))
-        val expected = listOf("parent", "child", "tab")
+        // Tabs belong to their conversation and never list (web `sessionListAtom`).
+        val expected = listOf("parent", "child")
         val time = ChatListModel.timeline(data, LocalDate.parse("2026-10-06"), ZoneOffset.UTC)
         assertEquals(1, time.size)
         assertEquals(TimeBucket.Week, time.single().bucket)
@@ -34,7 +35,7 @@ class ChatListModelTest {
         val projects = ChatListModel.byProject(data)
         assertEquals(1, projects.size)
         assertEquals(expected, projects.single().chats.map { it.id })
-        assertEquals(listOf(null, "parent", "parent"), projects.single().chats.map { it.nestedUnder })
+        assertEquals(listOf(null, "parent"), projects.single().chats.map { it.nestedUnder })
     }
 
     @Test fun idleLimitNeverCutsThroughFamily() {
@@ -242,14 +243,14 @@ class ChatListModelTest {
             } + CatalogSession("t", "m", "p-zed", "Tab", "idle", false, false, "2026-09-01T00:00:00Z", parentSessionId = "2"),
         )
         val zed = ChatListModel.byProject(opened).first { it.header == HomeSection.Header.Project("zed") }.chats
-        // The family takes its freshest member's (#5) place; the contained Tab joins the family.
-        assertEquals(listOf("2", "5", "1", "t"), zed.map { it.id })
-        assertEquals(listOf(null, "2", "2", "2"), zed.map { it.nestedUnder })
-        assertEquals(listOf(false, false, false, true), zed.map { it.lastChild })
-        // Children drop a project that repeats their opener's; the Tab does too.
-        assertEquals(listOf("zed", "", "", ""), zed.map { it.place })
+        // The family takes its freshest member's (#5) place; the Tab itself never lists.
+        assertEquals(listOf("2", "5", "1"), zed.map { it.id })
+        assertEquals(listOf(null, "2", "2"), zed.map { it.nestedUnder })
+        assertEquals(listOf(false, false, true), zed.map { it.lastChild })
+        // Children drop a project that repeats their opener's.
+        assertEquals(listOf("zed", "", ""), zed.map { it.place })
         assertTrue(zed[0].treeParent)
-        assertEquals(listOf(3, 0, 0, 0), zed.map { it.childCount })
+        assertEquals(listOf(2, 0, 0), zed.map { it.childCount })
         // A child from a different project follows its parent and retains its project label.
         val other = opened.copy(sessions = opened.sessions.map { if (it.id == "3") it.copy(openedBySessionId = "2") else it })
         val crossProject = ChatListModel.byProject(other).first { it.header == HomeSection.Header.Project("zed") }.chats.first { it.id == "3" }

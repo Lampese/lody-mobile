@@ -210,7 +210,7 @@ object ChatListModel {
         val projects = snapshot.projects.associateBy { it.id }
         val all = snapshot.sessions.associateBy { it.id }
         return snapshot.sessions
-            .filter { !it.archived }
+            .filter { !it.archived && !isTab(it) }
             .map { session ->
                 val project = projects[session.projectId]?.takeUnless { isChat(it.id) }
                 item(session, project?.name.orEmpty(), project?.repoFullName != null).copy(openerId = opener(session, all))
@@ -222,9 +222,31 @@ object ChatListModel {
     private fun families(snapshot: CatalogSnapshot): List<List<ChatItem>> =
         nest(homeItems(snapshot)).groupBy { it.nestedUnder ?: it.id }.values.toList()
 
+    /**
+     * A Tab or side chat (`parentSessionId`) belongs to its parent conversation, not the list
+     * (web `sessionListAtom` drops them from the sidebar entirely; iOS `SessionRows.isTab`).
+     */
+    fun isTab(session: CatalogSession): Boolean = !session.parentSessionId.isNullOrEmpty()
+
+    /**
+     * Only opened chats nest under their opener (web `buildOpenedBySessionTree`). A chat opened
+     * from inside a Tab nests under the conversation that Tab belongs to.
+     */
     private fun opener(session: CatalogSession, all: Map<String, CatalogSession>): String? =
-        listOfNotNull(session.parentSessionId, session.openedBySessionId, session.openedByRootSessionId)
+        listOfNotNull(session.openedBySessionId, session.openedByRootSessionId)
+            .map { conversation(it, all) }
             .firstOrNull { it != session.id && all[it]?.archived == session.archived }
+
+    /** The listed conversation a session id stands for: a Tab resolves to its parent. */
+    private fun conversation(id: String, all: Map<String, CatalogSession>): String {
+        var current = id
+        val seen = mutableSetOf(current)
+        while (true) {
+            val parent = all[current]?.parentSessionId?.takeIf { it.isNotEmpty() } ?: return current
+            if (!seen.add(parent)) return current
+            current = parent
+        }
+    }
 
     /**
      * Nests each chat under its root opener when that opener is in the same group (one level, as
@@ -273,7 +295,7 @@ object ChatListModel {
     fun isChat(projectId: String) = projectId.endsWith(":unassigned")
 
     fun groups(snapshot: CatalogSnapshot): List<ChatGroup> {
-        val visible = snapshot.sessions.filter { !it.archived }.sortedByDescending { activityAt(it) ?: Long.MIN_VALUE }
+        val visible = snapshot.sessions.filter { !it.archived && !isTab(it) }.sortedByDescending { activityAt(it) ?: Long.MIN_VALUE }
         val (pinned, rest) = visible.partition { it.pinned }
         val groups = mutableListOf<ChatGroup>()
         if (pinned.isNotEmpty()) groups += ChatGroup(PINNED_ID, "", ChatGroup.Kind.Pinned, pinned.map { item(it) })

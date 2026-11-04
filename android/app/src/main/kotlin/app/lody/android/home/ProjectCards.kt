@@ -56,7 +56,8 @@ object ProjectCards {
     fun build(
         snapshot: CatalogSnapshot, owner: String?, source: ProjectSource, hideEmpty: Boolean, query: String = "",
     ): List<ProjectCard> {
-        val live = snapshot.sessions.filter { !it.archived && (owner == null || it.userId == owner) }
+        // Tabs belong to their parent conversation, so they never count on their own.
+        val live = snapshot.sessions.filter { !it.archived && !ChatListModel.isTab(it) && (owner == null || it.userId == owner) }
         val byProject = live.groupBy { it.projectId }
         val term = query.trim()
         return snapshot.projects.asSequence()

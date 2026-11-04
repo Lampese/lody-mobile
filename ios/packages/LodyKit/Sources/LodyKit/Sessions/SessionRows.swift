@@ -109,13 +109,28 @@ enum SessionRows {
     }
   }
 
+  /// A Tab or side chat (`parentSessionId`) belongs to its parent conversation, not the list
+  /// (web `sessionListAtom` drops them from the sidebar entirely).
+  static func isTab(_ session: SessionItem) -> Bool { !(session.parentSessionId ?? "").isEmpty }
+
   // Input order is the list's ranking; a group takes its freshest member's place.
+  // Only opened chats nest under their opener (web `buildOpenedBySessionTree`); Tabs never list.
   static func tree(_ sessions: [SessionItem], all: [SessionItem]) -> [(session: SessionItem, children: [SessionItem])] {
+    let sessions = sessions.filter { !isTab($0) }
     let visible = Dictionary(sessions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    let indexed = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    /// The listed conversation an id stands for: a Tab resolves to the conversation it belongs to.
+    func conversation(_ id: String) -> String {
+      var current = id
+      var seen: Set = [id]
+      while let parent = indexed[current]?.parentSessionId, !parent.isEmpty, seen.insert(parent).inserted { current = parent }
+      return current
+    }
     func parent(of session: SessionItem) -> String? {
-      // Tabs and opened chats share one family, even across projects/computers.
-      let candidates = [session.parentSessionId, session.openedBySessionId, session.openedByRootSessionId]
-      return candidates.compactMap { $0 }.first { id in
+      // Opened chats join their opener's family, even across projects/computers; one opened from
+      // inside a Tab joins that Tab's conversation.
+      let candidates = [session.openedBySessionId, session.openedByRootSessionId]
+      return candidates.compactMap { $0 }.map(conversation).first { id in
         id != session.id && visible[id]?.archived == session.archived
       }
     }
