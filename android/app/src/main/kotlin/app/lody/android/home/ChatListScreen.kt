@@ -213,10 +213,10 @@ fun ChatListScreen(
     }
     var grouping by remember { mutableStateOf(HomeGroupings.load(context)) }
     val selectGrouping = { next: HomeGrouping -> grouping = next; HomeGroupings.save(context, next) }
-    var scope by remember { mutableStateOf(HomeGroupings.loadScope(context)) }
-    val selectScope = { next: HomeScope -> scope = next; HomeGroupings.saveScope(context, next) }
+    var homeScope by remember { mutableStateOf(HomeGroupings.loadScope(context)) }
+    val selectScope = { next: HomeScope -> homeScope = next; HomeGroupings.saveScope(context, next) }
     var idleExpanded by rememberSaveable { mutableStateOf(false) }
-    val owner = state.userId.takeIf { scope == HomeScope.Mine }
+    val owner = state.userId.takeIf { homeScope == HomeScope.Mine }
     val sections = remember(state.snapshot, grouping, owner) { state.snapshot?.let { ChatListModel.home(it, grouping, owner) }.orEmpty() }
     // Projects: newest activity first; the view menu picks the source and hides empty projects,
     // search filters the cards in place.
@@ -242,7 +242,7 @@ fun ChatListScreen(
                 project != null -> TitleTopBar(project.name, onBack = { projectId = null })
                 tab == HomeTab.Chats -> Box {
                     HomeTopBar(state, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace) {
-                        ViewMenu(scope, selectScope, grouping, selectGrouping, details, toggleDetail)
+                        ViewMenu(homeScope, selectScope, grouping, selectGrouping, details, toggleDetail)
                     }
                     HomeSyncPill(state.sync, Modifier.align(Alignment.Center).statusBarsPadding())
                 }
@@ -250,7 +250,7 @@ fun ChatListScreen(
                 tab == HomeTab.Projects -> Box {
                     HomeTopBar(state, onSearch = { searching = true }, onSelectWorkspace = onSelectWorkspace) {
                         ProjectsViewMenu(
-                            scope, selectScope,
+                            homeScope, selectScope,
                             projectSource, { next -> projectSource = next; ProjectViewPrefs.saveSource(context, next) },
                             hideEmpty, { next -> hideEmpty = next; ProjectViewPrefs.saveHideEmpty(context, next) },
                         )
