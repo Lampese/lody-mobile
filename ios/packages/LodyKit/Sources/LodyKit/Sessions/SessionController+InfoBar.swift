@@ -10,6 +10,12 @@ import UIKit
 extension SessionController {
   func actionBarState(_ session: SessionItem, busy: Bool) -> [String: Any] {
     let state = source.state
+    if githubScope != state.key {
+      githubScope = state.key
+      githubUpdates = SessionPullRequestUpdates()
+      githubOperation = nil
+    }
+    let session = githubUpdates.apply(session)
     let project = state.catalog.projects.first { $0.id == session.projectId }
     let repository = project?.repoFullName ?? (session.projectId.hasPrefix("github:") ? String(session.projectId.dropFirst(7)) : "")
     let bar = SessionInfoBar(session: session, repository: repository, busy: busy)
@@ -28,6 +34,13 @@ extension SessionController {
         "label": SessionInfoBar.title(first),
         "moreLabel": String(localized: "bar.more", bundle: .lody),
         "more": bar.actions.dropFirst().map { ["id": $0.rawValue, "title": SessionInfoBar.title($0), "symbol": Self.symbol($0)] },
+      ]
+    }
+    if let operation = githubOperation {
+      let pending = operation == "merge" ? "bar.merge.pending" : "bar.ready.pending"
+      result["primary"] = [
+        "label": String(localized: String.LocalizationValue(pending), bundle: .lody),
+        "busy": true, "more": [], "moreLabel": "",
       ]
     }
     return result
@@ -97,6 +110,7 @@ extension SessionController {
 
   /// `item` or `item:menuAction`, from the action bar.
   func infoBarAction(_ id: String) {
+    if githubOperation != nil && (id == "act" || id.hasPrefix("more:")) { return }
     let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
     if ["browser", "simulator"].contains(parts[0]) { resourceAction(parts[0], parts.count > 1 ? parts[1] : "open"); return }
     guard let bar = infoBar else { return }
@@ -151,18 +165,27 @@ extension SessionController {
   /// One GitHub write at a time, scoped to the account and workspace that started it. Never
   /// retried: an unknown result says so instead of claiming failure.
   private func writePullRequest(_ operation: String, method: String? = nil) {
-    guard !githubWriting, let pr = infoBar?.pullRequest else { return }
+    guard githubOperation == nil, let pr = infoBar?.pullRequest else { return }
     let state = source.state
-    githubWriting = true
+    githubOperation = operation
+    githubUpdates.begin(pr, merged: operation == "merge")
+    renderComposer()
     var payload: [String: Any] = ["workspaceId": state.workspaceId, "repository": pr.repository, "number": pr.number, "operation": operation]
     if let method { payload["method"] = method }
     let pending = operation == "merge" ? "bar.merge.pending" : "bar.ready.pending"
     LodyToastOverlay.shared.show(message: String(localized: String.LocalizationValue(pending), bundle: .lody), kind: "info")
     Task { @MainActor [weak self] in
-      defer { self?.githubWriting = false }
+      defer {
+        if let self, self.source.state.key == state.key {
+          self.githubOperation = nil
+          self.githubUpdates.finish(success: false)
+          self.renderComposer()
+        }
+      }
       do {
         _ = try await GitHubPullRequests.run(Self.json(payload))
         guard let self, self.source.state.key == state.key else { return }
+        self.githubUpdates.finish(success: true)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let done = operation == "merge" ? "bar.merge.done" : "bar.ready.done"
         LodyToastOverlay.shared.show(message: String(localized: String.LocalizationValue(done), bundle: .lody), kind: "success")

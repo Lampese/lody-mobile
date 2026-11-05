@@ -371,10 +371,11 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         }
         Unit
     }
-    val bar = session?.let { SessionInfoBar.of(it, context.repository, busy = running || !canSend) }
+    val prUpdates = remember(scope, id) { SessionPullRequestUpdates() }
+    val bar = session?.let { SessionInfoBar.of(prUpdates.apply(it), context.repository, busy = running || !canSend) }
     // Merge / Ready for review go straight to GitHub, one at a time, never retried.
     var merging by remember(id) { mutableStateOf(false) }
-    var writing by remember(id) { mutableStateOf(false) }
+    var writing by remember(scope, id) { mutableStateOf<SessionInfoBar.Action?>(null) }
     val prefs = remember { appContext.getSharedPreferences("lody.chat", android.content.Context.MODE_PRIVATE) }
     val writeTexts = WriteTexts(
         stringResource(R.string.bar_merge_pending), stringResource(R.string.bar_merge_done), stringResource(R.string.bar_merge_error),
@@ -384,8 +385,9 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val writePullRequest: (String?) -> Unit = write@{ method ->
         val pr = bar?.pullRequest ?: return@write
-        if (writing) return@write
-        writing = true
+        if (writing != null) return@write
+        prUpdates.begin(pr, merged = method != null)
+        writing = if (method != null) SessionInfoBar.Action.Merge else SessionInfoBar.Action.ReadyForReview
         coroutines.launch {
             snackbar.showSnackbar(if (method != null) writeTexts.mergePending else writeTexts.readyPending)
         }
@@ -393,6 +395,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             val message = try {
                 if (method != null) repository.mergePullRequest(scope, pr.repository, pr.number, method)
                 else repository.markReady(scope, pr.repository, pr.number)
+                prUpdates.finish(success = true)
                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                 if (method != null) writeTexts.mergeDone else writeTexts.readyDone
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -400,7 +403,10 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Reject)
                 (error as? GitHubWriteFailure)?.code?.let { writeTexts.errors[it] }
                     ?: if (method != null) writeTexts.mergeError else writeTexts.readyError
-            } finally { writing = false }
+            } finally {
+                prUpdates.finish(success = false)
+                writing = null
+            }
             snackbar.currentSnackbarData?.dismiss()
             snackbar.showSnackbar(message)
         }
@@ -475,10 +481,11 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             if (bar != null) {
                 ChatActionBar(
                     bar, context.machineName, context.machineKind,
+                    writing = writing,
                     onAction = { action ->
                         // Only while still offered, so a menu left open cannot act for a state that moved on.
                         when {
-                            action !in bar.actions -> Unit
+                            writing != null || action !in bar.actions -> Unit
                             action == SessionInfoBar.Action.Merge -> merging = true
                             action == SessionInfoBar.Action.ReadyForReview -> writePullRequest(null)
                             else -> sendText(bar.prompt(action, prompts), emptyList())
@@ -967,6 +974,7 @@ private fun ChatActionBar(
     machineKind: app.lody.android.create.CreateSessionModel.MachineKind,
     onAction: (SessionInfoBar.Action) -> Unit,
     onCopied: (String) -> Unit,
+    writing: SessionInfoBar.Action? = null,
 ) {
     val context = bar.pullRequest != null || bar.branch.isNotEmpty() || bar.repository.isNotEmpty()
     val diff = bar.added + bar.removed > 0
@@ -975,7 +983,10 @@ private fun ChatActionBar(
         if (machine.isNotEmpty()) MachineItem(machine, machineKind)
         if (context || diff) ContextItem(bar, diffDot, onCopied, modifier)
     }
-    @Composable fun Action() { if (bar.actions.isNotEmpty()) ActionSplit(bar.actions, onAction) }
+    @Composable fun Action() {
+        if (writing != null) ActionSplit(listOf(writing), onAction, pending = true)
+        else if (bar.actions.isNotEmpty()) ActionSplit(bar.actions, onAction)
+    }
     @Composable fun Line(fill: Boolean, diffDot: Boolean) {
         Row(
             if (fill) Modifier.fillMaxWidth() else Modifier,
@@ -1201,7 +1212,7 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
  * Its label never truncates.
  */
 @Composable
-private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (SessionInfoBar.Action) -> Unit) {
+private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (SessionInfoBar.Action) -> Unit, pending: Boolean = false) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -1216,14 +1227,18 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
             Box(
                 Modifier
                     .fillMaxHeight()
-                    .clickable(role = Role.Button) {
+                    .clickable(enabled = !pending, role = Role.Button) {
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                         onAction(first)
                     }
                     .padding(start = LodySpacing.md, end = if (actions.size > 1) LodySpacing.sm else LodySpacing.md),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(actionTitle(first), style = type.subhead, color = colors.textPrimary, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
+                    if (pending) CircularProgressIndicator(modifier = Modifier.size(LodyIconSize.sm), strokeWidth = 2.dp, color = colors.textSecondary)
+                    val label = if (pending) stringResource(if (first == SessionInfoBar.Action.Merge) R.string.bar_merge_pending else R.string.bar_ready_pending) else actionTitle(first)
+                    Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1)
+                }
             }
             if (actions.size > 1) {
                 Box(Modifier.width(0.5.dp).height(LodyIconSize.sm).background(colors.borderStrong))

@@ -39,7 +39,9 @@ class SessionController: UIViewController {
   var quotaEntry = "pending"
   var rendered: [String: String] = [:]
   var infoBar: SessionInfoBar?
-  var githubWriting = false
+  var githubOperation: String?
+  var githubScope = ""
+  var githubUpdates = SessionPullRequestUpdates()
   private let initialChoice: ModelChoice?
   private var observers: [NSObjectProtocol] = []
   private var findToken = 0

@@ -53,6 +53,7 @@ struct ChatActionBarState: Decodable, Equatable {
   /// The top repository action; [more] holds the rest in priority order.
   struct Primary: Decodable, Equatable {
     let label: String
+    var busy: Bool?
     let more: [ChatMenuAction]
     let moreLabel: String
   }
@@ -276,7 +277,10 @@ struct ChatActionBarContent: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         onAction("act")
       } label: {
-        Text(primary.label)
+        HStack(spacing: 8) {
+          if primary.busy == true { ProgressView().controlSize(.small) }
+          Text(primary.label)
+        }
           .fontWeight(.semibold)
           .lineLimit(1)
           .padding(.leading, 14)
@@ -300,6 +304,7 @@ struct ChatActionBarContent: View {
       }
     }
     .buttonStyle(.plain)
+    .disabled(primary.busy == true)
     .foregroundStyle(LodyColor.textPrimary)
     .fixedSize()
     .glassEffect(.regular.interactive(), in: .capsule)

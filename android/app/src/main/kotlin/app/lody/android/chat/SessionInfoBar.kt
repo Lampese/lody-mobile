@@ -3,6 +3,33 @@ package app.lody.android.chat
 import app.lody.android.runtime.CatalogPullRequest
 import app.lody.android.runtime.CatalogSession
 
+class SessionPullRequestUpdates {
+    private val confirmed = mutableMapOf<Pair<String, Int>, String>()
+    private var pending: Pair<CatalogPullRequest, Boolean>? = null
+    fun begin(pr: CatalogPullRequest, merged: Boolean) { pending = pr to merged }
+    fun finish(success: Boolean) {
+        if (success) pending?.let { (pr, merged) -> confirm(pr, merged) }
+        pending = null
+    }
+    private fun key(pr: CatalogPullRequest) = pr.repository.lowercase() to pr.number
+    /** Only acknowledged writes override stale catalog frames, until the catalog catches up. */
+    fun confirm(pr: CatalogPullRequest, merged: Boolean) {
+        confirmed[key(pr)] = if (merged) "merged" else "open"
+    }
+    fun apply(session: CatalogSession): CatalogSession = session.copy(pullRequests = session.pullRequests.map { pr ->
+        val id = key(pr)
+        val status = confirmed[id] ?: return@map pr
+        if (pr.status == status || (status == "open" && pr.status != "draft")) {
+            confirmed.remove(id)
+            pr
+        } else pr.copy(status = status)
+    }.map { pr ->
+        val (target, merged) = pending ?: return@map pr
+        if (key(pr) == key(target) && (merged || pr.status == "draft")) pr.copy(status = if (merged) "merged" else "open")
+        else pr
+    })
+}
+
 /**
  * Web `SessionInfoBar` (the action bar above the composer), reduced to what the catalog carries:
  * the repository context (PR, CI, branch, ±diff) and the repository actions, ranked like

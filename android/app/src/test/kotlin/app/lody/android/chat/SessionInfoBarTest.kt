@@ -8,6 +8,40 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionInfoBarTest {
+    @Test fun pendingWritesProjectImmediatelyAndRollBackOnFailure() {
+        val updates = SessionPullRequestUpdates()
+        val draft = pr("draft")
+        val stale = session(pr = draft)
+        updates.begin(draft, merged = false)
+        assertEquals("open", updates.apply(stale).pullRequests.last().status)
+        updates.finish(success = false)
+        assertEquals("draft", updates.apply(stale).pullRequests.last().status)
+        updates.begin(draft, merged = true)
+        assertEquals("merged", updates.apply(stale).pullRequests.last().status)
+        updates.finish(success = true)
+        assertEquals("merged", updates.apply(stale).pullRequests.last().status)
+    }
+
+    @Test fun confirmedWritesUpdateImmediatelyAndYieldToTheCatalogAfterConvergence() {
+        val updates = SessionPullRequestUpdates()
+        val draft = pr("draft", merge = "c")
+        val stale = session(pr = draft)
+        assertEquals(listOf(Action.ReadyForReview), actions(updates.apply(stale)))
+        updates.confirm(draft, merged = false)
+        assertEquals("open", updates.apply(stale).pullRequests.last().status)
+        assertEquals(listOf(Action.Merge), actions(updates.apply(stale)))
+        updates.confirm(draft, merged = true)
+        assertEquals("merged", updates.apply(stale).pullRequests.last().status)
+        assertTrue(actions(updates.apply(stale)).isEmpty())
+        val other = session(pr = draft.copy(repository = "another/repo"))
+        assertEquals("draft", updates.apply(other).pullRequests.last().status)
+
+        val ready = SessionPullRequestUpdates()
+        ready.confirm(draft, merged = false)
+        assertEquals(listOf(Action.FixCi), actions(ready.apply(session(pr = pr(ci = "f")))))
+        assertEquals(listOf(Action.ReadyForReview), actions(ready.apply(stale)))
+    }
+
     private fun session(
         dirty: Boolean = false, unpushed: Boolean = false, added: Int = 0, pr: CatalogPullRequest? = null,
     ) = CatalogSession(

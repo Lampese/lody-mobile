@@ -1,5 +1,45 @@
 import Foundation
 
+struct SessionPullRequestUpdates {
+  private var confirmed: [String: String] = [:]
+  private var pending: (pr: SessionPullRequest, merged: Bool)?
+  mutating func begin(_ pr: SessionPullRequest, merged: Bool) { pending = (pr, merged) }
+  mutating func finish(success: Bool) {
+    if success, let pending { confirm(pending.pr, merged: pending.merged) }
+    pending = nil
+  }
+  private func key(_ pr: SessionPullRequest) -> String { "\(pr.repository.lowercased())#\(pr.number)" }
+
+  /// Only called after GitHub acknowledges the write; retain it across stale catalog frames.
+  mutating func confirm(_ pr: SessionPullRequest, merged: Bool) {
+    confirmed[key(pr)] = merged ? "merged" : "open"
+  }
+
+  mutating func apply(_ session: SessionItem) -> SessionItem {
+    var result = session
+    result.pullRequests = session.pullRequests.map { pr in
+      let id = key(pr)
+      guard let status = confirmed[id] else { return pr }
+      if pr.status == status || (status == "open" && pr.status != "draft") {
+        confirmed.removeValue(forKey: id)
+        return pr
+      }
+      var updated = pr
+      updated.status = status
+      return updated
+    }
+    if let pending {
+      result.pullRequests = result.pullRequests.map { pr in
+        guard key(pr) == key(pending.pr), pending.merged || pr.status == "draft" else { return pr }
+        var updated = pr
+        updated.status = pending.merged ? "merged" : "open"
+        return updated
+      }
+    }
+    return result
+  }
+}
+
 /// Web `SessionInfoBar` (the action bar above the composer), reduced to what the catalog carries:
 /// the session's computer, its repository context (PR, CI, branch, ±diff) and the repository
 /// actions, ranked like `resolveSessionInfoBarGitHubActionIds`. Merge and Ready for review run
