@@ -33,7 +33,7 @@ final class ChatMarkdownCell: UICollectionViewCell {
     markdown.onLink = { [weak self] in self?.onLink?($0) }
     markdown.setShine(row.shines)
     icon.image = row.symbol.isEmpty ? nil : UIImage(systemName: row.symbol, withConfiguration: ChatCell.iconSymbolConfiguration(for: row))
-    icon.tintColor = row.attention ? .systemOrange : .secondaryLabel
+    icon.tintColor = .secondaryLabel  // No warning orange in a conversation.
     accessibilityIdentifier = row.id
     accessibilityLabel = row.text
     accessibilityCustomActions = markdown.fileActions

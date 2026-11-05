@@ -291,8 +291,8 @@ let failedLiveSummary = summaryCell(for: summaryRow(running: true, attention: tr
 let traits = runningSummary.traitCollection
 precondition(runningSummary.icon.image == nil && doneSummary.icon.image == nil, "A healthy process shows no pip")
 precondition(ChatCell.leading(doneSummary.row!) == 0, "Without a pip the summary starts at the text edge")
-precondition(resolved(failedSummary.icon.tintColor, traits: traits) == resolved(.systemOrange, traits: traits),
-  "A failed or pending process pip must be system orange")
+precondition(resolved(failedSummary.icon.tintColor, traits: traits) == resolved(.secondaryLabel, traits: traits),
+  "A process waiting on permission has a neutral mark (no orange in a conversation)")
 precondition(runningSummary.row!.shines, "A live process pip must shine")
 precondition(!doneSummary.row!.shines, "A finished process must not shine")
 precondition(failedLiveSummary.row!.shines, "A live process with a failed tool must keep the shine")
@@ -309,15 +309,15 @@ precondition(
   failedLiveSummary.icon.image?.pngData() == warnMark?.pngData(),
   "The leading mark must draw the warning symbol, not the pip"
 )
-precondition(resolved(failedLiveSummary.icon.tintColor, traits: traits) == resolved(.systemOrange, traits: traits),
-  "The warning mark must stay system orange")
+precondition(resolved(failedLiveSummary.icon.tintColor, traits: traits) == resolved(.secondaryLabel, traits: traits),
+  "The warning mark stays neutral")
 precondition((runningSummary.icon.image?.size.width ?? .greatestFiniteMagnitude) < (thoughtCell.icon.image?.size.width ?? 0),
   "The process status pip must be smaller than thought and tool icons")
 precondition((failedLiveSummary.icon.image?.size.width ?? .greatestFiniteMagnitude) < (thoughtCell.icon.image?.size.width ?? 0),
   "The warning mark must stay in the process pip scale")
-precondition(ChatCell.leading(doneSummary.row!) == railText, "Summary text must start at the rail text column")
-precondition(abs(doneSummary.icon.frame.midX - railCenter) < 0.5, "The summary pip must sit on the rail center")
-precondition(doneSummary.icon.frame.width == 8, "The process pip slot must match the 6-point dot")
+precondition(ChatCell.leading(failedSummary.row!) == railText, "A summary with a mark starts at the rail text column")
+precondition(abs(failedSummary.icon.frame.midX - railCenter) < 0.5, "The summary mark must sit on the rail center")
+precondition(failedSummary.icon.frame.width == 8, "The process mark slot stays 8 points")
 precondition(abs(doneSummary.icon.frame.midY - doneSummary.label.frame.midY) <= 0.5,
   "The process pip must sit on the text baseline")
 precondition(doneSummary.label.frame.minX == railText, "Summary text must start at the rail text column")
@@ -377,8 +377,8 @@ precondition(
   "The leading mark must finish on the warning symbol"
 )
 precondition(
-  resolved(markSwap.icon.tintColor, traits: traits) == resolved(.systemOrange, traits: traits),
-  "The animated warning mark must stay system orange"
+  resolved(markSwap.icon.tintColor, traits: traits) == resolved(.secondaryLabel, traits: traits),
+  "The animated warning mark stays neutral"
 )
 let reusedMark = summaryCell(for: summaryRow(running: true, attention: false))
 reusedMark.prepareForReuse()

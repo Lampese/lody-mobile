@@ -42,10 +42,10 @@ let liveFailedJSON = """
 """
 transcript.entries = try JSONDecoder().decode([ChatEntry].self, from: Data(liveFailedJSON.utf8))
 let liveFailed = transcript.rows().first { $0.kind == "summary" }!
-assert(liveFailed.attention)
+assert(!liveFailed.attention, "A failed command needs no special treatment")
 assert(liveFailed.running)
 assert(liveFailed.shines, "A live process with a failed tool must keep the shine")
-assert(liveFailed.symbol == "exclamationmark.triangle.fill",
+assert(liveFailed.symbol.isEmpty,
   "A live process with a failed tool must show a warning mark instead of the pip")
 let permission = finished.replacingOccurrences(of: "\"status\":\"completed\"", with: "\"permission\":{\"requestId\":\"p\",\"pending\":true}")
 transcript.entries = try JSONDecoder().decode([ChatEntry].self, from: Data(permission.utf8))

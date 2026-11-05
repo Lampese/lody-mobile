@@ -506,7 +506,7 @@ extension LodyChatView {
 
 private func textColor(for row: ChatRow) -> UIColor {
   if row.kind == "chat_failed" { return .systemRed }
-  if row.attention { return .systemOrange }
+  // No warning orange in a conversation (failed steps look like any other).
   if row.kind == "changes" || row.kind == "file" || (row.kind == "summary" && row.running) { return .lodyAccent }
   if row.kind == "user" { return .label }
   return .secondaryLabel

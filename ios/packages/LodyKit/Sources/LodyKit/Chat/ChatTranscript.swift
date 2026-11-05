@@ -572,11 +572,12 @@ struct ChatTranscript {
           if index == absorbed { continue }
           let process = indices.map { entry.items[$0] }
           let needsPermission = process.contains { $0.permission?.pending == true }
-          let failed = process.contains { $0.status == "failed" }
           let tail = entry.items.indices.last { !entry.items[$0].hidesFromTranscript }
           let running = entry.isRunning && indices.last == tail && process.first?.processDurationMs == nil
           let firstGroup = index == groups.keys.min()
-          let attention = needsPermission || failed
+          // Only a step waiting on the person flags the summary; a failed command needs no special
+          // treatment (its own row says it failed).
+          let attention = needsPermission
           var title = ChatProcessSummary.title(items: process, running: running)
           if !running, !folds, let duration = process.first?.processDurationMs {
             let summary = ChatProcessSummary.title(items: process, running: false, includesThought: false)
@@ -599,7 +600,7 @@ struct ChatTranscript {
           }
           continue
         }
-        let attention = item.status == "failed" || item.permission?.pending == true
+        let attention = item.permission?.pending == true
         var row = ChatRow(id: entry.id + ":" + item.itemId, entryID: entry.id,
           kind: item.type, text: item.text ?? "", itemID: item.itemId,
           running: entry.isRunning && item.status == "in_progress", attention: attention,
@@ -777,7 +778,8 @@ struct ChatSubagentCard: Equatable {
 }
 
 enum ChatProcessSummary {
-  /// No pip for a healthy process (the row's shine shows it is live); a warning when it needs a look.
+  /// No pip for a process (the row's shine shows it is live); a mark only while a step waits on the
+  /// person's permission.
   static func mark(attention: Bool) -> String {
     attention ? "exclamationmark.triangle.fill" : ""
   }

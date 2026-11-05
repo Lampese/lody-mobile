@@ -271,10 +271,9 @@ internal fun ToolStep(
             Text("+$added", style = digits, color = colors.diffAddedText)
             Text("−$removed", style = digits, color = colors.diffRemovedText)
         }
-        when {
-            item.awaitingPermission -> Text(stringResource(R.string.chat_step_awaiting), style = type.footnote, color = colors.warningDefault)
-            item.status == "failed" -> Text(stringResource(R.string.chat_step_failed), style = type.footnote, color = colors.dangerDefault)
-        }
+        // Only a step waiting on the person is called out; a failed command looks like any other
+        // (iOS likewise: no warning UI for failures in a conversation).
+        if (item.awaitingPermission) Text(stringResource(R.string.chat_step_awaiting), style = type.footnote, color = colors.textSecondary)
         // Disclosure label leads, chevron trails (web).
         if (expanded != null) Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs).rotate(angle))
     }

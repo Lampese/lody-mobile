@@ -128,7 +128,7 @@ final class ChatTranscriptPreviewController: UIViewController {
       return box
     }
     let icon = UIImageView(image: UIImage(systemName: row.symbol))
-    icon.tintColor = row.attention ? .systemOrange : .secondaryLabel
+    icon.tintColor = .secondaryLabel  // No warning orange in a conversation.
     icon.contentMode = .scaleAspectFit
     icon.setContentHuggingPriority(.required, for: .horizontal)
     icon.setContentCompressionResistancePriority(.required, for: .horizontal)
