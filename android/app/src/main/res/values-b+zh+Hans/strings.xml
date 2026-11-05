@@ -328,4 +328,5 @@
         <item quantity="other">共 %d 个对话</item>
     </plurals>
     <string name="home_projects_search_empty">没有匹配“%1$s”的项目</string>
+    <string name="chat_new_tab_title">新对话</string>
 </resources>

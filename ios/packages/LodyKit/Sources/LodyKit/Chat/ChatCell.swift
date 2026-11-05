@@ -4,9 +4,13 @@ import UIKit
 enum ChatRowPadding {
   static let content: CGFloat = 6
   static var durationBottom: CGFloat { content / 2 }
-  /// Body copy after the duration hairline needs a full paragraph inset;
-  /// process rows keep the tighter half-gap under the rule.
-  static var textBelowDuration: CGFloat { content * 2 }
+  /// "Worked for …" closes the user's turn: it keeps clear of the message above and sits close
+  /// to the reply below. This is the room it adds above itself.
+  static let durationLead: CGFloat = 12
+  /// The text under it only needs the ordinary inset.
+  static var textBelowDuration: CGFloat { content }
+  /// The process text's distance from the row's bottom edge.
+  static let durationTextBottom: CGFloat = 8
 
   static func top(kind: String, previousKind: String?) -> CGFloat {
     if kind == "text" && previousKind == "duration" { return textBelowDuration }
@@ -427,8 +431,8 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
 
   static func processHeight(for row: ChatRow, width: CGFloat, traits: UITraitCollection) -> CGFloat {
     let lines = processLines(row, traits: traits)
-    if lines.detail == 0 { return max(44, lines.title + 16) }
-    return max(LodyDesign.Rail.primaryHeight, lines.title + lines.detail + 16)
+    if lines.detail == 0 { return max(44, lines.title + 16) + ChatRowPadding.durationLead }
+    return max(LodyDesign.Rail.primaryHeight, lines.title + lines.detail + 16) + ChatRowPadding.durationLead
   }
 
   private static let chevronSlot: CGFloat = 24
@@ -439,7 +443,9 @@ final class ChatCell: UICollectionViewCell, UIContextMenuInteractionDelegate {
     let lines = Self.processLines(row, traits: traitCollection)
     let x = processGlyph.isHidden ? 0 : LodyDesign.Rail.text - ChatReadingColumn.cellMargin
     let textWidth = max(1, width - x - (processChevron.isHidden ? 0 : Self.chevronSlot))
-    let top = floor((height - lines.title - lines.detail) / 2)
+    // Text sits low in the row: the room above parts it from the user's message, and the reply
+    // follows close below.
+    let top = max(0, floor(height - lines.title - lines.detail - ChatRowPadding.durationTextBottom))
     processTitle.frame = CGRect(x: x, y: top, width: textWidth, height: lines.title)
     processDetail.frame = CGRect(x: x, y: processTitle.frame.maxY + 2, width: textWidth, height: lines.detail - 2)
     let glyph = LodyDesign.Rail.glyph

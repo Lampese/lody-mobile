@@ -252,7 +252,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val snackbar = remember { SnackbarHostState() }
     var creatingTab by remember(id, scope) { mutableStateOf(false) }
     var attemptedTab by rememberSaveable(id, scope.workspaceId) { mutableStateOf<String?>(null) }
-    val newTabTitle = stringResource(R.string.chat_new_tab)
+    // A new Tab starts as "New chat"; "New Tab conversation" is only the action's label.
+    val newTabTitle = stringResource(R.string.chat_new_tab_title)
     val tabFailure = stringResource(R.string.chat_tab_creation_failed)
     val tabUnknown = stringResource(R.string.chat_tab_creation_unknown)
     val createTab = {

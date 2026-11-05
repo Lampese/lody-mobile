@@ -263,7 +263,7 @@ class SessionController: UIViewController {
       defer { self.creatingTab = false; self.render() }
       do {
         let result = try await runtime.workspaceCall(RuntimeContract.Calls.CreateTab.self) { workspace, _ in
-          RuntimeContract.CreateTabParams(workspaceId: workspace, sessionId: target, parentSessionId: self.sessionId, title: String(localized: "session.tabs.new", bundle: .lody))
+          RuntimeContract.CreateTabParams(workspaceId: workspace, sessionId: target, parentSessionId: self.sessionId, title: String(localized: "session.tabs.defaultTitle", bundle: .lody))
         }
         switch result {
         case .created:

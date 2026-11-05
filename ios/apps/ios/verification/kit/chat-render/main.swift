@@ -169,7 +169,8 @@ precondition(liveCell.processGlyph.kind == .live, "A running process draws the l
 precondition(liveCell.processChevron.isHidden, "A process row that cannot open hides the chevron")
 precondition(liveCell.processDetail.isHidden, "A process row without a summary hides line two")
 precondition(liveCell.processTree.path == nil, "A process row without sub-agents draws no trunk")
-precondition(abs(liveCell.processTitle.frame.midY - liveHeight / 2) < 1, "One-line process text is centered")
+precondition(abs(liveCell.processTitle.frame.maxY - (liveHeight - ChatRowPadding.durationTextBottom)) < 1,
+  "Process text sits low: clear of the message above, close to the reply below")
 var waitingRow = processRow
 waitingRow.attention = true
 liveCell.configure(waitingRow, text: NSAttributedString(string: waitingRow.text))
@@ -179,7 +180,7 @@ print("Chat render: process rows draw the rail glyph, two lines, chevron and sub
 let answerRow = ChatRow(id: "reply:answer", entryID: "reply", kind: "text", text: "计时完成。")
 precondition(
   ChatRowPadding.top(kind: "text", previousKind: "duration") == ChatRowPadding.textBelowDuration,
-  "Body copy under the duration hairline must use a full paragraph inset"
+  "Body copy right under the process row keeps the ordinary inset"
 )
 precondition(
   ChatCell.rowExtra(for: answerRow, previousKind: "duration")

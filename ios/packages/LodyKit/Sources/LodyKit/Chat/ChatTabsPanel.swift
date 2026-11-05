@@ -29,7 +29,7 @@ struct ChatTabsPanel: View {
               if let attention = tab.attention { AttentionGlyph(attention: attention) }
             }
             .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-            Text(tab.title.isEmpty ? String(localized: "session.tabs.new", bundle: .lody) : tab.title)
+            Text(tab.title.isEmpty ? String(localized: "session.tabs.defaultTitle", bundle: .lody) : tab.title)
               .lodyTextStyle(.body)
               .foregroundStyle(LodyColor.textPrimary)
               .lineLimit(1)

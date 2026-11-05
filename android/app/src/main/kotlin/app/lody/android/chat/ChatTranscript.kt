@@ -247,7 +247,8 @@ private fun LazyListScope.transcriptRows(
                             Disclosure(
                                 entry.worked.ifEmpty { stringResource(R.string.chat_finished_working) },
                                 expanded,
-                                Modifier.animateItem(),
+                                // Clear of the user's message above, close to the reply below (iOS `durationLead`).
+                                Modifier.animateItem().padding(top = LodySpacing.md),
                             ) { toggle(key, it) }
                         }
                         if (expanded) turnBlocks(entry, layout.folding, open, toggle, details)
