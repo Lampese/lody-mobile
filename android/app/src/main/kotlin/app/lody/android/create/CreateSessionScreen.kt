@@ -124,7 +124,23 @@ import kotlinx.coroutines.launch
 fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService, runtimeScope: RuntimeScope, onSubmit: (CreateRequest) -> Unit, onBack: () -> Unit) {
     val dismissKeyboard = rememberKeyboardDismissal()
     val colors = LodyTheme.colors
-    val catalog = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
+    // Multi-repository projects (web Project groups), read once; listed as projects pinned to
+    // their local members' computer or to none. One that cannot run (two computers) is left out.
+    var groups by remember(runtimeScope) { mutableStateOf<List<ProjectGroup>>(emptyList()) }
+    LaunchedEffect(runtimeScope) {
+        groups = try { repository.projectGroups(runtimeScope) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { emptyList() }
+    }
+    val runnable = groups.filter { !it.conflict && it.members.size > 1 }
+    val groupProjects = runnable.map { group ->
+        CatalogProject(
+            CreateSessionModel.GROUP_PREFIX + group.id, group.machineId.orEmpty(), group.name,
+            androidx.compose.ui.res.pluralStringResource(R.plurals.create_group_members, group.members.size, group.members.size),
+        )
+    }
+    val base = snapshot ?: CatalogSnapshot(0, emptyList(), emptyList(), emptyList())
+    val catalog = base.copy(projects = base.projects.filterNot { CreateSessionModel.isGroup(it.id) } + groupProjects)
     var target by remember(catalog.revision == 0L) { mutableStateOf(CreateSessionModel.initial(catalog)) }
     var prompt by rememberSaveable { mutableStateOf("") }
     // The field with its caret and IME composition; the @ panel reads the trigger at the caret.
@@ -447,12 +463,13 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearc
     val project = projects.firstOrNull { it.id == target.projectId }
     val chatLabel = stringResource(R.string.create_chat_only)
     val chatOption = PickerOption(CHAT, chatLabel, selected = target.chat, icon = LodyIcons.Close)
-    val usable = projects.filter { CreateSessionModel.isGithub(it.id) || target.machineId == null || it.machineId == target.machineId }
+    val usable = projects.filter { CreateSessionModel.isUsable(it, target) }
     PickerCard(
         onSearchFocus = onSearchFocus,
         icon = when {
             target.chat -> LodyIcons.Close
             CreateSessionModel.isGithub(project?.id) -> LodyIcons.Github
+            CreateSessionModel.isGroup(project?.id) -> LodyIcons.Project
             else -> LodyIcons.Folder
         },
         title = if (target.chat) chatLabel else project?.name ?: stringResource(R.string.create_pick_project),
@@ -474,7 +491,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearc
         expandAllOn = MORE,
     )
 
-    val local = !target.chat && project != null && !CreateSessionModel.isGithub(project.id)
+    val local = !target.chat && project != null && !CreateSessionModel.isGithub(project.id) && !CreateSessionModel.isGroup(project.id)
     if (local) WorktreeChip(target.worktree) { dismissKeyboard(); onChange(target.copy(worktree = it)) }
 }
 
@@ -520,8 +537,13 @@ private fun CatalogProject.option(target: CreateTarget) = PickerOption(
     id = id,
     title = name,
     selected = !target.chat && id == target.projectId,
+    // A group's row carries "N repositories" (put in its rootPath when the groups are listed).
     subtitle = if (CreateSessionModel.isGithub(id)) "GitHub" else rootPath.replace(Regex("^/(Users|home)/[^/]+"), "~"),
-    icon = if (CreateSessionModel.isGithub(id)) LodyIcons.Github else LodyIcons.Folder,
+    icon = when {
+        CreateSessionModel.isGithub(id) -> LodyIcons.Github
+        CreateSessionModel.isGroup(id) -> LodyIcons.Project
+        else -> LodyIcons.Folder
+    },
 )
 
 /**

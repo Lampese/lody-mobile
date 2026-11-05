@@ -23,7 +23,10 @@ struct CreateSessionSelection: Equatable {
 
   var target: String { chat ? CreateLogic.chatTarget : projectId }
   var github: Bool { !chat && projectId.hasPrefix("github:") }
-  var local: Bool { !chat && !projectId.isEmpty && !github }
+  /// A multi-repository project (web Project group): every member, worktrees on its computer.
+  var group: Bool { !chat && projectId.hasPrefix(Self.groupPrefix) }
+  var local: Bool { !chat && !projectId.isEmpty && !github && !group }
+  static let groupPrefix = "group:"
 
   // The workspace snapshot covers every machine; the selected project determines the target.
   var machines: [(id: String, name: String)] {
@@ -81,6 +84,8 @@ struct CreateSessionForm {
   var prefs: CreatePrefs?
   /// The workspace's Agent Roles readable by this user; nil until listed (no Role row then).
   var roles: [RuntimeContract.AgentRoleItem]?
+  /// Members per multi-repository project, by project id (`group:<uuid>`), for the picker.
+  var groupMembers: [String: Int] = [:]
   var locked = false
   // Share Extension: a selection without cached options is sent and finished in the app.
   var deferUnresolved = false
@@ -139,6 +144,15 @@ struct CreateSessionForm {
   }
 
   /// One form and one workspace-wide options snapshot; changing project only changes selection.
+  /// Lists the workspace's multi-repository projects (one that cannot run — local members on
+  /// two computers — is left out), as projects pinned to their computer or to none.
+  mutating func applyGroups(_ groups: [RuntimeContract.ProjectGroupItem]) {
+    let runnable = groups.filter { !$0.conflict && $0.members.count > 1 }
+    projects.removeAll { $0.id.hasPrefix(CreateSessionSelection.groupPrefix) }
+    projects += runnable.map { CreateProject(id: CreateSessionSelection.groupPrefix + $0.id, machineId: $0.machineId ?? "", name: $0.name) }
+    groupMembers = Dictionary(runnable.map { (CreateSessionSelection.groupPrefix + $0.id, $0.members.count) }, uniquingKeysWith: { first, _ in first })
+  }
+
   mutating func selectProject(_ picked: CreateProject?) {
     if let picked, !projects.contains(where: { $0.id == picked.id }) { projects.append(picked) }
     let id = picked?.id ?? ""
@@ -151,6 +165,8 @@ struct CreateSessionForm {
     current.branchesFailed = false
     current.worktree = false
     if current.local, let picked, picked.machineId != current.machineId { selectMachine(picked.machineId) }
+    // A group with local members runs on their computer.
+    if current.group, let picked, !picked.machineId.isEmpty, picked.machineId != current.machine?.id { selectMachine(picked.machineId) }
     var value = prefs ?? CreatePrefs()
     value.context = current.chat ? "chat" : "project"
     if let picked { value.projectId = picked.id }
@@ -186,6 +202,10 @@ struct CreateSessionForm {
   mutating func selectMachine(_ id: String) {
     // A Role binds one machine's agent exactly, so another computer clears it (web).
     current.roleId = ""
+    // A group pinned to another computer cannot run here.
+    if current.group, let pinned = projects.first(where: { $0.id == current.projectId })?.machineId, !pinned.isEmpty, pinned != id {
+      current.projectId = ""
+    }
     current.machineId = id
     let first = current.options?.agents.first { $0.machineId == id }
     current.agentKey = first?.key ?? ""

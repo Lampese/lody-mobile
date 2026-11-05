@@ -14,6 +14,8 @@ struct CreateSessionService {
   var cachedOptions: (_ userId: String, _ workspaceId: String, _ projectId: String?) async -> CreationOptions? = { _, _, _ in nil }
   /// Agent Roles readable by this user (runtime `agentRoles` list); none without a runtime.
   var roles: (_ workspaceId: String) async throws -> [RuntimeContract.AgentRoleItem] = { _ in [] }
+  /// The workspace's multi-repository projects (runtime `projectGroups`); none without a runtime.
+  var projectGroups: (_ workspaceId: String) async throws -> [RuntimeContract.ProjectGroupItem] = { _ in [] }
 
   var cachedBranches: (_ userId: String, _ workspaceId: String, _ repo: String) async -> CreateBranches? = { _, _, _ in nil }
   var persistBranches: (_ userId: String, _ workspaceId: String, _ repo: String, _ branches: CreateBranches) -> Void = { _, _, _, _ in }
@@ -97,6 +99,12 @@ struct CreateSessionService {
         return try await runtime.workspaceCall(RuntimeContract.Calls.AgentRoles.self) { workspace, userId in
           .list(.init(workspaceId: workspace, userId: userId))
         }.roles
+      },
+      projectGroups: { workspaceId in
+        guard !LodyUIVerify.enabled, let runtime = DataRuntime.current, runtime.workspace == workspaceId else { return [] }
+        return try await runtime.workspaceCall(RuntimeContract.Calls.ProjectGroups.self) { workspace, userId in
+          RuntimeContract.ProjectGroupsParams(workspaceId: workspace, userId: userId)
+        }.groups
       },
       cachedBranches: { userId, workspaceId, repo in
         let key = branchesKey(userId: userId, workspaceId: workspaceId, repo: repo)

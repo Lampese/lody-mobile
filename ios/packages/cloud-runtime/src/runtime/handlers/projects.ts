@@ -10,6 +10,8 @@ import {
 } from '../local-projects';
 import { availableCreationOptions } from '../machine-presence';
 import { projectHistory } from '../project-history';
+import { readWorkspaceProjects } from '../project-groups';
+import { projectGroupItems } from '../../protocol/project-groups.ts';
 import type { RuntimeContext } from './context.ts';
 
 export function registerProjects(ctx: RuntimeContext) {
@@ -65,6 +67,20 @@ export function registerProjects(ctx: RuntimeContext) {
         ),
       });
     return available;
+  });
+  // The workspace's multi-repository projects for the new-chat picker (a fresh read).
+  channel.handle('projectGroups', async (args) => {
+    const workspace = state.workspace;
+    if (args.workspaceId !== workspace) throw new Error('metadata_not_ready');
+    const projects = await readWorkspaceProjects(workspace, getGrant, AbortSignal.timeout(30000));
+    if (state.workspace !== workspace) throw new Error('workspace_changed');
+    const names = (machineId: string, localProjectId: string) => {
+      const row = state.machineReplicas.get(machineId)?.get(['localProject', localProjectId]) as
+        | Record<string, unknown>
+        | undefined;
+      return typeof row?.name === 'string' && row.name ? row.name : undefined;
+    };
+    return { groups: projectGroupItems(projects, names) };
   });
   channel.handle('localProjects', async (args) => {
     const { workspace, machineReplicas } = state;

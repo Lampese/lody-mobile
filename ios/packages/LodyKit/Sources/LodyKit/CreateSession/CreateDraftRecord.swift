@@ -36,7 +36,14 @@ struct CreateDraftRecord {
       ("userId", Self.string(draft.userId)),
       ("title", Self.string(title)),
     ]
-    if let projectId = draft.projectId, !projectId.isEmpty { creation.append(("projectId", Self.string(projectId))) }
+    if let projectId = draft.projectId, !projectId.isEmpty {
+      // A multi-repository project is created by group: the runtime reads it fresh.
+      if projectId.hasPrefix(CreateSessionSelection.groupPrefix) {
+        creation.append(("projectGroupId", Self.string(String(projectId.dropFirst(CreateSessionSelection.groupPrefix.count)))))
+      } else {
+        creation.append(("projectId", Self.string(projectId)))
+      }
+    }
     if let branch = draft.branch, !branch.isEmpty { creation.append(("branch", Self.string(branch))) }
     if draft.useWorktree == true { creation.append(("useWorktree", "true")) }
     // The Role the session starts as: provenance on its metadata, and the first turn's Role,

@@ -39,6 +39,18 @@ open class WebViewRuntime internal constructor(
         }
         is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL).put(command.agentConfigId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
         RuntimeCommand.ListAgentRoles -> RuntimeResult.Roles(CreationJson.roles(call("agentRoles", deadline = CommandDeadline.QUERY) as JSONObject))
+        RuntimeCommand.ListProjectGroups -> {
+            val rows = (call("projectGroups", deadline = CommandDeadline.QUERY) as JSONObject).optJSONArray("groups") ?: JSONArray()
+            RuntimeResult.ProjectGroups((0 until rows.length()).map { rows.getJSONObject(it) }.map { group ->
+                val members = group.optJSONArray("members") ?: JSONArray()
+                ProjectGroup(
+                    group.getString("id"), group.optString("name"),
+                    group.optString("machineId").takeIf { !group.isNull("machineId") && it.isNotEmpty() },
+                    group.optBoolean("conflict"),
+                    (0 until members.length()).map { members.getJSONObject(it).optString("label") },
+                )
+            })
+        }
         is RuntimeCommand.ShortcutBody -> RuntimeResult.Shortcut(call("shortcutBody", JSONArray().put(command.id), CommandDeadline.QUERY) as JSONObject)
         is RuntimeCommand.LocalProjects -> {
             val args = JSONArray().put(command.action).put(command.browserId)

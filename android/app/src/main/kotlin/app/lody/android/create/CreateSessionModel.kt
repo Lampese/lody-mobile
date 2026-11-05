@@ -27,6 +27,9 @@ object CreateSessionModel {
     }
 
     fun isGithub(projectId: String?) = projectId?.startsWith("github:") == true
+    /** A multi-repository project (web Project group); its `machineId` is empty when it runs anywhere. */
+    fun isGroup(projectId: String?) = projectId?.startsWith(GROUP_PREFIX) == true
+    const val GROUP_PREFIX = "group:"
     fun isChat(projectId: String) = projectId.endsWith(":unassigned")
 
     /** Computers by id with their display name (the id when the catalog has none). */
@@ -50,8 +53,13 @@ object CreateSessionModel {
     /** Picks a project, keeping a chosen computer where the project allows any. */
     fun select(snapshot: CatalogSnapshot, target: CreateTarget, projectId: String): CreateTarget {
         val project = snapshot.projects.firstOrNull { it.id == projectId } ?: return target
-        val machine = if (isGithub(project.id)) target.machineId ?: machines(snapshot).firstOrNull()?.first else project.machineId
-        return CreateTarget(chat = false, projectId = project.id, machineId = machine, worktree = target.worktree && !isGithub(project.id))
+        val machine = when {
+            isGithub(project.id) -> target.machineId ?: machines(snapshot).firstOrNull()?.first
+            // A group runs on its local members' computer, or on any when it has none.
+            isGroup(project.id) -> project.machineId.ifEmpty { null } ?: target.machineId ?: machines(snapshot).firstOrNull()?.first
+            else -> project.machineId
+        }
+        return CreateTarget(chat = false, projectId = project.id, machineId = machine, worktree = target.worktree && !isGithub(project.id) && !isGroup(project.id))
     }
 
     fun chat(snapshot: CatalogSnapshot, target: CreateTarget): CreateTarget =
@@ -65,6 +73,11 @@ object CreateSessionModel {
      * recent local project, or to a chat there when it has none. Chats and GitHub projects switch.
      */
     fun pickMachine(snapshot: CatalogSnapshot, target: CreateTarget, machineId: String): CreateTarget {
+        if (!target.chat && isGroup(target.projectId)) {
+            // A group pinned to another computer cannot run there: back to a chat on it.
+            val pinned = snapshot.projects.firstOrNull { it.id == target.projectId }?.machineId.orEmpty()
+            return if (pinned.isEmpty() || pinned == machineId) target.copy(machineId = machineId) else CreateTarget(chat = true, machineId = machineId)
+        }
         val local = !target.chat && target.projectId != null && !isGithub(target.projectId)
         if (!local) return target.copy(machineId = machineId)
         val current = snapshot.projects.firstOrNull { it.id == target.projectId }
@@ -75,13 +88,18 @@ object CreateSessionModel {
 
     const val RECENT_LIMIT = 5
 
+    /** GitHub projects and groups without local members run on any computer. */
+    fun isUsable(project: CatalogProject, target: CreateTarget): Boolean =
+        isGithub(project.id) || target.machineId == null || project.machineId == target.machineId ||
+            (isGroup(project.id) && project.machineId.isEmpty())
+
     /**
      * The project menu's recent part: the five most recent projects usable on the chosen
      * computer (its local projects and any GitHub project); a selected project outside them
      * still shows so the check matches the line.
      */
     fun recent(snapshot: CatalogSnapshot, target: CreateTarget): List<CatalogProject> {
-        val usable = projects(snapshot).filter { isGithub(it.id) || target.machineId == null || it.machineId == target.machineId }
+        val usable = projects(snapshot).filter { isUsable(it, target) }
         val recent = usable.take(RECENT_LIMIT)
         val current = snapshot.projects.firstOrNull { it.id == target.projectId && !target.chat }
         return if (current == null || recent.any { it.id == current.id }) recent else listOf(current) + recent

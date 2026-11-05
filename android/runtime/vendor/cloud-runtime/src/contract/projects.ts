@@ -195,3 +195,36 @@ export const LocalProjectsResult = z
     z.object({ outcome: z.literal('project'), project: Project }),
   ])
   .meta({ id: 'LocalProjectsResult' });
+
+/** The workspace's multi-repository projects (web Project groups), for the new-chat picker. */
+export const ProjectGroupsParams = z
+  .object({ workspaceId: z.string().min(1), userId: z.string() })
+  .meta({ id: 'ProjectGroupsParams' });
+
+export const ProjectGroupItem = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    /** The machine its local members pin; null when it runs anywhere. */
+    machineId: z.string().nullable(),
+    /** Local members on different machines: it cannot start a conversation. */
+    conflict: z.boolean(),
+    members: z.array(
+      z.object({
+        id: z.string().min(1),
+        kind: z.enum(['github', 'local']),
+        label: z.string(),
+        repoFullName: z.string().optional(),
+        machineId: z.string().optional(),
+        localProjectId: z.string().optional(),
+        preferLocal: z.boolean().optional(),
+        path: z.string(),
+      }),
+    ),
+  })
+  .meta({ id: 'ProjectGroupItem' });
+
+export const ProjectGroupsResult = z
+  .object({ groups: z.array(ProjectGroupItem) })
+  .meta({ id: 'ProjectGroupsResult' });
+

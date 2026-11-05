@@ -21,6 +21,8 @@ import {
   CreationOptionsParams,
   LocalProjectsParams,
   LocalProjectsResult,
+  ProjectGroupsParams,
+  ProjectGroupsResult,
 } from './projects.ts';
 import {
   OpenSessionParams,
@@ -175,6 +177,11 @@ export const runtimeCalls = {
   creationOptions: {
     params: CreationOptionsParams,
     result: CreationOptions,
+    timeoutMs: 45_000,
+  },
+  projectGroups: {
+    params: ProjectGroupsParams,
+    result: ProjectGroupsResult,
     timeoutMs: 45_000,
   },
   localProjects: {

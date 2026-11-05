@@ -47,6 +47,11 @@ export const CreateSessionParams = z
     /** Provenance only (web): the Role this session starts as, frozen at its revision. */
     agentRoleId: z.string().min(1).optional(),
     agentRoleRevision: z.number().int().positive().optional(),
+    /**
+     * Start in a multi-repository project (web Project group): the runtime reads the
+     * group fresh and writes its `projectRun` snapshot. `projectId` is then omitted.
+     */
+    projectGroupId: z.string().uuid().optional(),
     billingEntitlement: BillingEntitlement.nullable(),
   })
   .meta({ id: 'CreateSessionParams' });

@@ -9,6 +9,7 @@ import {
   renameSession,
 } from '../archive-session';
 import { creationOptions, createSession } from '../create-session';
+import { readWorkspaceProjects } from '../project-groups';
 import { sessionMcpSelection } from '../mcp';
 import { expandMentions } from '../mention-expansion';
 import { expandShortcuts, shortcutAccess } from '../prompt-shortcuts';
@@ -133,12 +134,20 @@ export function registerSessions(
     const replica = state.metaReplica;
     creating = true;
     try {
+      // A multi-repository project: read the group fresh; its run picks the machine's agents.
+      const workspace = state.workspace;
+      const group = args.projectGroupId
+        ? (await readWorkspaceProjects(workspace, getGrant, AbortSignal.timeout(30000))).find(
+            (project) => project.id === args.projectGroupId,
+          )
+        : undefined;
+      if (args.projectGroupId && (!group || state.workspace !== workspace)) return { state: 'rejected' };
       const options = creationOptions(
-        args.projectId,
+        group ? undefined : args.projectId,
         replica.flock,
         state.machineReplicas,
       );
-      const result = await createSession(args, options, replica, getGrant);
+      const result = await createSession(group ? { ...args, projectId: undefined } : args, options, replica, getGrant, group);
       if (result.state === 'created') republish(replica);
       return result;
     } catch (error) {

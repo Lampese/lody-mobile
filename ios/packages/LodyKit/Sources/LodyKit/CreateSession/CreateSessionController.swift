@@ -10,6 +10,8 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
   var loadOptions: (() async throws -> CreationOptions)?
   /// The workspace's Agent Roles; the run config shows no Role row until they are listed.
   var loadRoles: (() async throws -> [RuntimeContract.AgentRoleItem])?
+  var loadProjectGroups: (() async throws -> [RuntimeContract.ProjectGroupItem])?
+  private var groupsTask: Task<Void, Never>?
   private var rolesTask: Task<Void, Never>?
   var loadRepositories: (() async throws -> [CreateProject])?
   var loadCachedBranches: ((_ repo: String) async -> CreateBranches?)?
@@ -133,6 +135,7 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
     load()
     fetchBranches()
     loadAgentRoles()
+    loadGroups()
   }
 
   @objc private func searchFocusChanged(_ notification: Notification) {
@@ -314,6 +317,16 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
         self.form.failOptions()
         self.changed(prefs: false)
       }
+    }
+  }
+
+  /// Multi-repository projects are read once per page; a failure simply leaves them out.
+  private func loadGroups() {
+    groupsTask?.cancel()
+    groupsTask = Task { [weak self] in
+      guard let groups = try? await self?.loadProjectGroups?(), let self, !Task.isCancelled else { return }
+      self.form.applyGroups(groups)
+      self.render()
     }
   }
 

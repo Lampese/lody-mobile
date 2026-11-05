@@ -46,6 +46,8 @@ export function contractBridge(runtime, emit) {
   localProjects:args=>invoke('localProjects',args),
   // Prompt shortcuts: the readable index and one body (for writing a chosen shortcut into the composer).
   promptShortcuts:args=>invoke('promptShortcuts',args),
+  // Multi-repository projects for the new-chat picker.
+  projectGroups:args=>invoke('projectGroups',args),
   // A changed file's text before and after one turn, read from the session's computer.
   turnDiff:args=>invoke('turnDiff',args),
   grant(value){for(const e of grants.values())receive(value?{...e,kind:'result',payload:value}:{...e,kind:'error',payload:undefined,error:{code:'grant_unavailable',retryable:true}});grants.clear();return true;},

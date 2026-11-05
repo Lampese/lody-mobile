@@ -152,8 +152,13 @@ export function projectRows(
       project = object(value.project);
     const localId = text(project.localProjectId),
       repo = text(project.repoFullName) || text(value.repoFullName);
-    const projectId =
-      project.kind === 'local' && localId
+    // A multi-repository project's session lists under its group (web `projectRun.id`),
+    // ahead of the legacy `project` that names only its first member.
+    const run = object(value.projectRun),
+      runId = text(run.id);
+    const projectId = runId
+      ? `group:${runId}`
+      : project.kind === 'local' && localId
         ? `${machineId}:local:${localId}`
         : repo
           ? `github:${repo}`
@@ -195,7 +200,9 @@ export function projectRows(
       workspaceDirty: value.workspaceDirty === true || undefined,
       workspaceUnpushed: value.workspaceUnpushed === true || undefined,
     });
-    if (localId || repo) {
+    if (runId) {
+      projects.push({ id: projectId, machineId, name: text(run.name) || labels.local, rootPath: '' });
+    } else if (localId || repo) {
       const githubRepo = repo || text(project.githubRepoFullName);
       projects.push({
         id: projectId,

@@ -167,7 +167,16 @@ enum CreateSessionContext {
   }
 
   private static func projectGlyph(_ id: String) -> CreateGlyph {
-    CreateProjectPicker.isGithub(id) ? .lody(.github) : .lody(.folder)
+    if id.hasPrefix(CreateSessionSelection.groupPrefix) { return .symbol("square.stack.3d.up") }
+    return CreateProjectPicker.isGithub(id) ? .lody(.github) : .lody(.folder)
+  }
+
+  /// A project row's second line: GitHub, the folder, or how many repositories a group holds.
+  private static func projectSubtitle(_ form: CreateSessionForm, _ project: CreateProject) -> String {
+    if let members = form.groupMembers[project.id] {
+      return String.localizedStringWithFormat(String(localized: "create.context.groupMembers", bundle: .lody), members)
+    }
+    return CreateProjectPicker.isGithub(project.id) ? "GitHub" : abbreviated(project.rootPath)
   }
 
   /// No project first; then recent projects usable on the chosen computer (its local projects
@@ -178,7 +187,7 @@ enum CreateSessionContext {
     var options = [chat] + shown.map { project in
       CreateOption(
         id: project.id, title: project.name,
-        subtitle: CreateProjectPicker.isGithub(project.id) ? "GitHub" : abbreviated(project.rootPath),
+        subtitle: projectSubtitle(form, project),
         glyph: projectGlyph(project.id), selected: !form.current.chat && project.id == form.current.projectId,
         searchText: project.rootPath)
     }
@@ -192,7 +201,11 @@ enum CreateSessionContext {
 
   private static func usableProjects(_ form: CreateSessionForm) -> [CreateProject] {
     let machine = form.current.machine?.id ?? form.current.machineId
-    return form.projects.filter { CreateProjectPicker.isGithub($0.id) || machine.isEmpty || $0.machineId == machine }
+    // GitHub projects and groups without local members run on any computer.
+    return form.projects.filter {
+      CreateProjectPicker.isGithub($0.id) || machine.isEmpty || $0.machineId == machine
+        || ($0.id.hasPrefix(CreateSessionSelection.groupPrefix) && $0.machineId.isEmpty)
+    }
   }
 
   /// `form.projects` is ordered by latest activity; the selected project always stays listed.

@@ -358,4 +358,8 @@
     <string name="projects_github_member_note">Only workspace admins and owners can add repositories.</string>
     <string name="projects_github_missing">Don\'t see a repository? Grant the Lody GitHub App access to it on GitHub.</string>
     <string name="projects_github_install">Configure on GitHub</string>
+    <plurals name="create_group_members">
+        <item quantity="one">%d repository</item>
+        <item quantity="other">%d repositories</item>
+    </plurals>
 </resources>

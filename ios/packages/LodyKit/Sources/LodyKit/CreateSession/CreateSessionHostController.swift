@@ -157,6 +157,10 @@ class CreateSessionHostController: UIViewController {
       guard let self else { throw CancellationError() }
       return try await service.roles(workspaceId)
     }
+    controller.loadProjectGroups = { [weak self] in
+      guard let self else { throw CancellationError() }
+      return try await service.projectGroups(workspaceId)
+    }
     controller.loadRepositories = { [weak self] in
       guard let self else { throw CancellationError() }
       return try await service.repositories(workspaceId).compactMap(CreateSessionService.githubProject)

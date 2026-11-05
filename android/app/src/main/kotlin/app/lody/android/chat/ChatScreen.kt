@@ -198,7 +198,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         if (session == null || status != "live") return@LaunchedEffect
         // A plain chat's `<machine>:unassigned` project is not a real project (the runtime
         // rejects it): read the workspace-wide options, as the new-chat page does for chats.
-        val project = session.projectId.takeUnless { app.lody.android.create.CreateSessionModel.isChat(it) }
+        // A multi-repository project's session reads them workspace-wide, as a plain chat.
+        val project = session.projectId.takeUnless { app.lody.android.create.CreateSessionModel.isChat(it) || app.lody.android.create.CreateSessionModel.isGroup(it) }
         try { options = repository.options(scope, project) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { /* The chip still shows the session's model; choices wait for the next load. */ }

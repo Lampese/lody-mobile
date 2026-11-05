@@ -92,7 +92,9 @@ extension SessionController {
       role: Self.composerRole(feed.composerJSON)
     )
     let project = state.catalog.projects.first { $0.id == session.projectId }
-    composerModel.load(workspaceId: state.workspaceId, projectId: project?.id, session: session)
+    // A multi-repository project's session reads workspace-wide options, as a plain chat.
+    let optionsProject = project?.id.hasPrefix(CreateSessionSelection.groupPrefix) == true ? nil : project?.id
+    composerModel.load(workspaceId: state.workspaceId, projectId: optionsProject, session: session)
     let billable = live ? feed.billableTurnCount : nil
     composerModel.watchTier(workspaceId: state.workspaceId, userId: state.userId, watch: (billable ?? 0) >= 25)
     let locked = SessionQuota.locked(count: billable, tier: composerModel.tier)

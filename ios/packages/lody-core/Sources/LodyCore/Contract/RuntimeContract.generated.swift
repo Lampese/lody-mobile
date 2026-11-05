@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeContract {
   public static let version = 1
-  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
+  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
 
   public enum AgentRoleItemVisibility: String, Codable, Sendable, Equatable, CaseIterable {
     case `private` = "private"
@@ -874,8 +874,9 @@ extension RuntimeContract {
     public var branch: String?
     public var agentRoleId: String?
     public var agentRoleRevision: Int?
+    public var projectGroupId: String?
     public var billingEntitlement: BillingEntitlement?
-    public init(workspaceId: String, projectId: String? = nil, sessionId: String, machineId: String, agentConfigId: String, userId: String, title: String, branch: String? = nil, agentRoleId: String? = nil, agentRoleRevision: Int? = nil, billingEntitlement: BillingEntitlement?) {
+    public init(workspaceId: String, projectId: String? = nil, sessionId: String, machineId: String, agentConfigId: String, userId: String, title: String, branch: String? = nil, agentRoleId: String? = nil, agentRoleRevision: Int? = nil, projectGroupId: String? = nil, billingEntitlement: BillingEntitlement?) {
       self.workspaceId = workspaceId
       self.projectId = projectId
       self.sessionId = sessionId
@@ -886,6 +887,7 @@ extension RuntimeContract {
       self.branch = branch
       self.agentRoleId = agentRoleId
       self.agentRoleRevision = agentRoleRevision
+      self.projectGroupId = projectGroupId
       self.billingEntitlement = billingEntitlement
     }
     public init(from decoder: any Decoder) throws {
@@ -900,6 +902,7 @@ extension RuntimeContract {
       self.branch = try c.decodeIfPresent(String.self, forKey: Key("branch"))
       self.agentRoleId = try c.decodeIfPresent(String.self, forKey: Key("agentRoleId"))
       self.agentRoleRevision = try c.decodeIfPresent(Int.self, forKey: Key("agentRoleRevision"))
+      self.projectGroupId = try c.decodeIfPresent(String.self, forKey: Key("projectGroupId"))
       self.billingEntitlement = try c.decode(BillingEntitlement?.self, forKey: Key("billingEntitlement"))
     }
     public func encode(to encoder: any Encoder) throws {
@@ -914,6 +917,7 @@ extension RuntimeContract {
       try c.encodeIfPresent(self.branch, forKey: Key("branch"))
       try c.encodeIfPresent(self.agentRoleId, forKey: Key("agentRoleId"))
       try c.encodeIfPresent(self.agentRoleRevision, forKey: Key("agentRoleRevision"))
+      try c.encodeIfPresent(self.projectGroupId, forKey: Key("projectGroupId"))
       try c.encode(self.billingEntitlement, forKey: Key("billingEntitlement"))
     }
   }
@@ -3605,6 +3609,119 @@ extension RuntimeContract {
       try c.encode(self.name, forKey: Key("name"))
       try c.encode(self.rootPath, forKey: Key("rootPath"))
       try c.encodeIfPresent(self.repoFullName, forKey: Key("repoFullName"))
+    }
+  }
+
+  public enum ProjectGroupItemMembersItemKind: String, Codable, Sendable, Equatable, CaseIterable {
+    case github = "github"
+    case local = "local"
+  }
+
+  public struct ProjectGroupItemMembersItem: Codable, Sendable, Equatable {
+    public var id: String
+    public var kind: ProjectGroupItemMembersItemKind
+    public var label: String
+    public var repoFullName: String?
+    public var machineId: String?
+    public var localProjectId: String?
+    public var preferLocal: Bool?
+    public var path: String
+    public init(id: String, kind: ProjectGroupItemMembersItemKind, label: String, repoFullName: String? = nil, machineId: String? = nil, localProjectId: String? = nil, preferLocal: Bool? = nil, path: String) {
+      self.id = id
+      self.kind = kind
+      self.label = label
+      self.repoFullName = repoFullName
+      self.machineId = machineId
+      self.localProjectId = localProjectId
+      self.preferLocal = preferLocal
+      self.path = path
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.id = try c.decode(String.self, forKey: Key("id"))
+      self.kind = try c.decode(ProjectGroupItemMembersItemKind.self, forKey: Key("kind"))
+      self.label = try c.decode(String.self, forKey: Key("label"))
+      self.repoFullName = try c.decodeIfPresent(String.self, forKey: Key("repoFullName"))
+      self.machineId = try c.decodeIfPresent(String.self, forKey: Key("machineId"))
+      self.localProjectId = try c.decodeIfPresent(String.self, forKey: Key("localProjectId"))
+      self.preferLocal = try c.decodeIfPresent(Bool.self, forKey: Key("preferLocal"))
+      self.path = try c.decode(String.self, forKey: Key("path"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.id, forKey: Key("id"))
+      try c.encode(self.kind, forKey: Key("kind"))
+      try c.encode(self.label, forKey: Key("label"))
+      try c.encodeIfPresent(self.repoFullName, forKey: Key("repoFullName"))
+      try c.encodeIfPresent(self.machineId, forKey: Key("machineId"))
+      try c.encodeIfPresent(self.localProjectId, forKey: Key("localProjectId"))
+      try c.encodeIfPresent(self.preferLocal, forKey: Key("preferLocal"))
+      try c.encode(self.path, forKey: Key("path"))
+    }
+  }
+
+  public struct ProjectGroupItem: Codable, Sendable, Equatable {
+    public var id: String
+    public var name: String
+    public var machineId: String?
+    public var conflict: Bool
+    public var members: [ProjectGroupItemMembersItem]
+    public init(id: String, name: String, machineId: String?, conflict: Bool, members: [ProjectGroupItemMembersItem]) {
+      self.id = id
+      self.name = name
+      self.machineId = machineId
+      self.conflict = conflict
+      self.members = members
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.id = try c.decode(String.self, forKey: Key("id"))
+      self.name = try c.decode(String.self, forKey: Key("name"))
+      self.machineId = try c.decode(String?.self, forKey: Key("machineId"))
+      self.conflict = try c.decode(Bool.self, forKey: Key("conflict"))
+      self.members = try c.decode([ProjectGroupItemMembersItem].self, forKey: Key("members"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.id, forKey: Key("id"))
+      try c.encode(self.name, forKey: Key("name"))
+      try c.encode(self.machineId, forKey: Key("machineId"))
+      try c.encode(self.conflict, forKey: Key("conflict"))
+      try c.encode(self.members, forKey: Key("members"))
+    }
+  }
+
+  public struct ProjectGroupsParams: Codable, Sendable, Equatable {
+    public var workspaceId: String
+    public var userId: String
+    public init(workspaceId: String, userId: String) {
+      self.workspaceId = workspaceId
+      self.userId = userId
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.workspaceId = try c.decode(String.self, forKey: Key("workspaceId"))
+      self.userId = try c.decode(String.self, forKey: Key("userId"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.workspaceId, forKey: Key("workspaceId"))
+      try c.encode(self.userId, forKey: Key("userId"))
+    }
+  }
+
+  public struct ProjectGroupsResult: Codable, Sendable, Equatable {
+    public var groups: [ProjectGroupItem]
+    public init(groups: [ProjectGroupItem]) {
+      self.groups = groups
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.groups = try c.decode([ProjectGroupItem].self, forKey: Key("groups"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.groups, forKey: Key("groups"))
     }
   }
 
@@ -6906,6 +7023,16 @@ extension RuntimeContract {
         return nil
       }
     }
+    public enum ProjectGroups: RuntimeCall {
+      public typealias Params = RuntimeContract.ProjectGroupsParams
+      public typealias Result = RuntimeContract.ProjectGroupsResult
+      public static let method = "projectGroups"
+      public static let timeout: Double = 45
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .projectGroups(let result) = value { return result }
+        return nil
+      }
+    }
     public enum PromptShortcuts: RuntimeCall {
       public typealias Params = RuntimeContract.PromptShortcutsParams
       public typealias Result = RuntimeContract.PromptShortcutsResult
@@ -7110,6 +7237,7 @@ extension RuntimeContract {
     case ping(RuntimeContract.Empty)
     case pinSession(RuntimeContract.Empty)
     case probeSchema(RuntimeContract.ProbeSchemaReport)
+    case projectGroups(RuntimeContract.ProjectGroupsResult)
     case promptShortcuts(RuntimeContract.PromptShortcutsResult)
     case publishedShares(RuntimeContract.PublishedSharesResult)
     case readFile(RuntimeContract.FileContent)
@@ -7208,6 +7336,7 @@ extension RuntimeContract {
         case "ping": message = .result(id: id, .ping(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "pinSession": message = .result(id: id, .pinSession(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "probeSchema": message = .result(id: id, .probeSchema(try c.decode(RuntimeContract.ProbeSchemaReport.self, forKey: Key("payload"))))
+        case "projectGroups": message = .result(id: id, .projectGroups(try c.decode(RuntimeContract.ProjectGroupsResult.self, forKey: Key("payload"))))
         case "promptShortcuts": message = .result(id: id, .promptShortcuts(try c.decode(RuntimeContract.PromptShortcutsResult.self, forKey: Key("payload"))))
         case "publishedShares": message = .result(id: id, .publishedShares(try c.decode(RuntimeContract.PublishedSharesResult.self, forKey: Key("payload"))))
         case "readFile": message = .result(id: id, .readFile(try c.decode(RuntimeContract.FileContent.self, forKey: Key("payload"))))

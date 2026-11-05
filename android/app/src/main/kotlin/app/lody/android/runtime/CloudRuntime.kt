@@ -37,6 +37,8 @@ sealed interface RuntimeCommand {
      * (a write, never retried) or `cancel`, for one folder browser ([browserId]).
      */
     data class LocalProjects(val action: String, val browserId: String, val machineId: String? = null, val path: String? = null, val cursor: String? = null) : RuntimeCommand
+    /** The workspace's multi-repository projects (upstream `projectGroups`). Read only. */
+    data object ListProjectGroups : RuntimeCommand
     /** A prompt shortcut's body ({prompt, mentions}) by id, for the composer. Read only. */
     data class ShortcutBody(val id: String) : RuntimeCommand
     /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
@@ -51,6 +53,7 @@ sealed interface RuntimeResult {
     /** The `localProjects` outcome as the runtime sent it (`machines`, `directory`, `project`, …). */
     data class LocalProjects(val value: org.json.JSONObject) : RuntimeResult
     data class Shortcut(val value: org.json.JSONObject) : RuntimeResult
+    data class ProjectGroups(val value: List<ProjectGroup>) : RuntimeResult
     data class Created(val value: CreationReceipt) : RuntimeResult
     /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult
@@ -303,3 +306,11 @@ data class MentionSource(
     val agentConfigId: String? = null, val cliType: String? = null, val agentType: String? = null,
 )
 data class MentionCatalogPage(val items: List<MentionCandidate>, val truncated: Boolean = false, val incomplete: Boolean = false)
+
+/**
+ * A multi-repository project (web Project group): its repositories and local folders start
+ * together in one conversation. [machineId] is the computer its local members pin (null: any);
+ * [conflict] groups (local members on two computers) cannot start one.
+ */
+data class ProjectGroup(val id: String, val name: String, val machineId: String?, val conflict: Boolean, val members: List<String>)
+

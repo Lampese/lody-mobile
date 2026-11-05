@@ -23498,6 +23498,35 @@
         }
       }
     },
+    "create.context.groupMembers": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld repository"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld repositories"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个仓库"
+          }
+        }
+      }
+    },
     "create.context.searchMachines": {
       "extractionState": "manual",
       "localizations": {

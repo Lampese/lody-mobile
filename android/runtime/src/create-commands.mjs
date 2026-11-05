@@ -31,6 +31,11 @@ export function createCommands(runtime, sendTurn, identity) {
    }
    return runtime.localProjects({workspaceId:scope.workspaceId,userId:scope.userId,browserId,action,...(action==='cancel' || action==='machines'?{}:fields)});
   },
+  // The workspace's multi-repository projects (shared runtime `projectGroups`); a read.
+  async projectGroups() {
+   const scope=identity();if(!scope?.userId)throw Error('not_connected');
+   return runtime.projectGroups({workspaceId:scope.workspaceId,userId:scope.userId});
+  },
   // A prompt shortcut's body for the composer (web `prepareShortcutSelection`): the index entry
   // by id, then its body for that revision. Returns the prompt and its references; a read.
   async shortcutBody(id) {
@@ -100,7 +105,11 @@ export function createCommands(runtime, sendTurn, identity) {
    signal?.throwIfAborted();
    if(!input || !uuid.test(input.sessionId) || !uuid.test(input.turnId) || typeof input.text!=='string' || !input.text.trim() || input.text.length>32000)throw Error('invalid_creation');
    if(attempted.has(input.sessionId))throw Error('already_attempted');
-   const scope=identity(), available=await options(input.projectId);
+   // A multi-repository project (`group:<uuid>`): workspace-wide agents; the runtime reads the
+   // group fresh, checks its computer and writes its frozen run (web Project group).
+   const group=typeof input.projectId==='string' && input.projectId.startsWith('group:') ? input.projectId.slice(6) : undefined;
+   if(group!==undefined && !uuid.test(group))throw Error('invalid_creation');
+   const scope=identity(), available=await options(group===undefined?input.projectId:undefined);
    const agent=available.agents.find(a=>a.id===input.agentConfigId && a.machineId===input.machineId);
    if(!agent)throw Error('agent_unavailable');
    const capability=available.capabilities.find(c=>c.machineId===agent.machineId && c.agentConfigId===agent.id) ?? available.capabilities.find(c=>c.machineId===agent.machineId && !c.agentConfigId && c.cliType===agent.cliType && c.agentType===agent.agentType);
@@ -120,7 +129,7 @@ export function createCommands(runtime, sendTurn, identity) {
    }
    attempted.add(input.sessionId);
    try {
-    const result=await runtime.createSession({workspaceId:scope.workspaceId,userId:scope.userId,sessionId:input.sessionId,machineId:agent.machineId,agentConfigId:agent.id,projectId:input.projectId,branch:input.branch,useWorktree:input.worktree===true,title:input.text.trim().slice(0,200),...(role?{agentRoleId:role.id,agentRoleRevision:role.revision}:{})});
+    const result=await runtime.createSession({workspaceId:scope.workspaceId,userId:scope.userId,sessionId:input.sessionId,machineId:agent.machineId,agentConfigId:agent.id,...(group===undefined?{projectId:input.projectId}:{projectGroupId:group}),branch:group===undefined?input.branch:undefined,useWorktree:input.worktree===true,title:input.text.trim().slice(0,200),...(role?{agentRoleId:role.id,agentRoleRevision:role.revision}:{})});
     if(result.state!=='created')return {state:result.state==='unknown'?'unknown':'rejected',sessionId:input.sessionId};
     signal?.throwIfAborted();
     await runtime.ensureSession({sessionId:input.sessionId});

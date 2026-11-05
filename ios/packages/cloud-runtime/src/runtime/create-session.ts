@@ -8,6 +8,12 @@ import type {
   CreationOptions,
 } from '../models/send.ts';
 import { githubProject, projectRows } from '../protocol/catalog.ts';
+import {
+  buildProjectGroupProjectRef,
+  buildSessionProjectRun,
+  getProjectBoundMachineId,
+  type WorkspaceProject,
+} from '../protocol/project-groups.ts';
 import { isThoughtLevel, validConfigValue } from '../protocol/capability';
 import { encodeFrame } from '../frames';
 import type { CreateSessionResult } from '../contract/methods.ts';
@@ -260,6 +266,8 @@ export async function createSession(
   options: CreationOptions,
   replica: { flock: Flock; client: StreamsClient },
   getGrant: () => Promise<{ token: string; gatewayBaseUrl: string }>,
+  /** A multi-repository project (web Project group), read fresh by the caller. */
+  group?: WorkspaceProject,
 ): Promise<CreateSessionResult> {
   const agent = options.agents.find(
     (a) => a.id === args.agentConfigId && a.machineId === args.machineId,
@@ -301,7 +309,14 @@ export async function createSession(
   );
   if (reason) return { state: 'rejected', reason } as const;
   let project: Record<string, string | boolean> | undefined;
-  if (!chat && github) {
+  // A Project group runs on its local members' machine, needs the machine's multi-repo
+  // support, and carries the frozen run (web chat landing `startSession`).
+  const projectRun = group ? groupRun(group, agent.machineId, replica.flock) : undefined;
+  const groupFirst = group?.members[0];
+  const groupRepo = group?.members.find((member) => member.source.kind === 'github')?.source;
+  if (group && groupFirst) {
+    project = buildProjectGroupProjectRef(groupFirst);
+  } else if (!chat && github) {
     project = {
       kind: 'github',
       repoFullName: options.project!.id.slice(7),
@@ -333,6 +348,13 @@ export async function createSession(
       ? { agentRoleId: args.agentRoleId, agentRoleRevision: args.agentRoleRevision }
       : {}),
     ...(project ? { project } : {}),
+    ...(projectRun ? { projectRun } : {}),
+    ...(group
+      ? {
+          ...(groupRepo?.kind === 'github' ? { repoFullName: groupRepo.repoFullName } : {}),
+          isWorktree: true,
+        }
+      : {}),
     ...(tab
       ? {
           parentSessionId: tab.parentSessionId,
@@ -357,7 +379,10 @@ export async function createSession(
     archived: false,
     pinned: false,
     projectId:
-      tab?.projectId ?? args.projectId ?? `${agent.machineId}:unassigned`,
+      tab?.projectId ??
+      (group ? groupProjectId(group, agent.machineId) : undefined) ??
+      args.projectId ??
+      `${agent.machineId}:unassigned`,
     ...(tab ? { parentSessionId: tab.parentSessionId } : {}),
     createdAt: meta.createdAt,
     cliType: meta.cliType,
@@ -393,3 +418,45 @@ export async function createSession(
     return { state: 'unknown', session };
   }
 }
+
+/** Where a group's session lists: the group itself, or its one member's project. */
+function groupProjectId(group: WorkspaceProject, machineId: string): string {
+  if (group.members.length > 1) return `group:${group.id}`;
+  const source = group.members[0]!.source;
+  return source.kind === 'github' ? `github:${source.repoFullName}` : `${machineId}:local:${source.localProjectId}`;
+}
+
+/** A machine's merged metadata row (`['m', 'machine-<id>']` plus field rows). */
+function machineMeta(flock: Flock, machineId: string): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  const id = `machine-${machineId}`;
+  for (const row of flock.scan()) {
+    if (row.key[0] !== 'm' || row.key[1] !== id) continue;
+    if (row.key.length === 2 && row.value && typeof row.value === 'object') Object.assign(fields, row.value);
+    else if (row.key.length === 3 && typeof row.key[2] === 'string') fields[row.key[2]] = row.value;
+  }
+  return fields;
+}
+
+function supports(meta: Record<string, unknown>, capability: string): boolean {
+  const capabilities = meta.protocolCapabilities;
+  if (!capabilities || typeof capabilities !== 'object') return false;
+  return Number((capabilities as Record<string, unknown>)[capability]) >= 1;
+}
+
+/**
+ * The group's frozen run on this machine (undefined for a one-member group, which
+ * is the single-repository flow). Throws when the group cannot run there.
+ */
+function groupRun(group: WorkspaceProject, machineId: string, flock: Flock) {
+  const bound = getProjectBoundMachineId(group.members);
+  if (bound === 'conflict' || (bound !== null && bound !== machineId)) throw new Error('project_machine_mismatch');
+  const run = buildSessionProjectRun(group);
+  if (!run) return undefined;
+  const meta = machineMeta(flock, machineId);
+  if (!supports(meta, 'multiRepoProject')) throw new Error('multi_repo_unsupported');
+  const preferLocal = group.members.some((member) => member.source.kind === 'github' && member.source.preferLocal);
+  if (preferLocal && !supports(meta, 'projectRepositoryMembers')) throw new Error('multi_repo_unsupported');
+  return run;
+}
+

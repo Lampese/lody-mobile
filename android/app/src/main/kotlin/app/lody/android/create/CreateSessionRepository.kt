@@ -27,6 +27,8 @@ interface CreationService {
     suspend fun roles(scope: RuntimeScope): List<AgentRole> = emptyList()
     /** One mention category for the composer's @ panel; none where there is no runtime. */
     suspend fun mentions(scope: RuntimeScope, category: String, source: MentionSource): MentionCatalogPage = MentionCatalogPage(emptyList())
+    /** The workspace's multi-repository projects for the picker; none without a runtime. */
+    suspend fun projectGroups(scope: RuntimeScope): List<ProjectGroup> = emptyList()
     /** A prompt shortcut's body ({prompt, mentions}) for the composer; none without a runtime. */
     suspend fun shortcut(scope: RuntimeScope, id: String): org.json.JSONObject = throw IllegalStateException("shortcut_unavailable")
     suspend fun options(scope: RuntimeScope, projectId: String?): CreationOptions
@@ -71,6 +73,9 @@ class CreateSessionRepository(private val owner: RuntimeOwner, private val store
     override suspend fun cachedOptions(scope: RuntimeScope, projectId: String?) = store.readOptions(scope, projectId)
     override suspend fun roles(scope: RuntimeScope): List<AgentRole> = owner.use(scope) {
         (it.execute(RuntimeCommand.ListAgentRoles) as RuntimeResult.Roles).value
+    }
+    override suspend fun projectGroups(scope: RuntimeScope): List<ProjectGroup> = owner.use(scope) {
+        (it.execute(RuntimeCommand.ListProjectGroups) as RuntimeResult.ProjectGroups).value
     }
     override suspend fun shortcut(scope: RuntimeScope, id: String): org.json.JSONObject = owner.use(scope) {
         (it.execute(RuntimeCommand.ShortcutBody(id)) as RuntimeResult.Shortcut).value

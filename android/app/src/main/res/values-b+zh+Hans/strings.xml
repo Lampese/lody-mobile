@@ -352,4 +352,7 @@
     <string name="projects_github_member_note">只有工作区管理员和所有者可以添加仓库。</string>
     <string name="projects_github_missing">找不到仓库？请在 GitHub 上为 Lody GitHub App 授权访问该仓库。</string>
     <string name="projects_github_install">在 GitHub 上配置</string>
+    <plurals name="create_group_members">
+        <item quantity="other">%d 个仓库</item>
+    </plurals>
 </resources>
