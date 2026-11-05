@@ -65,7 +65,14 @@ sealed interface MentionLevel {
  * under the prompt; the text after the trigger filters the visible level.
  */
 object Mentions {
+    /** What the runtime lists (`mentionCatalog` categories). */
     val categories = listOf("file", "skill", "session", "role", "issue", "pr", "cmd")
+    /** What the panel shows: prompt shortcuts split from the agent's commands (web). */
+    val shownCategories = listOf("file", "skill", "session", "role", "issue", "pr", "shortcut", "cmd")
+
+    /** Whether a trigger's scope includes an item: `/` offers shortcuts and commands (web). */
+    private fun inScope(item: MentionCandidate, scoped: String?) =
+        scoped == null || item.category == scoped || (scoped == "cmd" && item.category == "shortcut")
 
     /** The trigger the caret is in: where it starts, the query after it, and its scope. */
     data class Trigger(val start: Int, val end: Int, val query: String, val scoped: String?)
@@ -106,9 +113,9 @@ object Mentions {
         return when (level) {
             MentionLevel.Root ->
                 if (query.isEmpty() && trigger.scoped == null) {
-                    categories.filter { it == "file" || it == "skill" || it == "session" || catalogs[it]?.items?.isNotEmpty() == true }
+                    shownCategories.filter { category -> category == "file" || category == "skill" || category == "session" || items.any { it.category == category } }
                         .map { MentionCandidate(it, it, "category") }
-                } else items.filter { (trigger.scoped == null || it.category == trigger.scoped) && matches(it, query) }
+                } else items.filter { inScope(it, trigger.scoped) && matches(it, query) }
             is MentionLevel.Category -> {
                 val scoped = items.filter { it.category == level.category }
                 if (level.category == "file" && query.isEmpty()) scoped.filter { parent(it.path).isEmpty() }
@@ -136,6 +143,7 @@ object Mentions {
         "role" -> R.string.mention_roles
         "issue" -> R.string.mention_issues
         "pr" -> R.string.mention_prs
+        "shortcut" -> R.string.mention_shortcuts
         else -> R.string.mention_commands
     }
 
@@ -147,6 +155,7 @@ object Mentions {
         "issue" -> LodyIcons.Alert
         "pr" -> LodyIcons.PullRequest
         "cmd" -> LodyIcons.Terminal
+        "shortcut" -> LodyIcons.Star
         else -> LodyIcons.File
     }
 }
@@ -236,7 +245,7 @@ fun MentionPanel(
                             else -> item.subtitle
                         }
                         MentionRow(
-                            icon = Mentions.icon(if (item.kind == "category") item.path else item.kind),
+                            icon = Mentions.icon(if (item.kind == "category") item.path else if (item.category == "shortcut") "shortcut" else item.kind),
                             title = title, subtitle = subtitle, accent = false, disclosure = browse,
                             emoji = if (item.kind == "role") item.emoji ?: "🪼" else null,
                         ) {
@@ -314,7 +323,8 @@ fun MentionDock(state: MentionState, field: TextFieldValue, active: Boolean, onF
             rowsFor = { level -> if (trigger == null) emptyList() else Mentions.rows(level, state.catalogs, trigger) },
             loading = { level ->
                 when (level) {
-                    is MentionLevel.Category -> level.category in state.pending
+                    // Prompt shortcuts arrive with the commands.
+                    is MentionLevel.Category -> (if (level.category == "shortcut") "cmd" else level.category) in state.pending
                     is MentionLevel.Directory -> "file" in state.pending
                     MentionLevel.Root -> state.pending.isNotEmpty()
                 }

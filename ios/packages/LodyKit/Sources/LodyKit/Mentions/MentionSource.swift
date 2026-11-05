@@ -86,11 +86,19 @@ final class MentionCatalogStore {
   }
 
   func composerItemsJSON() -> String {
-    let rows: [[String: Any]] = Self.categories.filter { category in
-      ["file", "skill", "session"].contains(category) || failed.contains(category) || catalogs[category]?.items.isEmpty == false
+    // Prompt shortcuts arrive with the agent's commands (`cmd`) but list as their own category.
+    let commands = catalogs["cmd"]?.items ?? []
+    let isShortcut = { (item: MentionItem) in item.kind.rawValue == "cmd" && (item.insertText ?? "").hasPrefix("/shortcut:") }
+    let rows: [[String: Any]] = ChatMentionItem.categories.filter { category in
+      switch category {
+      case "file", "skill", "session": return true
+      case "shortcut": return commands.contains(where: isShortcut)
+      case "cmd": return failed.contains(category) || commands.contains { !isShortcut($0) }
+      default: return failed.contains(category) || catalogs[category]?.items.isEmpty == false
+      }
     }.map { category in
       [
-        "path": category, "kind": "category", "subtitle": Self.notice(catalogs[category]),
+        "path": category, "kind": "category", "subtitle": Self.notice(catalogs[category == "shortcut" ? "cmd" : category]),
         "name": String(localized: String.LocalizationValue("native.chat.mention." + (ChatMentionItem.labels[category] ?? category)), bundle: .lody),
       ]
     }

@@ -10,10 +10,21 @@ struct ChatMentionItem: Decodable, Equatable {
   /// A Role's emoji: it leads the row instead of a symbol (as the run-config Role row).
   var emoji: String?
 
-  var category: String { kind == "directory" ? "file" : kind }
-  static let categories = ["file", "skill", "session", "role", "issue", "pr", "cmd"]
-  static let labels = ["file": "files", "skill": "skills", "session": "sessions", "role": "roles", "issue": "issues", "pr": "prs", "cmd": "commands"]
-  static let glyphs = ["file": "doc.text", "directory": "folder", "skill": "sparkles", "session": "bubble.left.and.bubble.right", "role": "person.crop.rectangle", "issue": "exclamationmark.circle", "pr": "arrow.triangle.branch", "cmd": "command"]
+  /// Folders browse with the files; prompt shortcuts (the runtime lists them with the agent's
+  /// commands, inserting `/shortcut:<slug>`) are their own category, as web's mention menu.
+  var category: String {
+    if kind == "directory" { return "file" }
+    if kind == "cmd", (insertText ?? "").hasPrefix("/shortcut:") { return "shortcut" }
+    return kind
+  }
+  /// Whether a trigger's scope includes this item: `/` offers shortcuts and commands (web).
+  func inScope(_ scoped: String?) -> Bool {
+    guard let scoped else { return true }
+    return category == scoped || (scoped == "cmd" && category == "shortcut")
+  }
+  static let categories = ["file", "skill", "session", "role", "issue", "pr", "shortcut", "cmd"]
+  static let labels = ["file": "files", "skill": "skills", "session": "sessions", "role": "roles", "issue": "issues", "pr": "prs", "shortcut": "shortcuts", "cmd": "commands"]
+  static let glyphs = ["file": "doc.text", "directory": "folder", "skill": "sparkles", "session": "bubble.left.and.bubble.right", "role": "person.crop.rectangle", "issue": "exclamationmark.circle", "pr": "arrow.triangle.branch", "shortcut": "bolt", "cmd": "command"]
 
   /// An emoji as a list image (drawn in its own colours, never tinted).
   static func emojiImage(_ emoji: String, size: CGFloat) -> UIImage {
@@ -38,7 +49,7 @@ struct ChatMentionItem: Decodable, Equatable {
     content.secondaryTextProperties.font = .dynamic(of: 13)
     content.secondaryTextProperties.color = .secondaryLabel
     content.secondaryTextProperties.numberOfLines = 1
-    let glyph = Self.glyphs[kind == "category" ? path : kind] ?? "doc.text"
+    let glyph = Self.glyphs[kind == "category" ? path : (category == "shortcut" ? "shortcut" : kind)] ?? "doc.text"
     content.image = UIImage(systemName: glyph, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .regular))
     if kind == "role" {
       content.image = Self.emojiImage(emoji?.isEmpty == false ? emoji! : "🪼", size: 20)
@@ -197,7 +208,7 @@ final class ChatMentionPanel: UIView {
     switch level {
     case .root:
       guard query.isEmpty && scoped == nil else {
-        return items.filter { (scoped == nil || $0.category == scoped) && $0.matches(query) }
+        return items.filter { $0.inScope(scoped) && $0.matches(query) }
       }
       let provided = catalog.filter { $0.kind == "category" }
       if !provided.isEmpty { return provided }
@@ -399,7 +410,8 @@ final class ChatMentionLevelController: UIViewController, UICollectionViewDelega
     if isViewLoaded { reload(animated: false) }
   }
 
-  /// 36 pt: a plain back chevron, the level's title, and a hairline under them.
+  /// 44 pt (the minimum touch target, still far shorter than the system bar): a plain back
+  /// chevron, the level's title, and a hairline under them.
   private func makeHeader() -> UIView {
     let header = UIView()
     header.translatesAutoresizingMaskIntoConstraints = false
@@ -429,7 +441,7 @@ final class ChatMentionLevelController: UIViewController, UICollectionViewDelega
       header.topAnchor.constraint(equalTo: view.topAnchor),
       header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      header.heightAnchor.constraint(equalToConstant: 36),
+      header.heightAnchor.constraint(equalToConstant: 44),
       back.leadingAnchor.constraint(equalTo: header.leadingAnchor),
       back.topAnchor.constraint(equalTo: header.topAnchor),
       back.bottomAnchor.constraint(equalTo: header.bottomAnchor),

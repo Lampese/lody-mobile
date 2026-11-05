@@ -277,8 +277,15 @@ data class MentionCandidate(
     /** A Role's emoji: it leads the row instead of an icon (as the run-config Role row). */
     val emoji: String? = null,
 ) {
-    /** Folders browse with the files. */
-    val category: String get() = if (kind == "directory") "file" else kind
+    /**
+     * Folders browse with the files; prompt shortcuts (listed with the agent's commands, inserting
+     * `/shortcut:<slug>`) are their own category, as web's mention menu and iOS.
+     */
+    val category: String get() = when {
+        kind == "directory" -> "file"
+        kind == "cmd" && insertText?.startsWith("/shortcut:") == true -> "shortcut"
+        else -> kind
+    }
 }
 /** What references come from: a conversation, or the new-chat page's selection (iOS `MentionSource`). */
 data class MentionSource(

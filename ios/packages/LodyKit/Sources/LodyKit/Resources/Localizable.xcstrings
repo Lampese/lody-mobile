@@ -12938,6 +12938,23 @@
         }
       }
     },
+    "native.chat.mention.shortcuts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt Shortcuts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示词快捷方式"
+          }
+        }
+      }
+    },
     "native.chat.mention.commands": {
       "extractionState": "manual",
       "localizations": {
