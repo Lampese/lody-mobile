@@ -75,7 +75,7 @@ enum CreateProjectPicker {
     var imageAsset = ""
     if group {
       image = ""
-      imageAsset = "lody.icon.project"
+      imageAsset = "lody.icon.projectGroup"
     } else if github {
       image = ""
       imageAsset = "lody-mark-github"

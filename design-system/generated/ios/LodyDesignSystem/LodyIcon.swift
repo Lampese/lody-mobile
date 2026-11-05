@@ -10,6 +10,7 @@ public enum LodyIcon: String, CaseIterable, Sendable {
     case session = "lody.icon.session"
     case sessions = "lody.icon.sessions"
     case project = "lody.icon.project"
+    case projectGroup = "lody.icon.projectGroup"
     case folder = "lody.icon.folder"
     case file = "lody.icon.file"
     case fileCode = "lody.icon.fileCode"

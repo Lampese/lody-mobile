@@ -469,7 +469,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearc
         icon = when {
             target.chat -> LodyIcons.Close
             CreateSessionModel.isGithub(project?.id) -> LodyIcons.Github
-            CreateSessionModel.isGroup(project?.id) -> LodyIcons.Project
+            CreateSessionModel.isGroup(project?.id) -> LodyIcons.ProjectGroup
             else -> LodyIcons.Folder
         },
         title = if (target.chat) chatLabel else project?.name ?: stringResource(R.string.create_pick_project),
@@ -542,7 +542,7 @@ private fun CatalogProject.option(target: CreateTarget) = PickerOption(
     subtitle = if (CreateSessionModel.isGithub(id)) "GitHub" else rootPath.replace(Regex("^/(Users|home)/[^/]+"), "~"),
     icon = when {
         CreateSessionModel.isGithub(id) -> LodyIcons.Github
-        CreateSessionModel.isGroup(id) -> LodyIcons.Project
+        CreateSessionModel.isGroup(id) -> LodyIcons.ProjectGroup
         else -> LodyIcons.Folder
     },
 )
