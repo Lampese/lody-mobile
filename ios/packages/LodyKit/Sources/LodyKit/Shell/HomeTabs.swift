@@ -56,6 +56,15 @@ final class HomeTabsController: UITabBarController, UITabBarControllerDelegate {
   func show(_ destination: HomeTab) {
     selectedTab = tab(forIdentifier: "home-tab-\(destination)")
     tabBarMinimizeBehavior = destination == .chats ? .onScrollDown : .never
+    updateCreate(destination)
+  }
+
+  /// On Projects the create action adds a project ("+"); elsewhere it starts a chat.
+  private func updateCreate(_ destination: HomeTab) {
+    guard let create = tab(forIdentifier: Self.createID) else { return }
+    let projects = destination == .projects
+    create.image = projects ? LodyIcon.plus.uiImage : LodyIcon.compose.uiImage
+    create.title = String(localized: String.LocalizationValue(projects ? "projects.add.title" : "tabs.newSession"), bundle: .lody)
   }
 
   func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
@@ -66,6 +75,7 @@ final class HomeTabsController: UITabBarController, UITabBarControllerDelegate {
   func tabBarController(_ tabBarController: UITabBarController, didSelectTab selectedTab: UITab, previousTab: UITab?) {
     guard let destination = HomeTab.allCases.first(where: { selectedTab.identifier == "home-tab-\($0)" }) else { return }
     tabBarMinimizeBehavior = destination == .chats ? .onScrollDown : .never
+    updateCreate(destination)
     onSelect(destination)
   }
 

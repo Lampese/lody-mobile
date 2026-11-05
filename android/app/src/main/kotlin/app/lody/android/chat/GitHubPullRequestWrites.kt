@@ -96,7 +96,7 @@ internal class GitHubPullRequestWrites(private val http: GitHubHttp = GitHubHttp
     }
 }
 
-private class GitHubHttpClient : GitHubHttp {
+internal class GitHubHttpClient : GitHubHttp {
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .connectTimeout(15, TimeUnit.SECONDS).callTimeout(25, TimeUnit.SECONDS).build()
 

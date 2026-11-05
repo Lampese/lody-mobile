@@ -16,6 +16,21 @@ export function createCommands(runtime, sendTurn, identity) {
   // The workspace's Agent Roles (emoji, per-machine targets and what each pins); a read.
   agentRoles:async()=>({roles:await roles()}),
   // One mention category for the composer's @ panel (shared runtime `mentionCatalog`); a read.
+  // The Projects tab's "Add local folder" (shared runtime `localProjects`): `machines`, `browse`
+  // a computer's folders (home by default; `cursor` pages), `add` registers the folder as a
+  // project (the computer derives its id from the path, so an existing project is returned),
+  // `cancel` ends the browser's machine RPCs. Reads, except `add`, which is never retried.
+  async localProjects(action,browserId,machineId,path,cursor) {
+   const scope=identity();if(!scope?.userId)throw Error('not_connected');
+   if(!['machines','browse','add','cancel'].includes(action) || typeof browserId!=='string' || !/^[A-Za-z0-9-]{1,200}$/.test(browserId))throw Error('invalid_request');
+   const fields={};
+   for(const [key,value] of [['machineId',machineId],['path',path],['cursor',cursor]]) {
+    if(value===undefined || value===null)continue;
+    if(typeof value!=='string' || !value || value.length>4096)throw Error('invalid_request');
+    fields[key]=value;
+   }
+   return runtime.localProjects({workspaceId:scope.workspaceId,userId:scope.userId,browserId,action,...(action==='cancel' || action==='machines'?{}:fields)});
+  },
   // `source` names what the references come from: a conversation, or the new-chat page's
   // project / computer / agent (iOS `MentionSource`); only non-empty strings cross.
   async mentionCatalog(category,source) {

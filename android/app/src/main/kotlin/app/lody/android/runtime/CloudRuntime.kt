@@ -32,6 +32,11 @@ sealed interface RuntimeCommand {
     data class TurnDiff(val sessionId: String, val entryId: String, val path: String) : RuntimeCommand
     /** One mention category for the composer's @ panel (upstream `mentionCatalog`). Read only. */
     data class MentionCatalog(val category: String, val source: MentionSource) : RuntimeCommand
+    /**
+     * Add a local folder as a project (upstream `localProjects`): `machines`, `browse`, `add`
+     * (a write, never retried) or `cancel`, for one folder browser ([browserId]).
+     */
+    data class LocalProjects(val action: String, val browserId: String, val machineId: String? = null, val path: String? = null, val cursor: String? = null) : RuntimeCommand
     /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
     data class StopTurn(val sessionId: String, val machineId: String, val turnId: String) : RuntimeCommand
     data object Ping : RuntimeCommand
@@ -41,6 +46,8 @@ sealed interface RuntimeResult {
     data class Options(val value: CreationOptions) : RuntimeResult
     data class Roles(val value: List<AgentRole>) : RuntimeResult
     data class Mentions(val value: MentionCatalogPage) : RuntimeResult
+    /** The `localProjects` outcome as the runtime sent it (`machines`, `directory`, `project`, …). */
+    data class LocalProjects(val value: org.json.JSONObject) : RuntimeResult
     data class Created(val value: CreationReceipt) : RuntimeResult
     /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult

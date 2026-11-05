@@ -330,4 +330,26 @@
     <string name="home_projects_search_empty">没有匹配“%1$s”的项目</string>
     <string name="chat_new_tab_title">新对话</string>
     <string name="mention_shortcuts">提示词快捷方式</string>
+    <string name="projects_add_title">添加项目</string>
+    <string name="projects_add_local">添加本地文件夹</string>
+    <string name="projects_add_github">添加 GitHub 仓库</string>
+    <string name="projects_add_done">已添加 %s</string>
+    <string name="projects_local_machines_failed">无法读取电脑列表。</string>
+    <string name="projects_local_read_failed">无法打开这个文件夹。</string>
+    <string name="projects_local_add_failed">添加文件夹失败，请重试。</string>
+    <string name="projects_local_up">上一级</string>
+    <string name="projects_local_empty">这里没有文件夹</string>
+    <string name="projects_local_more">加载更多</string>
+    <string name="projects_local_add">添加“%1$s”</string>
+    <string name="projects_github_search">搜索仓库</string>
+    <string name="projects_github_private">私有</string>
+    <string name="projects_github_added">已添加</string>
+    <string name="projects_github_add_failed">添加仓库失败，请重试。</string>
+    <string name="projects_github_install_failed">无法打开 GitHub，请重试。</string>
+    <string name="projects_github_load_failed">无法读取仓库列表。</string>
+    <string name="projects_github_none">Lody GitHub App 还不能访问任何仓库。请先在 GitHub 上授权，再回来添加。</string>
+    <string name="projects_github_none_member">还没有连接任何仓库。请让工作区管理员安装 Lody GitHub App。</string>
+    <string name="projects_github_member_note">只有工作区管理员和所有者可以添加仓库。</string>
+    <string name="projects_github_missing">找不到仓库？请在 GitHub 上为 Lody GitHub App 授权访问该仓库。</string>
+    <string name="projects_github_install">在 GitHub 上配置</string>
 </resources>

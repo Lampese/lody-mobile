@@ -123,6 +123,7 @@ import app.lody.android.designsystem.LodyTheme
 import app.lody.android.designsystem.LodyWorkingGrid
 import app.lody.android.designsystem.shadow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 /** Everything Home renders; HomeActivity derives it from account and catalog state. */
@@ -168,6 +169,10 @@ fun ChatListScreen(
     onSignOut: () -> Unit,
     onOpenChat: (ChatItem) -> Unit,
     onNewChat: () -> Unit,
+    /** The Projects tab's "+" (add a local folder or a GitHub repository); none hides it. */
+    projects: ProjectAdding? = null,
+    scope: app.lody.android.runtime.RuntimeScope? = null,
+    onOpenUrl: (String) -> Unit = {},
 ) {
     val colors = LodyTheme.colors
     val chatsListState = rememberLazyListState()
@@ -189,6 +194,16 @@ fun ChatListScreen(
     val project = state.projects.firstOrNull { it.id == projectId }
         ?: state.snapshot?.projects?.firstOrNull { it.id == projectId }?.let { ChatGroup(it.id, it.name, ChatGroup.Kind.Project, emptyList()) }
     val snackbar = remember { SnackbarHostState() }
+    val notices = androidx.compose.runtime.rememberCoroutineScope()
+    // The Projects "+": its menu, then the sheet it opens ("local" / "github").
+    var addMenu by remember { mutableStateOf(false) }
+    var addSheet by rememberSaveable { mutableStateOf<String?>(null) }
+    val addedFormat = stringResource(R.string.projects_add_done)
+    val added = { name: String ->
+        addSheet = null
+        notices.launch { snackbar.showSnackbar(addedFormat.format(name)) }
+        Unit
+    }
     val closeSearch = { searching = false; query = "" }
     val context = LocalContext.current
     var details by remember { mutableStateOf(ChatRowDetails.load(context)) }
@@ -216,6 +231,7 @@ fun ChatListScreen(
         if (searching) closeSearch() else projectId = null
     }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = colors.bgBase,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -246,11 +262,13 @@ fun ChatListScreen(
         },
         bottomBar = {
             if (!searching && project == null) {
+                val adds = tab == HomeTab.Projects && projects != null && scope != null
                 HomeBottomBar(
                     selected = tab,
                     collapsed = tab == HomeTab.Chats && barCollapsed,
-                    onSelect = { tab = it },
-                    onCreate = onNewChat,
+                    onSelect = { tab = it; addMenu = false },
+                    adds = adds,
+                    onCreate = { if (adds) addMenu = !addMenu else onNewChat() },
                 )
             }
         },
@@ -280,6 +298,21 @@ fun ChatListScreen(
             tab == HomeTab.Projects -> ProjectCardList(cards, padding, empty = stringResource(R.string.home_projects_empty), onOpen = { projectId = it.id })
             else -> SettingsList(state, padding, onSelectWorkspace, onSignOut)
         }
+    }
+    if (projects != null && scope != null) {
+        // Over the screen, so the capsules rise above the bar from the "+".
+        ProjectAddMenu(
+            open = addMenu && tab == HomeTab.Projects && !searching && project == null,
+            bottomInset = BarHeight + LodySpacing.xs + LodySpacing.sm,
+            onDismiss = { addMenu = false },
+            onLocal = { addMenu = false; addSheet = "local" },
+            onGitHub = { addMenu = false; addSheet = "github" },
+        )
+        when (addSheet) {
+            "local" -> LocalFolderSheet(projects, scope, onDismiss = { addSheet = null }, onAdded = added)
+            "github" -> GitHubRepoSheet(projects, scope, onDismiss = { addSheet = null }, onAdded = added, onOpenUrl = onOpenUrl)
+        }
+    }
     }
 }
 
@@ -562,9 +595,10 @@ private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose
 
 /** Labelled tabs in a floating capsule plus a separate new-chat button. */
 @Composable
-private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (HomeTab) -> Unit, onCreate: () -> Unit) {
+private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (HomeTab) -> Unit, adds: Boolean = false, onCreate: () -> Unit) {
     val colors = LodyTheme.colors
-    val create = stringResource(R.string.home_new_chat)
+    // On Projects the button adds a project ("+"); elsewhere it starts a chat.
+    val create = stringResource(if (adds) R.string.projects_add_title else R.string.home_new_chat)
     val progress by animateFloatAsState(
         if (collapsed) 1f else 0f,
         tween(LodyMotion.slowMillis, easing = LodyMotion.standard), label = "home-bar-collapse",
@@ -617,7 +651,9 @@ private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (Home
                 .semantics { contentDescription = create },
             contentAlignment = Alignment.Center,
         ) {
-            Glyph(LodyIcons.Compose, colors.iconPrimary, LodyIconSize.lg)
+            androidx.compose.animation.Crossfade(adds, label = "create-glyph") { plus ->
+                Glyph(if (plus) LodyIcons.Plus else LodyIcons.Compose, colors.iconPrimary, LodyIconSize.lg)
+            }
         }
     }
 }

@@ -39,6 +39,12 @@ open class WebViewRuntime internal constructor(
         }
         is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL).put(command.agentConfigId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
         RuntimeCommand.ListAgentRoles -> RuntimeResult.Roles(CreationJson.roles(call("agentRoles", deadline = CommandDeadline.QUERY) as JSONObject))
+        is RuntimeCommand.LocalProjects -> {
+            val args = JSONArray().put(command.action).put(command.browserId)
+                .put(command.machineId ?: JSONObject.NULL).put(command.path ?: JSONObject.NULL).put(command.cursor ?: JSONObject.NULL)
+            val deadline = if (command.action == "add") CommandDeadline.WRITE else CommandDeadline.QUERY
+            RuntimeResult.LocalProjects(call("localProjects", args, deadline) as JSONObject)
+        }
         is RuntimeCommand.MentionCatalog -> {
             val source = command.source
             val args = JSONArray().put(command.category).put(JSONObject().apply {

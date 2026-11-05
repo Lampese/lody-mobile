@@ -1,5 +1,6 @@
 import LodyCore
 import LodyDesignSystem
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -233,7 +234,10 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
   }
   private func configureTabs() {
     tabsHost.onSelect = { [weak self] in self?.selectedTab = $0 }
-    tabsHost.onCreate = { [weak self] in self?.inbox.newSession() }
+    tabsHost.onCreate = { [weak self] in
+      guard let self else { return }
+      if self.selectedTab == .projects { self.addProject() } else { self.inbox.newSession() }
+    }
     tabsHost.onDebug = { [weak self] in
       guard let self else { return }
       LodyShell.shared.openPage("debug", from: self.tabPages[.settings])
@@ -272,6 +276,33 @@ final class HomeController: UIViewController, UISplitViewControllerDelegate, UIP
     LodyShell.shared.configureNavigation(navigation)
     tabNavigations[destination] = navigation
     return navigation
+  }
+
+  /// The Projects tab's "+": the add menu springs out of the button; tapping it again folds it.
+  private func addProject() {
+    let host = tabsHost.view!
+    if let shown = ProjectAddMenu.shown(in: host) { return shown.close() }
+    let state = source.state
+    guard state.workspace != nil, !state.workspaceId.isEmpty else {
+      LodyToastOverlay.shared.show(message: String(localized: "tabs.toast.signInFirst", bundle: .lody), kind: "error")
+      return
+    }
+    let workspaceId = state.workspaceId
+    ProjectAddMenu.present(in: host, above: tabsHost.tabBar, onLocal: {
+      Task { @MainActor in
+        guard let project = await DirectoryController.browse(workspaceId: workspaceId) else { return }
+        LodyToastOverlay.shared.show(
+          message: String.localizedStringWithFormat(String(localized: "projects.add.done", bundle: .lody), project.name), kind: "success")
+      }
+    }, onGitHub: {
+      let model = GitHubRepositoryModel(workspaceId: workspaceId)
+      let picker = UIHostingController(rootView: GitHubRepositoryPicker(model: model))
+      model.onAdded = { [weak picker] repo in
+        (picker?.parent ?? picker)?.navigationController?.dismiss(animated: true)
+        LodyToastOverlay.shared.show(message: String.localizedStringWithFormat(String(localized: "projects.add.done", bundle: .lody), repo), kind: "success")
+      }
+      LodyShell.shared.presentNative(picker, title: String(localized: "projects.add.github", bundle: .lody), detents: [1], grabber: true)
+    })
   }
 
   func selectTab(_ next: HomeTab) {

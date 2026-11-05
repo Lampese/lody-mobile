@@ -336,4 +336,26 @@
     <string name="home_projects_search_empty">No projects match “%1$s”</string>
     <string name="chat_new_tab_title">New chat</string>
     <string name="mention_shortcuts">Prompt Shortcuts</string>
+    <string name="projects_add_title">Add Project</string>
+    <string name="projects_add_local">Add Local Folder</string>
+    <string name="projects_add_github">Add GitHub Repository</string>
+    <string name="projects_add_done">Added %s</string>
+    <string name="projects_local_machines_failed">Couldn\'t load your computers.</string>
+    <string name="projects_local_read_failed">Can\'t open this folder.</string>
+    <string name="projects_local_add_failed">Couldn\'t add the folder. Try again.</string>
+    <string name="projects_local_up">Up one folder</string>
+    <string name="projects_local_empty">No folders here</string>
+    <string name="projects_local_more">Load more</string>
+    <string name="projects_local_add">Add “%1$s”</string>
+    <string name="projects_github_search">Search repositories</string>
+    <string name="projects_github_private">Private</string>
+    <string name="projects_github_added">Added</string>
+    <string name="projects_github_add_failed">Couldn\'t add the repository. Try again.</string>
+    <string name="projects_github_install_failed">Couldn\'t open GitHub. Try again.</string>
+    <string name="projects_github_load_failed">Couldn\'t load repositories.</string>
+    <string name="projects_github_none">The Lody GitHub App can\'t reach any repositories yet. Grant it access on GitHub, then come back.</string>
+    <string name="projects_github_none_member">No repositories are connected yet. Ask a workspace admin to install the Lody GitHub App.</string>
+    <string name="projects_github_member_note">Only workspace admins and owners can add repositories.</string>
+    <string name="projects_github_missing">Don\'t see a repository? Grant the Lody GitHub App access to it on GitHub.</string>
+    <string name="projects_github_install">Configure on GitHub</string>
 </resources>

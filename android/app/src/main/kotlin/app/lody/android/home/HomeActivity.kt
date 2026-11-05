@@ -113,6 +113,9 @@ class HomeActivity : ComponentActivity() {
                                 onSignOut = { app.account.logout() },
                                 onOpenChat = { selectedTitle = it.title; selectedId = it.id },
                                 onNewChat = { creating = true },
+                                projects = app.projectAdding,
+                                scope = workspace?.let { RuntimeScope(user.id, it.id) },
+                                onOpenUrl = { url -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
                             )
                         }
                     }
