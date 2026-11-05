@@ -3,7 +3,7 @@
   "commit": "216d24ee8163821783f6cbd41604c761fc61ee74",
   "license": "AGPL-3.0-only",
   "path": "ios/packages/cloud-runtime",
-  "note": "Base commit snapshot plus reviewed local capability-refresh and directory Tab changes shared verbatim with ios/packages/cloud-runtime; recorded in e7df50f. Agent Role creation (role run config and emoji in the listing, sendTurn agentRoleId resolved from the fresh row, createSession role provenance) shared verbatim with ios/packages/cloud-runtime in the same change. Creation options expose confirmed online machine IDs for the Android computer picker, copied verbatim from the shared runtime in this change. Conversation Roles (web session composer): sendTurn accepts agentRoleId on later turns, applying the Role's pins, memory and provenance without repeating its prompt prefix, and a cleared agentRoleId as an explicit None; the session composer projection exposes the latest turn's agentRoleId. Copied verbatim from the shared runtime in this change. Role mention items carry the Role's emoji, copied verbatim from the shared runtime. Multi-repository projects (web Project groups: projectGroups listing, createSession projectGroupId with the frozen projectRun, catalog sessions under group:<id>) copied verbatim from the shared runtime.",
+  "note": "Base commit snapshot plus reviewed local capability-refresh and directory Tab changes shared verbatim with ios/packages/cloud-runtime; recorded in e7df50f. Agent Role creation (role run config and emoji in the listing, sendTurn agentRoleId resolved from the fresh row, createSession role provenance) shared verbatim with ios/packages/cloud-runtime in the same change. Creation options expose confirmed online machine IDs for the Android computer picker, copied verbatim from the shared runtime in this change. Conversation Roles (web session composer): sendTurn accepts agentRoleId on later turns, applying the Role's pins, memory and provenance without repeating its prompt prefix, and a cleared agentRoleId as an explicit None; the session composer projection exposes the latest turn's agentRoleId. Copied verbatim from the shared runtime in this change. Role mention items carry the Role's emoji, copied verbatim from the shared runtime. Multi-repository projects (web Project groups: projectGroups listing, createSession projectGroupId with the frozen projectRun, catalog sessions under group:<id>) copied verbatim from the shared runtime. Creation availability is isolated per machine; selected config probes recover after failure; matching per-model controls and creation change notifications are copied verbatim from the shared runtime in this change.",
   "localSourceFiles": [
     "contract/runtime-contract.json",
     "src/contract/projects.ts",
@@ -29,6 +29,8 @@
     "src/contract/mentions.ts",
     "src/models/mentions.ts",
     "src/protocol/project-groups.ts",
-    "src/runtime/project-groups.ts"
+    "src/runtime/project-groups.ts",
+    "src/protocol/capability.ts",
+    "src/runtime/index.ts"
   ]
 }

@@ -307,6 +307,7 @@ export const hostCalls = {
 export const runtimeEvents = {
   catalog: CatalogEvent,
   shareProgress: ShareProgressEvent,
+  creationOptionsChanged: Empty,
   machinePresence: MachinePresence,
   synced: SyncedEvent,
   syncError: SyncErrorEvent,

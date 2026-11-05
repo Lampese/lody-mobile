@@ -195,7 +195,7 @@ class CreateSessionHostController: UIViewController {
   private func selectionChanged(_ form: CreateSessionForm) {
     let page = form.current
     if page.options?.availability == "online", let agent = page.agent,
-       CreateLogic.capabilityFor(page.options, agent) == nil, capabilityConfig != agent.id {
+       capabilityConfig != agent.id {
       capabilityConfig = agent.id
       capabilityTask?.cancel()
       capabilityTask = Task { [weak self] in

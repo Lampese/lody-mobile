@@ -195,7 +195,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         ?.takeIf { CreateSessionModel.roleApplied(it, agent?.id, modelId, modeId, effort) }
     LaunchedEffect(runtimeScope, agent?.id, optionsFresh, capability != null) {
         val selected = agent ?: return@LaunchedEffect
-        if (optionsFresh && capability == null) {
+        if (optionsFresh) {
             try { repository.refreshCapability(runtimeScope, selected.id) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* Cached choices remain usable for display. */ }

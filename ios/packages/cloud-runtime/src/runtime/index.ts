@@ -215,6 +215,7 @@ function publish() {
     }
   for (const machine of meta.machineIds)
     if (!watchers.has(machine)) watch(machine);
+  channel.emit('creationOptionsChanged', {});
   if (unhealthy.size || meta.machineIds.some((id) => !catalogs.has(id))) return;
   const projects = new Map(meta.projects.map((p) => [p.id, p]));
   for (const id of meta.machineIds)
@@ -364,6 +365,7 @@ function watch(mode: string) {
         if (mode === 'meta') state.metaReplica = undefined;
         else machineReplicas.delete(mode);
         unhealthy.add(mode);
+        channel.emit('creationOptionsChanged', {});
         const reason = error instanceof Error ? error.message : 'sync_failed';
         channel.emit('syncError', {
           reason:

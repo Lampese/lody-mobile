@@ -4,7 +4,7 @@ data class CreationChoice(val id: String, val name: String)
 data class CreationAgent(val id: String, val name: String, val machineId: String, val cliType: String, val agentType: String)
 /** An agent switch the composer may offer (ACP config option); [options] are a select's value ids. */
 data class CreationConfigOption(val id: String, val category: String?, val type: String, val currentValue: Any?, val options: List<String> = emptyList())
-data class CreationCapability(val machineId: String, val cliType: String, val agentType: String, val models: List<CreationChoice>, val modes: List<CreationChoice>, val efforts: Map<String, List<String>>, val agentConfigId: String? = null, val defaultModelId: String? = null, val defaultEfforts: List<String> = emptyList(), val switches: List<CreationConfigOption> = emptyList()) {
+data class CreationCapability(val machineId: String, val cliType: String, val agentType: String, val models: List<CreationChoice>, val modes: List<CreationChoice>, val efforts: Map<String, List<String>>, val agentConfigId: String? = null, val defaultModelId: String? = null, val defaultEfforts: List<String> = emptyList(), val switches: List<CreationConfigOption> = emptyList(), val fastModes: Map<String, Boolean> = emptyMap()) {
     fun effortsFor(modelId: String?): List<String> = efforts[modelId ?: defaultModelId] ?: defaultEfforts
 
     /** Web's Plan switch: Lody's boolean `plan_mode`, or a collaboration mode with a `plan` value. */
@@ -27,11 +27,11 @@ data class CreationCapability(val machineId: String, val cliType: String, val ag
 
     /** Plan / Fast state for the chip and sheet; null when the agent offers no such switch. */
     fun planOn(values: Map<String, Any>): Boolean? = planSwitch?.let { switchOn(it, values) }
-    fun fastOn(values: Map<String, Any>): Boolean? = fastSwitch?.let { switchOn(it, values) }
+    fun fastOn(values: Map<String, Any>, modelId: String? = null): Boolean? = fastSwitch?.takeUnless { fastModes[modelId ?: defaultModelId] == false }?.let { switchOn(it, values) }
 
     /** The option id and value that set Plan / Fast; null when not offered. */
     fun planValue(on: Boolean): Pair<String, Any>? = planSwitch?.let { it.id to switchValue(it, on) }
-    fun fastValue(on: Boolean): Pair<String, Any>? = fastSwitch?.let { it.id to switchValue(it, on) }
+    fun fastValue(on: Boolean, modelId: String? = null): Pair<String, Any>? = fastSwitch?.takeUnless { fastModes[modelId ?: defaultModelId] == false }?.let { it.id to switchValue(it, on) }
 }
 data class CreationOptions(val agents: List<CreationAgent>, val capabilities: List<CreationCapability>, val availability: String = "online", val onlineMachineIds: Set<String>? = null) {
     fun capability(agent: CreationAgent?): CreationCapability? {

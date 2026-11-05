@@ -26,9 +26,14 @@ still runs the bundled watcher against a synthetic transport to pin the budget.
 `create-commands.mjs` exposes creation options and create-and-send using native scope identity. Presence is read through the grant origin; the UI only offers currently online agents. The adapter calls upstream creation, session bootstrap and text send in order, retaining IDs and never retrying writes. It deliberately uses plain text (no shortcut, attachment or mention expansion). The snapshot's creation carries the public local-project `useWorktree` field. Native and JavaScript network gates permit only the exact workspace stream kinds needed for persistence and dispatch. An accepted Machine RPC is not task completion. GitHub branches are entered by name in this first integration.
 
 Creation keeps cached choices visible until presence is known. The open creation
-page refreshes from catalog/presence events, not a timer. Selecting a provider
-with no capabilities requests `machine/acp-capabilities-refresh` through the
-existing machine RPC transport, once per provider/runtime. Discovery is bounded
+page refreshes from catalog/presence events, not a timer. Selecting an online provider revalidates its cached capabilities with `machine/acp-capabilities-refresh` through the
+existing machine RPC transport, coalesced per provider/runtime; failed probes may retry on a later selection after a 30-second cooldown. Discovery is bounded
 and serialized per machine. Its progress frames are not final replies; validated
 final capabilities are held in a workspace/config-scoped display overlay and
 passed through the normal capability projection. These capabilities are synchronized from the shared iOS runtime snapshot.
+
+Creation reads healthy machine replicas independently: another machine's failed
+sync does not block its agents or session creation. `creationOptionsChanged`
+wakes both native pickers even before the whole catalog can report synced.
+Matching `acpModelCapability` source versions supply per-model effort/Fast
+controls; mismatched declarations never overwrite current capabilities.

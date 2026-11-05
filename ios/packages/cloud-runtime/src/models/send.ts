@@ -27,6 +27,7 @@ export type Capability = {
   // Actual legacy ACP modes, before the model picker folds in config selectors.
   legacyModes?: CapabilityChoice[];
   reasoningEfforts: Record<string, string[]>;
+  fastModes?: Record<string, boolean>;
   reasoningEffortConfigId?: string;
   configOptions?: ConfigOption[];
   steer: boolean;

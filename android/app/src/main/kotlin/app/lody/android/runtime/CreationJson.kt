@@ -16,7 +16,7 @@ internal object CreationJson {
             val efforts = c.optJSONObject("reasoningEfforts") ?: JSONObject()
             CreationCapability(c.getString("machineId"), c.getString("cliType"), c.getString("agentType"), choices(c.optJSONArray("models")), choices(c.optJSONArray("modes")), efforts.keys().asSequence().associateWith { key ->
                 val a = efforts.getJSONArray(key); (0 until a.length()).map { a.getString(it) }
-            }, c.optString("agentConfigId").takeIf { it.isNotBlank() }, defaultModel, defaultEfforts, switches(config))
+            }, c.optString("agentConfigId").takeIf { it.isNotBlank() }, defaultModel, defaultEfforts, switches(config), c.optJSONObject("fastModes")?.let { modes -> modes.keys().asSequence().associateWith { modes.getBoolean(it) } }.orEmpty())
         },
         value.optString("availability", "unknown"),
         value.optJSONArray("onlineMachineIds")?.let { ids -> (0 until ids.length()).map { ids.getString(it) }.toSet() },
@@ -46,6 +46,7 @@ internal object CreationJson {
                     }.put("options", choices(option.options.map { CreationChoice(it, it) })))
                 }
             })
+            .put("fastModes", JSONObject(c.fastModes))
             .put("models", choices(c.models)).put("modes", choices(c.modes)).put("reasoningEfforts", JSONObject().apply { c.efforts.forEach { (model, levels) -> put(model, JSONArray(levels)) } }) }))
     }
     fun request(value: CreateRequest) = JSONObject().apply {

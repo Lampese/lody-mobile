@@ -5,6 +5,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CreationJsonTest {
+    @Test fun modelControlsFollowTheSelectedModelAfterCacheRestore() {
+        val json = JSONObject("""{"capabilities":[{"machineId":"m","agentConfigId":"a","cliType":"builtin","agentType":"codex","reasoningEfforts":{"small":[],"large":["high","max"]},"fastModes":{"small":false,"large":true},"configOptions":[{"id":"model","category":"model","currentValue":"small"},{"id":"fast-mode","type":"boolean","currentValue":false}]}]}""")
+        val options = CreationJson.options(CreationJson.encodeOptions(CreationJson.options(json)))
+        val capability = options.capabilities.single()
+        assertEquals(listOf("high", "max"), capability.effortsFor("large"))
+        assertEquals(emptyList<String>(), capability.effortsFor("small"))
+        assertNull(capability.fastOn(emptyMap()))
+        assertNull(capability.fastValue(true, "small"))
+        assertEquals(false, capability.fastOn(emptyMap(), "large"))
+    }
+
     @Test fun machinePresenceIsReadButNeverRestoredFromCache() {
         val options = CreationJson.options(JSONObject("""{"availability":"online","agents":[],"capabilities":[],"onlineMachineIds":["without-agent"]}"""))
         assertEquals(setOf("without-agent"), options.onlineMachineIds)

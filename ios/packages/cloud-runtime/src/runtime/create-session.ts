@@ -178,6 +178,90 @@ export function creationOptions(
             projected.currentValue = option.currentValue as string | boolean;
           return [projected];
         });
+        // Model controls are stored separately from the probe snapshot. Only merge
+        // the declaration for this config and the same launch/source version.
+        const declaration = configId
+          ? (flock.get(['acpModelCapability', configId]) as
+              | {
+                  version?: number;
+                  sourceVersion?: string;
+                  models?: Record<
+                    string,
+                    { effortValues?: string[]; fastMode?: boolean }
+                  >;
+                }
+              | undefined)
+          : undefined;
+        const modelControls =
+          declaration?.version === 1 &&
+          typeof value.sourceVersion === 'string' &&
+          declaration.sourceVersion === value.sourceVersion &&
+          declaration.models &&
+          typeof declaration.models === 'object' &&
+          !Array.isArray(declaration.models) &&
+          Object.values(declaration.models).every(
+            (control) =>
+              control &&
+              typeof control === 'object' &&
+              !Array.isArray(control) &&
+              (control.effortValues === undefined ||
+                (Array.isArray(control.effortValues) &&
+                  control.effortValues.every((v) => typeof v === 'string'))) &&
+              (control.fastMode === undefined ||
+                typeof control.fastMode === 'boolean'),
+          )
+            ? declaration.models
+            : undefined;
+        const declaredEfforts: Record<string, string[]> = {};
+        const fastModes: Record<string, boolean> = {};
+        for (const [model, control] of Object.entries(modelControls ?? {})) {
+          if (control.effortValues) {
+            declaredEfforts[model] =
+              cliType === 'builtin' && agentType === 'claude'
+                ? [...new Set(['default', ...control.effortValues])]
+                : control.effortValues;
+          } else if (cliType === 'builtin' && agentType === 'claude')
+            declaredEfforts[model] = [];
+          if (control.fastMode !== undefined)
+            fastModes[model] = control.fastMode;
+        }
+        const binding =
+          cliType === 'builtin'
+            ? (
+                {
+                  codex: ['reasoning_effort', 'fast-mode'],
+                  claude: ['effort', 'fast'],
+                } as Record<string, string[]>
+              )[agentType]
+            : undefined;
+        if (
+          binding &&
+          !configOptions.some(isThoughtLevel) &&
+          Object.values(declaredEfforts).some((v) => v.length)
+        ) {
+          configOptions.push({
+            id: binding[0],
+            name: 'Reasoning effort',
+            type: 'select',
+            category: 'thought_level',
+            options: [...new Set(Object.values(declaredEfforts).flat())].map(
+              (id) => ({ id, name: id }),
+            ),
+          });
+        }
+        if (
+          binding &&
+          Object.values(fastModes).includes(true) &&
+          !configOptions.some((o) => o.id === binding[1])
+        ) {
+          configOptions.push({
+            id: binding[1],
+            name: 'Fast',
+            type: 'boolean',
+            currentValue: false,
+            options: [],
+          });
+        }
         const effortOption = configOptions.find(isThoughtLevel);
         const modelOption = configOptions.find(
           (option) => option.category === 'model' && option.type === 'select',
@@ -194,18 +278,21 @@ export function creationOptions(
           modes: modeOption?.options ?? choices(value.modes, 'id'),
           legacyModes: choices(value.modes, 'id'),
           configOptions,
-          reasoningEfforts: Object.fromEntries(
-            Object.entries(
-              (efforts && typeof efforts === 'object' ? efforts : {}) as Record<
-                string,
-                unknown
-              >,
-            ).flatMap(([modelId, levels]) =>
-              Array.isArray(levels)
-                ? [[modelId, levels.filter((l) => typeof l === 'string')]]
-                : [],
+          ...(Object.keys(fastModes).length ? { fastModes } : {}),
+          reasoningEfforts: {
+            ...Object.fromEntries(
+              Object.entries(
+                (efforts && typeof efforts === 'object'
+                  ? efforts
+                  : {}) as Record<string, unknown>,
+              ).flatMap(([modelId, levels]) =>
+                Array.isArray(levels)
+                  ? [[modelId, levels.filter((l) => typeof l === 'string')]]
+                  : [],
+              ),
             ),
-          ),
+            ...declaredEfforts,
+          },
           ...(typeof effortOption?.id === 'string' && effortOption.id
             ? { reasoningEffortConfigId: effortOption.id }
             : {}),
@@ -311,9 +398,13 @@ export async function createSession(
   let project: Record<string, string | boolean> | undefined;
   // A Project group runs on its local members' machine, needs the machine's multi-repo
   // support, and carries the frozen run (web chat landing `startSession`).
-  const projectRun = group ? groupRun(group, agent.machineId, replica.flock) : undefined;
+  const projectRun = group
+    ? groupRun(group, agent.machineId, replica.flock)
+    : undefined;
   const groupFirst = group?.members[0];
-  const groupRepo = group?.members.find((member) => member.source.kind === 'github')?.source;
+  const groupRepo = group?.members.find(
+    (member) => member.source.kind === 'github',
+  )?.source;
   if (group && groupFirst) {
     project = buildProjectGroupProjectRef(groupFirst);
   } else if (!chat && github) {
@@ -345,13 +436,18 @@ export async function createSession(
     agentType: agent.agentType,
     agentConfigId: agent.id,
     ...(args.agentRoleId
-      ? { agentRoleId: args.agentRoleId, agentRoleRevision: args.agentRoleRevision }
+      ? {
+          agentRoleId: args.agentRoleId,
+          agentRoleRevision: args.agentRoleRevision,
+        }
       : {}),
     ...(project ? { project } : {}),
     ...(projectRun ? { projectRun } : {}),
     ...(group
       ? {
-          ...(groupRepo?.kind === 'github' ? { repoFullName: groupRepo.repoFullName } : {}),
+          ...(groupRepo?.kind === 'github'
+            ? { repoFullName: groupRepo.repoFullName }
+            : {}),
           isWorktree: true,
         }
       : {}),
@@ -423,7 +519,9 @@ export async function createSession(
 function groupProjectId(group: WorkspaceProject, machineId: string): string {
   if (group.members.length > 1) return `group:${group.id}`;
   const source = group.members[0]!.source;
-  return source.kind === 'github' ? `github:${source.repoFullName}` : `${machineId}:local:${source.localProjectId}`;
+  return source.kind === 'github'
+    ? `github:${source.repoFullName}`
+    : `${machineId}:local:${source.localProjectId}`;
 }
 
 /** A machine's merged metadata row (`['m', 'machine-<id>']` plus field rows). */
@@ -432,8 +530,10 @@ function machineMeta(flock: Flock, machineId: string): Record<string, unknown> {
   const id = `machine-${machineId}`;
   for (const row of flock.scan()) {
     if (row.key[0] !== 'm' || row.key[1] !== id) continue;
-    if (row.key.length === 2 && row.value && typeof row.value === 'object') Object.assign(fields, row.value);
-    else if (row.key.length === 3 && typeof row.key[2] === 'string') fields[row.key[2]] = row.value;
+    if (row.key.length === 2 && row.value && typeof row.value === 'object')
+      Object.assign(fields, row.value);
+    else if (row.key.length === 3 && typeof row.key[2] === 'string')
+      fields[row.key[2]] = row.value;
   }
   return fields;
 }
@@ -450,13 +550,17 @@ function supports(meta: Record<string, unknown>, capability: string): boolean {
  */
 function groupRun(group: WorkspaceProject, machineId: string, flock: Flock) {
   const bound = getProjectBoundMachineId(group.members);
-  if (bound === 'conflict' || (bound !== null && bound !== machineId)) throw new Error('project_machine_mismatch');
+  if (bound === 'conflict' || (bound !== null && bound !== machineId))
+    throw new Error('project_machine_mismatch');
   const run = buildSessionProjectRun(group);
   if (!run) return undefined;
   const meta = machineMeta(flock, machineId);
-  if (!supports(meta, 'multiRepoProject')) throw new Error('multi_repo_unsupported');
-  const preferLocal = group.members.some((member) => member.source.kind === 'github' && member.source.preferLocal);
-  if (preferLocal && !supports(meta, 'projectRepositoryMembers')) throw new Error('multi_repo_unsupported');
+  if (!supports(meta, 'multiRepoProject'))
+    throw new Error('multi_repo_unsupported');
+  const preferLocal = group.members.some(
+    (member) => member.source.kind === 'github' && member.source.preferLocal,
+  );
+  if (preferLocal && !supports(meta, 'projectRepositoryMembers'))
+    throw new Error('multi_repo_unsupported');
   return run;
 }
-

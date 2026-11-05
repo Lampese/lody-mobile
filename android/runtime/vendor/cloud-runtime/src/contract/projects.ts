@@ -51,6 +51,7 @@ export const Capability = z
     models: z.array(CapabilityChoice),
     modes: z.array(CapabilityChoice),
     legacyModes: z.array(CapabilityChoice).optional(),
+    fastModes: z.record(z.string(), z.boolean()).optional(),
     reasoningEfforts: z.record(z.string(), z.array(z.string())),
     reasoningEffortConfigId: z.string().optional(),
     configOptions: z.array(ConfigOption).optional(),
@@ -227,4 +228,3 @@ export const ProjectGroupItem = z
 export const ProjectGroupsResult = z
   .object({ groups: z.array(ProjectGroupItem) })
   .meta({ id: 'ProjectGroupsResult' });
-

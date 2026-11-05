@@ -41,7 +41,7 @@ test('runtime projection preserves capabilities for providers of one agent type'
  const code=(await transform(source.slice(source.indexOf('export function creationOptions('),source.indexOf('const attempted =')).replace('export function','function'),{loader:'ts'})).code;
  const context={crypto,projectRows:()=>({projects:[]}),isThoughtLevel:()=>false,validConfigValue:()=>false};vm.runInNewContext(code+';globalThis.options=creationOptions',context);
  const rows=['a','b'].map(id=>({key:['acpCapability',id],value:{cliType:'builtin',agentType:'codex',models:[{modelId:id,name:id}],fetchedAt:1}}));
- const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,'a');assert.equal(result.capabilities[1].models[0].id,'b');
+ const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows,get:()=>undefined}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,'a');assert.equal(result.capabilities[1].models[0].id,'b');
 });
 
 test('legacy capability keys preserve all builtin agent types',async()=>{
@@ -50,7 +50,7 @@ test('legacy capability keys preserve all builtin agent types',async()=>{
  const code=(await transform(source.slice(source.indexOf('export function creationOptions('),source.indexOf('const attempted =')).replace('export function','function'),{loader:'ts'})).code;
  const context={crypto,projectRows:()=>({projects:[]}),isThoughtLevel:()=>false,validConfigValue:()=>false};vm.runInNewContext(code+';globalThis.options=creationOptions',context);
  const rows=['grok','codex'].map(id=>({key:['acpCapability','builtin',id],value:{cliType:'builtin',agentType:id,models:[{modelId:id,name:id}],fetchedAt:1}}));
- const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,undefined);assert.equal(result.capabilities[0].agentType,'grok');assert.equal(result.capabilities[1].models[0].id,'codex');
+ const result=context.options(undefined,{scan:()=>[]},new Map([['m',{scan:()=>rows,get:()=>undefined}]]));assert.equal(result.capabilities.length,2);assert.equal(result.capabilities[0].agentConfigId,undefined);assert.equal(result.capabilities[0].agentType,'grok');assert.equal(result.capabilities[1].models[0].id,'codex');
 });
 
 test('thought-level choices validate and send without a per-model catalog',async()=>{

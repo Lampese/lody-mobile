@@ -46,13 +46,15 @@ export function registerProjects(ctx: RuntimeContext) {
     if (
       args.workspaceId !== state.workspace ||
       !state.metaReplica ||
-      state.unhealthy.size
+      state.unhealthy.has('meta')
     )
       throw new Error('metadata_not_ready');
     const options = creationOptions(
       args.projectId,
       state.metaReplica.flock,
-      state.machineReplicas,
+      new Map(
+        [...state.machineReplicas].filter(([id]) => !state.unhealthy.has(id)),
+      ),
       refreshMissing.rows(state.workspace),
     );
     const available = availableCreationOptions(
@@ -72,12 +74,17 @@ export function registerProjects(ctx: RuntimeContext) {
   channel.handle('projectGroups', async (args) => {
     const workspace = state.workspace;
     if (args.workspaceId !== workspace) throw new Error('metadata_not_ready');
-    const projects = await readWorkspaceProjects(workspace, getGrant, AbortSignal.timeout(30000));
+    const projects = await readWorkspaceProjects(
+      workspace,
+      getGrant,
+      AbortSignal.timeout(30000),
+    );
     if (state.workspace !== workspace) throw new Error('workspace_changed');
     const names = (machineId: string, localProjectId: string) => {
-      const row = state.machineReplicas.get(machineId)?.get(['localProject', localProjectId]) as
-        | Record<string, unknown>
-        | undefined;
+      const row = state.machineReplicas
+        .get(machineId)
+        ?.get(['localProject', localProjectId]) as
+        Record<string, unknown> | undefined;
       return typeof row?.name === 'string' && row.name ? row.name : undefined;
     };
     return { groups: projectGroupItems(projects, names) };

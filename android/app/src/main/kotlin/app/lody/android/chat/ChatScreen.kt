@@ -509,7 +509,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 mode = modeId,
                 modeLabel = capability?.modes?.firstOrNull { it.id == modeId }?.name,
                 plan = capability?.planOn(optionValues) == true,
-                fast = capability?.fastOn(optionValues) == true,
+                fast = capability?.fastOn(optionValues, modelId) == true,
                 onRunConfig = if (session != null) ({ runConfig = true }) else null,
                 stoppable = runningTurn != null && status == "live",
                 stopping = stopping,
@@ -568,7 +568,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     capability?.planOn(optionValues)?.let { on ->
                         add(app.lody.android.create.RunConfigRow(RUN_PLAN, stringResource(R.string.run_config_plan), emptyList(), toggle = on))
                     }
-                    capability?.fastOn(optionValues)?.let { on ->
+                    capability?.fastOn(optionValues, modelId)?.let { on ->
                         add(app.lody.android.create.RunConfigRow(RUN_FAST, stringResource(R.string.run_config_fast), emptyList(), toggle = on))
                     }
                 },
@@ -581,7 +581,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     RUN_EFFORT -> choose(modelId, value, modeId)
                     RUN_MODE -> choose(modelId, effort, value)
                     RUN_PLAN -> capability?.planValue(on)?.let { (key, setting) -> chooseOption(key, setting) }
-                    RUN_FAST -> capability?.fastValue(on)?.let { (key, setting) -> chooseOption(key, setting) }
+                    RUN_FAST -> capability?.fastValue(on, modelId)?.let { (key, setting) -> chooseOption(key, setting) }
                 }
             }
         }

@@ -13,7 +13,7 @@ type Options = {
     agentType: string;
   }[];
 };
-/** Missing providers only; bounded work, serialized per machine, no polling. */
+/** Revalidate the selected config; coalesce probes and back off failures. */
 export function createCapabilityRefresh(
   request: (
     workspace: string,
@@ -23,7 +23,7 @@ export function createCapabilityRefresh(
   currentWorkspace: () => string,
   changed: () => void,
 ) {
-  const attempted = new Set<string>();
+  const attempted = new Map<string, number>();
   const received = new Map<
     string,
     {
@@ -72,6 +72,7 @@ export function createCapabilityRefresh(
               configId: item.agent.id,
               value: {
                 ...(result.capability as Record<string, unknown>),
+                fetchedAt: Date.now(),
                 cliType: item.agent.cliType,
                 agentType: item.agent.agentType,
               },
@@ -80,6 +81,12 @@ export function createCapabilityRefresh(
         })
         .catch(() => {}) // A failed probe must retain the existing choices.
         .finally(() => {
+          const key = JSON.stringify([
+            item.workspace,
+            item.agent.machineId,
+            item.agent.id,
+          ]);
+          if (!received.has(key)) attempted.set(key, Date.now() + 30_000);
           running--;
           busy.delete(item.agent.machineId);
           if (currentWorkspace() === item.workspace) changed();
@@ -89,17 +96,10 @@ export function createCapabilityRefresh(
   }
   const refresh = (workspace: string, options: Options) => {
     for (const agent of options.agents) {
-      const known = options.capabilities.some(
-        (capability) =>
-          capability.machineId === agent.machineId &&
-          (capability.agentConfigId === agent.id ||
-            (!capability.agentConfigId &&
-              capability.cliType === agent.cliType &&
-              capability.agentType === agent.agentType)),
-      );
       const key = JSON.stringify([workspace, agent.machineId, agent.id]);
-      if (known || attempted.has(key)) continue;
-      attempted.add(key);
+      if ((attempted.get(key) ?? -Infinity) > Date.now()) continue;
+      // In-flight probes and successful results are shared across native refreshes.
+      attempted.set(key, Infinity);
       queue.push({ workspace, agent });
     }
     drain();

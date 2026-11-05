@@ -31,18 +31,69 @@ test('missing config is probed once even when another provider has capabilities'
   refresh('workspace', options);
   assert.equal(calls.length, 1);
 });
-test('existing exact or legacy capabilities do not start another agent', () => {
+test('selecting a config revalidates an existing empty capability snapshot', async () => {
+  const agent = {
+    id: 'a',
+    machineId: 'm',
+    cliType: 'builtin',
+    agentType: 'codex',
+  };
   const refresh = createCapabilityRefresh(
-    () => assert.fail('unexpected request'),
+    async () => ({
+      result: {
+        success: true,
+        machineId: 'm',
+        configId: 'a',
+        cliType: 'builtin',
+        agentType: 'codex',
+        capability: { models: [{ modelId: 'fresh', name: 'Fresh' }] },
+      },
+    }),
     () => 'w',
     () => {},
   );
   refresh('w', {
-    agents: [
-      { id: 'a', machineId: 'm', cliType: 'builtin', agentType: 'grok' },
-    ],
-    capabilities: [{ machineId: 'm', cliType: 'builtin', agentType: 'grok' }],
+    agents: [agent],
+    capabilities: [{ ...agent, agentConfigId: 'a', models: [] }],
   });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(refresh.rows('w')[0]?.value.models[0].modelId, 'fresh');
+});
+test('a failed probe can recover on a later selection without an immediate retry loop', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  let attempts = 0;
+  const agent = {
+    id: 'a',
+    machineId: 'm',
+    cliType: 'builtin',
+    agentType: 'codex',
+  };
+  const refresh = createCapabilityRefresh(
+    async () => {
+      if (++attempts === 1) throw new Error('temporary network failure');
+      return {
+        result: {
+          success: true,
+          machineId: 'm',
+          configId: 'a',
+          cliType: 'builtin',
+          agentType: 'codex',
+          capability: { models: [{ modelId: 'recovered', name: 'Recovered' }] },
+        },
+      };
+    },
+    () => 'w',
+    () => {},
+  );
+  const options = { agents: [agent], capabilities: [] };
+  refresh('w', options);
+  await new Promise((resolve) => setImmediate(resolve));
+  refresh('w', options);
+  assert.equal(attempts, 1);
+  t.mock.timers.tick(30_000);
+  refresh('w', options);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(refresh.rows('w')[0]?.value.models[0].modelId, 'recovered');
 });
 test('validated RPC capability is available immediately before catalog sync', async () => {
   const agent = {

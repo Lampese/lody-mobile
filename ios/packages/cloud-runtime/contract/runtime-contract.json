@@ -214,6 +214,7 @@
   },
   "events": {
     "catalog": "CatalogEvent",
+    "creationOptionsChanged": "Empty",
     "diagnostic": "DiagnosticEvent",
     "machinePresence": "MachinePresence",
     "session": "SessionEvent",
@@ -486,6 +487,11 @@
         "legacyModes": {
           "type": "array",
           "items": { "$ref": "CapabilityChoice" }
+        },
+        "fastModes": {
+          "type": "object",
+          "propertyNames": { "type": "string" },
+          "additionalProperties": { "type": "boolean" }
         },
         "reasoningEfforts": {
           "type": "object",

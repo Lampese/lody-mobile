@@ -51,6 +51,9 @@ public enum CreateLogic {
   }
 
   public static func fastMode(_ capability: Capability?, _ choice: ModelChoice) -> (id: String, enabled: Bool)? {
+    var model = choice.modelId
+    if model == nil, case .string(let current)? = capability?.configOptions?.first(where: { $0.category == "model" })?.currentValue { model = current }
+    if let model, capability?.fastModes?[model] == false { return nil }
     guard let option = capability?.configOptions?.first(where: { ["fast-mode", "fast"].contains($0.id) && $0.type == "boolean" })
     else { return nil }
     let value = choice.configOptionValues?[option.id] ?? option.currentValue

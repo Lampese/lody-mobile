@@ -294,6 +294,8 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
       reason = "machine_presence"
       emitStatus(["creationOptionsChanged": true])
       onMachinePresence?(owner, value)
+    case .creationOptionsChanged:
+      emitStatus(["creationOptionsChanged": true])
     case .synced:
       if phase != "live" { publish("live", reason: "synced") }
       emitStatus(["creationOptionsChanged": true])

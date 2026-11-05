@@ -397,11 +397,12 @@ extension RuntimeContract {
     public var models: [CapabilityChoice]
     public var modes: [CapabilityChoice]
     public var legacyModes: [CapabilityChoice]?
+    public var fastModes: [String: Bool]?
     public var reasoningEfforts: [String: [String]]
     public var reasoningEffortConfigId: String?
     public var configOptions: [ConfigOption]?
     public var steer: Bool
-    public init(machineId: String, agentConfigId: String? = nil, cliType: String, agentType: String, models: [CapabilityChoice], modes: [CapabilityChoice], legacyModes: [CapabilityChoice]? = nil, reasoningEfforts: [String: [String]], reasoningEffortConfigId: String? = nil, configOptions: [ConfigOption]? = nil, steer: Bool) {
+    public init(machineId: String, agentConfigId: String? = nil, cliType: String, agentType: String, models: [CapabilityChoice], modes: [CapabilityChoice], legacyModes: [CapabilityChoice]? = nil, fastModes: [String: Bool]? = nil, reasoningEfforts: [String: [String]], reasoningEffortConfigId: String? = nil, configOptions: [ConfigOption]? = nil, steer: Bool) {
       self.machineId = machineId
       self.agentConfigId = agentConfigId
       self.cliType = cliType
@@ -409,6 +410,7 @@ extension RuntimeContract {
       self.models = models
       self.modes = modes
       self.legacyModes = legacyModes
+      self.fastModes = fastModes
       self.reasoningEfforts = reasoningEfforts
       self.reasoningEffortConfigId = reasoningEffortConfigId
       self.configOptions = configOptions
@@ -423,6 +425,7 @@ extension RuntimeContract {
       self.models = try c.decode([CapabilityChoice].self, forKey: Key("models"))
       self.modes = try c.decode([CapabilityChoice].self, forKey: Key("modes"))
       self.legacyModes = try c.decodeIfPresent([CapabilityChoice].self, forKey: Key("legacyModes"))
+      self.fastModes = try c.decodeIfPresent([String: Bool].self, forKey: Key("fastModes"))
       self.reasoningEfforts = try c.decode([String: [String]].self, forKey: Key("reasoningEfforts"))
       self.reasoningEffortConfigId = try c.decodeIfPresent(String.self, forKey: Key("reasoningEffortConfigId"))
       self.configOptions = try c.decodeIfPresent([ConfigOption].self, forKey: Key("configOptions"))
@@ -437,6 +440,7 @@ extension RuntimeContract {
       try c.encode(self.models, forKey: Key("models"))
       try c.encode(self.modes, forKey: Key("modes"))
       try c.encodeIfPresent(self.legacyModes, forKey: Key("legacyModes"))
+      try c.encodeIfPresent(self.fastModes, forKey: Key("fastModes"))
       try c.encode(self.reasoningEfforts, forKey: Key("reasoningEfforts"))
       try c.encodeIfPresent(self.reasoningEffortConfigId, forKey: Key("reasoningEffortConfigId"))
       try c.encodeIfPresent(self.configOptions, forKey: Key("configOptions"))
@@ -7272,6 +7276,7 @@ extension RuntimeContract {
 
   public enum Event: Sendable, Equatable {
     case catalog(RuntimeContract.CatalogEvent)
+    case creationOptionsChanged(RuntimeContract.Empty)
     case diagnostic(RuntimeContract.DiagnosticEvent)
     case machinePresence(RuntimeContract.MachinePresence)
     case session(RuntimeContract.SessionEvent)
@@ -7359,6 +7364,7 @@ extension RuntimeContract {
       case ("event", _):
         switch method {
         case "catalog": message = .event(.catalog(try c.decode(RuntimeContract.CatalogEvent.self, forKey: Key("payload"))))
+        case "creationOptionsChanged": message = .event(.creationOptionsChanged(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "diagnostic": message = .event(.diagnostic(try c.decode(RuntimeContract.DiagnosticEvent.self, forKey: Key("payload"))))
         case "machinePresence": message = .event(.machinePresence(try c.decode(RuntimeContract.MachinePresence.self, forKey: Key("payload"))))
         case "session": message = .event(.session(try c.decode(RuntimeContract.SessionEvent.self, forKey: Key("payload"))))

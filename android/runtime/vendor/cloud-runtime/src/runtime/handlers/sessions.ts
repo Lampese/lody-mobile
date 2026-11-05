@@ -128,7 +128,8 @@ export function registerSessions(
       creating ||
       args.workspaceId !== state.workspace ||
       !state.metaReplica ||
-      state.unhealthy.size
+      state.unhealthy.has('meta') ||
+      state.unhealthy.has(args.machineId)
     )
       return { state: 'rejected' };
     const replica = state.metaReplica;
@@ -137,17 +138,28 @@ export function registerSessions(
       // A multi-repository project: read the group fresh; its run picks the machine's agents.
       const workspace = state.workspace;
       const group = args.projectGroupId
-        ? (await readWorkspaceProjects(workspace, getGrant, AbortSignal.timeout(30000))).find(
-            (project) => project.id === args.projectGroupId,
-          )
+        ? (
+            await readWorkspaceProjects(
+              workspace,
+              getGrant,
+              AbortSignal.timeout(30000),
+            )
+          ).find((project) => project.id === args.projectGroupId)
         : undefined;
-      if (args.projectGroupId && (!group || state.workspace !== workspace)) return { state: 'rejected' };
+      if (args.projectGroupId && (!group || state.workspace !== workspace))
+        return { state: 'rejected' };
       const options = creationOptions(
         group ? undefined : args.projectId,
         replica.flock,
         state.machineReplicas,
       );
-      const result = await createSession(group ? { ...args, projectId: undefined } : args, options, replica, getGrant, group);
+      const result = await createSession(
+        group ? { ...args, projectId: undefined } : args,
+        options,
+        replica,
+        getGrant,
+        group,
+      );
       if (result.state === 'created') republish(replica);
       return result;
     } catch (error) {
@@ -210,16 +222,19 @@ export function registerSessions(
     if (!state.metaReplica)
       return { state: 'not_sent', reason: 'metadata_not_ready' };
     // A Role binds the session's own Agent Config, read from metadata, never the wire.
-    const meta = state.metaReplica.flock.get(['m', `session-${wire.sessionId}`]) as
-      | Record<string, unknown>
-      | undefined;
+    const meta = state.metaReplica.flock.get([
+      'm',
+      `session-${wire.sessionId}`,
+    ]) as Record<string, unknown> | undefined;
     const args = {
       ...wire,
       modelId: cleared(wire.modelId),
       reasoningEffort: cleared(wire.reasoningEffort),
       agentRoleId: cleared(wire.agentRoleId),
       agentConfigId:
-        typeof meta?.agentConfigId === 'string' ? meta.agentConfigId : undefined,
+        typeof meta?.agentConfigId === 'string'
+          ? meta.agentConfigId
+          : undefined,
     };
     const sourceWorkspace = state.workspace;
     const source = {
