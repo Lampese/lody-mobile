@@ -367,7 +367,7 @@ struct ChatTranscript {
          let tail = members.last(where: { $0.role == "assistant" }),
          tail.executionFinished == true, members.filter({ $0.role == "assistant" }).allSatisfy(\.finished), !executionResultIDs(tail).isEmpty {
         guard emitted.insert(groupID).inserted else { return [] }
-        let users = members.filter { $0.role == "user" }.flatMap {
+        let users = members.filter { $0.role == "user" && $0.id == groupID }.flatMap {
           ChatTranscript(entries: [$0]).entryRows(now: now)
         }
         let process = executionProcess(members)
@@ -417,8 +417,14 @@ struct ChatTranscript {
     let assistants = members.filter { $0.role == "assistant" }
     guard let tail = assistants.last else { return [] }
     let resultIDs = executionResultIDs(tail)
-    return assistants.flatMap { entry in
-      ChatTranscript(entries: [entry]).entryRows(processEntryID: entry.id, flatItems: true).filter {
+    return members.flatMap { entry -> [ChatRow] in
+      if entry.role == "user" {
+        // The execution ID identifies the initial prompt. Later user messages
+        // are guides and belong at their original position in the process.
+        guard entry.id != entry.executionId else { return [] }
+        return ChatTranscript(entries: [entry]).entryRows()
+      }
+      return ChatTranscript(entries: [entry]).entryRows(processEntryID: entry.id, flatItems: true).filter {
         $0.kind != "proposed_plan" && (entry.id != tail.id || !resultIDs.contains($0.itemID))
       }
     }
