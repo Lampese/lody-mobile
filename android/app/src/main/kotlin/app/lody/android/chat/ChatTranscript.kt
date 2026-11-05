@@ -1,5 +1,6 @@
 package app.lody.android.chat
 
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -122,24 +123,43 @@ fun ChatTranscript(
     entries: List<ChatEntry>,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
-    state: LazyListState = rememberLazyListState(),
+    state: LazyListState = rememberLazyListState(initialFirstVisibleItemIndex = Int.MAX_VALUE),
+    scrollToLatest: Int = 0,
     /** Opens a step's detail; null where there is no runtime (previews, the stream probe). */
     loadDetail: (suspend (entryId: String, itemId: String) -> StepDetail)? = null,
     /** Opens a changed file's diff for a turn; null where there is no runtime. */
     loadDiff: (suspend (entryId: String, path: String) -> app.lody.android.runtime.FileDiff)? = null,
 ) {
-    // Follow mode changes only through the reader's own scrolling: dragging up leaves it,
-    // reaching the bottom again re-enters it. Growing content alone never turns it off.
-    var following by remember { mutableStateOf(true) }
+    // Only an actual drag leaves follow mode. Programmatic positioning and IME layout
+    // changes must not look like the reader scrolled away from the end.
+    var following by remember(state) { mutableStateOf(true) }
+    LaunchedEffect(state) {
+        state.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) following = false
+        }
+    }
     LaunchedEffect(state) {
         snapshotFlow { state.isScrollInProgress to state.canScrollForward }
-            .collect { (scrolling, more) -> if (scrolling) following = !more }
+            .collect { (scrolling, more) -> if (scrolling && !more) following = true }
     }
-    val tail = entries.lastOrNull()
-    val tailSize = when (tail) {
-        is ChatEntry.Assistant -> tail.layout.blocks.size to tail.prose.values.sumOf { it.blocks.size + (it.blocks.lastOrNull()?.length ?: 0) }
-        is ChatEntry.User -> 1 to tail.text.length + tail.delivery.ordinal
-        null -> 0 to 0
+    LaunchedEffect(state, scrollToLatest) {
+        if (scrollToLatest == 0) return@LaunchedEffect
+        following = true
+        val last = state.layoutInfo.totalItemsCount - 1
+        if (last >= 0) state.animateScrollToItem(last)
+    }
+    LaunchedEffect(state) {
+        // Observe measured geometry, not the previous frame's item count. This also
+        // follows growing text and each IME/composer resize while staying at the end.
+        snapshotFlow {
+            val layout = state.layoutInfo
+            val tail = layout.visibleItemsInfo.lastOrNull()
+            FollowLayout(following, state.isScrollInProgress, state.canScrollForward,
+                layout.totalItemsCount, layout.viewportEndOffset, tail?.index, tail?.offset, tail?.size)
+        }.collect { layout ->
+            if (layout.follow && !layout.scrolling && layout.more && layout.count > 0)
+                state.scrollToItem(layout.count - 1)
+        }
     }
     // Disclosure state for the screen's life: worked folds and activity groups, by key.
     val open = remember { mutableStateMapOf<String, Boolean>() }
@@ -152,6 +172,7 @@ fun ChatTranscript(
     // an open group, then closing it) it falls back to an index and the page jumps.
     var anchor by remember { mutableStateOf<Anchor?>(null) }
     val toggle: (String, Boolean) -> Unit = { key, value ->
+        following = false
         haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
         val row = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
         if (row != null) anchor = Anchor(key, row.offset, (anchor?.serial ?: 0) + 1)
@@ -187,15 +208,19 @@ fun ChatTranscript(
         // Tasks that left the transcript just leave the sheet closed.
         if (tasks.isNotEmpty()) TasksSheet(tasks) { shownTasks = null }
     }
-    LaunchedEffect(entries.size, tailSize) {
-        val last = state.layoutInfo.totalItemsCount - 1
-        if (following && last >= 0) state.scrollToItem(last, Int.MAX_VALUE)
-    }
     LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
         keys.reset()
         with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFiles) }
+        // A small stable end anchor avoids enormous scroll offsets and measuring the
+        // whole final Markdown block merely to discover its bottom.
+        item(key = "transcript-end", contentType = "end") { Spacer(Modifier.height(LodySpacing.xxs)) }
     }
 }
+
+private data class FollowLayout(
+    val follow: Boolean, val scrolling: Boolean, val more: Boolean, val count: Int,
+    val viewportEnd: Int, val tailIndex: Int?, val tailOffset: Int?, val tailSize: Int?,
+)
 
 /** A toggled row and its offset from the list's top before the toggle; [serial] re-runs equal toggles. */
 private data class Anchor(val key: Any, val offset: Int, val serial: Int)

@@ -114,9 +114,6 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         val showThoughts = context.session?.cliType == "builtin" && context.session.agentType == "deepseek"
         try {
             repository.observe(scope, id).conflate().collect { snapshot ->
-                status = snapshot.status
-                messages = snapshot.messages
-                snapshotChoice = snapshot.composer
                 entries = withContext(Dispatchers.Default) {
                     val next = snapshot.messages.map { message ->
                         rendered[message.id]?.takeIf { it.first == message }?.second ?: when (message.role) {
@@ -160,6 +157,9 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     proseCache.keys.retainAll { key -> snapshot.messages.any { key.startsWith(it.id + ":") } }
                     next
                 }
+                messages = snapshot.messages
+                snapshotChoice = snapshot.composer
+                status = snapshot.status
                 if (snapshot.messages.any { it.streaming }) delay(33)
             }
         } finally { repair.close() }
@@ -174,14 +174,19 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             else -> Delivery.Failed
         })
     }
-    val pending = (listOfNotNull(firstTurn) + outgoing).filter { it.turnId !in authorsByMessage }
-    val all = entries.map { entry ->
-        if (entry is ChatEntry.User) {
-            val userId = authorsByMessage[entry.id]
-            entry.copy(who = senderIdentity(userId, context.me, members[userId ?: context.me?.id], memberLabel, entry.who.time))
-        } else entry
-    } + pending.map {
-        ChatEntry.User(it.turnId, it.text, senderIdentity(null, context.me, members[context.me?.id], memberLabel, turnTime(it.at)), it.delivery, it.attachments)
+    val pending = remember(firstTurn, outgoing, authorsByMessage) {
+        (listOfNotNull(firstTurn) + outgoing).filter { it.turnId !in authorsByMessage }
+    }
+    // Composer focus / IME animation must not rebuild every sender row in a long chat.
+    val all = remember(entries, authorsByMessage, members, context.me, memberLabel, pending) {
+        entries.map { entry ->
+            if (entry is ChatEntry.User) {
+                val userId = authorsByMessage[entry.id]
+                entry.copy(who = senderIdentity(userId, context.me, members[userId ?: context.me?.id], memberLabel, entry.who.time))
+            } else entry
+        } + pending.map {
+            ChatEntry.User(it.turnId, it.text, senderIdentity(null, context.me, members[context.me?.id], memberLabel, turnTime(it.at)), it.delivery, it.attachments)
+        }
     }
     val creationUnconfirmed = creation != null && creation.state !in setOf("accepted", "queued") && creation.request.turnId !in authorsByMessage
     val creationNotice = if (creationUnconfirmed && creation?.state != "sending") {
@@ -431,7 +436,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     )
 
     val colors = LodyTheme.colors
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = Int.MAX_VALUE)
+    var scrollToLatest by remember { mutableIntStateOf(0) }
     val atLatest by remember { derivedStateOf { !listState.canScrollForward } }
     val headerHeight = LodySize.controlLg + LodySpacing.md
     Scaffold(
@@ -449,7 +455,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 } else {
                     // The transcript scrolls under the floating header.
                     ChatTranscript(
-                        all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top + if (creationNotice != null) LodySize.controlLg else LodySpacing.none, bottom = LodySpacing.md), state = listState,
+                        all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top + if (creationNotice != null) LodySize.controlLg else LodySpacing.none, bottom = LodySpacing.md), state = listState, scrollToLatest = scrollToLatest,
                         loadDetail = { entryId, itemId -> repository.detail(scope, id, entryId, itemId) },
                         loadDiff = { entryId, path -> repository.turnDiff(scope, id, entryId, path) },
                     )
@@ -475,7 +481,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     RoundButton(
                         LodyIcons.Expand, label,
                         Modifier.align(Alignment.BottomEnd).padding(end = TranscriptMargin, bottom = LodySpacing.md),
-                    ) { coroutines.launch { listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0), Int.MAX_VALUE) } }
+                    ) { scrollToLatest++ }
                 }
             }
             if (bar != null) {

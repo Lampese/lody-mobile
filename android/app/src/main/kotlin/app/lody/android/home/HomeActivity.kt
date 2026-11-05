@@ -93,12 +93,19 @@ class HomeActivity : ComponentActivity() {
                 } else {
                     val workspace = catalog.workspace
                     val route = selectedId ?: if (creating) "create" else "home"
-                    AnimatedContent(targetState = route, transitionSpec = {
-                        if (initialState == "create" && targetState != "home") {
-                            (slideInHorizontally(tween(LodyMotion.slowMillis)) { it } + fadeIn(tween(LodyMotion.baseMillis))) togetherWith
-                                fadeOut(tween(LodyMotion.fastMillis))
-                        } else EnterTransition.None togetherWith ExitTransition.None
-                    }, label = "session-navigation") { destination ->
+                    AnimatedContent(
+                        targetState = route, modifier = Modifier.fillMaxSize(),
+                        transitionSpec = {
+                            val motion = tween<androidx.compose.ui.unit.IntOffset>(LodyMotion.slowMillis)
+                            if (targetState == "home") {
+                                (slideInHorizontally(motion) { -it / 4 } + fadeIn(tween(LodyMotion.baseMillis))) togetherWith
+                                    slideOutHorizontally(motion) { it }
+                            } else {
+                                slideInHorizontally(motion) { it } togetherWith
+                                    (slideOutHorizontally(motion) { -it / 4 } + fadeOut(tween(LodyMotion.baseMillis)))
+                            }.using(null) // Full-screen pages; IME resizing must not animate the route's size again.
+                        }, label = "session-navigation",
+                    ) { destination ->
                         val id = destination.takeUnless { it == "create" || it == "home" }
                         if (id != null && workspace != null) {
                             ChatScreen(repository, RuntimeScope(user.id, workspace.id), id, chatContext(catalog, id, selectedTitle, user), onBack = { selectedId = null }, onSelectTab = { selectedId = it; selectedTitle = "" }, creation = submissions[id]?.takeIf { it.scope == activeScope })
