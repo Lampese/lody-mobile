@@ -864,7 +864,7 @@ private fun ChatComposer(
                 },
             )
             if (!expanded) {
-                // The running agent's mark (the Role's emoji when one is) and a chevron.
+                // The running agent's mark (the Role's emoji when one is).
                 Row(
                     Modifier
                         .heightIn(min = LodySize.controlMd)
@@ -877,7 +877,6 @@ private fun ChatComposer(
                 ) {
                     if (roleEmoji != null) Text(roleEmoji, style = type.body)
                     else AgentMark(agentCliType, agentType, colors.iconPrimary, Modifier.size(LodyIconSize.md))
-                    if (onRunConfig != null) Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
                 }
                 Send()
             }

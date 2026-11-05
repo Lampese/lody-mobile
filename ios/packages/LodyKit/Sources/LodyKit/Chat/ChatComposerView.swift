@@ -1656,22 +1656,17 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     !expanded && composerOptions.agentAsset != nil
   }
 
-  /// The collapsed face of the run-config chip: the agent mark tinted like text, then a small chevron.
+  /// The collapsed face of the run-config chip: the agent mark alone, tinted like text.
   private func renderCollapsedMark() {
     guard let asset = composerOptions.agentAsset,
           let mark = UIImage(named: asset, in: .main, compatibleWith: traitCollection) else { return }
-    let chevron = UIImage(systemName: "chevron.down", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
-    let side: CGFloat = 20, gap: CGFloat = 5
-    let chevronSize = chevron?.size ?? .zero
-    let size = CGSize(width: side + gap + chevronSize.width, height: side)
-    let face = UIGraphicsImageRenderer(size: size).image { _ in
+    let side: CGFloat = 20
+    let face = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
       mark.withTintColor(.label.resolvedColor(with: traitCollection)).draw(in: CGRect(x: 0, y: 0, width: side, height: side))
-      chevron?.withTintColor(.secondaryLabel.resolvedColor(with: traitCollection))
-        .draw(in: CGRect(x: side + gap, y: (side - chevronSize.height) / 2, width: chevronSize.width, height: chevronSize.height))
     }
     var configuration = UIButton.Configuration.plain()
     configuration.image = face.withRenderingMode(.alwaysOriginal)
-    configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 6)
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
     collapsedMark.configuration = configuration
     collapsedMark.isEnabled = modelButton.isEnabled
     collapsedMark.accessibilityLabel = modelButton.accessibilityLabel
