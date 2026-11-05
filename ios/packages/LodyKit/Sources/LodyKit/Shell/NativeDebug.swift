@@ -9,7 +9,12 @@ enum NativeDebug {
       do { try NativeHomeFixture.prepare() }
       catch { preconditionFailure("Invalid offline fixture: \(error)") }
     }
-    let root: UIViewController = LodyUIVerify.has("--ui-verify-home") ? HomeController() : NativeDebugController()
+    let root: UIViewController
+    if let review = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--ui-review-bar=") }) {
+      root = SessionPreviewController(scenario: "bar-" + String(review.dropFirst("--ui-review-bar=".count)))
+    } else {
+      root = LodyUIVerify.has("--ui-verify-home") ? HomeController() : NativeDebugController()
+    }
     LodyShell.shared.start(in: window, content: root, title: root is NativeDebugController ? "Debug" : "")
     let ready = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
     ready.isAccessibilityElement = true
@@ -69,6 +74,10 @@ enum NativeDebug {
         preconditionFailure("Missing native verification scene: \(scenario)")
       }
       content = page
+    }
+    if scenario.hasPrefix("session-preview-bar-") {
+      LodyShell.shared.pushRootNative(content, title: "")
+      return
     }
     let onboarding = content is OnboardingController
     let regular = LodyShell.shared.presenter?.traitCollection.horizontalSizeClass == .regular

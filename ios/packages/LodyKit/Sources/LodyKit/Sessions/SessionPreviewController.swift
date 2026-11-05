@@ -3,11 +3,13 @@ import UIKit
 
 @MainActor
 final class SessionPreviewController: SessionController {
+  private let scenario: String
   private let fixture: SessionPreviewFixture
   private let probe = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
 
   init(scenario: String) {
-    let fixture = SessionPreviewFixture(offline: scenario == "offline", tools: LodyUIVerify.has("--ui-verify-process-tools"))
+    self.scenario = scenario
+    let fixture = SessionPreviewFixture(offline: scenario == "offline", tools: LodyUIVerify.has("--ui-verify-process-tools"), bar: scenario)
     self.fixture = fixture
     super.init(
       sessionId: SessionPreviewFixture.sessionId, findQuery: scenario == "find" ? "needle" : "",
@@ -32,7 +34,7 @@ final class SessionPreviewController: SessionController {
         }
         return .init(success: true, preview: .init(operationId: "native-fixture", udid: "native-fixture-phone", phase: .ready, transport: .remote, viewerUrl: "lody-simulator-fixture://stream"))
       }),
-      pullRequest: { _, _ in PullRequestPreviewController(params: [:]) },
+      pullRequest: { reference, _ in PullRequestPreviewController(params: scenario.hasPrefix("bar-") ? ["state": reference.status, "reference": reference] : [:]) },
       browser: { _, _ in .init(url: "https://native-fixture.trycloudflare.com") }
     )
   }
@@ -42,10 +44,43 @@ final class SessionPreviewController: SessionController {
 
   override var persistsDraft: Bool { false }
 
+  override var resourceItems: [[String: Any]] {
+    guard scenario.hasPrefix("bar-") else { return super.resourceItems }
+    return SessionActionBarPreview.resources(scenario, browser: browserItem)
+  }
+
+  override func adjustComposer(_ state: inout [String: Any]) {
+    guard scenario.hasPrefix("bar-") else { return }
+    state["connection"] = ""
+    if scenario == "bar-running", let session = source.state.catalog.session(sessionId) {
+      state["actionBar"] = actionBarState(session, busy: true)
+    }
+    if ["bar-ready-pending", "bar-merge-pending"].contains(scenario) {
+      var bar = state["actionBar"] as? [String: Any] ?? [:]
+      let key = scenario == "bar-ready-pending" ? "bar.ready.pending" : "bar.merge.pending"
+      bar["primary"] = ["label": String(localized: String.LocalizationValue(key), bundle: .lody), "busy": true, "more": [], "moreLabel": ""]
+      state["actionBar"] = bar
+    }
+  }
+
   override func viewDidLoad() {
     probe.isAccessibilityElement = true
     probe.accessibilityIdentifier = "session-preview-probe"
     super.viewDidLoad()
+    if scenario.hasPrefix("bar-") {
+      let action = chat.onPreview
+      chat.onPreview = { [weak self] body in
+        guard let self else { return }
+        let id = body["action"] as? String ?? ""
+        if id == "bar:context:diff" || id == "bar:diff" {
+          LodyShell.shared.presentDetail(WorkspaceChangesPreviewController(), title: String(localized: "workspaceChanges.title", bundle: .lody), from: self)
+        } else if id == "bar:act", self.infoBar?.actions.first != .merge {
+          // Screenshot fixtures never send prompts or write to GitHub.
+          return
+        } else if id.hasPrefix("bar:more:") { return }
+        else { action(body) }
+      }
+    }
     view.addSubview(probe)
     fixture.changed = { [weak self] in self?.updateProbe() }
     updateProbe()
@@ -64,11 +99,13 @@ private final class SessionPreviewFixture {
   var changed: (() -> Void)?
   private let offline: Bool
   private let tools: Bool
+  private let bar: String
   private var catalog: SessionCatalog
   private var receive: (@MainActor (SessionRuntimeEvent) -> Void)?
   private var revision = 1
 
-  init(offline: Bool, tools: Bool = false, now: Double = LodyRelativeTime.now()) {
+  init(offline: Bool, tools: Bool = false, bar: String = "", now: Double = LodyRelativeTime.now()) {
+    self.bar = bar
     self.offline = offline
     self.tools = tools
     catalog = SessionCatalog(
@@ -82,12 +119,13 @@ private final class SessionPreviewFixture {
       ],
       machineIds: ["preview-mac"], machineNames: ["preview-mac": "Preview Mac"], machineSimulators: ["preview-mac": "available"]
     )
+    if bar.hasPrefix("bar-") { SessionActionBarPreview.configure(&catalog, scenario: bar) }
   }
 
   var state: SessionListState {
     SessionListState(
       userId: "preview-user", workspaceId: "preview-workspace",
-      presence: SettingsMachinePresence(state: "live", onlineMachineIds: ["preview-mac"]),
+      presence: SettingsMachinePresence(state: bar == "bar-unknown" ? "syncing" : "live", onlineMachineIds: bar == "bar-offline" ? [] : ["preview-mac"]),
       workspaces: [AuthWorkspace(id: "preview-workspace", name: "Preview", slug: "preview", image: nil)], catalog: catalog
     )
   }
@@ -129,7 +167,22 @@ private final class SessionPreviewFixture {
 
   private func emit(forceLive: Bool = false) {
     let status = offline && !forceLive ? "offline" : "live"
-    let session = Self.envelope(status: status, revision: revision, reply: "Live reply with a needle", tools: tools)
+    var session = Self.envelope(status: status, revision: revision, reply: "Live reply with a needle", tools: tools)
+    if bar.hasPrefix("bar-"), let data = session?.data(using: .utf8),
+       var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       var entries = object["entries"] as? [[String: Any]] {
+      entries[0]["items"] = [["itemId": "text", "type": "text", "text": SessionActionBarPreview.text("prompt")]]
+      entries[1]["items"] = [["itemId": "reply", "type": "text", "text": SessionActionBarPreview.text("reply")]]
+      if bar == "bar-tasks" || bar == "bar-crowded" {
+        var items = entries[1]["items"] as! [[String: Any]]
+        for index in 1...3 {
+          items.insert(["itemId": "task-\(index)", "type": "subagent_task", "taskId": "review-\(index)", "status": "in_progress", "actor": SessionActionBarPreview.text("task") + " \(index)", "description": SessionActionBarPreview.text("taskDescription")], at: 0)
+        }
+        entries[1]["items"] = items
+      }
+      object["entries"] = entries
+      session = SessionController.json(object)
+    }
     // Deliver after the cached frame, the way the runtime answers an open.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
       MainActor.assumeIsolated {

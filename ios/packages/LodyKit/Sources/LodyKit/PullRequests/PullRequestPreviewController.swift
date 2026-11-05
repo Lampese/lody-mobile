@@ -3,7 +3,7 @@ import UIKit
 @MainActor
 final class PullRequestPreviewController: PullRequestController {
   init(params: [String: Any]) {
-    let fixture = PullRequestFixture(mode: params["mode"] as? String ?? "preview", state: params["state"] as? String ?? "open")
+    let fixture = PullRequestFixture(mode: params["mode"] as? String ?? "preview", state: params["state"] as? String ?? "open", reference: params["reference"] as? SessionPullRequest)
     let store = PullRequestStore(repository: fixture.data.repository, number: fixture.data.number,
       scope: SettingsActor(userId: "preview", workspaceId: "preview"), service: fixture.service)
     super.init(store: store)
@@ -23,9 +23,15 @@ private final class PullRequestFixture {
   let mode: String
   var reads = 0
   var writes = 0
-  init(mode: String, state: String) {
+  init(mode: String, state: String, reference: SessionPullRequest? = nil) {
     self.mode = mode
-    data = try! JSONDecoder().decode(PullRequestSnapshot.self, from: Data(Self.json.utf8))
+    var object = try! JSONSerialization.jsonObject(with: Data(Self.json.utf8)) as! [String: Any]
+    if let reference {
+      object["repository"] = reference.repository
+      object["number"] = reference.number
+      object["headRef"] = "feature/mobile-ui"
+    }
+    data = try! JSONDecoder().decode(PullRequestSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
     data.state = state
     if mode == "empty" { data.checks = [] }
   }
