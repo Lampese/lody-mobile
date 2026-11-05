@@ -48,6 +48,28 @@ export type CreateSessionArgs = {
   };
 };
 
+/** Match the daemon's repo-metadata + machine-Flock merge. Machine rows win. */
+function metadataAgents(meta: Flock) {
+  const records = new Map<string, Record<string, unknown>>();
+  for (const row of meta.scan({ prefix: ['m'] })) {
+    const room = row.key[1];
+    if (typeof room !== 'string' || !room.startsWith('agent-')) continue;
+    if (meta.get(['e', room]) !== true) continue;
+    const fields = records.get(room) ?? Object.create(null);
+    if (row.key.length === 2 && row.value && typeof row.value === 'object')
+      Object.assign(fields, row.value);
+    else if (row.key.length === 3 && typeof row.key[2] === 'string') {
+      if (row.value === undefined) delete fields[row.key[2]];
+      else fields[row.key[2]] = row.value;
+    }
+    records.set(room, fields);
+  }
+  return [...records].map(([room, value]) => ({
+    key: ['agentConfig', room.slice('agent-'.length)],
+    value,
+  }));
+}
+
 export function creationOptions(
   projectId: string | undefined,
   meta: Flock,
@@ -107,7 +129,8 @@ export function creationOptions(
         })
       : [];
 
-  const agents: CreationOptions['agents'] = [];
+  const agents = new Map<string, CreationOptions['agents'][number]>();
+  const legacyAgents = metadataAgents(meta);
   for (const [machineId, flock] of machines) {
     if (
       !chat &&
@@ -116,6 +139,7 @@ export function creationOptions(
     )
       continue;
     for (const row of [
+      ...legacyAgents,
       ...flock.scan(),
       ...refreshed
         .filter((row) => row.machineId === machineId)
@@ -318,7 +342,7 @@ export function creationOptions(
       )
         continue;
       // Project only labels and IDs; never send launch environment or secrets to the UI.
-      agents.push({
+      agents.set(`${machineId}:${value.id}`, {
         id: value.id,
         name: value.name,
         machineId,
@@ -339,7 +363,7 @@ export function creationOptions(
   return {
     sessionId: crypto.randomUUID(),
     ...(project ? { project } : {}),
-    agents,
+    agents: [...agents.values()],
     capabilities: [...capabilities.values()].map(
       ({ fetchedAt: _fetchedAt, ...capability }) => capability,
     ),

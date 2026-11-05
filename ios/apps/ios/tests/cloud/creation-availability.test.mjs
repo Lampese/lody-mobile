@@ -200,3 +200,44 @@ test('creating on a healthy machine is not rejected by an unrelated sync failure
     'rejected',
   );
 });
+
+// The daemon merges repo metadata with machine rows; a provider may live in either.
+test('creation merges live metadata agents with authoritative machine configs', () => {
+  const { meta, machine, state } = fixture();
+  const put = (id, fields, alive = true) => {
+    meta.set(['e', `agent-${id}`], alive);
+    meta.set(['m', `agent-${id}`], {
+      id,
+      machineId: 'online',
+      name: id,
+      cliType: 'builtin',
+      agentType: 'codex',
+      env: { SECRET: 'never-project' },
+      ...fields,
+    });
+  };
+  put('legacy', {});
+  meta.set(['m', 'agent-legacy', 'name'], 'Codex');
+  put('coder', { name: 'Old Coder' });
+  put('removed', {}, false);
+  put('foreign', { machineId: 'unreadable' });
+  put('mismatch', { id: 'different' });
+  const options = creationOptions(undefined, meta, state.machineReplicas);
+  assert.deepEqual(
+    options.agents
+      .map(({ id, name }) => ({ id, name }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    [
+      { id: 'coder', name: 'Coder' },
+      { id: 'legacy', name: 'Codex' },
+    ],
+  );
+  assert.equal(JSON.stringify(options).includes('never-project'), false);
+  meta.set(['e', 'agent-legacy'], false);
+  assert.deepEqual(
+    creationOptions(undefined, meta, state.machineReplicas).agents.map(
+      (a) => a.id,
+    ),
+    ['coder'],
+  );
+});

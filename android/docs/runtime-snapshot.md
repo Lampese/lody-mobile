@@ -37,3 +37,8 @@ sync does not block its agents or session creation. `creationOptionsChanged`
 wakes both native pickers even before the whole catalog can report synced.
 Matching `acpModelCapability` source versions supply per-model effort/Fast
 controls; mismatched declarations never overwrite current capabilities.
+
+Agent discovery merges live `agent-*` repo metadata with machine Flock configs,
+matching the daemon. Machine configs win by machine/config identity; deleted
+metadata and agents outside readable healthy machines are excluded. Only display
+fields reach native UI, never launch environments or credentials.
