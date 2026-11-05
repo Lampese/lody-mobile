@@ -10,7 +10,6 @@ for (language, expected) in [
     let value = String.localizedStringWithFormat(String(localized: "changes.fileCount", bundle: bundle), count)
     precondition(value == expected[count], "\(language) plural: \(value)")
   }
-  precondition(String(localized: "native.liveActivity.others", bundle: bundle).contains("{count}"), "Widget payload keeps its template contract")
   let attachment = String.localizedStringWithFormat(
     String(localized: "native.chat.attachment.preview", bundle: bundle), "{name} 100%"
   )

@@ -85,7 +85,6 @@ final class NativeDebugController: UIViewController {
       ("pull-request-preview", "GitHub PR / CI 预览", "arrow.triangle.pull"),
       ("project-picker-preview", "选择项目验收", "folder"),
       ("notification-preview", "通知权限验收", "bell"),
-      ("live-activity-preview", "Live Activity 演示", "sparkles"),
       ("push-subscription-verify", "验证 OneSignal 订阅", "bell.badge"),
       ("permission-native-preview", "权限验收", "hand.raised"),
       ("onboarding-preview", "登录引导验收", "hand.wave"),

@@ -253,7 +253,6 @@ final class AuthSession {
   private func clearCredentials() throws {
     stopRuntime?()
     PushNotifications.shared.identify(nil)
-    LiveActivities.shared.endAll()
     try AuthKeychain.clear()
   }
 

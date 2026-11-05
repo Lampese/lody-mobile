@@ -69,7 +69,7 @@ class ActivityController: UIViewController {
     loadViews(state)
     var catalog = state.catalog.viewed(views)
     catalog.sessions = ready ? catalog.sessions.filter(Self.isActive) : []
-    var placeholder = "native.liveActivity.empty"
+    var placeholder = "activity.empty"
     if !localReady() || (allowed && (!ready || state.loading)) {
       placeholder = "common.loading"
     } else if !allowed {

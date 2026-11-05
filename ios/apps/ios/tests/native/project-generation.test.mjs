@@ -28,7 +28,6 @@ async function fixture() {
     'Lody',
     'LodyShare',
     'LodyNotificationService',
-    'LodyLiveActivity',
   ]) {
     targets[name] = { type: 'application', platform: 'iOS', sources: ['App'] };
   }
@@ -113,7 +112,6 @@ test(
         'ai.lody.mobile': 'app-profile',
         'ai.lody.mobile.share': 'share-profile',
         'ai.lody.mobile.notification-service': 'push-profile',
-        'ai.lody.mobile.live-activity': 'activity-profile',
       };
       let result = generate(root, {
         IOS_PROFILE_MAP: JSON.stringify({ 'ai.lody.mobile': 'app-profile' }),
@@ -133,7 +131,7 @@ test(
       const signed = configurations.filter(
         (value) => value.buildSettings.PROVISIONING_PROFILE_SPECIFIER,
       );
-      assert.equal(signed.length, 4);
+      assert.equal(signed.length, 3);
       assert.deepEqual(
         signed
           .map((value) => value.buildSettings.PROVISIONING_PROFILE_SPECIFIER)

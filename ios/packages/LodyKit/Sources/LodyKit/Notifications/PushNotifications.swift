@@ -4,7 +4,7 @@ import UIKit
 
 /// Process-owned listener: notification clicks can precede scene restoration.
 @MainActor
-final class PushNotifications: NSObject, OSNotificationClickListener, OSNotificationLifecycleListener, OSPushSubscriptionObserver, OSUserStateObserver {
+final class PushNotifications: NSObject, OSNotificationClickListener, OSNotificationLifecycleListener, OSPushSubscriptionObserver {
   static let shared = PushNotifications()
   private(set) var configured = false
   private var userId: String?
@@ -31,7 +31,6 @@ final class PushNotifications: NSObject, OSNotificationClickListener, OSNotifica
       }, fallbackToSettings: false)
     }
     OneSignal.User.pushSubscription.addObserver(self)
-    OneSignal.User.addObserver(self)
     evaluateSubscription(OneSignal.User.pushSubscription.id)
     OneSignal.Notifications.addClickListener(self)
     OneSignal.Notifications.addForegroundLifecycleListener(self)
@@ -41,13 +40,7 @@ final class PushNotifications: NSObject, OSNotificationClickListener, OSNotifica
     let id = state.current.id
     Task { @MainActor in
       self.evaluateSubscription(id)
-      if self.registered { LiveActivities.shared.recoverRegistrations() }
     }
-  }
-
-  nonisolated func onUserStateDidChange(state: OSUserChangedState) {
-    // A background push-to-start launch may restore SDK identity before account restoration.
-    Task { @MainActor in LiveActivities.shared.start() }
   }
 
   private func evaluateSubscription(_ id: String?) {
@@ -76,11 +69,9 @@ final class PushNotifications: NSObject, OSNotificationClickListener, OSNotifica
     userId = id
     DiagnosticsStore.shared.record("notification", "identity_observed", fields: ["identified": String(id != nil), "current": String(previous == id)])
     clicks.identify(id)
-    LiveActivities.shared.identify(id)
     if let id, !id.isEmpty {
       if let previous, previous != id { clearDelivered() }
       OneSignal.login(id)
-      LiveActivities.shared.start()
       // Never trigger the system permission prompt as a side effect of login.
       if OneSignal.Notifications.permission { OneSignal.User.pushSubscription.optIn() }
     } else {
@@ -180,21 +171,17 @@ final class PushNotifications: NSObject, OSNotificationClickListener, OSNotifica
 final class PushLifecycle {
   func applicationDidEnterBackground(_ application: UIApplication) {
     DiagnosticsStore.shared.record("app", "background", fields: ["appState": String(application.applicationState.rawValue)])
-    LiveActivities.shared.diagnosticSnapshot("background")
     DiagnosticsStore.shared.flush()
   }
 
   func applicationDidBecomeActive(_ application: UIApplication) {
     DiagnosticsStore.shared.record("app", "foreground", fields: ["appState": String(application.applicationState.rawValue)])
-    LiveActivities.shared.diagnosticSnapshot("foreground")
     PushNotifications.shared.status { _ in }
-    LiveActivities.shared.recoverRegistrations()
   }
 
   func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
     DiagnosticsStore.shared.record("app", "launch", fields: ["appState": String(application.applicationState.rawValue), "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""])
     PushNotifications.shared.start(launchOptions)
-    LiveActivities.shared.start()
     return true
   }
 }

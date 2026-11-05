@@ -98,7 +98,7 @@ test('signing verification excludes non-archived app hosts while checking extens
       },
     },
     {
-      target: 'LodyActivityVerify',
+      target: 'LodyVerify',
       buildSettings: {
         PRODUCT_BUNDLE_IDENTIFIER: 'ai.lody.mobile',
         PRODUCT_TYPE: 'com.apple.product-type.application',

@@ -113,7 +113,6 @@ extension DiagnosticsStore {
     let root = shared.directory
     let date = Date()
     let app = DiagnosticsStore(directory: root, process: .app, now: { date.addingTimeInterval(-60) })
-    app.record("live-activity", "snapshot", fields: ["active": "1", "activity": correlation("fixture-activity")])
     app.flush()
     let extensionStore = DiagnosticsStore(directory: root, process: .notificationService, now: { date.addingTimeInterval(-120) })
     extensionStore.record("notification", "extension_received", fields: ["message": "3327c0d1-727b-4af6-8e0f-3f27098d15df"])

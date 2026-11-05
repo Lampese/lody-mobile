@@ -32,7 +32,6 @@ public final class LodyApplication {
     ContentPreview.clearAll()
     if LodyUIVerify.offline { URLProtocol.registerClass(OfflineProbe.self) }
     lodyApplyWindowAccent()
-    LiveActivities.shared.syncAppIcon()
     DataRuntime.current = runtime
     AuthSession.shared.presenter = { LodyShell.shared.presenter }
     AuthSession.shared.stopRuntime = { [weak self] in self?.runtime.stop() }

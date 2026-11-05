@@ -131,7 +131,6 @@ enum LodyNativePages {
     "message-share": { params in MessageShareController(contentJSON: params["contentJSON"] as? String ?? "") },
     "notification-settings": { _ in NotificationSettingsController() },
     "notification-preview": { _ in NotificationPreviewController() },
-    "live-activity-preview": { _ in LiveActivityPreviewController() },
     "onboarding": { _ in OnboardingController() },
     "onboarding-preview": { _ in OnboardingPreviewController() },
     "mention-picker": { params in MentionPickerController.page(params) },

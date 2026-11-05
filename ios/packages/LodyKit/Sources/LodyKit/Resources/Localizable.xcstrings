@@ -5004,91 +5004,6 @@
         }
       }
     },
-    "settings.liveActivity.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "灵动岛"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dynamic Island"
-          }
-        }
-      }
-    },
-    "settings.liveActivity.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在锁屏和灵动岛显示会话进度"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show session progress on the Lock Screen and Dynamic Island"
-          }
-        }
-      }
-    },
-    "settings.liveActivity.disabled": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实时活动已关闭，点按前往系统设置开启"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Live Activities are off. Open System Settings to turn them on"
-          }
-        }
-      }
-    },
-    "settings.liveActivity.openSettingsFailed": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暂时无法打开系统设置"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't open System Settings"
-          }
-        }
-      }
-    },
-    "settings.liveActivity.toggleFailed": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暂时无法修改灵动岛设置"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn't change the Dynamic Island setting"
-          }
-        }
-      }
-    },
     "settings.notifications.title": {
       "extractionState": "manual",
       "localizations": {
@@ -5129,13 +5044,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "通知与实时活动"
+            "value": "通知"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notifications & Live Activities"
+            "value": "Notifications"
           }
         }
       }
@@ -5612,469 +5527,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "That session is no longer available"
-          }
-        }
-      }
-    },
-    "native.liveActivity.status.permission": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "需要你授权"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Needs your approval"
-          }
-        }
-      }
-    },
-    "native.liveActivity.status.attention": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待你处理"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for you"
-          }
-        }
-      }
-    },
-    "native.liveActivity.status.running": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在工作"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Working"
-          }
-        }
-      }
-    },
-    "native.liveActivity.status.question": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有问题要问你"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Has a question for you"
-          }
-        }
-      }
-    },
-    "native.liveActivity.status.unread": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已完成"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Completed"
-          }
-        }
-      }
-    },
-    "native.liveActivity.status.failed": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已失败"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Failed"
-          }
-        }
-      }
-    },
-    "native.liveActivity.small.attention": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待你处理"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for you"
-          }
-        }
-      }
-    },
-    "native.liveActivity.small.waiting": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待中"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting"
-          }
-        }
-      }
-    },
-    "native.liveActivity.small.done": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已完成"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Done"
-          }
-        }
-      }
-    },
-    "native.liveActivity.small.failed": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "失败"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Failed"
-          }
-        }
-      }
-    },
-    "native.liveActivity.small.stale": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已过期"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Outdated"
-          }
-        }
-      }
-    },
-    "native.liveActivity.stale": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已断开"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disconnected"
-          }
-        }
-      }
-    },
-    "native.liveActivity.empty": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本轮任务已结束"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All tasks finished"
-          }
-        }
-      }
-    },
-    "native.liveActivity.runningSummary": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} 个执行中"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} running"
-          }
-        }
-      },
-      "comment": "Serialized Live Activity template; the widget substitutes {count}."
-    },
-    "native.liveActivity.completedSummary": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} 个任务已完成"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} tasks finished"
-          }
-        }
-      },
-      "comment": "Serialized Live Activity template; the widget substitutes {count}."
-    },
-    "native.liveActivity.failedSummary": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} 个任务失败"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} tasks failed"
-          }
-        }
-      },
-      "comment": "Serialized Live Activity template; the widget substitutes {count}."
-    },
-    "native.liveActivity.caption.elapsed": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "本轮"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "elapsed"
-          }
-        }
-      }
-    },
-    "native.liveActivity.caption.waiting": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "等待"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "waiting"
-          }
-        }
-      }
-    },
-    "native.liveActivity.caption.took": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "用时"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "took"
-          }
-        }
-      }
-    },
-    "native.liveActivity.others": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "还有 {count} 个在跑"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{count} more running"
-          }
-        }
-      },
-      "comment": "Serialized Live Activity template; the widget substitutes {count}."
-    },
-    "native.liveActivity.lastSync": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "上次同步"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Last synced"
-          }
-        }
-      }
-    },
-    "native.liveActivity.openHint": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "点按处理"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tap to review"
-          }
-        }
-      }
-    },
-    "native.liveActivity.debug.title1": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重构 composer 键盘避让"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Refactor the composer keyboard avoidance"
-          }
-        }
-      }
-    },
-    "native.liveActivity.debug.title2": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "修复 push-extension 签名"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fix the push-extension signing"
-          }
-        }
-      }
-    },
-    "native.liveActivity.debug.title3": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "写 Live Activity 设计文档"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Write the Live Activity design doc"
-          }
-        }
-      }
-    },
-    "native.liveActivity.debug.updatedAt": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "刚刚"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Just now"
-          }
-        }
-      }
-    },
-    "native.liveActivity.debug.alertTitle": {
-      "extractionState": "manual",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "需要你授权"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Needs your approval"
           }
         }
       }
@@ -18031,8 +17483,18 @@
     "workspaceChanges.menuTitle": {
       "extractionState": "manual",
       "localizations": {
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "变更" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Changes" } }
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变更"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes"
+          }
+        }
       }
     },
     "workspaceChanges.title": {
@@ -25183,6 +24645,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "创建结果暂未确认，再次点击可打开该对话。"
+          }
+        }
+      }
+    },
+    "activity.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本轮任务已结束"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All tasks finished"
           }
         }
       }

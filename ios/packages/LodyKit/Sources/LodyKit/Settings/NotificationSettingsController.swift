@@ -6,16 +6,9 @@ struct NotificationService {
     var permission: String
   }
 
-  struct Live: Equatable {
-    var enabled: Bool
-    var supported: Bool
-  }
-
   var status: @MainActor () async throws -> Push
   var request: @MainActor () async throws -> Bool
   var settings: @MainActor () async throws -> Void
-  var liveStatus: @MainActor () async throws -> Live
-  var setLiveEnabled: @MainActor (Bool) async throws -> Void
 
   struct OpenFailed: Error {}
 
@@ -38,12 +31,7 @@ struct NotificationService {
       guard let url = URL(string: UIApplication.openSettingsURLString), await UIApplication.shared.open(url) else {
         throw OpenFailed()
       }
-    },
-    liveStatus: {
-      let value = LiveActivities.shared.status()
-      return Live(enabled: value["enabled"] as? Bool ?? false, supported: value["supported"] as? Bool ?? false)
-    },
-    setLiveEnabled: { LiveActivities.shared.enabled = $0 }
+    }
   )
 }
 
@@ -54,9 +42,7 @@ final class NotificationSettingsController: UIViewController {
   private let signedIn: @MainActor () -> Bool
   private var observers: [NSObjectProtocol] = []
   private var push: NotificationService.Push?
-  private var live: NotificationService.Live?
   private var busy = false
-  private var liveBusy = false
 
   init(service: NotificationService = .live, signedIn: @escaping @MainActor () -> Bool = { SettingsSource.live.state.account != nil }) {
     self.service = service
@@ -98,9 +84,7 @@ final class NotificationSettingsController: UIViewController {
   private func read() async {
     do {
       let push = try await service.status()
-      let live = try await service.liveStatus()
       self.push = push
-      self.live = live
     } catch {
       LodyToastOverlay.shared.show(message: text("notifications.readFailed"), kind: "error")
     }
@@ -111,8 +95,6 @@ final class NotificationSettingsController: UIViewController {
     guard let id = body["id"] as? String else { return }
     switch (name, id) {
     case ("rowPress", "notification-permission"): Task { await press() }
-    case ("rowPress", "live-activity"): Task { await openLiveActivitySettings() }
-    case ("rowToggle", "live-activity"): Task { await toggleLive(body["value"] as? Bool ?? false) }
     default: break
     }
   }
@@ -135,33 +117,6 @@ final class NotificationSettingsController: UIViewController {
     render()
   }
 
-  private func toggleLive(_ enabled: Bool) async {
-    live?.enabled = enabled
-    liveBusy = true
-    render()
-    do {
-      try await service.setLiveEnabled(enabled)
-    } catch {
-      LodyToastOverlay.shared.show(message: text("settings.liveActivity.toggleFailed"), kind: "error")
-    }
-    await read()
-    liveBusy = false
-    render()
-  }
-
-  private func openLiveActivitySettings() async {
-    guard signedIn(), live?.supported == false, !liveBusy else { return }
-    liveBusy = true
-    render()
-    do {
-      try await service.settings()
-    } catch {
-      LodyToastOverlay.shared.show(message: text("settings.liveActivity.openSettingsFailed"), kind: "error")
-    }
-    liveBusy = false
-    render()
-  }
-
   private func render() {
     guard isViewLoaded else { return }
     let signedIn = signedIn()
@@ -170,17 +125,9 @@ final class NotificationSettingsController: UIViewController {
       "notification-permission", permissionTitle, subtitle: permissionHint(signedIn: signedIn), image: "bell",
       action: signedIn && configured && !busy, disclosure: signedIn && configured
     )
-    let supported = live?.supported == true
-    var liveHint = text("settings.liveActivity.hint")
-    if let live, !live.supported { liveHint = text("settings.liveActivity.disabled") }
-    let liveRow = LodyListRow.item(
-      "live-activity", text("settings.liveActivity.title"), subtitle: liveHint, image: "clock",
-      action: signedIn && live != nil && !liveBusy, disclosure: signedIn && live != nil && !supported,
-      toggle: supported ? live?.enabled == true : nil
-    )
     list.setSections([
       .group("notifications", header: text("notifications.section.header"), footer: text("notifications.section.footer"), [
-        permission, liveRow,
+        permission,
       ]),
     ])
   }

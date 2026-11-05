@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Agent provider marks: converts the iOS agent SVGs (one source for both apps, imported from web's
 // `agent-icon.tsx` assets) to Android VectorDrawables plus the `AgentLogos` name table.
-// Dependency-free Node 22. Run after changing ../ios/apps/ios/Extensions/LiveActivity/AgentIcons.xcassets:
+// Dependency-free Node 22. Run after changing ../ios/apps/ios/Resources/AgentIcons.xcassets:
 //   node android/scripts/agent-icons.mjs        (write)
 //   node android/scripts/agent-icons.mjs --check (fail on stale output)
 // Supported SVG: path / circle / ellipse / rect / line / polyline / polygon, nested <g>, fill / stroke
@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const source = join(root, '../ios/apps/ios/Extensions/LiveActivity/AgentIcons.xcassets');
+const source = join(root, '../ios/apps/ios/Resources/AgentIcons.xcassets');
 const drawables = join(root, 'app/src/main/res/drawable');
 const table = join(root, 'app/src/main/kotlin/app/lody/android/home/AgentLogos.generated.kt');
 const check = process.argv.includes('--check');

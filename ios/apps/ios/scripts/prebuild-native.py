@@ -25,10 +25,9 @@ def generate(root, environment):
     if profiles:
         # Release signing is another XcodeGen input, never a post-generation project edit.
         targets = {'ai.lody.mobile': 'Lody', 'ai.lody.mobile.share': 'LodyShare',
-                   'ai.lody.mobile.notification-service': 'LodyNotificationService',
-                   'ai.lody.mobile.live-activity': 'LodyLiveActivity'}
+                   'ai.lody.mobile.notification-service': 'LodyNotificationService'}
         if set(profiles) != set(targets):
-            raise ValueError('Provisioning profiles must cover exactly the app and its three extensions')
+            raise ValueError('Provisioning profiles must cover exactly the app and its two extensions')
         spec['targets'] = {targets[bundle]: {'settings': {'configs': {'Release': {
             'CODE_SIGN_STYLE': 'Manual', 'CODE_SIGN_IDENTITY': 'Apple Distribution',
             'DEVELOPMENT_TEAM': environment['APPLE_TEAM_ID'], 'PROVISIONING_PROFILE_SPECIFIER': profile,

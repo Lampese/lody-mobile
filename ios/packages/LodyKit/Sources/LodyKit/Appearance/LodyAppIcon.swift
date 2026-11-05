@@ -16,14 +16,12 @@ enum LodyAppIcon {
     let app = UIApplication.shared
     let alternate = name == "default" ? nil : name
     guard app.alternateIconName != alternate else {
-      LiveActivities.shared.syncAppIcon()
       return completion(.success(name))
     }
     guard app.supportsAlternateIcons else { return completion(.failure(LodyAppIconError.unavailable)) }
     app.setAlternateIconName(alternate) { error in
       DispatchQueue.main.async {
         if let error { return completion(.failure(error)) }
-        LiveActivities.shared.syncAppIcon()
         completion(.success(current))
       }
     }

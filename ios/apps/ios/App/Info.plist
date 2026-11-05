@@ -60,10 +60,6 @@
 	<string>Connect to your Mac on the local network to view and control its iOS Simulator.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose photos to attach to your messages.</string>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
-	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
-	<false/>
 	<key>OneSignal_app_groups_key</key>
 	<string>group.ai.lody.mobile</string>
 	<key>OneSignal_suppress_launch_urls</key>

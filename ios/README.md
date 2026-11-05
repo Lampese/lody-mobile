@@ -138,7 +138,7 @@ apps/ios/Lody.xcodeproj              # Generated Xcode project
 apps/ios/project.yml                # XcodeGen: app, extensions and verify hosts
 apps/ios/App/                       # UIKit entry, plist, entitlements and app assets
 apps/ios/App/Resources/             # Images, file icons and dependency notices
-apps/ios/Extensions/                # Share, notification service and Live Activity
+apps/ios/Extensions/                # Share and notification service
 apps/ios/.generated/                # Generated plist, XcodeGen input and runtime assets
 apps/ios/runtime/decoder/           # Browser-safe decoding adapter
 apps/ios/scripts/                   # Asset generation and source checks

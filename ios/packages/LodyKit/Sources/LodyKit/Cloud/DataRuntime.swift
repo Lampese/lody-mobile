@@ -29,8 +29,6 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
   var health = RuntimeHealth()
   private var pingPending = false
   var workspace: String?
-  private var workspaceSlug = ""
-  private var workspaceName = ""
   var owner = ""
   var generation = 0
   var backgrounded = false
@@ -79,14 +77,13 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
       }
     })
   }
-  func start(workspace: String, slug: String, name: String, owner: String, userId: String) {
+  func start(workspace: String, owner: String, userId: String) {
     disposeView()
     if self.workspace != workspace || self.userId != userId {
       sessionId = nil; sessionSnapshot = nil; retainedSessions = []; reservedSessions = []; billing.clear()
     }
     self.userId = userId; cacheErrorShown = false
     self.workspace = workspace; self.owner = owner; health = RuntimeHealth()
-    workspaceSlug = slug; workspaceName = name
     backgrounded = UIApplication.shared.applicationState == .background
     if backgrounded { publish("background", reason: "paused") }
     else { build(reason: "subscribe") }
@@ -290,13 +287,6 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     case .catalog(let value):
       guard value.catalog.utf8.count <= 12 * 1024 * 1024 else { return }
       publish("live", reason: "catalog", catalog: value.catalog)
-      LiveActivities.shared.sync(
-        catalogJSON: value.catalog,
-        workspaceId: workspace ?? "",
-        workspaceSlug: workspaceSlug,
-        workspaceName: workspaceName,
-        userId: userId
-      )
     case .shareProgress(let value):
       NotificationCenter.default.post(name: .lodyShareProgress, object: value)
     case .machinePresence(let value):

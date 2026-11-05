@@ -130,7 +130,7 @@ final class CatalogSession {
     snapshot.connection = CatalogConnection(state: watch.state, machines: watch.machines, syncedAt: watch.syncedAt)
     publish()
     readLocal(key: key, owner: watch.owner)
-    runtime.start(workspace: selected.id, slug: selected.slug ?? selected.id, name: selected.name,
+    runtime.start(workspace: selected.id,
                   owner: watch.owner, userId: account.user.id)
   }
 

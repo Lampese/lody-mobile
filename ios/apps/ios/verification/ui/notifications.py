@@ -18,10 +18,6 @@ def tap(value):
     touch(text(value))
 
 
-def toggle_live():
-    ui.tap_switch(ui.element('live-activity:toggle'))
-
-
 def reset():
     back = [i for i in ui.state() if i.get('AXUniqueId') == 'BackButton'][-1]
     touch(back)
@@ -31,11 +27,7 @@ def reset():
     text(catalog.text('notifications.hint.default'))
 
 text(catalog.text('notifications.hint.default'))
-text(catalog.text('settings.liveActivity.disabled'))
 ui.capture('permission-undetermined')
-tap(catalog.text('settings.liveActivity.title'))
-ui.element('notification-settings-opened')
-reset()
 tap(catalog.text('notifications.permission.turnOn'))
 text(catalog.text('notifications.changeFailed'))
 text(catalog.text('notifications.hint.default'))
@@ -51,15 +43,5 @@ tap(catalog.text('notifications.permission.settings'))
 ui.element('notification-settings-opened')
 text(catalog.text('notifications.hint.authorized'))
 ui.capture('permission-authorized')
-assert ui.element('live-activity:toggle').get('AXValue') == '0'
-toggle_live()
-text('Live changes: 1')
-ui.wait(lambda _: ui.element('live-activity:toggle').get('AXValue') == '1', 'Live Activities toggle did not enable')
-ui.capture('live-activity-enabled')
-toggle_live()
-text('Live changes: 2')
-text(catalog.text('settings.liveActivity.toggleFailed'))
-ui.wait(lambda _: ui.element('live-activity:toggle').get('AXValue') == '1', 'Failed toggle did not restore the native value')
-ui.capture('live-activity-failed-retained')
 reset()
 ui.capture('reset')
