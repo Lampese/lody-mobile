@@ -88,6 +88,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         if (field.text != prompt) field = androidx.compose.ui.text.input.TextFieldValue(prompt, androidx.compose.ui.text.TextRange(prompt.length))
     }
     var composerFocused by remember(id) { mutableStateOf(false) }
+    // @ references: the catalogs, the panel's levels, and Role labels to resolve at send.
+    val mentions = rememberMentionState(id, scope)
     val appContext = LocalContext.current.applicationContext
     val coroutines = rememberCoroutineScope()
     val agentName = agentLabel(context.session)
@@ -322,7 +324,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         Unit
     }
     val send = {
-        val text = prompt.trim()
+        // Role labels ("🧪 Reviewer") go out as their tokens (`@role:<id>`), which expand at send.
+        val text = mentions.resolve(prompt.trim())
         if (canSend && (text.isNotEmpty() || attachments.isNotEmpty())) {
             sendText(text, attachments)
             prompt = ""
@@ -338,7 +341,6 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     // @ references (iOS `ChatMentionPanel`, Notion-style): every category is read once the
     // conversation is live; a trigger at the caret opens the panel docked on the keyboard.
-    val mentions = rememberMentionState(id, scope)
     LaunchedEffect(scope, id, status == "live", session?.cliType, session?.agentType) {
         if (session == null || status != "live") return@LaunchedEffect
         mentions.load { category -> repository.mentions(scope, category, session) }
@@ -513,7 +515,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 onStop = stop,
             )
             // Docked between the prompt and the keyboard; rows never take focus, so the keyboard stays.
-            MentionDock(mentions, field, active = composerFocused && canSend) { next -> field = next; prompt = next.text }
+            MentionDock(mentions, field, active = composerFocused && canSend, loadShortcut = { shortcutId -> repository.shortcut(scope, shortcutId) }) { next -> field = next; prompt = next.text }
         }
     }
     if (runConfig && session != null) {

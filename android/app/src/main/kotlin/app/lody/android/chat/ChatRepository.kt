@@ -52,6 +52,10 @@ class ChatRepository(
             (it.execute(RuntimeCommand.MentionCatalog(category, source)) as RuntimeResult.Mentions).value
         }
 
+    /** A prompt shortcut's body ({prompt, mentions}); a read. */
+    suspend fun shortcut(scope: RuntimeScope, id: String): org.json.JSONObject =
+        owner.use(scope) { (it.execute(RuntimeCommand.ShortcutBody(id)) as RuntimeResult.Shortcut).value }
+
     /** Stops the running turn; never retried (a lost reply is reported, not replayed). */
     suspend fun stop(scope: RuntimeScope, sessionId: String, machineId: String, turnId: String) {
         owner.use(scope) { it.execute(RuntimeCommand.StopTurn(sessionId, machineId, turnId)) }

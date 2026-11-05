@@ -251,8 +251,35 @@ final class ChatComposerInput: TextView {
     }
   }
 
+  /// A reference chip's label to the token the agent receives, for chips that show something
+  /// friendlier than their token (an Agent Role reads "🧪 Reviewer" but sends `@role:<id>`).
+  private(set) var labelledReferences: [String: String] = [:]
+
+  /// The text sent: each labelled chip's token restored in place, chip by chip in order.
   var markdown: String {
-    (try? MarkdownExporter.gfm.export(editor)) ?? (text ?? "")
+    let exported = (try? MarkdownExporter.gfm.export(editor)) ?? (text ?? "")
+    guard !labelledReferences.isEmpty else { return exported }
+    var result = exported
+    var cursor = result.startIndex
+    for label in referenceLabels {
+      guard let token = labelledReferences[label], let found = result.range(of: label, range: cursor..<result.endIndex) else { continue }
+      result.replaceSubrange(found, with: token)
+      cursor = result.index(found.lowerBound, offsetBy: token.count, limitedBy: result.endIndex) ?? result.endIndex
+    }
+    return result
+  }
+
+  /// The labels of the chips in the editor, in document order.
+  private var referenceLabels: [String] {
+    var labels: [String] = []
+    try? editor.read {
+      func collect(_ node: Node) {
+        if let reference = node as? ChatReferenceNode { labels.append(reference.getTextContent()) }
+        (node as? ElementNode)?.getChildren().forEach(collect)
+      }
+      getRoot().map(collect)
+    }
+    return labels
   }
 
   var serializedState: String? {
@@ -261,16 +288,19 @@ final class ChatComposerInput: TextView {
 
   // Drafts persist the editor state; anything else is plain text from an older build.
   var draftEnvelope: String {
-    guard let state = serializedState, let json = try? JSONSerialization.jsonObject(with: Data(state.utf8)),
-      let data = try? JSONSerialization.data(withJSONObject: ["v": 1, "lexical": json]), let envelope = String(data: data, encoding: .utf8)
-    else { return text ?? "" }
-    return envelope
+    guard let state = serializedState, let json = try? JSONSerialization.jsonObject(with: Data(state.utf8)) else { return text ?? "" }
+    var envelope: [String: Any] = ["v": 1, "lexical": json]
+    // Labelled chips keep their tokens across restores.
+    if !labelledReferences.isEmpty { envelope["references"] = labelledReferences }
+    guard let data = try? JSONSerialization.data(withJSONObject: envelope), let value = String(data: data, encoding: .utf8) else { return text ?? "" }
+    return value
   }
 
   func restoreDraft(_ stored: String) {
     if let data = stored.data(using: .utf8), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
       object["v"] as? Int == 1, let lexical = object["lexical"], let state = try? JSONSerialization.data(withJSONObject: lexical),
       let json = String(data: state, encoding: .utf8), restore(state: json) {
+      labelledReferences = (object["references"] as? [String: String]) ?? [:]
       return
     }
     text = stored
@@ -301,11 +331,35 @@ final class ChatComposerInput: TextView {
     }
   }
 
-  func insertReference(_ token: String, replacing range: NSRange) {
+  /// Inserts a reference chip over `range`. With a `label` the chip shows it and sends `token`.
+  func insertReference(_ token: String, label: String? = nil, replacing range: NSRange) {
+    insertSegments([ChatComposerSegment(text: label ?? token, token: label == nil ? nil : token, reference: true)], replacing: range)
+  }
+
+  /// Inserts text and reference chips over `range` (a prompt shortcut's body, with its references
+  /// as chips), then a space.
+  func insertSegments(_ segments: [ChatComposerSegment], replacing range: NSRange) {
     selectedRange = range
+    for segment in segments where segment.reference {
+      if let token = segment.token, token != segment.text { labelledReferences[segment.text] = token }
+    }
     try? editor.update {
       guard let selection = try getSelection() as? RangeSelection else { return }
-      _ = try selection.insertNodes(nodes: [ChatReferenceNode(text: token, key: nil), createTextNode(text: " ")], selectStart: false)
+      var nodes: [Node] = []
+      for segment in segments where !segment.text.isEmpty {
+        if segment.reference {
+          nodes.append(ChatReferenceNode(text: segment.text, key: nil))
+          continue
+        }
+        // A body's newlines become line breaks.
+        let lines = segment.text.components(separatedBy: "\n")
+        for (index, line) in lines.enumerated() {
+          if index > 0 { nodes.append(createLineBreakNode()) }
+          if !line.isEmpty { nodes.append(createTextNode(text: line)) }
+        }
+      }
+      nodes.append(createTextNode(text: " "))
+      _ = try selection.insertNodes(nodes: nodes, selectStart: false)
     }
     delegate?.textViewDidChange?(self)
   }
@@ -844,6 +898,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     attachmentBar.onHeightChange = { [weak self] in self?.updateComposer() }
     queueView.onHeightChange = { [weak self] in self?.updateComposer() }
     mentionPanel.onBrowse = { [weak self] in self?.onMentionBrowse?($0) }
+    #if !LODY_SHARE_EXTENSION
+    // Choosing a prompt shortcut writes its body (web); the Share Extension has no runtime.
+    mentionPanel.loadShortcut = { id in try await PromptShortcutsController.body(id: id) }
+    #endif
     addSubview(composer)
     composer.contentView.addSubview(queueView)
     queueView.onSteer = { [weak self] in self?.onSteer?($0) }

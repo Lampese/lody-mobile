@@ -39,6 +39,7 @@ open class WebViewRuntime internal constructor(
         }
         is RuntimeCommand.GetCreationOptions -> RuntimeResult.Options(CreationJson.options(call("creationOptions", JSONArray().put(command.projectId ?: JSONObject.NULL).put(command.agentConfigId ?: JSONObject.NULL), CommandDeadline.QUERY) as JSONObject))
         RuntimeCommand.ListAgentRoles -> RuntimeResult.Roles(CreationJson.roles(call("agentRoles", deadline = CommandDeadline.QUERY) as JSONObject))
+        is RuntimeCommand.ShortcutBody -> RuntimeResult.Shortcut(call("shortcutBody", JSONArray().put(command.id), CommandDeadline.QUERY) as JSONObject)
         is RuntimeCommand.LocalProjects -> {
             val args = JSONArray().put(command.action).put(command.browserId)
                 .put(command.machineId ?: JSONObject.NULL).put(command.path ?: JSONObject.NULL).put(command.cursor ?: JSONObject.NULL)

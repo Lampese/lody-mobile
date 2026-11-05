@@ -31,6 +31,20 @@ export function createCommands(runtime, sendTurn, identity) {
    }
    return runtime.localProjects({workspaceId:scope.workspaceId,userId:scope.userId,browserId,action,...(action==='cancel' || action==='machines'?{}:fields)});
   },
+  // A prompt shortcut's body for the composer (web `prepareShortcutSelection`): the index entry
+  // by id, then its body for that revision. Returns the prompt and its references; a read.
+  async shortcutBody(id) {
+   const scope=identity();if(!scope?.userId)throw Error('not_connected');
+   if(typeof id!=='string' || !id || id.length>200)throw Error('invalid_request');
+   const base={workspaceId:scope.workspaceId,userId:scope.userId};
+   const list=await runtime.promptShortcuts({...base,action:'list'});
+   const entry=(list?.entries??[]).find(item=>item.id===id);
+   if(!entry)throw Error('shortcut_unavailable');
+   const read=await runtime.promptShortcuts({...base,action:'read',entry});
+   const shortcut=read?.shortcut;
+   if(!shortcut || typeof shortcut.prompt!=='string')throw Error('shortcut_unavailable');
+   return {prompt:shortcut.prompt,mentions:Array.isArray(shortcut.mentions)?shortcut.mentions:[]};
+  },
   // `source` names what the references come from: a conversation, or the new-chat page's
   // project / computer / agent (iOS `MentionSource`); only non-empty strings cross.
   async mentionCatalog(category,source) {

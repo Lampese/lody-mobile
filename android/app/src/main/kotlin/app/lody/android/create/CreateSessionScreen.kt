@@ -133,6 +133,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         if (field.text != prompt) field = androidx.compose.ui.text.input.TextFieldValue(prompt, androidx.compose.ui.text.TextRange(prompt.length))
     }
     var composerFocused by remember { mutableStateOf(false) }
+    // @ references: the catalogs, the panel's levels, and Role labels to resolve at send.
+    val mentions = app.lody.android.chat.rememberMentionState(runtimeScope)
     var runConfig by remember { mutableStateOf(false) }
     var openContext by remember { mutableStateOf<String?>(null) }
     var searchFocused by remember { mutableStateOf(false) }
@@ -236,7 +238,8 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
         if (canSend && !attempted && !busy && prompt.isNotBlank()) {
             attempted = true; busy = true
             val request = CreateRequest(
-                sessionId, turnId, target.projectId.takeUnless { target.chat }, chosen.machineId, chosen.id, prompt, branch.takeIf { github }, target.worktree, modelId, modeId, effort,
+                // Role labels ("🧪 Reviewer") go out as their tokens (`@role:<id>`).
+                sessionId, turnId, target.projectId.takeUnless { target.chat }, chosen.machineId, chosen.id, mentions.resolve(prompt), branch.takeIf { github }, target.worktree, modelId, modeId, effort,
                 agentRoleId = activeRole?.role?.id,
                 configOptionValues = activeRole?.let { CreateSessionModel.roleChoice(it.target).options }.orEmpty(),
             )
@@ -328,7 +331,6 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
             }
             // @ references, docked between the prompt and the keyboard as in a conversation; they
             // come from the chosen project, computer and agent (iOS creation `MentionSource`).
-            val mentions = app.lody.android.chat.rememberMentionState(runtimeScope)
             val mentionSource = MentionSource(
                 projectId = target.projectId.takeUnless { target.chat }, machineId = target.machineId,
                 agentConfigId = agent?.id, cliType = agent?.cliType, agentType = agent?.agentType,
@@ -339,6 +341,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
             }
             app.lody.android.chat.MentionDock(
                 mentions, field, active = composerFocused && !attempted && !coverComposer,
+                loadShortcut = { shortcutId -> repository.shortcut(runtimeScope, shortcutId) },
             ) { next -> if (!attempted) { field = next; prompt = next.text } }
         }
     }

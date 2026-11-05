@@ -1,4 +1,5 @@
 import ChatKit
+import LodyCore
 import UIKit
 
 struct ChatMentionItem: Decodable, Equatable {
@@ -89,6 +90,10 @@ final class ChatMentionPanel: UIView {
   var onChange: (() -> Void)?
   /// Kept for hosts that still route a category to a page; the docked panel never asks.
   var onBrowse: (([String: String]) -> Void)?
+  /// Reads a prompt shortcut's body by id, so choosing one writes the body (web); without it, or
+  /// when the read fails, the `/shortcut:<slug>` token goes in and the runtime expands it at send.
+  var loadShortcut: ((String) async throws -> RuntimeContract.PromptShortcut)?
+  private var shortcutLoad: Task<Void, Never>?
   private(set) var panelHeight: CGFloat = 0
 
   override init(frame: CGRect) {
@@ -208,7 +213,10 @@ final class ChatMentionPanel: UIView {
     switch level {
     case .root:
       guard query.isEmpty && scoped == nil else {
-        return items.filter { $0.inScope(scoped) && $0.matches(query) }
+        let matches = items.filter { $0.inScope(scoped) && $0.matches(query) }
+        // `/` leads with prompt shortcuts, then the agent's commands (web's category order).
+        guard scoped == "cmd" else { return matches }
+        return matches.filter { $0.category == "shortcut" } + matches.filter { $0.category != "shortcut" }
       }
       let provided = catalog.filter { $0.kind == "category" }
       if !provided.isEmpty { return provided }
@@ -240,8 +248,37 @@ final class ChatMentionPanel: UIView {
       push(.category(item.path), title: item.name)
     } else if item.kind == "directory" {
       push(.directory(item.path), title: (item.path as NSString).lastPathComponent)
+    } else if item.category == "shortcut", loadShortcut != nil {
+      insertShortcut(item)
     } else {
       insert(item)
+    }
+  }
+
+  /// A Role's chip: its emoji and name, as the catalog lists it (web).
+  private func roleLabel(_ id: String) -> ChatRoleLabel? {
+    guard let role = catalog.first(where: { $0.kind == "role" && ($0.path == id || $0.path.hasPrefix(id + "@")) }) else { return nil }
+    return ChatRoleLabel(emoji: role.emoji.flatMap { $0.isEmpty ? nil : $0 } ?? "🪼", name: role.name)
+  }
+
+  /// Writes the shortcut's body over the trigger once it is read, if the prompt has not moved on.
+  private func insertShortcut(_ item: ChatMentionItem) {
+    guard let input, let range, let load = loadShortcut else { return insert(item) }
+    let before = input.text ?? ""
+    UISelectionFeedbackGenerator().selectionChanged()
+    shortcutLoad?.cancel()
+    shortcutLoad = Task { @MainActor [weak self] in
+      let body = try? await load(item.path)
+      guard let self, !Task.isCancelled, input.text == before else { return }
+      guard let body, let composer = input as? ChatComposerInput else { return self.insert(item, into: input, range: range) }
+      let segments = ChatShortcutInsertion.segments(prompt: body.prompt, mentions: body.mentions) { self.roleLabel($0) }
+      let length = segments.reduce(0) { $0 + ($1.text as NSString).length }
+      guard NSMaxRange(range) <= (before as NSString).length, (before as NSString).length - range.length + length <= 32000 else { return }
+      UIImpactFeedbackGenerator(style: .light).impactOccurred()
+      self.applyingEdit = true
+      composer.insertSegments(segments, replacing: range)
+      self.applyingEdit = false
+      self.onChange?()
     }
   }
 
@@ -321,7 +358,9 @@ final class ChatMentionPanel: UIView {
     UIImpactFeedbackGenerator(style: .light).impactOccurred()
     applyingEdit = true
     if let composer = input as? ChatComposerInput {
-      composer.insertReference(String(text.dropLast()), replacing: range)
+      // An Agent Role reads as its emoji and name; it still sends `@role:<id>` (web).
+      let label = item.kind == "role" ? ChatRoleLabel(emoji: item.emoji.flatMap { $0.isEmpty ? nil : $0 } ?? "🪼", name: item.name).text : nil
+      composer.insertReference(String(text.dropLast()), label: label, replacing: range)
       applyingEdit = false
       onChange?()
       return

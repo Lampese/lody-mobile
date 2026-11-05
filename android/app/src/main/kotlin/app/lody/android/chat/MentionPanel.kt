@@ -115,7 +115,10 @@ object Mentions {
                 if (query.isEmpty() && trigger.scoped == null) {
                     shownCategories.filter { category -> category == "file" || category == "skill" || category == "session" || items.any { it.category == category } }
                         .map { MentionCandidate(it, it, "category") }
-                } else items.filter { inScope(it, trigger.scoped) && matches(it, query) }
+                } else items.filter { inScope(it, trigger.scoped) && matches(it, query) }.let { found ->
+                    // `/` leads with prompt shortcuts, then the agent's commands (web's category order).
+                    if (trigger.scoped == "cmd") found.filter { it.category == "shortcut" } + found.filter { it.category != "shortcut" } else found
+                }
             is MentionLevel.Category -> {
                 val scoped = items.filter { it.category == level.category }
                 if (level.category == "file" && query.isEmpty()) scoped.filter { parent(it.path).isEmpty() }
@@ -130,10 +133,62 @@ object Mentions {
     }
 
     /** Replaces the trigger with the reference and a trailing space, caret after it. */
-    fun insert(value: TextFieldValue, trigger: Trigger, item: MentionCandidate): TextFieldValue {
-        val reference = (item.insertText ?: "@${item.path}") + " "
-        val text = value.text.replaceRange(trigger.start, trigger.end, reference)
-        return TextFieldValue(text, TextRange(trigger.start + reference.length))
+    fun insert(value: TextFieldValue, trigger: Trigger, item: MentionCandidate): TextFieldValue =
+        insertText(value, trigger, shown(item))
+
+    /** Replaces the trigger with [text] and a trailing space, caret after it. */
+    fun insertText(value: TextFieldValue, trigger: Trigger, text: String): TextFieldValue {
+        val written = "$text "
+        val next = value.text.replaceRange(trigger.start, trigger.end, written)
+        return TextFieldValue(next, TextRange(trigger.start + written.length))
+    }
+
+    /** What the prompt shows for a reference: an Agent Role reads as its emoji and name (web). */
+    fun shown(item: MentionCandidate): String =
+        if (item.kind == "role") roleLabel(item.emoji, item.name) else item.insertText ?: "@${item.path}"
+
+    fun token(item: MentionCandidate): String = item.insertText ?: "@${item.path}"
+
+    fun roleLabel(emoji: String?, name: String) = listOf(emoji?.takeIf { it.isNotEmpty() } ?: "🪼", name).joinToString(" ")
+
+    /**
+     * A prompt shortcut's body as prompt text (web `prepareShortcutSelection`): each reference
+     * becomes its token — files `@path`, skills `$name`, issues and pull requests `#number` — and
+     * an Agent Role its emoji and name, reported through [role] so it sends `@role:<id>`.
+     */
+    fun shortcutText(body: org.json.JSONObject, catalogs: Map<String, MentionCatalogPage>, role: (label: String, token: String) -> Unit): String {
+        val prompt = body.optString("prompt")
+        val list = body.optJSONArray("mentions") ?: org.json.JSONArray()
+        val mentions = (0 until list.length()).map { list.getJSONObject(it) }.sortedBy { it.optInt("start") }
+        val roles = catalogs["role"]?.items.orEmpty()
+        val out = StringBuilder()
+        var cursor = 0
+        for (mention in mentions) {
+            val start = mention.optInt("start", -1)
+            val end = mention.optInt("end", -1)
+            if (start < cursor || end <= start || end > prompt.length) continue
+            out.append(prompt, cursor, start)
+            val label = prompt.substring(start, end)
+            val target = mention.optJSONObject("target") ?: org.json.JSONObject()
+            out.append(
+                when (target.optString("kind")) {
+                    "file" -> "@" + target.optString("path")
+                    "skill" -> if (label.startsWith("$")) label else "$$label"
+                    "issue", "pull_request" -> "#" + target.optInt("number")
+                    "agent_role" -> {
+                        val id = target.optString("agentRoleId")
+                        val item = roles.firstOrNull { it.path == id || it.path.startsWith("$id@") }
+                        val shown = item?.let { roleLabel(it.emoji, it.name) } ?: label
+                        role(shown, "@role:$id")
+                        shown
+                    }
+                    else -> label
+                },
+            )
+            cursor = end
+        }
+        if (cursor < prompt.length) out.append(prompt, cursor, prompt.length)
+        return out.toString()
     }
 
     fun label(category: String): Int = when (category) {
@@ -281,6 +336,23 @@ class MentionState {
     var catalogs by mutableStateOf(emptyMap<String, MentionCatalogPage>())
     var pending by mutableStateOf(Mentions.categories.toSet())
     var stack by mutableStateOf(listOf<MentionLevel>(MentionLevel.Root))
+    /** Agent Role labels in the prompt ("🧪 Reviewer") to the token they send (`@role:<id>`). */
+    var labels by mutableStateOf(emptyMap<String, String>())
+
+    /** The text to send: each Role label back to its token, label by label in order. */
+    fun resolve(text: String): String {
+        if (labels.isEmpty()) return text
+        var result = text
+        var cursor = 0
+        // Earliest label first, so repeated Roles resolve in place.
+        while (true) {
+            val next = labels.keys.mapNotNull { label -> result.indexOf(label, cursor).takeIf { it >= 0 }?.let { it to label } }.minByOrNull { it.first } ?: break
+            val token = labels.getValue(next.second)
+            result = result.replaceRange(next.first, next.first + next.second.length, token)
+            cursor = next.first + token.length
+        }
+        return result
+    }
 
     /** Reads every category in parallel; a category that fails stays empty. */
     suspend fun load(fetch: suspend (String) -> MentionCatalogPage) = coroutineScope {
@@ -307,7 +379,16 @@ fun rememberMentionState(vararg keys: Any?): MentionState = remember(*keys) { Me
  * able to send) and the caret is in a trigger; choosing a row writes the reference into the field.
  */
 @Composable
-fun MentionDock(state: MentionState, field: TextFieldValue, active: Boolean, onFieldChange: (TextFieldValue) -> Unit) {
+fun MentionDock(
+    state: MentionState,
+    field: TextFieldValue,
+    active: Boolean,
+    /** Reads a prompt shortcut's body by id; without it the `/shortcut:<slug>` token goes in. */
+    loadShortcut: (suspend (String) -> org.json.JSONObject)? = null,
+    onFieldChange: (TextFieldValue) -> Unit,
+) {
+    val loads = androidx.compose.runtime.rememberCoroutineScope()
+    val latest by androidx.compose.runtime.rememberUpdatedState(field)
     val trigger = if (active) Mentions.trigger(field) else null
     // Leaving the trigger (sent, deleted, caret moved) starts the next one at the categories.
     LaunchedEffect(trigger == null) { if (trigger == null) state.stack = listOf(MentionLevel.Root) }
@@ -333,9 +414,31 @@ fun MentionDock(state: MentionState, field: TextFieldValue, active: Boolean, onF
             onPop = { if (state.stack.size > 1) state.stack = state.stack.dropLast(1) },
             onInsert = { item ->
                 val current = Mentions.trigger(field)
-                if (current != null) {
+                if (current != null && item.category == "shortcut" && loadShortcut != null) {
+                    // Write the shortcut's body (web) once read, if the prompt has not moved on.
+                    val before = field
+                    loads.launch {
+                        val body = try { loadShortcut(item.path) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+                        if (latest.text != before.text) return@launch
+                        if (body == null) {
+                            val next = Mentions.insert(before, current, item)
+                            if (next.text.length <= 32000) onFieldChange(next)
+                            return@launch
+                        }
+                        val roles = mutableMapOf<String, String>()
+                        val text = Mentions.shortcutText(body, state.catalogs) { label, token -> roles[label] = token }
+                        val next = Mentions.insertText(before, current, text)
+                        if (next.text.length <= 32000) {
+                            state.labels = state.labels + roles
+                            onFieldChange(next)
+                        }
+                    }
+                } else if (current != null) {
                     val next = Mentions.insert(field, current, item)
-                    if (next.text.length <= 32000) onFieldChange(next)
+                    if (next.text.length <= 32000) {
+                        if (item.kind == "role") state.labels = state.labels + (Mentions.shown(item) to Mentions.token(item))
+                        onFieldChange(next)
+                    }
                 }
                 state.stack = listOf(MentionLevel.Root)
             },

@@ -164,6 +164,7 @@ targets:
           - Chat/ChatComposerGrabber.swift
           - Chat/ChatActionBar.swift
           - Chat/ChatMentionPanel.swift
+          - Chat/ChatShortcutInsertion.swift
           - Chat/ChatSendHandoff.swift
           - Chat/ChatThrowCurve.swift
           - Chat/ChatNumericText.swift

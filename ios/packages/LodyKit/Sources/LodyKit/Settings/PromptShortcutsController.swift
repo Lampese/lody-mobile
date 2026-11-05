@@ -138,6 +138,15 @@ class PromptShortcutsController: UIViewController {
     }
   }
 
+  /// A shortcut's body, read fresh for the composer: its index entry by id, then the body.
+  static func body(id: String, service: PromptShortcutService = PromptShortcutsController.cloud) async throws -> RuntimeContract.PromptShortcut {
+    guard case .list(let list) = try await service(.list), let entry = list.entries.first(where: { $0.id == id }) else {
+      throw CocoaError(.fileNoSuchFile)
+    }
+    guard case .read(let read) = try await service(.read(entry)) else { throw CocoaError(.coderInvalidValue) }
+    return read.shortcut
+  }
+
   static func cloud(_ request: PromptShortcutRequest) async throws -> RuntimeContract.PromptShortcutsResult {
     guard let runtime = DataRuntime.current else {
       throw DataRuntime.failure("not_ready", String(localized: "native.runtime.sessionNotSynced", bundle: .lody))

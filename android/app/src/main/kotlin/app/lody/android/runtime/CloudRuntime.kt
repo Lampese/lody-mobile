@@ -37,6 +37,8 @@ sealed interface RuntimeCommand {
      * (a write, never retried) or `cancel`, for one folder browser ([browserId]).
      */
     data class LocalProjects(val action: String, val browserId: String, val machineId: String? = null, val path: String? = null, val cursor: String? = null) : RuntimeCommand
+    /** A prompt shortcut's body ({prompt, mentions}) by id, for the composer. Read only. */
+    data class ShortcutBody(val id: String) : RuntimeCommand
     /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
     data class StopTurn(val sessionId: String, val machineId: String, val turnId: String) : RuntimeCommand
     data object Ping : RuntimeCommand
@@ -48,6 +50,7 @@ sealed interface RuntimeResult {
     data class Mentions(val value: MentionCatalogPage) : RuntimeResult
     /** The `localProjects` outcome as the runtime sent it (`machines`, `directory`, `project`, …). */
     data class LocalProjects(val value: org.json.JSONObject) : RuntimeResult
+    data class Shortcut(val value: org.json.JSONObject) : RuntimeResult
     data class Created(val value: CreationReceipt) : RuntimeResult
     /** Upstream send state (`sent` / `queued` / `not_sent` / `unknown`); a machine ACK is delivery only. */
     data class Sent(val state: String, val reason: String? = null) : RuntimeResult
