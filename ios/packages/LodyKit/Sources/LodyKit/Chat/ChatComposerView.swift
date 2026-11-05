@@ -730,6 +730,13 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       updateComposer()
     }
   }
+  /// The conversation's card rests as one line — +, the prompt, the agent mark ⌄ and Send — and
+  /// opens into the card (prompt over +, the run-config chip and Send) while editing.
+  var restsCollapsed = false {
+    didSet { if restsCollapsed != oldValue { updateComposer() } }
+  }
+  /// The card is open: always on the new-chat page; while editing in a conversation.
+  private var cardOpen: Bool { cardStyle && (!restsCollapsed || input.isFirstResponder) }
   private lazy var surfaceLayout: any ChatComposerSurfaceLayout = ChatComposerLiquidGlassSurfaceLayout(
     container: composer,
     inputSurface: inputSurface
@@ -1477,7 +1484,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     mentionButton.isEnabled = state.editable && !state.sending && pendingDraft == nil
     let sending = state.sending || pendingDraft != nil
     if !state.editable && input.isFirstResponder { input.resignFirstResponder() }
-    let expanded = input.isFirstResponder || cardStyle
+    let expanded = input.isFirstResponder || cardOpen
     // The card always shows its controls; editing is what gives the bar's row to the editor.
     let editing = input.isFirstResponder
     let expansionChanged = composerExpanded != expanded
@@ -1590,7 +1597,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       minimumHeight = topInset + verticalInset + lines * input.font!.lineHeight
     }
     let inlineHeight = expanded ? min(ChatMessageContent.maximumCollapsedHeight, max(minimumHeight, height)) : 48
-    let cardFocusChanged = cardStyle && cardFocused != input.isFirstResponder
+    // A conversation's card opens with focus (the expansion's own animation carries it).
+    let cardFocusChanged = cardStyle && !restsCollapsed && cardFocused != input.isFirstResponder
     cardFocused = input.isFirstResponder
     if fullProgress > 0 {
       let fullHeight = fullScreenInputHeight(chrome: chrome - formatHeight.constant + 44)
@@ -1634,7 +1642,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       }
     } else {
       collapsedMark.alpha = markAlpha
-      controls.alpha = cardStyle ? 1 : controlsAlpha
+      controls.alpha = cardOpen ? 1 : controlsAlpha
     }
     collapsedMark.isUserInteractionEnabled = showsMark
     collapsedMark.accessibilityElementsHidden = !showsMark
@@ -1645,7 +1653,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private var collapsedMarkWidth: CGFloat { collapsedMark.intrinsicContentSize.width }
 
   private func showsCollapsedMark(expanded: Bool) -> Bool {
-    !expanded && !cardStyle && composerOptions.agentAsset != nil
+    !expanded && composerOptions.agentAsset != nil
   }
 
   /// The collapsed face of the run-config chip: the agent mark tinted like text, then a small chevron.
@@ -1670,6 +1678,11 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   }
 
   @objc private func openFromCollapsedMark() {
+    // The card's run config is a sheet: open it straight from the mark, no keyboard first.
+    if cardStyle, let onRunConfig {
+      guard state.editable, modelButton.isEnabled || composerOptions.agentAsset != nil else { return }
+      return onRunConfig()
+    }
     guard state.editable, input.becomeFirstResponder() else { return }
     // Opening runs on the expansion's curve; the panel follows once the chip has landed.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) { [weak self] in

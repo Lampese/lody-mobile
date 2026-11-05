@@ -64,6 +64,8 @@ extension SessionController {
     // The conversation composer is the new-chat composer (web's mobile session page): a card
     // with +, the run-config chip and Send, no @ button; the chip opens the run-config sheet.
     chat.composer.cardStyle = true
+    // At rest one line (+, prompt, agent mark ⌄, Send); the card opens while editing.
+    chat.composer.restsCollapsed = true
     chat.composer.onRunConfig = { [weak self] in self?.presentRunConfig() }
     chat.onStop = { [weak self] _ in self?.controlTurn("stop") }
     chat.onSteer = { [weak self] body in self?.controlTurn("steer", messageId: body["id"] as? String) }

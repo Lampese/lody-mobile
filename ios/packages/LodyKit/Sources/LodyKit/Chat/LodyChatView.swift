@@ -968,6 +968,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     // The conversation's run config, not the creation page's, answers the chip from here on.
     incoming.onRunConfig = old.onRunConfig
     incoming.cardStyle = old.cardStyle
+    incoming.restsCollapsed = old.restsCollapsed
     incoming.setInputIdentifier("session-input")
     NSLayoutConstraint.deactivate(links)
     old.removeFromSuperview()

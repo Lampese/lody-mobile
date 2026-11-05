@@ -697,11 +697,12 @@ private fun turnTime(timestamp: String?): String {
 }
 
 /**
- * Web's mobile session composer, the same card as the new-chat page (`create/CreateSessionScreen`
- * `Composer`): the prompt (one line at rest, three while editing), then + (photos / files), the
- * run-config chip (the Role's emoji or the provider's mark, model · effort, the mode's glyph, Plan
- * and Fast when on) opening the run-config sheet, and Send — which becomes Stop while a turn runs
- * and nothing is typed (typing again queues a turn). No @ button, as web and iOS.
+ * Web's mobile session composer. At rest one capsule line — +, the prompt, the agent's mark ⌄
+ * (it opens the run-config sheet) and Send. Editing (or attachments waiting to go) opens it into
+ * the new-chat card (`create/CreateSessionScreen` `Composer`): the prompt, then +, the run-config
+ * chip (the Role's emoji or the provider's mark, model · effort, the mode's glyph, Plan and Fast
+ * when on) and Send. Send becomes Stop while a turn runs and nothing is typed. The one text field
+ * stays put across both, so focus and the keyboard survive. No @ button, as web and iOS.
  */
 @Composable
 private fun ChatComposer(
@@ -731,7 +732,6 @@ private fun ChatComposer(
 ) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
-    val shape = RoundedCornerShape(LodyRadius.xl)
     // Web: "Work with <assistant>" — the Agent Role when one is, else the conversation's agent.
     val workWith = roleName ?: agentName
     val placeholder = when {
@@ -740,11 +740,69 @@ private fun ChatComposer(
         else -> stringResource(R.string.create_composer_placeholder_agent, workWith)
     }
     var focused by remember { mutableStateOf(false) }
+    val expanded = focused || attachments.isNotEmpty()
     // Dismissing the keyboard (Back, swipe) also ends editing.
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     @OptIn(ExperimentalLayoutApi::class)
     val imeVisible = WindowInsets.isImeVisible
     LaunchedEffect(imeVisible) { if (!imeVisible && focused) focusManager.clearFocus() }
+    // A capsule at rest, the card while open.
+    val radius by androidx.compose.animation.core.animateDpAsState(
+        if (expanded) LodyRadius.xl else LodySize.controlLg / 2 + LodySpacing.xs, label = "composer-radius",
+    )
+    val shape = RoundedCornerShape(radius)
+    val runConfigLabel = stringResource(R.string.chat_run_config)
+    val showStop = stoppable && prompt.text.isBlank() && attachments.isEmpty()
+    val ready = if (showStop) !stopping else enabled && (prompt.text.isNotBlank() || attachments.isNotEmpty())
+
+    @Composable
+    fun Plus() {
+        Box {
+            val attach = stringResource(R.string.create_attach)
+            var attachMenu by remember { mutableStateOf(false) }
+            IconButton(onClick = { attachMenu = true }, enabled = enabled, modifier = Modifier.semantics { contentDescription = attach }.widthIn(min = LodySize.controlMd)) {
+                Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
+            }
+            DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_attach_photos)) },
+                    leadingIcon = { Icon(LodyIcons.Image, contentDescription = null) },
+                    onClick = { attachMenu = false; onPickPhotos() },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_attach_files)) },
+                    leadingIcon = { Icon(LodyIcons.File, contentDescription = null) },
+                    onClick = { attachMenu = false; onPickFiles() },
+                )
+            }
+        }
+    }
+
+    // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs cross-fade
+    // and the fill follows, so the button never jumps.
+    @Composable
+    fun Send() {
+        val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
+        val fill by androidx.compose.animation.animateColorAsState(
+            when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",
+        )
+        Box(
+            Modifier
+                .padding(LodySpacing.xxs)
+                .size(LodySize.controlSm)
+                .clip(CircleShape)
+                .background(fill)
+                .clickable(enabled = ready, role = Role.Button, onClick = if (showStop) onStop else onSend)
+                .semantics { contentDescription = label },
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.animation.Crossfade(showStop, label = "send-stop") { stop ->
+                if (stop) Icon(LodyIcons.Stop, contentDescription = null, tint = colors.bgBase, modifier = Modifier.size(LodyIconSize.sm))
+                else Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+            }
+        }
+    }
+
     Column(
         Modifier
             .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.sm)
@@ -752,8 +810,8 @@ private fun ChatComposer(
             .dropShadow(shape, LodyElevations.md.shadow())
             .clip(shape)
             .background(colors.bgOverlay, shape)
-            .animateContentSize()
-            .padding(LodySpacing.sm),
+            .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+            .padding(LodySpacing.xs),
     ) {
         // Picked attachments, one removable chip each, above the prompt (web / iOS attachment stack).
         androidx.compose.animation.AnimatedVisibility(
@@ -782,105 +840,92 @@ private fun ChatComposer(
                 }
             }
         }
-        BasicTextField(
-            value = prompt,
-            onValueChange = onPromptChange,
-            enabled = enabled,
-            textStyle = type.body.copy(color = colors.textPrimary),
-            cursorBrush = SolidColor(colors.accentDefault),
-            minLines = if (focused) 3 else 1,
-            maxLines = 10,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) }
-                .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.xs)
-                .semantics { contentDescription = placeholder },
-            decorationBox = { inner ->
-                Box {
-                    if (prompt.text.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    inner()
-                }
-            },
-        )
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // +: the attachment menu.
-            Box {
-                val attach = stringResource(R.string.create_attach)
-                var attachMenu by remember { mutableStateOf(false) }
-                IconButton(onClick = { attachMenu = true }, enabled = enabled, modifier = Modifier.semantics { contentDescription = attach }.widthIn(min = LodySize.controlMd)) {
-                    Icon(LodyIcons.Plus, contentDescription = null, tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
-                }
-                DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.chat_attach_photos)) },
-                        leadingIcon = { Icon(LodyIcons.Image, contentDescription = null) },
-                        onClick = { attachMenu = false; onPickPhotos() },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.chat_attach_files)) },
-                        leadingIcon = { Icon(LodyIcons.File, contentDescription = null) },
-                        onClick = { attachMenu = false; onPickFiles() },
-                    )
-                }
-            }
-            // The run-config chip, as the new-chat page draws it.
-            val runConfigLabel = stringResource(R.string.chat_run_config)
-            val fastLabel = stringResource(R.string.run_config_fast)
-            Row(
-                Modifier
+        // At rest the line holds +, the prompt, the agent's mark ⌄ and Send; open, only the prompt.
+        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlLg - LodySpacing.xs * 2), verticalAlignment = Alignment.CenterVertically) {
+            if (!expanded) Plus()
+            BasicTextField(
+                value = prompt,
+                onValueChange = onPromptChange,
+                enabled = enabled,
+                textStyle = type.body.copy(color = colors.textPrimary),
+                cursorBrush = SolidColor(colors.accentDefault),
+                minLines = if (focused) 3 else 1,
+                maxLines = if (expanded) 10 else 1,
+                modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = LodySize.controlMd)
-                    .clip(RoundedCornerShape(LodyRadius.md))
-                    .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
-                    .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
-                    .padding(horizontal = LodySpacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-            ) {
-                // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
-                if (roleEmoji != null) Text(roleEmoji, style = type.subhead)
-                else AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
-                fun label(named: Boolean) = buildAnnotatedString {
-                    // With the Role's name, model · effort recede to secondary ink.
-                    if (named) withStyle(SpanStyle(color = colors.textPrimary)) { append(roleName.orEmpty()); append("   ") }
-                    face.forEachIndexed { index, part ->
-                        if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
-                        withStyle(SpanStyle(color = if (named) colors.textSecondary else colors.textPrimary)) { append(part) }
+                    .onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) }
+                    .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.sm)
+                    .semantics { contentDescription = placeholder },
+                decorationBox = { inner ->
+                    Box {
+                        if (prompt.text.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        inner()
                     }
-                }
-                // The Role's name only when the whole face fits; otherwise the emoji alone marks it.
-                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f, fill = false)) {
-                    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
-                    val named = label(named = true)
-                    val fits = !roleName.isNullOrEmpty() &&
-                        measurer.measure(named, type.subhead, maxLines = 1).size.width <= constraints.maxWidth
-                    Text(if (fits) named else label(named = false), style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                app.lody.android.create.ModeMark(mode, modeLabel)
-                if (plan) Icon(LodyIcons.PermissionPlan, contentDescription = stringResource(R.string.run_config_plan), tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                if (fast) Text(fastLabel, style = type.caption, color = colors.accentFg)
-            }
-            // Stop takes Send's place while a turn runs and nothing is typed (web); the glyphs
-            // cross-fade and the fill follows, so the button never jumps.
-            val showStop = stoppable && prompt.text.isBlank() && attachments.isEmpty()
-            val ready = if (showStop) !stopping else enabled && (prompt.text.isNotBlank() || attachments.isNotEmpty())
-            val label = stringResource(if (showStop) R.string.chat_stop else R.string.create_send)
-            val fill by androidx.compose.animation.animateColorAsState(
-                when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",
+                },
             )
-            Box(
-                Modifier
-                    .size(LodySize.controlSm)
-                    .clip(CircleShape)
-                    .background(fill)
-                    .clickable(enabled = ready, role = Role.Button, onClick = if (showStop) onStop else onSend)
-                    .semantics { contentDescription = label },
-                contentAlignment = Alignment.Center,
-            ) {
-                androidx.compose.animation.Crossfade(showStop, label = "send-stop") { stop ->
-                    if (stop) Icon(LodyIcons.Stop, contentDescription = null, tint = colors.bgBase, modifier = Modifier.size(LodyIconSize.sm))
-                    else Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
+            if (!expanded) {
+                // The running agent's mark (the Role's emoji when one is) and a chevron.
+                Row(
+                    Modifier
+                        .heightIn(min = LodySize.controlMd)
+                        .clip(RoundedCornerShape(LodyRadius.md))
+                        .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
+                        .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
+                        .padding(horizontal = LodySpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+                ) {
+                    if (roleEmoji != null) Text(roleEmoji, style = type.body)
+                    else AgentMark(agentCliType, agentType, colors.iconPrimary, Modifier.size(LodyIconSize.md))
+                    if (onRunConfig != null) Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
                 }
+                Send()
+            }
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            expanded,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Plus()
+                // The run-config chip, as the new-chat page draws it.
+                val fastLabel = stringResource(R.string.run_config_fast)
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = LodySize.controlMd)
+                        .clip(RoundedCornerShape(LodyRadius.md))
+                        .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
+                        .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
+                        .padding(horizontal = LodySpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                ) {
+                    // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
+                    if (roleEmoji != null) Text(roleEmoji, style = type.subhead)
+                    else AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
+                    fun label(named: Boolean) = buildAnnotatedString {
+                        // With the Role's name, model · effort recede to secondary ink.
+                        if (named) withStyle(SpanStyle(color = colors.textPrimary)) { append(roleName.orEmpty()); append("   ") }
+                        face.forEachIndexed { index, part ->
+                            if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
+                            withStyle(SpanStyle(color = if (named) colors.textSecondary else colors.textPrimary)) { append(part) }
+                        }
+                    }
+                    // The Role's name only when the whole face fits; otherwise the emoji alone marks it.
+                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+                        val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+                        val named = label(named = true)
+                        val fits = !roleName.isNullOrEmpty() &&
+                            measurer.measure(named, type.subhead, maxLines = 1).size.width <= constraints.maxWidth
+                        Text(if (fits) named else label(named = false), style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    app.lody.android.create.ModeMark(mode, modeLabel)
+                    if (plan) Icon(LodyIcons.PermissionPlan, contentDescription = stringResource(R.string.run_config_plan), tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                    if (fast) Text(fastLabel, style = type.caption, color = colors.accentFg)
+                }
+                Send()
             }
         }
     }
