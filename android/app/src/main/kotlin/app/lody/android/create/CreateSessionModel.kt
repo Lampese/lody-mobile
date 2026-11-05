@@ -101,7 +101,7 @@ object CreateSessionModel {
     fun recent(snapshot: CatalogSnapshot, target: CreateTarget): List<CatalogProject> {
         val usable = projects(snapshot).filter { isUsable(it, target) }
         val recent = usable.take(RECENT_LIMIT)
-        val current = snapshot.projects.firstOrNull { it.id == target.projectId && !target.chat }
+        val current = usable.firstOrNull { it.id == target.projectId && !target.chat }
         return if (current == null || recent.any { it.id == current.id }) recent else listOf(current) + recent
     }
 

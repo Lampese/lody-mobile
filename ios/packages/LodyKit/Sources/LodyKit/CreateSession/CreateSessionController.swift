@@ -361,7 +361,7 @@ final class CreateSessionController: UIViewController, UIGestureRecognizerDelega
 
   private func pickProject() {
     let picker = CreateProjectPickerController(
-      projects: form.projects, machineNames: form.machineNames, selectedId: form.current.projectId,
+      projects: form.availableProjects, machineNames: form.machineNames, selectedId: form.current.projectId,
       loadRepositories: loadRepositories, browse: browseProject)
     picker.onPick = { [weak self, weak picker] project in
       guard let self else { return }

@@ -18,6 +18,24 @@ let claudeCapability = Capability(
   reasoningEfforts: ["opus": ["low", "high"]])
 let options = CreationOptions(sessionId: "s", project: CreateProject(id: "p1", machineId: "m1", name: "P"), agents: [codex, claude], capabilities: [claudeCapability])
 
+// Every project picker scopes local projects and groups to the selected computer.
+do {
+  var form = CreateSessionForm(projects: [
+    CreateProject(id: "m1:local:a", machineId: "m1", name: "A"),
+    CreateProject(id: "m2:local:b", machineId: "m2", name: "B"),
+    CreateProject(id: "github:owner/repo", machineId: "", name: "Repo"),
+    CreateProject(id: "group:bound", machineId: "m1", name: "Bound"),
+    CreateProject(id: "group:any", machineId: "", name: "Anywhere"),
+  ])
+  form.current.machineId = "m2"
+  form.current.projectId = "m1:local:a"
+  check(form.availableProjects.map(\.id) == ["m2:local:b", "github:owner/repo", "group:any"],
+    "other computers' projects stay out even when selected")
+  form.current.machineId = "m1"
+  check(form.availableProjects.map(\.id) == ["m1:local:a", "github:owner/repo", "group:bound", "group:any"],
+    "switching computers changes the complete picker scope")
+}
+
 // Chat context is remembered without overwriting the last project.
 do {
   let project = CreateLogic.withSelection(nil, target: "p1", selection: ProjectPrefs(machineId: "m1", agentKey: "m1:c1"), chat: false)

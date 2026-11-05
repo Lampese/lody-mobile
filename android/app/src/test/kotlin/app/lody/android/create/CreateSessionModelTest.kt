@@ -9,6 +9,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CreateSessionModelTest {
+    @Test
+    fun recentProjectsDoNotRestoreASelectionFromAnotherComputer() {
+        val catalog = snapshot.copy(projects = snapshot.projects + listOf(
+            CatalogProject("m2:local:b", "m2", "beta", "/b"),
+            CatalogProject("group:bound", "m1", "Bound", ""),
+            CatalogProject("group:any", "", "Anywhere", ""),
+        ))
+        for (selected in listOf("m1:local:a", "group:bound")) {
+            val target = CreateTarget(projectId = selected, machineId = "m2")
+            assertEquals(listOf("github:lody/web", "m2:local:b", "group:any"),
+                CreateSessionModel.recent(catalog, target).map { it.id })
+        }
+    }
+
     private val snapshot = CatalogSnapshot(
         revision = 1,
         projects = listOf(

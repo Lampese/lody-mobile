@@ -94,6 +94,16 @@ struct CreateSessionForm {
 
   var prefsTarget: String { current.target }
 
+  /// Shared by recent, search and the full picker. Unbound groups and GitHub repositories
+  /// can run on any computer; local projects and bound groups stay on their own computer.
+  var availableProjects: [CreateProject] {
+    let machine = current.machine?.id ?? current.machineId
+    return projects.filter {
+      $0.id.hasPrefix("github:") || machine.isEmpty || $0.machineId == machine
+        || ($0.id.hasPrefix(CreateSessionSelection.groupPrefix) && $0.machineId.isEmpty)
+    }
+  }
+
   mutating func open(projectId: String?, context: String?) {
     let selected = context == "chat" ? nil : (projectId
       ?? CreateLogic.rememberedProject(prefs, projects)

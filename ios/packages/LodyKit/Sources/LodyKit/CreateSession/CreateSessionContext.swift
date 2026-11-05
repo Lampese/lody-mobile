@@ -183,7 +183,7 @@ enum CreateSessionContext {
   /// and any GitHub project) and More projects…, or for search every usable project.
   private static func projectOptions(_ form: CreateSessionForm, recent: Bool) -> [CreateOption] {
     let chat = CreateOption(id: chatOption, title: text("create.context.chat"), glyph: .symbol("circle.slash"), selected: form.current.chat)
-    let shown = recent ? recentProjects(form) : usableProjects(form)
+    let shown = recent ? recentProjects(form) : form.availableProjects
     var options = [chat] + shown.map { project in
       CreateOption(
         id: project.id, title: project.name,
@@ -199,19 +199,11 @@ enum CreateSessionContext {
     path.replacingOccurrences(of: #"^/(Users|home)/[^/]+"#, with: "~", options: .regularExpression)
   }
 
-  private static func usableProjects(_ form: CreateSessionForm) -> [CreateProject] {
-    let machine = form.current.machine?.id ?? form.current.machineId
-    // GitHub projects and groups without local members run on any computer.
-    return form.projects.filter {
-      CreateProjectPicker.isGithub($0.id) || machine.isEmpty || $0.machineId == machine
-        || ($0.id.hasPrefix(CreateSessionSelection.groupPrefix) && $0.machineId.isEmpty)
-    }
-  }
-
-  /// `form.projects` is ordered by latest activity; the selected project always stays listed.
+  /// Preserve the selected project only while it remains usable on this computer.
   static func recentProjects(_ form: CreateSessionForm) -> [CreateProject] {
-    var recent = Array(usableProjects(form).prefix(recentLimit))
-    if !form.current.chat, let current = form.projects.first(where: { $0.id == form.current.projectId }), !recent.contains(where: { $0.id == current.id }) {
+    let available = form.availableProjects
+    var recent = Array(available.prefix(recentLimit))
+    if !form.current.chat, let current = available.first(where: { $0.id == form.current.projectId }), !recent.contains(where: { $0.id == current.id }) {
       recent.insert(current, at: 0)
     }
     return recent
