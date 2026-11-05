@@ -134,7 +134,7 @@ final class CreateProjectPickerController: CreateListController {
   private var task: Task<Void, Never>?
 
   init(
-    projects: [CreateProject], machineNames: [String: String], selectedId: String,
+    projects: [CreateProject], machineNames: [String: String], selectedId: String, machineName: String?,
     loadRepositories: (() async throws -> [CreateProject])?, browse: (() async -> CreateProject?)?
   ) {
     self.projects = projects
@@ -145,6 +145,7 @@ final class CreateProjectPickerController: CreateListController {
     segment = CreateProjectPicker.isGithub(selectedId) ? 1 : 0
     super.init(nibName: nil, bundle: nil)
     title = String(localized: "create.row.selectProject", bundle: .lody)
+    navigationItem.subtitle = machineName
   }
 
   @available(*, unavailable)

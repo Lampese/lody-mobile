@@ -479,6 +479,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearc
             PickerOption(MORE, stringResource(R.string.create_more_projects), selected = false, icon = LodyIcons.More),
         searchOptions = listOf(chatOption) + usable.map { it.option(target) },
         searchPlaceholder = stringResource(R.string.create_search_projects),
+        scopeLabel = machineName.orEmpty(),
         open = open == PROJECT,
         onToggle = { toggle(PROJECT) },
         onPick = { id ->
@@ -564,6 +565,7 @@ private fun PickerCard(
     searchPlaceholder: String = "",
     expandAllOn: String? = null,
     onSearchFocus: (Boolean) -> Unit = {},
+    scopeLabel: String = "",
 ) {
     val colors = LodyTheme.colors
     Column {
@@ -594,7 +596,19 @@ private fun PickerCard(
             enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
             exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
         ) {
-            OptionList(options, searchOptions, searchPlaceholder, onPick, expandAllOn, onSearchFocus = onSearchFocus)
+            Column {
+                if (scopeLabel.isNotEmpty()) {
+                    Text(
+                        scopeLabel,
+                        style = LodyTheme.typography.footnote,
+                        color = colors.textTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
+                    )
+                }
+                OptionList(options, searchOptions, searchPlaceholder, onPick, expandAllOn, onSearchFocus = onSearchFocus)
+            }
         }
     }
 }
