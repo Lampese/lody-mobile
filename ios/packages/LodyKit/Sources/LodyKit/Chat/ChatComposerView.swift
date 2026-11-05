@@ -629,9 +629,10 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private var sheetContentBottom: NSLayoutConstraint!
   private let accessoryBar = UIView()
   private let modelButton = UIButton(type: .system)
-  /// The collapsed one-line composer's run-config affordance: the agent mark and a chevron beside
+  /// The collapsed one-line composer's run-config affordance: the agent mark beside
   /// Send. Tapping it opens the composer and then its model panel.
   private let collapsedMark = UIButton(type: .system)
+  private var movingAgentMark: UIImageView?
   private weak var optionsPopover: ChatComposerModelPanel?
   private let attachmentBar = ChatAttachmentBar()
   private let attachmentStack = ChatComposerAttachmentStack()
@@ -1491,6 +1492,25 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     // The bottom anchor belongs to the host; animate its layout with the contents.
     let layoutRoot = window ?? superview ?? self
     if expansionChanged && window != nil { layoutRoot.layoutIfNeeded() }
+    // Keep one visible mark while its two button layouts exchange places.
+    var movingMark: UIImageView?
+    if expansionChanged && restsCollapsed && window != nil && !UIAccessibility.isReduceMotionEnabled,
+       composerOptions.roleEmoji?.isEmpty != false {
+      let source = movingAgentMark ?? (composerExpanded ? modelButton.imageView : collapsedMark.imageView)
+      if let source, let image = source.image, !source.bounds.isEmpty {
+        let mark = UIImageView(image: image)
+        mark.contentMode = .scaleAspectFit
+        if source === movingAgentMark {
+          mark.frame = source.layer.presentation()?.frame ?? source.frame
+        } else {
+          mark.frame = source.convert(source.bounds, to: inputSurface.contentView)
+        }
+        movingAgentMark?.removeFromSuperview()
+        inputSurface.contentView.addSubview(mark)
+        movingAgentMark = mark
+        movingMark = mark
+      }
+    }
     composerExpanded = expanded
     input.isEditable = state.editable && (sendHandoff || !sending)
     attach.isEnabled = state.editable && !sending
@@ -1620,7 +1640,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
         (self.window ?? self.superview ?? self).layoutIfNeeded()
       }
     }
-    // Collapsed mark out, expanded controls in (and back), on the expansion's own curve.
+    // Carry the mark between buttons while the controls fade on the expansion's own curve.
     let markAlpha: CGFloat = showsMark ? 1 : 0
     let controlsAlpha: CGFloat = expanded ? 1 : 0
     if expansionChanged {
@@ -1630,7 +1650,17 @@ final class ChatComposerView: UIView, UITextViewDelegate {
           self.collapsedMark.alpha = markAlpha
           self.controls.alpha = controlsAlpha
           layoutRoot.layoutIfNeeded()
+          if let movingMark,
+             let destination = expanded ? self.modelButton.imageView : self.collapsedMark.imageView {
+            movingMark.frame = destination.convert(destination.bounds, to: self.inputSurface.contentView)
+          }
         } completion: { finished in
+          if let movingMark, self.movingAgentMark === movingMark {
+            movingMark.removeFromSuperview()
+            self.movingAgentMark = nil
+            self.modelButton.imageView?.alpha = 1
+            self.collapsedMark.imageView?.alpha = 1
+          }
           if finished && self.composerExpanded == expanded { self.surfaceLayout.completeTransition() }
         }
       } else {
@@ -1668,6 +1698,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     configuration.image = face.withRenderingMode(.alwaysOriginal)
     configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
     collapsedMark.configuration = configuration
+    collapsedMark.imageView?.alpha = movingAgentMark == nil ? 1 : 0
     collapsedMark.isEnabled = modelButton.isEnabled
     collapsedMark.accessibilityLabel = modelButton.accessibilityLabel
   }
@@ -1750,6 +1781,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       title.append(dot)
       title.append(NSAttributedString(attachment: symbol))
     }
+    var agentImage: UIImage?
     if let emoji = composerOptions.roleEmoji, !emoji.isEmpty {
       // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
       title.addAttribute(.font, value: font, range: NSRange(location: 0, length: title.length))
@@ -1757,19 +1789,20 @@ final class ChatComposerView: UIView, UITextViewDelegate {
       summary = [composerOptions.roleName ?? "", summary].filter { !$0.isEmpty }.joined(separator: " · ")
     } else if let asset = composerOptions.agentAsset, let mark = UIImage(named: asset, in: .main, compatibleWith: traitCollection) {
       // Marks are template images: draw them in the title's ink so they read in dark mode.
-      let attachment = NSTextAttachment(image: mark.withTintColor(.label.resolvedColor(with: traitCollection), renderingMode: .alwaysOriginal))
-      attachment.bounds = CGRect(x: 0, y: font.descender, width: font.lineHeight, height: font.lineHeight)
-      let prefix = NSMutableAttributedString(attachment: attachment)
-      prefix.append(NSAttributedString(string: "  "))
-      title.insert(prefix, at: 0)
+      agentImage = UIGraphicsImageRenderer(size: CGSize(width: font.lineHeight, height: font.lineHeight)).image { _ in
+        mark.withTintColor(.label.resolvedColor(with: traitCollection)).draw(in: CGRect(x: 0, y: 0, width: font.lineHeight, height: font.lineHeight))
+      }.withRenderingMode(.alwaysOriginal)
     }
     title.addAttribute(.font, value: font, range: NSRange(location: 0, length: title.length))
     var configuration = UIButton.Configuration.plain()
     configuration.attributedTitle = AttributedString(title)
+    configuration.image = agentImage
+    configuration.imagePadding = 8
     configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
     configuration.baseForegroundColor = .label
     configuration.titleLineBreakMode = .byTruncatingTail
     modelButton.configuration = configuration
+    modelButton.imageView?.alpha = movingAgentMark == nil ? 1 : 0
     modelButton.accessibilityLabel = String.localizedStringWithFormat(String(localized: "native.chat.composer.modelButton", bundle: .lody), String(describing: summary))
     modelButton.accessibilityValue = composerOptions.fast == true ? String(localized: "native.chat.composer.fast", bundle: .lody) + ": " + String(localized: "native.chat.composer.fastOn", bundle: .lody) : nil
     optionsPopover?.render(composerOptions)

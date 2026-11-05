@@ -704,8 +704,9 @@ private fun turnTime(timestamp: String?): String {
  * when on) and Send. Send becomes Stop while a turn runs and nothing is typed. The one text field
  * stays put across both, so focus and the keyboard survive. No @ button, as web and iOS.
  */
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
-private fun ChatComposer(
+internal fun ChatComposer(
     prompt: androidx.compose.ui.text.input.TextFieldValue,
     onPromptChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
     onFocusChange: (Boolean) -> Unit,
@@ -803,128 +804,148 @@ private fun ChatComposer(
         }
     }
 
-    Column(
-        Modifier
-            .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.sm)
-            .fillMaxWidth()
-            .dropShadow(shape, LodyElevations.md.shadow())
-            .clip(shape)
-            .background(colors.bgOverlay, shape)
-            .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
-            .padding(LodySpacing.xs),
-    ) {
-        // Picked attachments, one removable chip each, above the prompt (web / iOS attachment stack).
-        androidx.compose.animation.AnimatedVisibility(
-            attachments.isNotEmpty(),
-            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+    androidx.compose.animation.SharedTransitionLayout {
+        Column(
+            Modifier
+                .padding(horizontal = LodyLayout.screenPaddingX, vertical = LodySpacing.sm)
+                .fillMaxWidth()
+                .dropShadow(shape, LodyElevations.md.shadow())
+                .clip(shape)
+                .background(colors.bgOverlay, shape)
+                .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+                .padding(LodySpacing.xs),
         ) {
-            val remove = stringResource(R.string.chat_attach_remove)
-            androidx.compose.foundation.lazy.LazyRow(
-                Modifier.fillMaxWidth().padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+            // Picked attachments, one removable chip each, above the prompt (web / iOS attachment stack).
+            androidx.compose.animation.AnimatedVisibility(
+                attachments.isNotEmpty(),
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
             ) {
-                items(attachments, key = { it.id }) { item ->
-                    AttachmentChip(item.name, item.image, Modifier.animateItem()) {
-                        Box(
-                            Modifier
-                                .size(LodySize.controlSm)
-                                .clip(CircleShape)
-                                .clickable(role = Role.Button) { onRemoveAttachment(item.id) }
-                                .semantics { contentDescription = "$remove ${item.name}" },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(LodyIcons.Close, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
-                        }
-                    }
-                }
-            }
-        }
-        // At rest the line holds +, the prompt, the agent's mark ⌄ and Send; open, only the prompt.
-        Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlLg - LodySpacing.xs * 2), verticalAlignment = Alignment.CenterVertically) {
-            if (!expanded) Plus()
-            BasicTextField(
-                value = prompt,
-                onValueChange = onPromptChange,
-                enabled = enabled,
-                textStyle = type.body.copy(color = colors.textPrimary),
-                cursorBrush = SolidColor(colors.accentDefault),
-                minLines = if (focused) 3 else 1,
-                maxLines = if (expanded) 10 else 1,
-                modifier = Modifier
-                    .weight(1f)
-                    .onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) }
-                    .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.sm)
-                    .semantics { contentDescription = placeholder },
-                decorationBox = { inner ->
-                    Box {
-                        if (prompt.text.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        inner()
-                    }
-                },
-            )
-            if (!expanded) {
-                // The running agent's mark (the Role's emoji when one is).
-                Row(
-                    Modifier
-                        .heightIn(min = LodySize.controlMd)
-                        .clip(RoundedCornerShape(LodyRadius.md))
-                        .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
-                        .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
-                        .padding(horizontal = LodySpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
+                val remove = stringResource(R.string.chat_attach_remove)
+                androidx.compose.foundation.lazy.LazyRow(
+                    Modifier.fillMaxWidth().padding(horizontal = LodySpacing.xs, vertical = LodySpacing.xs),
                     horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
                 ) {
-                    if (roleEmoji != null) Text(roleEmoji, style = type.body)
-                    else AgentMark(agentCliType, agentType, colors.iconPrimary, Modifier.size(LodyIconSize.md))
-                }
-                Send()
-            }
-        }
-        androidx.compose.animation.AnimatedVisibility(
-            expanded,
-            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Plus()
-                // The run-config chip, as the new-chat page draws it.
-                val fastLabel = stringResource(R.string.run_config_fast)
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = LodySize.controlMd)
-                        .clip(RoundedCornerShape(LodyRadius.md))
-                        .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
-                        .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
-                        .padding(horizontal = LodySpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
-                ) {
-                    // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
-                    if (roleEmoji != null) Text(roleEmoji, style = type.subhead)
-                    else AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
-                    fun label(named: Boolean) = buildAnnotatedString {
-                        // With the Role's name, model · effort recede to secondary ink.
-                        if (named) withStyle(SpanStyle(color = colors.textPrimary)) { append(roleName.orEmpty()); append("   ") }
-                        face.forEachIndexed { index, part ->
-                            if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
-                            withStyle(SpanStyle(color = if (named) colors.textSecondary else colors.textPrimary)) { append(part) }
+                    items(attachments, key = { it.id }) { item ->
+                        AttachmentChip(item.name, item.image, Modifier.animateItem()) {
+                            Box(
+                                Modifier
+                                    .size(LodySize.controlSm)
+                                    .clip(CircleShape)
+                                    .clickable(role = Role.Button) { onRemoveAttachment(item.id) }
+                                    .semantics { contentDescription = "$remove ${item.name}" },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(LodyIcons.Close, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.xs))
+                            }
                         }
                     }
-                    // The Role's name only when the whole face fits; otherwise the emoji alone marks it.
-                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f, fill = false)) {
-                        val measurer = androidx.compose.ui.text.rememberTextMeasurer()
-                        val named = label(named = true)
-                        val fits = !roleName.isNullOrEmpty() &&
-                            measurer.measure(named, type.subhead, maxLines = 1).size.width <= constraints.maxWidth
-                        Text(if (fits) named else label(named = false), style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    app.lody.android.create.ModeMark(mode, modeLabel)
-                    if (plan) Icon(LodyIcons.PermissionPlan, contentDescription = stringResource(R.string.run_config_plan), tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
-                    if (fast) Text(fastLabel, style = type.caption, color = colors.accentFg)
                 }
-                Send()
+            }
+            // At rest the line holds +, the prompt, the agent's mark ⌄ and Send; open, only the prompt.
+            Row(Modifier.fillMaxWidth().heightIn(min = LodySize.controlLg - LodySpacing.xs * 2), verticalAlignment = Alignment.CenterVertically) {
+                if (!expanded) Plus()
+                BasicTextField(
+                    value = prompt,
+                    onValueChange = onPromptChange,
+                    enabled = enabled,
+                    textStyle = type.body.copy(color = colors.textPrimary),
+                    cursorBrush = SolidColor(colors.accentDefault),
+                    minLines = if (focused) 3 else 1,
+                    maxLines = if (expanded) 10 else 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged { focused = it.isFocused; onFocusChange(it.isFocused) }
+                        .padding(horizontal = LodySpacing.sm, vertical = LodySpacing.sm)
+                        .semantics { contentDescription = placeholder },
+                    decorationBox = { inner ->
+                        Box {
+                            if (prompt.text.isEmpty()) Text(placeholder, style = type.body, color = colors.textPlaceholder, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            inner()
+                        }
+                    },
+                )
+                androidx.compose.animation.AnimatedVisibility(
+                    !expanded,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut(),
+                ) {
+                    val markVisibility = this
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // The running agent's mark (the Role's emoji when one is).
+                        Row(
+                            Modifier
+                                .heightIn(min = LodySize.controlMd)
+                                .clip(RoundedCornerShape(LodyRadius.md))
+                                .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
+                                .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
+                                .padding(horizontal = LodySpacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
+                        ) {
+                            Box(Modifier.sharedElement(
+                                rememberSharedContentState("composer-agent"), markVisibility,
+                                boundsTransform = { _, _ -> androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow) },
+                            )) {
+                                if (roleEmoji != null) Text(roleEmoji, style = type.body)
+                                else AgentMark(agentCliType, agentType, colors.iconPrimary, Modifier.size(LodyIconSize.md))
+                            }
+                        }
+                        Send()
+                    }
+                }
+            }
+            androidx.compose.animation.AnimatedVisibility(
+                expanded,
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+            ) {
+                val markVisibility = this
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Plus()
+                    // The run-config chip, as the new-chat page draws it.
+                    val fastLabel = stringResource(R.string.run_config_fast)
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = LodySize.controlMd)
+                            .clip(RoundedCornerShape(LodyRadius.md))
+                            .clickable(enabled = onRunConfig != null, role = Role.Button) { onRunConfig?.invoke() }
+                            .semantics { contentDescription = "$runConfigLabel: ${listOfNotNull(roleName).plus(face).joinToString(", ")}" }
+                            .padding(horizontal = LodySpacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
+                    ) {
+                        // An Agent Role leads with its emoji instead of the assistant's mark (web's Role face).
+                        Box(Modifier.sharedElement(
+                            rememberSharedContentState("composer-agent"), markVisibility,
+                            boundsTransform = { _, _ -> androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow) },
+                        )) {
+                            if (roleEmoji != null) Text(roleEmoji, style = type.subhead)
+                            else AgentMark(agentCliType, agentType, colors.iconSecondary, Modifier.size(LodyIconSize.sm))
+                        }
+                        fun label(named: Boolean) = buildAnnotatedString {
+                            // With the Role's name, model · effort recede to secondary ink.
+                            if (named) withStyle(SpanStyle(color = colors.textPrimary)) { append(roleName.orEmpty()); append("   ") }
+                            face.forEachIndexed { index, part ->
+                                if (index > 0) withStyle(SpanStyle(color = colors.textTertiary)) { append("  ·  ") }
+                                withStyle(SpanStyle(color = if (named) colors.textSecondary else colors.textPrimary)) { append(part) }
+                            }
+                        }
+                        // The Role's name only when the whole face fits; otherwise the emoji alone marks it.
+                        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+                            val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+                            val named = label(named = true)
+                            val fits = !roleName.isNullOrEmpty() &&
+                                measurer.measure(named, type.subhead, maxLines = 1).size.width <= constraints.maxWidth
+                            Text(if (fits) named else label(named = false), style = type.subhead, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        app.lody.android.create.ModeMark(mode, modeLabel)
+                        if (plan) Icon(LodyIcons.PermissionPlan, contentDescription = stringResource(R.string.run_config_plan), tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                        if (fast) Text(fastLabel, style = type.caption, color = colors.accentFg)
+                    }
+                    Send()
+                }
             }
         }
     }
