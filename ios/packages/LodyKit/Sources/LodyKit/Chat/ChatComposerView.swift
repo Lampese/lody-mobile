@@ -706,10 +706,6 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   }
   var onReconnect: (() -> Void)?
   var onPreview: ((String) -> Void)?
-  var onTasksPress: (() -> Void)?
-  var taskCount = 0 {
-    didSet { if oldValue != taskCount { updateComposer() } }
-  }
   var onMentionBrowse: (([String: String]) -> Void)?
   private var mentionResultID = ""
   private var mentionNeedsFocus = false
@@ -916,7 +912,6 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     // Its own glass panel: it must not also contribute to the composer's merged glass.
     addSubview(actionBar)
     actionBar.onAction = { [weak self] in self?.onPreview?("bar:" + $0) }
-    actionBar.onTasks = { [weak self] in self?.onTasksPress?() }
     composer.contentView.addSubview(notice)
     composer.contentView.addSubview(quotaNotice)
     composer.contentView.addSubview(inputSurface)
@@ -1552,8 +1547,8 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     queueView.render(queuedDrafts, enabled: state.canStop == true && !sending && state.controlling != true, steeringID: state.steerID ?? "", firstOnly: state.steerInterrupts == true)
     queueHeight.constant = queueView.panelHeight
     // The action bar stays while typing; expanded editing gives its row to the editor.
-    let showsBar = !editing && ChatActionBarView.shows(state.actionBar, tasks: taskCount)
-    actionBar.render(state.actionBar, tasks: taskCount, visible: showsBar, animated: true)
+    let showsBar = !editing && ChatActionBarView.shows(state.actionBar)
+    actionBar.render(state.actionBar, visible: showsBar, animated: true)
     // One row of capsules; the stacked fallback at very large text is taller.
     actionBarHeight.constant = showsBar ? actionBar.fittingHeight(width: max(0, bounds.width - 32)) : 0
     queueGap.constant = showsBar && queueHeight.constant > 0 ? 8 : 0

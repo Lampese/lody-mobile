@@ -32,6 +32,7 @@ extension SessionController {
     if let first = bar.actions.first {
       result["primary"] = [
         "label": SessionInfoBar.title(first),
+        "disclosure": first == .merge,
         "moreLabel": String(localized: "bar.more", bundle: .lody),
         "more": bar.actions.dropFirst().map { ["id": $0.rawValue, "title": SessionInfoBar.title($0), "symbol": Self.symbol($0)] },
       ]
@@ -92,7 +93,6 @@ extension SessionController {
       "label": label, "symbol": symbol, "tint": tint, "actions": actions,
       "accessibilityLabel": description.filter { !$0.isEmpty }.joined(separator: ", "),
       "menuTitle": bar.repository,
-      "tap": bar.pullRequest != nil,
     ]
   }
 

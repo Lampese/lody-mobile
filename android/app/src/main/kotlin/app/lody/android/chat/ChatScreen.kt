@@ -1088,7 +1088,6 @@ private fun MachineItem(name: String, kind: app.lody.android.create.CreateSessio
 private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String) -> Unit, modifier: Modifier = Modifier) {
     val colors = LodyTheme.colors
     val type = LodyTheme.typography
-    val uri = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var open by remember { mutableStateOf(false) }
     val pr = bar.pullRequest
@@ -1122,10 +1121,10 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
     var panel by remember { mutableStateOf(false) }
     if (panel && pr != null) PullRequestSheet(bar, pr, icon, tint, verdict, onCopied) { panel = false }
     Box(modifier.barCapsule(colors)) {
-        // A PR capsule opens the PR panel on tap and keeps its menu on a long press.
+        // Always choose a destination before opening the PR or inspecting changes.
         BarCell(
             description,
-            onClick = { if (pr != null) panel = true else open = true },
+            onClick = { open = true },
             Modifier.padding(horizontal = LodySpacing.xs),
             onLongClick = if (pr != null) ({ open = true }) else null,
         ) {
@@ -1141,6 +1140,10 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
                 val style = type.subhead.copy(fontFeatureSettings = "tnum")
                 Text("+${bar.added}", style = style, color = colors.diffAddedText, maxLines = 1)
                 Text("−${bar.removed}", style = style, color = colors.diffRemovedText, maxLines = 1)
+            }
+            val optionCount = (if (pr != null) 1 else 0) + (if (diff) 1 else 0) + (if (bar.branch.isNotEmpty()) 1 else 0)
+            if (optionCount > 1) {
+                Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
             }
         }
         DropdownMenu(open, onDismissRequest = { open = false }) {
@@ -1182,8 +1185,8 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
                         }
                     },
                     leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.md)) },
-                    trailingIcon = { Icon(LodyIcons.ExternalLink, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm)) },
-                    onClick = { open = false; uri.openUri(bar.pullRequestUrl) },
+                    trailingIcon = { Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm)) },
+                    onClick = { open = false; panel = true },
                 )
             }
             if (bar.branch.isNotEmpty()) {
@@ -1238,6 +1241,9 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
                     if (pending) CircularProgressIndicator(modifier = Modifier.size(LodyIconSize.sm), strokeWidth = 2.dp, color = colors.textSecondary)
                     val label = if (pending) stringResource(if (first == SessionInfoBar.Action.Merge) R.string.bar_merge_pending else R.string.bar_ready_pending) else actionTitle(first)
                     Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1)
+                    if (!pending && first == SessionInfoBar.Action.Merge && actions.size == 1) {
+                        Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                    }
                 }
             }
             if (actions.size > 1) {

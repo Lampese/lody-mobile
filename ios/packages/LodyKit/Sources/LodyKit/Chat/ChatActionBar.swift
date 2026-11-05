@@ -22,7 +22,7 @@ struct ChatActionBarState: Decodable, Equatable {
     var tint: String?
     /// Connecting: a spinner replaces the glyph.
     var busy: Bool?
-    /// A count beside the glyph (sub-tasks).
+    /// An optional count beside a resource glyph.
     var badge: String?
     let accessibilityLabel: String
     /// Tap acts on the item itself; its menu (if any) opens on a long press.
@@ -38,8 +38,6 @@ struct ChatActionBarState: Decodable, Equatable {
     let accessibilityLabel: String
     var menuTitle: String?
     let actions: [ChatMenuAction]
-    /// With a PR, a tap opens its detail panel; the menu moves to a long press.
-    var tap: Bool?
   }
 
   struct Diff: Decodable, Equatable {
@@ -54,6 +52,8 @@ struct ChatActionBarState: Decodable, Equatable {
   struct Primary: Decodable, Equatable {
     let label: String
     var busy: Bool?
+    /// The primary action itself opens a choice, such as the merge-method picker.
+    var disclosure: Bool?
     let more: [ChatMenuAction]
     let moreLabel: String
   }
@@ -67,15 +67,13 @@ struct ChatActionBarState: Decodable, Equatable {
 }
 
 /// Three glass capsules grouped by purpose, so the composer stays the only full-width shape:
-/// environment (computer, live resources, sub-tasks), context (PR or branch with ±diff) and the
+/// environment (computer and live resources), context (PR or branch with ±diff) and the
 /// repository action, pinned trailing. Never scrolls: `ViewThatFits` takes the first stage that
 /// fits on one line — long labels capped, then the diff as a dot, then the environment folded
 /// into one icon with a "+n" badge — and only at very large text moves the action to its own row.
 struct ChatActionBarContent: View {
   var state = ChatActionBarState()
-  var tasks = 0
   var onAction: (String) -> Void = { _ in }
-  var onTasks: () -> Void = {}
   @Environment(\.dynamicTypeSize) private var typeSize
 
   var body: some View {
@@ -128,17 +126,8 @@ struct ChatActionBarContent: View {
 
   // MARK: Environment
 
-  /// Computer and live resources, with sub-tasks as one more icon.
-  private var environment: [ChatActionBarState.Item] {
-    var items = state.items ?? []
-    if tasks > 0 {
-      items.append(.init(
-        id: "tasks", symbol: "point.3.connected.trianglepath.dotted", tint: "secondary", badge: "\(tasks)",
-        accessibilityLabel: String.localizedStringWithFormat(String(localized: "native.chat.overlay.tasks", bundle: .lody), tasks)
-      ))
-    }
-    return items
-  }
+  /// Computer and live resources; tasks are shown in the transcript.
+  private var environment: [ChatActionBarState.Item] { state.items ?? [] }
 
   private var environmentCapsule: some View {
     HStack(spacing: 0) {
@@ -150,12 +139,11 @@ struct ChatActionBarContent: View {
   }
 
   /// One icon stands for the group: a computer in trouble first, then a live resource, then
-  /// sub-tasks; the menu lists every item.
+  /// the first item; the menu lists every item.
   private var foldedEnvironment: some View {
     let items = environment
     let lead = items.first { $0.id == "machine" && $0.tint == "warning" }
       ?? items.first { ["browser", "simulator"].contains($0.id) }
-      ?? items.first { $0.id == "tasks" }
       ?? items[0]
     return Menu {
       ForEach(items) { item in
@@ -179,7 +167,7 @@ struct ChatActionBarContent: View {
   }
 
   private func open(_ item: ChatActionBarState.Item) {
-    if item.id == "tasks" { onTasks() } else { onAction(item.id) }
+    onAction(item.id)
   }
 
   @ViewBuilder private func item(_ item: ChatActionBarState.Item) -> some View {
@@ -201,7 +189,6 @@ struct ChatActionBarContent: View {
   private static func identifier(_ id: String) -> String {
     switch id {
     case "browser", "simulator": "session-preview"
-    case "tasks": "session-subtasks"
     default: "session-bar:" + id
     }
   }
@@ -232,7 +219,7 @@ struct ChatActionBarContent: View {
     if let diff = state.diff, diff.tap == true {
       actions.insert(.init(
         id: "diff", title: String(localized: "workspaceChanges.menuTitle", bundle: .lody), symbol: "plus.forwardslash.minus"
-      ), at: 0)
+      ), at: actions.first?.id == "pr" ? 1 : 0)
     }
     let label = HStack(spacing: 6) {
       if let context {
@@ -252,13 +239,17 @@ struct ChatActionBarContent: View {
             .fixedSize()
           }
         }
+        if actions.count > 1 {
+          Image(systemName: "chevron.down")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(LodyColor.iconSecondary)
+        }
       }
       .padding(.horizontal, 12)
       .frame(minHeight: ChatActionBarView.rowHeight)
       .contentShape(Capsule())
     return ContextActionsPopover(
       actions: actions, title: context?.menuTitle, diff: state.diff,
-      primaryAction: context?.tap == true ? { onAction("context:pr") } : nil,
       onAction: { onAction("context:" + $0) }, label: label
     )
     .buttonStyle(.plain)
@@ -280,6 +271,9 @@ struct ChatActionBarContent: View {
         HStack(spacing: 8) {
           if primary.busy == true { ProgressView().controlSize(.small) }
           Text(primary.label)
+          if primary.disclosure == true && primary.more.isEmpty && primary.busy != true {
+            Image(systemName: "chevron.down").font(.footnote.weight(.semibold))
+          }
         }
           .fontWeight(.semibold)
           .lineLimit(1)
@@ -354,9 +348,8 @@ final class ChatActionBarView: UIView {
   static let rowHeight: CGFloat = 36
 
   private let host = UIHostingController(rootView: ChatActionBarContent())
-  private var rendered: (state: ChatActionBarState, tasks: Int)?
+  private var rendered: ChatActionBarState?
   var onAction: ((String) -> Void)?
-  var onTasks: (() -> Void)?
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -380,7 +373,7 @@ final class ChatActionBarView: UIView {
   required init?(coder: NSCoder) { fatalError() }
 
   /// Whether the bar has anything to show for this state.
-  static func shows(_ state: ChatActionBarState?, tasks: Int) -> Bool { !(state?.isEmpty ?? true) || tasks > 0 }
+  static func shows(_ state: ChatActionBarState?) -> Bool { !(state?.isEmpty ?? true) }
 
   /// The height the chosen stage needs at this width: one row, or two at very large text.
   func fittingHeight(width: CGFloat) -> CGFloat {
@@ -389,14 +382,13 @@ final class ChatActionBarView: UIView {
     return max(Self.rowHeight, ceil(size.height))
   }
 
-  func render(_ state: ChatActionBarState?, tasks: Int, visible: Bool, animated: Bool) {
+  func render(_ state: ChatActionBarState?, visible: Bool, animated: Bool) {
     let state = state ?? ChatActionBarState()
-    if rendered?.state != state || rendered?.tasks != tasks {
-      rendered = (state, tasks)
+    if rendered != state {
+      rendered = state
       let content = ChatActionBarContent(
-        state: state, tasks: tasks,
-        onAction: { [weak self] in self?.onAction?($0) },
-        onTasks: { [weak self] in self?.onTasks?() }
+        state: state,
+        onAction: { [weak self] in self?.onAction?($0) }
       )
       // Glass capsules morph between stages and as groups come and go.
       if animated && window != nil && !UIAccessibility.isReduceMotionEnabled {
@@ -405,7 +397,7 @@ final class ChatActionBarView: UIView {
         host.rootView = content
       }
     }
-    let shown = visible && Self.shows(state, tasks: tasks)
+    let shown = visible && Self.shows(state)
     guard isUserInteractionEnabled != shown || isHidden == shown else { return }
     isUserInteractionEnabled = shown
     accessibilityElementsHidden = !shown
@@ -427,7 +419,6 @@ private struct ContextActionsPopover<Label: View>: View {
   let actions: [ChatMenuAction]
   let title: String?
   let diff: ChatActionBarState.Diff?
-  let primaryAction: (() -> Void)?
   let onAction: (String) -> Void
   let label: Label
   @State private var presented = false
@@ -435,9 +426,7 @@ private struct ContextActionsPopover<Label: View>: View {
   var body: some View {
     label
       .accessibilityElement(children: .ignore)
-      .onTapGesture {
-        if let primaryAction { primaryAction() } else { presented = true }
-      }
+      .onTapGesture { presented = true }
       .onLongPressGesture { presented = true }
       .accessibilityAddTraits(.isButton)
       .popover(isPresented: $presented, arrowEdge: .bottom) {

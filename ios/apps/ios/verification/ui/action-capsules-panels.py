@@ -31,6 +31,12 @@ def changes():
     f = entry['frame']
     ui.axe('tap', '-x', str(f['x']+f['width']/2), '-y', str(f['y']+f['height']/2), '--post-delay', '1.2')
 
+def open_pr():
+    tap('session-bar:context')
+    entry = next(i for i in ui.state() if 'loro-dev/lody #128' in (i.get('AXLabel') or '') and i.get('type') == 'Button')
+    f = entry['frame']
+    ui.axe('tap', '-x', str(f['x']+f['width']/2), '-y', str(f['y']+f['height']/2), '--post-delay', '.7')
+
 take('P01','clean','点击机器 · 在线',lambda: tap('session-bar:machine'))
 take('P02','offline','点击机器 · 离线',lambda: tap('session-bar:machine'))
 take('P03','unknown','点击机器 · 未知',lambda: tap('session-bar:machine'))
@@ -42,20 +48,20 @@ take('P08','conflict-ci','冲突和 CI 失败 · 更多操作',lambda: tap('sess
 take('P09','unpushed','未推送提交 · 更多操作',lambda: tap('session-bar:more'))
 take('P10','merge','点击合并 · 合并方式确认面板',lambda: tap('session-bar:act'))
 take('P11','open','长按 PR · 上下文菜单',lambda: hold('session-bar:context'))
-take('P12','open','点击 PR · 原生 PR 详情',lambda: tap('session-bar:context'))
+take('P12','open','点击 PR · 原生 PR 详情',open_pr)
 take('P13','local','点击变更 · 工作区文件列表',changes)
 take('P14','browser','长按浏览器 · 复制链接 / 停止预览',lambda: hold('session-preview'))
 take('P15','browser','浏览器预览 · 当前模拟器打开后空白',lambda: tap('session-preview'))
 take('P16','simulator','长按模拟器 · 停止预览',lambda: hold('session-preview'))
 take('P17','simulator','点击模拟器 · 原生预览',lambda: tap('session-preview'))
-take('P18','tasks','点击子任务 · 执行过程',lambda: tap('session-subtasks'))
+take('P18','tasks','子任务仅在对话中显示',lambda: None)
 take('P19','crowded','点击折叠的资源胶囊',lambda: tap('session-bar:environment'))
-take('P20','draft','点击草稿 PR · 详情',lambda: tap('session-bar:context'))
-take('P21','merged','点击已合并 PR · 详情',lambda: tap('session-bar:context'))
-take('P22','closed','点击已关闭 PR · 详情',lambda: tap('session-bar:context'))
+take('P20','draft','点击草稿 PR · 详情',open_pr)
+take('P21','merged','点击已合并 PR · 详情',open_pr)
+take('P22','closed','点击已关闭 PR · 详情',open_pr)
 
 open_case('open')
-tap('session-bar:context')
+open_pr()
 ui.element('pr-checks')
 ui.axe('drag', '--start-x', '201', '--start-y', '394', '--end-x', '201', '--end-y', '100', '--duration', '.7', '--post-delay', '.7')
 result.append(capture('P23', 'pr-expanded', 'PR 详情展开'))
