@@ -660,7 +660,8 @@ private struct ChatRowContent: View {
 
   /// The family's own line under the opener (Slack's "7 replies"): chevron + "7 opened chats",
   /// aligned with the opener's title. Same place folded or open; the chevron turns down when the
-  /// family shows and the rail starts beneath it. The whole line is the target.
+  /// family shows and the rail starts beneath it. Only the chevron and count are the target; the
+  /// rest of the line opens the parent.
   private func familyToggle(_ expanded: Bool) -> some View {
     Button(action: onToggle) {
       HStack(spacing: LodySpacing.xs) {
@@ -678,11 +679,16 @@ private struct ChatRowContent: View {
           .foregroundStyle(LodyColor.textSecondary)
           .monospacedDigit()
       }
-      .padding(.leading, LodyLayout.childIndent)
-      .frame(maxWidth: .infinity, minHeight: LodySize.controlSm, alignment: .leading)
+      // Only the chevron and count toggle (with a little room around them); the rest of the
+      // line belongs to the parent row, so a tap meant for the parent opens it.
+      .padding(.leading, LodySpacing.xs)
+      .padding(.trailing, LodySpacing.md)
+      .frame(minHeight: LodySize.controlSm, alignment: .leading)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .padding(.leading, LodyLayout.childIndent - LodySpacing.xs)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.top, -LodySpacing.xs)
     .accessibilityHidden(true)
   }
