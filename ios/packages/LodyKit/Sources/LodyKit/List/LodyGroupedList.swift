@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import LodyDesignSystem
 
 private final class ListAppearanceController: UIViewController {
   var onWillAppear: ((Bool, UIViewControllerTransitionCoordinator?) -> Void)?
@@ -417,7 +418,8 @@ final class LodyGroupedList: LodyAppearanceView, UICollectionViewDelegate, UISea
       if !row.imageAsset.isEmpty {
         LodyListGlyph.apply(
           &content,
-          image: UIImage(named: row.imageAsset, in: .main, compatibleWith: nil)?
+          image: LodyIcon(rawValue: row.imageAsset)?.uiImage?.withRenderingMode(.alwaysTemplate)
+            ?? UIImage(named: row.imageAsset, in: .main, compatibleWith: nil)?
             .withRenderingMode(.alwaysTemplate)
             ?? UIImage(named: row.imageAsset)?.withRenderingMode(.alwaysTemplate),
           asset: true

@@ -70,11 +70,21 @@ enum CreateProjectPicker {
 
   static func row(_ project: CreateProject, machineNames: [String: String], selected: String) -> LodyListRow {
     let github = isGithub(project.id)
+    let group = project.id.hasPrefix(CreateSessionSelection.groupPrefix)
+    var image = "folder"
+    var imageAsset = ""
+    if group {
+      image = ""
+      imageAsset = "lody.icon.project"
+    } else if github {
+      image = ""
+      imageAsset = "lody-mark-github"
+    }
     return .item(
       project.id, project.name,
       subtitle: [machineNames[project.machineId] ?? project.machineId, project.rootPath]
         .filter { !$0.isEmpty }.joined(separator: " · "),
-      image: github ? "" : "folder", imageAsset: github ? "lody-mark-github" : "",
+      image: image, imageAsset: imageAsset,
       selected: project.id == selected, subtitleMono: !project.rootPath.isEmpty)
   }
 

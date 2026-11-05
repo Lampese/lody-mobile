@@ -167,7 +167,7 @@ enum CreateSessionContext {
   }
 
   private static func projectGlyph(_ id: String) -> CreateGlyph {
-    if id.hasPrefix(CreateSessionSelection.groupPrefix) { return .symbol("square.stack.3d.up") }
+    if id.hasPrefix(CreateSessionSelection.groupPrefix) { return .lody(.project) }
     return CreateProjectPicker.isGithub(id) ? .lody(.github) : .lody(.folder)
   }
 
