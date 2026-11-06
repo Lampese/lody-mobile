@@ -75,8 +75,8 @@ internal fun LazyListScope.turnBlocks(
         when (block) {
             is TurnLayout.Content -> content(entry, block, open, toggle, details)
             is TurnLayout.Activity -> {
-                // A running turn shows its work open; once it settles, groups rest closed (web).
-                val expanded = open[block.key] ?: (entry.working || block.opensByDefault)
+                // Tool groups stay collapsed during streaming too; only an explicit toggle opens them.
+                val expanded = open[block.key] ?: block.opensByDefault
                 val running = block.key == active
                 item(key = block.key, contentType = "disclosure") {
                     Disclosure(activityLabel(block, running), expanded, Modifier.animateItem(), shimmer = running) { toggle(block.key, it) }
@@ -263,7 +263,8 @@ internal fun ToolStep(
         Text(
             text,
             style = type.footnote,
-            maxLines = if (expanded == true) 6 else 2,
+            maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).then(if (inProgress) Modifier.shimmer() else Modifier),
         )
