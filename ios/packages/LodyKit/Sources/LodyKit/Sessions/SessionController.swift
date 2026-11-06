@@ -47,6 +47,10 @@ class SessionController: UIViewController {
   private var findToken = 0
   private var listed = false
   private var moreItem: UIBarButtonItem?
+  private var tabViews: [String: Double] = [:]
+  private var tabViewsKey = ""
+  private var tabViewsLoad = 0
+  private var browsingVisible = false
   private var renderedEntries: String?
   private var memberScope = ""
   private var memberTask: Task<Void, Never>?
@@ -123,7 +127,9 @@ class SessionController: UIViewController {
     observers = (source.changes + [UIApplication.didBecomeActiveNotification, .lodyPreferencesDidChange]).map { name in
       NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
         let activated = note.name == UIApplication.didBecomeActiveNotification
+        let viewsChanged = note.name == .lodySessionViewsDidChange
         MainActor.assumeIsolated {
+          if viewsChanged { self?.loadTabViews() }
           self?.render()
           if activated { self?.markViewed() }
         }
@@ -134,6 +140,7 @@ class SessionController: UIViewController {
 
   override func viewIsAppearing(_ animated: Bool) {
     super.viewIsAppearing(animated)
+    browsingVisible = true
     NotificationCenter.default.post(name: LodyScrollEdges.ownerChanged, object: self)
     let slug = source.state.workspace?.slug ?? ""
     PushNotifications.shared.visibleRoute = slug.isEmpty ? "" : "/\(slug)/sessions/\(sessionId)"
@@ -147,6 +154,7 @@ class SessionController: UIViewController {
 
   override func viewWillDisappear(_ animated: Bool) {
     super.viewWillDisappear(animated)
+    browsingVisible = false
     PushNotifications.shared.visibleRoute = ""
     if SettingsPage.leaving(self) {
       permissionPage?.update(nil, ready: true)
@@ -176,6 +184,12 @@ class SessionController: UIViewController {
       return
     }
     listed = true
+    if tabViewsKey != state.key {
+      tabViewsKey = state.key
+      tabViews = [:]
+      loadTabViews()
+    }
+    markViewed()
     prepareSimulator(state, session)
     startFeed(state)
     chat.setAttachmentContext(Self.json(["workspaceId": state.workspaceId, "sessionId": sessionId]))
@@ -246,7 +260,11 @@ class SessionController: UIViewController {
   private var changingTab = false
 
   private func tabItems(_ tabs: [SessionItem]) -> [ChatTabItem] {
-    tabs.map { ChatTabItem(id: $0.id, title: $0.title, attention: Attention($0), current: $0.id == sessionId) }
+    tabs.map { session in
+      var viewed = session
+      if let at = tabViews[session.id] { viewed.lastViewedMessageAt = max(viewed.lastViewedMessageAt ?? -.infinity, at) }
+      return ChatTabItem(id: session.id, title: session.title, attention: Attention(viewed), current: session.id == sessionId)
+    }
   }
 
   private func setTabClosed(_ id: String, closed: Bool) {
@@ -393,14 +411,33 @@ class SessionController: UIViewController {
     chat.setFindRequest(Self.json(["token": findToken, "query": query, "keyboard": keyboard, "open": true]))
   }
 
-  private func markViewed() {
-    guard UIApplication.shared.applicationState == .active, view.window != nil else { return }
+  private func loadTabViews() {
     let state = source.state
-    guard state.catalog.session(sessionId)?.isTabClosed != true else { return }
-    SessionSource.markViewed(
-      userId: state.userId, workspaceId: state.workspaceId, sessionId: sessionId,
-      at: state.catalog.session(sessionId)?.lastMessageAt
-    )
+    tabViewsLoad += 1
+    let load = tabViewsLoad
+    Task { [weak self] in
+      let saved = await SessionSource.views(userId: state.userId, workspaceId: state.workspaceId)
+      guard let self, self.source.state.key == state.key, self.tabViewsLoad == load else { return }
+      let merged = saved.merging(self.tabViews) { max($0, $1) }
+      guard merged != self.tabViews else { return }
+      self.tabViews = merged
+      self.render()
+    }
+  }
+
+  private func markViewed() {
+    guard browsingVisible, UIApplication.shared.applicationState == .active, view.window != nil else { return }
+    let state = source.state
+    guard let session = state.catalog.session(sessionId), !session.isTabClosed else { return }
+    if persistsDraft {
+      SessionTabSelection().remember(session, all: state.catalog.sessions, user: state.userId, workspace: state.workspaceId)
+    }
+    guard let message = session.lastMessageAt, message.isFinite, message > (tabViews[sessionId] ?? -.infinity) else { return }
+    tabViews[sessionId] = message
+    SessionSource.markViewed(userId: state.userId, workspaceId: state.workspaceId, sessionId: sessionId, at: message)
+    if let panel = ChatTabsOverlay.shown(in: (parent ?? self).view) {
+      panel.state.tabs = tabItems(directoryTabs)
+    }
   }
 
   static func json(_ object: [String: Any]) -> String {

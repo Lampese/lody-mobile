@@ -220,16 +220,24 @@ enum DirectoryTabs {
     family(current: current, all: all).filter { $0.isTabClosed }
   }
 
+  static func root(_ current: SessionItem, all: [SessionItem]) -> String {
+    root(current, indexed: Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }))
+  }
+
+  private static func root(_ current: SessionItem, indexed: [String: SessionItem]) -> String {
+    var id = current.id
+    var seen = Set<String>()
+    while seen.insert(id).inserted {
+      guard let parent = indexed[id]?.parentSessionId, !parent.isEmpty else { return id }
+      id = parent
+    }
+    return current.id
+  }
+
   private static func family(current: SessionItem, all: [SessionItem]) -> [SessionItem] {
     let indexed = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-    func root(_ item: SessionItem) -> String {
-      var id = item.id
-      var seen = Set<String>()
-      while seen.insert(id).inserted, let parent = indexed[id]?.parentSessionId, !parent.isEmpty { id = parent }
-      return id
-    }
-    let owner = root(current)
-    return all.filter { !$0.archived && $0.childSessionPlacement != "side-panel" && $0.machineId == current.machineId && root($0) == owner }
+    let owner = root(current, indexed: indexed)
+    return all.filter { !$0.archived && $0.childSessionPlacement != "side-panel" && $0.machineId == current.machineId && root($0, indexed: indexed) == owner }
       .sorted { left, right in
         if left.id != right.id && left.id == owner { return true }
         if right.id == owner { return false }

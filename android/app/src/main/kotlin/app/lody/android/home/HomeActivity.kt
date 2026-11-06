@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import app.lody.android.chat.TabBrowsing
 import app.lody.android.chat.ChatRepository
 import app.lody.android.chat.ChatScreen
 import app.lody.android.create.CreateSessionScreen
@@ -67,15 +69,37 @@ class HomeActivity : ComponentActivity() {
                 val submissions by app.submissions.state.collectAsState()
                 val activeScope = account.account?.id?.let { userId -> remoteCatalog.workspace?.id?.let { RuntimeScope(userId, it) } }
                 LaunchedEffect(activeScope) { app.submissions.activate(activeScope) }
+                val browsing = remember {
+                    val prefs = getSharedPreferences("tab-browsing-v1", MODE_PRIVATE)
+                    TabBrowsing({ prefs.getString(it, null) }) { key, value -> prefs.edit().putString(key, value).apply() }
+                }
+                val browsingRevision by browsing.revision.collectAsState()
+                var resumed by remember { mutableStateOf(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) }
+                DisposableEffect(Unit) {
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+                        resumed = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    }
+                    lifecycle.addObserver(observer)
+                    onDispose { lifecycle.removeObserver(observer) }
+                }
                 val pending = submissions.values.filter { it.scope == activeScope }
-                val catalog = remoteCatalog.copy(snapshot = remoteCatalog.snapshot?.let { snapshot ->
-                    snapshot.copy(sessions = snapshot.sessions + pending.map { it.session }.filter { local -> snapshot.sessions.none { it.id == local.id } })
-                })
+                val catalog = remember(remoteCatalog, pending, activeScope, browsingRevision) {
+                    remoteCatalog.copy(snapshot = remoteCatalog.snapshot?.let { snapshot ->
+                        val rows = snapshot.sessions + pending.map { it.session }.filter { local -> snapshot.sessions.none { it.id == local.id } }
+                        snapshot.copy(sessions = rows.map { session -> activeScope?.let { browsing.viewed(it, session) } ?: session })
+                    })
+                }
                 val user = account.account
                 var selectedId by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf<String?>(null) }
                 var selectedTitle by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf("") }
                 var creating by rememberSaveable(user?.id, catalog.workspace?.id) { mutableStateOf(false) }
                 val repository = remember { ChatRepository(app.runtimeOwner, app.pullRequests, app.attachments) }
+                val selectedSession = catalog.snapshot?.sessions?.firstOrNull { it.id == selectedId }
+                LaunchedEffect(selectedSession, activeScope, resumed) {
+                    if (resumed && activeScope != null && selectedSession != null) {
+                        browsing.visit(activeScope, selectedSession, catalog.snapshot?.sessions.orEmpty())
+                    }
+                }
                 val creator = app.creation
                 val screens = rememberSaveableStateHolder()
                 // The repository restores the cached workspace; a first sign-in picks the first one.
@@ -118,7 +142,11 @@ class HomeActivity : ComponentActivity() {
                                 state = uiState(account, catalog),
                                 onSelectWorkspace = { app.cloud.select(it) },
                                 onSignOut = { app.account.logout() },
-                                onOpenChat = { selectedTitle = it.title; selectedId = it.id },
+                                onOpenChat = { row ->
+                                    val session = catalog.snapshot?.sessions?.firstOrNull { it.id == row.id }
+                                    selectedId = if (activeScope != null && session != null) browsing.resolve(activeScope, session, catalog.snapshot?.sessions.orEmpty()) else row.id
+                                    selectedTitle = if (selectedId == row.id) row.title else ""
+                                },
                                 onNewChat = { creating = true },
                                 projects = app.projectAdding,
                                 scope = workspace?.let { RuntimeScope(user.id, it.id) },

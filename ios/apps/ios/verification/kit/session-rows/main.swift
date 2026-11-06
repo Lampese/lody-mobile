@@ -237,3 +237,27 @@ precondition(!SessionRows.isUnread(closedRoot))
 let decodedClosed = try! JSONDecoder().decode(SessionItem.self, from: Data(#"{"id":"saved","isTabClosed":true}"#.utf8))
 precondition(decodedClosed.isTabClosed)
 print("PASS: closed Tabs remain recoverable without hiding open children")
+
+let preferenceSuite = "tab-selection-test-" + UUID().uuidString
+let preferences = UserDefaults(suiteName: preferenceSuite)!
+let selection = SessionTabSelection(defaults: preferences)
+selection.remember(directoryTab, all: [tabRoot, directoryTab], user: "u", workspace: "w")
+let restarted = SessionTabSelection(defaults: UserDefaults(suiteName: preferenceSuite)!)
+precondition(restarted.resolve(tabRoot, all: [tabRoot, directoryTab], user: "u", workspace: "w") == directoryTab.id)
+precondition(restarted.resolve(tabRoot, all: [tabRoot, directoryTab], user: "other", workspace: "w") == tabRoot.id)
+precondition(restarted.resolve(tabRoot, all: [tabRoot, directoryTab], user: "u", workspace: "other") == tabRoot.id)
+var closedTab = directoryTab
+closedTab.isTabClosed = true
+precondition(restarted.resolve(tabRoot, all: [tabRoot, closedTab], user: "u", workspace: "w") == tabRoot.id)
+precondition(restarted.resolve(tabRoot, all: [tabRoot], user: "u", workspace: "w") == tabRoot.id)
+precondition(restarted.resolve(directoryTab, all: [tabRoot, directoryTab], user: "u", workspace: "w") == directoryTab.id)
+var readTab = directoryTab
+readTab.status = "idle"
+readTab.lastMessageAt = 100
+readTab.lastReadAt = nil
+let viewedCatalog = SessionCatalog(sessions: [readTab]).viewed([readTab.id: 100])
+precondition(!SessionRows.needsEmphasis(viewedCatalog.sessions[0]))
+readTab.lastMessageAt = 101
+precondition(SessionRows.needsEmphasis(SessionCatalog(sessions: [readTab]).viewed([readTab.id: 100]).sessions[0]))
+preferences.removePersistentDomain(forName: preferenceSuite)
+print("PASS: remembered Tabs survive reload, respect scope and fall back from closed/deleted Tabs; viewed watermarks preserve new unread output")

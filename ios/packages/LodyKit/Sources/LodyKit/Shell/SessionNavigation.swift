@@ -22,7 +22,9 @@ enum SessionNavigation {
       } else { object = fields["session"] as! [String: Any] }
       let id = object["id"] as! String
       guard state.catalog.session(id) != nil else { throw OutboxError.scopeExpired }
-      open(id, query: fields["findQuery"] as? String ?? "", source: source)
+      let query = fields["findQuery"] as? String ?? ""
+      let target = query.isEmpty ? SessionTabSelection().resolve(state.catalog.session(id)!, all: state.catalog.sessions, user: state.userId, workspace: state.workspaceId) : id
+      open(target, query: query, source: source)
     case "share":
       let id = fields["sessionId"] as! String
       guard state.catalog.session(id) != nil else { throw OutboxError.scopeExpired }
