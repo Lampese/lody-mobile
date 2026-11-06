@@ -23,7 +23,7 @@ final class ChatMessageActionsCell: UICollectionViewCell {
     label.lineBreakMode = .byTruncatingTail
     contentView.addSubview(label)
     actions.axis = .horizontal
-    actions.spacing = 0
+    actions.spacing = -LodySpacing.md
     for (button, icon, key) in [
       (copyButton, LodyIcon.copy, "native.chat.message.copy"),
       (editButton, LodyIcon.edit, "native.chat.editAction"),
@@ -79,7 +79,8 @@ final class ChatMessageActionsCell: UICollectionViewCell {
   func updateEdit() { editButton.isHidden = !user || canEdit?() != true; setNeedsLayout() }
   override func layoutSubviews() {
     super.layoutSubviews()
-    let width = CGFloat(actions.arrangedSubviews.filter { !$0.isHidden }.count) * 44
+    let count = CGFloat(actions.arrangedSubviews.filter { !$0.isHidden }.count)
+    let width = count * 44 + max(0, count - 1) * actions.spacing
     label.frame = CGRect(x: 0, y: 0, width: bounds.width, height: 24)
     actions.frame = CGRect(x: user ? max(0, bounds.width - width - ChatCell.avatarSlot) : 0, y: user ? 0 : 24, width: width, height: 44)
   }
