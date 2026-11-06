@@ -46,5 +46,12 @@
       "contract/runtime-contract.json"
     ],
     "note": "Reviewed shared isTabClosed projection and acknowledged field-only writes. No archive or agent lifecycle changes."
+  },
+  "roleSendMetadata": {
+    "commit": "4708fbf",
+    "files": [
+      "src/runtime/handlers/sessions.ts"
+    ],
+    "note": "Read authoritative session Agent Config from merged legacy and field-level metadata for Role sends; refuse deleted sessions. Exported from the reviewed iOS source commit."
   }
 }
