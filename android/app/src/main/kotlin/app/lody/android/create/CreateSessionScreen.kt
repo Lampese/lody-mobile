@@ -12,6 +12,11 @@
 
 package app.lody.android.create
 
+import app.lody.android.chat.PendingAttachment
+import app.lody.android.chat.SessionAttachmentUploads
+import app.lody.android.chat.AttachmentChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import app.lody.android.designsystem.shadow
 import app.lody.android.home.AgentMark
 import app.lody.android.runtime.AgentRole
@@ -157,8 +162,33 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     val coverComposer = searchFocused && WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val unavailable = stringResource(R.string.create_extras_unavailable)
-    val notice = { scope.launch { snackbar.showSnackbar(unavailable) }; Unit }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val application = context.applicationContext as app.lody.android.LodyApplication
+    var attachments by remember(runtimeScope) { mutableStateOf<List<PendingAttachment>>(emptyList()) }
+    val uploadFailed = stringResource(R.string.chat_attach_failed)
+    val attachLimit = stringResource(R.string.chat_attach_limit)
+    var attachMenu by remember { mutableStateOf(false) }
+    val addAttachments: (List<android.net.Uri>, Boolean) -> Unit = { uris, image ->
+        scope.launch {
+            val picked = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    try { SessionAttachmentUploads.describe(context.contentResolver, uri, image) }
+                    catch (_: Exception) { null }
+                }
+            }
+            val merged = attachments + picked
+            val kept = merged.filter { it.image }.take(8) + merged.filter { !it.image }.take(8)
+            attachments = merged.filter { it in kept }
+            if (kept.size < merged.size) snackbar.showSnackbar(attachLimit)
+            else if (picked.size < uris.size) snackbar.showSnackbar(uploadFailed)
+        }
+    }
+    val photoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(8),
+    ) { addAttachments(it, true) }
+    val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments(),
+    ) { addAttachments(it, false) }
     var options by remember(runtimeScope) { mutableStateOf<CreationOptions?>(null) }
     var targetChosen by remember(runtimeScope) { mutableStateOf(false) }
     var onlineMachines by remember(runtimeScope) { mutableStateOf<Set<String>?>(null) }
@@ -251,7 +281,7 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
     BackHandler(enabled = busy) { }
     val send = {
         val chosen = agent
-        if (canSend && !attempted && !busy && prompt.isNotBlank()) {
+        if (canSend && !attempted && !busy && (prompt.isNotBlank() || attachments.isNotEmpty())) {
             attempted = true; busy = true
             val request = CreateRequest(
                 // Role labels ("🧪 Reviewer") go out as their tokens (`@role:<id>`).
@@ -260,7 +290,18 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 configOptionValues = activeRole?.let { CreateSessionModel.roleChoice(it.target).options }.orEmpty(),
             )
             dismissKeyboard()
-            onSubmit(request)
+            val picked = attachments
+            scope.launch {
+                val blocks = try {
+                    if (picked.isEmpty()) emptyList() else application.attachments.upload(runtimeScope, sessionId, picked)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    attempted = false; busy = false
+                    snackbar.showSnackbar(uploadFailed)
+                    return@launch
+                }
+                onSubmit(request.copy(attachments = blocks))
+            }
         }
         Unit
     }
@@ -325,11 +366,22 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 val child = measurable.measure(constraints)
                 layout(child.width, if (coverComposer) 0 else child.height) { child.placeRelative(0, 0) }
             }) {
+                DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.chat_attach_photos)) },
+                        leadingIcon = { Icon(LodyIcons.Image, null) },
+                        onClick = { attachMenu = false; photoPicker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageAndVideo)) })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.chat_attach_files)) },
+                        leadingIcon = { Icon(LodyIcons.File, null) },
+                        onClick = { attachMenu = false; filePicker.launch(arrayOf("*/*")) })
+                }
                 Composer(
                     field,
                     onPromptChange = { if (!attempted && it.text.length <= 32000) { field = it; prompt = it.text } },
                     onFocusChange = { composerFocused = it },
-                    onAttach = notice,
+                    attachments = attachments,
+                    onRemoveAttachment = { id -> if (!busy) attachments = attachments.filterNot { it.id == id } },
+                    busy = busy,
+                    onAttach = { if (!busy) attachMenu = true },
                     onRunConfig = { dismissKeyboard(); if (!attempted) runConfig = true },
                     onSend = send,
                     enabled = canSend,
@@ -855,6 +907,9 @@ private fun Composer(
     prompt: androidx.compose.ui.text.input.TextFieldValue,
     onPromptChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    attachments: List<PendingAttachment>,
+    onRemoveAttachment: (String) -> Unit,
+    busy: Boolean,
     onAttach: () -> Unit,
     onRunConfig: () -> Unit,
     onSend: () -> Unit,
@@ -888,7 +943,21 @@ private fun Composer(
             .animateContentSize()
             .padding(LodySpacing.sm),
     ) {
+        if (attachments.isNotEmpty()) {
+            val remove = stringResource(R.string.chat_attach_remove)
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                items(attachments, key = { it.id }) { item ->
+                    AttachmentChip(item.name, item.image) {
+                        IconButton(onClick = { onRemoveAttachment(item.id) }, enabled = !busy) {
+                            Icon(LodyIcons.Close, "$remove ${item.name}", modifier = Modifier.size(LodyIconSize.xs))
+                        }
+                    }
+                }
+            }
+        }
+        if (busy) androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
         BasicTextField(
+            readOnly = busy,
             value = prompt,
             onValueChange = onPromptChange,
             textStyle = type.body.copy(color = colors.textPrimary),
@@ -946,7 +1015,7 @@ private fun Composer(
                 ModeMark(mode, modeLabel)
 
             }
-            val ready = enabled && prompt.text.isNotBlank()
+            val ready = enabled && (prompt.text.isNotBlank() || attachments.isNotEmpty())
             val send = stringResource(R.string.create_send)
             Box(
                 Modifier

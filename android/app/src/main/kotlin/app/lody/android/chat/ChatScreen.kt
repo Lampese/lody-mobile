@@ -172,7 +172,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             "accepted" -> Delivery.Sent
             "queued" -> Delivery.Queued
             else -> Delivery.Failed
-        })
+        }, it.request.attachments.map { block -> MessageAttachment(block.optString("fileName", block.optString("name", "attachment")), block.optString("type") == "image") })
     }
     val pending = remember(firstTurn, outgoing, authorsByMessage) {
         (listOfNotNull(firstTurn) + outgoing).filter { it.turnId !in authorsByMessage }

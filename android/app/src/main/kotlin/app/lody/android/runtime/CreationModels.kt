@@ -57,6 +57,7 @@ data class CreateRequest(
     val agentRoleId: String? = null,
     /** Option values the Role pins beyond model / mode / effort (strings or booleans). */
     val configOptionValues: Map<String, Any> = emptyMap(),
+    val attachments: List<org.json.JSONObject> = emptyList(),
 )
 
 /** What one machine target of an Agent Role pins (runtime listing; secrets never cross). */

@@ -50,6 +50,7 @@ internal object CreationJson {
             .put("models", choices(c.models)).put("modes", choices(c.modes)).put("reasoningEfforts", JSONObject().apply { c.efforts.forEach { (model, levels) -> put(model, JSONArray(levels)) } }) }))
     }
     fun request(value: CreateRequest) = JSONObject().apply {
+        if (value.attachments.isNotEmpty()) put("attachments", JSONArray(value.attachments))
         put("sessionId", value.sessionId); put("turnId", value.turnId); put("projectId", value.projectId)
         put("machineId", value.machineId); put("agentConfigId", value.agentConfigId); put("text", value.text)
         put("branch", value.branch); put("worktree", value.worktree); put("modelId", value.modelId); put("modeId", value.modeId); put("effort", value.effort)

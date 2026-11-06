@@ -103,7 +103,9 @@ export function createCommands(runtime, sendTurn, identity) {
   },
   async createAndSend(input,signal) {
    signal?.throwIfAborted();
-   if(!input || !uuid.test(input.sessionId) || !uuid.test(input.turnId) || typeof input.text!=='string' || !input.text.trim() || input.text.length>32000)throw Error('invalid_creation');
+   if(!input || !uuid.test(input.sessionId) || !uuid.test(input.turnId) || typeof input.text!=='string' || input.text.length>32000)throw Error('invalid_creation');
+   const attachments=input.attachments??[];
+   if(!Array.isArray(attachments) || attachments.length>16 || attachments.some(block=>!block || typeof block!=='object' || !['image','file'].includes(block.type)) || JSON.stringify(attachments).length>64000 || (!input.text.trim() && !attachments.length))throw Error('invalid_creation');
    if(attempted.has(input.sessionId))throw Error('already_attempted');
    // A multi-repository project (`group:<uuid>`): workspace-wide agents; the runtime reads the
    // group fresh, checks its computer and writes its frozen run (web Project group).
@@ -134,7 +136,7 @@ export function createCommands(runtime, sendTurn, identity) {
     signal?.throwIfAborted();
     await runtime.ensureSession({sessionId:input.sessionId});
     signal?.throwIfAborted();
-    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:agent.machineId,userId:scope.userId,text:input.text,cliType:agent.cliType,agentType:agent.agentType,modelId:input.modelId,modeId:input.modeId,reasoningEffort:input.effort,reasoningEffortConfigId:capability?.reasoningEffortConfigId,...(pinned?{configOptionValues:pinned}:{}),...(role?{agentRoleId:role.id,agentConfigId:agent.id}:{})});
+    const sent=await sendTurn({id:input.turnId,sessionId:input.sessionId,machineId:agent.machineId,userId:scope.userId,text:input.text,...(attachments.length?{attachmentBlocks:attachments}:{}),cliType:agent.cliType,agentType:agent.agentType,modelId:input.modelId,modeId:input.modeId,reasoningEffort:input.effort,reasoningEffortConfigId:capability?.reasoningEffortConfigId,...(pinned?{configOptionValues:pinned}:{}),...(role?{agentRoleId:role.id,agentConfigId:agent.id}:{})});
     return {state:sent.state,sessionId:input.sessionId,...(sent.state==='not_sent'&&sent.reason?{reason:sent.reason}:{})};
    } catch {return {state:'unknown',sessionId:input.sessionId};}
   },

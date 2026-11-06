@@ -113,3 +113,6 @@ test('a conversation turn carries the agent switches it changed (Plan, Fast)',as
  await assert.rejects(c.sendText({...turn,configOptionValues:{fast:7}}),/invalid_send/);
  await assert.rejects(c.sendText({...turn,configOptionValues:['x']}),/invalid_send/);
 });
+
+test('attachment-only creation forwards uploads to the first turn',async()=>{const {c,calls}=fixture();const attachments=[{type:'image',imageId:'image-1',mimeType:'image/png',sizeBytes:10}];assert.equal((await c.createAndSend({...input,text:'',attachments})).state,'accepted');assert.deepEqual(calls.at(-1)[1].attachmentBlocks,attachments);});
+test('invalid attachments reject creation before writes',async()=>{const {c,calls}=fixture();await assert.rejects(c.createAndSend({...input,attachments:[{type:'video'}]}),/invalid_creation/);assert.equal(calls.length,0);});
