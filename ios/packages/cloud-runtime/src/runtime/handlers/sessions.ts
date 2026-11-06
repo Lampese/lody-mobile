@@ -282,10 +282,14 @@ export function registerSessions(
     if (!state.metaReplica)
       return { state: 'not_sent', reason: 'metadata_not_ready' };
     // A Role binds the session's own Agent Config, read from metadata, never the wire.
-    const meta = state.metaReplica.flock.get([
-      'm',
-      `session-${wire.sessionId}`,
-    ]) as Record<string, unknown> | undefined;
+    const room = `session-${wire.sessionId}`;
+    const flock = state.metaReplica.flock;
+    const meta = sessionActionMeta(
+      flock.get(['m', room]),
+      flock.scan({ prefix: ['m', room] }),
+      flock.get(['e', room]),
+    );
+    if (!meta) return { state: 'not_sent', reason: 'session_not_ready' };
     const args = {
       ...wire,
       modelId: cleared(wire.modelId),
