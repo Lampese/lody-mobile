@@ -92,7 +92,7 @@ extension LodyChatView {
       followsBottom = true
     }
     lastUserID = userID
-    stream.receive(entries, animate: window != nil && !UIAccessibility.isReduceMotionEnabled, deferredEntries: Set(deferredRows.keys))
+    stream.receive(entries, animate: window != nil && !UIAccessibility.isReduceMotionEnabled, deferredEntries: Set(deferredRows.keys), initialSnapshot: !hasPositionedContent)
     if hasPositionedContent { startFrameTimer() }
     else { renderFrame() }
   }
@@ -128,6 +128,12 @@ extension LodyChatView {
       transcript.entries = entries
       applyRows()
       rendering = false
+      // The first layout may receive another snapshot while its diff is committing.
+      // Do not strand pending reveals until the next network update.
+      if framePending || stream.hasPending {
+        framePending = false
+        startFrameTimer()
+      }
       return
     }
     let parser = store.parser

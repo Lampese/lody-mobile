@@ -27,7 +27,7 @@ struct ChatStream {
     min(0.096, 0.048 * (1 + Double(tailLength) / 256))
   }
 
-  mutating func receive(_ entries: [ChatEntry], animate: Bool, deferredEntries: Set<String> = [], at time: Double = ProcessInfo.processInfo.systemUptime) {
+  mutating func receive(_ entries: [ChatEntry], animate: Bool, deferredEntries: Set<String> = [], initialSnapshot: Bool = false, at time: Double = ProcessInfo.processInfo.systemUptime) {
     receiveProcessTimes(entries, at: time)
     let wasRunning = Set(targets.filter(\.isRunning).map(\.id))
     var retained: Set<ID> = []
@@ -36,7 +36,7 @@ struct ChatStream {
         let id = ID(entry: entry.id, item: item.itemId)
         retained.insert(id)
         var reveal = reveals[id] ?? CKTextReveal()
-        let shouldAnimate = initialized && animate && !deferredEntries.contains(entry.id) && entry.role == "assistant" && (entry.isRunning || wasRunning.contains(entry.id) || reveal.hasPending)
+        let shouldAnimate = !initialSnapshot && initialized && animate && !deferredEntries.contains(entry.id) && entry.role == "assistant" && (entry.isRunning || wasRunning.contains(entry.id) || reveal.hasPending)
         reveal.receive(item.text ?? "", animate: shouldAnimate, at: time)
         reveals[id] = reveal
       }
@@ -44,7 +44,7 @@ struct ChatStream {
     reveals = reveals.filter { retained.contains($0.key) }
     targets = entries
     settling.formIntersection(entries.map(\.id))
-    if !animate { settling.removeAll() }
+    if !animate || initialSnapshot { settling.removeAll() }
     initialized = true
   }
 
