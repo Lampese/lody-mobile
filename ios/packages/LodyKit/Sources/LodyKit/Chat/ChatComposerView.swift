@@ -698,6 +698,9 @@ final class ChatComposerView: UIView, UITextViewDelegate {
   private var queueHeight: NSLayoutConstraint!
   private var queueGap: NSLayoutConstraint!
   private let actionBar = ChatActionBarView(frame: .zero)
+  var primaryActionAnchor: (view: UIView, rect: CGRect) {
+    (actionBar, actionBar.primaryFrame.isEmpty ? CGRect(x: actionBar.bounds.maxX - ChatActionBarView.rowHeight, y: 0, width: ChatActionBarView.rowHeight, height: ChatActionBarView.rowHeight) : actionBar.primaryFrame)
+  }
   private var actionBarHeight: NSLayoutConstraint!
   private var queuedDrafts: [ChatQueuedDraft] = []
   var retiringQueueHeight: CGFloat { queuedDrafts.isEmpty ? queueView.panelHeight + queueGap.constant : 0 }

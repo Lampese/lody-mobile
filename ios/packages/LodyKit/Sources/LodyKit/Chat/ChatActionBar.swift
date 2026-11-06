@@ -74,6 +74,7 @@ struct ChatActionBarState: Decodable, Equatable {
 struct ChatActionBarContent: View {
   var state = ChatActionBarState()
   var onAction: (String) -> Void = { _ in }
+  var onPrimaryFrame: (CGRect) -> Void = { _ in }
   @Environment(\.dynamicTypeSize) private var typeSize
 
   var body: some View {
@@ -93,6 +94,8 @@ struct ChatActionBarContent: View {
       }
     }
     .font(.subheadline)
+    .coordinateSpace(name: "chat-action-bar")
+    .onPreferenceChange(PrimaryActionFrame.self, perform: onPrimaryFrame)
   }
 
   private func row(diffDot: Bool, folded: Bool) -> some View {
@@ -282,6 +285,9 @@ struct ChatActionBarContent: View {
           .frame(minHeight: ChatActionBarView.rowHeight)
           .contentShape(Rectangle())
       }
+      .background(GeometryReader { geometry in
+        Color.clear.preference(key: PrimaryActionFrame.self, value: geometry.frame(in: .named("chat-action-bar")))
+      })
       .accessibilityIdentifier("session-bar:act")
       if !primary.more.isEmpty {
         Divider().frame(height: 16)
@@ -350,6 +356,7 @@ final class ChatActionBarView: UIView {
   private let host = UIHostingController(rootView: ChatActionBarContent())
   private var rendered: ChatActionBarState?
   var onAction: ((String) -> Void)?
+  private(set) var primaryFrame: CGRect = .zero
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -388,7 +395,8 @@ final class ChatActionBarView: UIView {
       rendered = state
       let content = ChatActionBarContent(
         state: state,
-        onAction: { [weak self] in self?.onAction?($0) }
+        onAction: { [weak self] in self?.onAction?($0) },
+        onPrimaryFrame: { [weak self] in self?.primaryFrame = $0 }
       )
       // Glass capsules morph between stages and as groups come and go.
       if animated && window != nil && !UIAccessibility.isReduceMotionEnabled {
@@ -465,5 +473,71 @@ private struct ContextActionsPopover<Label: View>: View {
         .fixedSize(horizontal: false, vertical: true)
         .presentationCompactAdaptation(.popover)
       }
+  }
+}
+
+private struct PrimaryActionFrame: PreferenceKey {
+  static let defaultValue: CGRect = .zero
+  static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+    let next = nextValue()
+    if !next.isEmpty { value = next }
+  }
+}
+
+/// A native anchored menu rather than an action sheet's oversized pill buttons.
+final class MergeOptionsController: UIHostingController<MergeOptionsContent>, UIPopoverPresentationControllerDelegate {
+  init(title: String, preferred: String, source: UIView, rect: CGRect, onMerge: @escaping (String) -> Void) {
+    let preferred = ["merge", "squash", "rebase"].contains(preferred) ? preferred : "merge"
+    super.init(rootView: MergeOptionsContent(title: title, preferred: preferred, onMerge: { _ in }))
+    rootView.onMerge = { [weak self] method in
+      self?.dismiss(animated: true) { onMerge(method) }
+    }
+    modalPresentationStyle = .popover
+    view.backgroundColor = .clear
+    preferredContentSize = sizeThatFits(in: CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude))
+    popoverPresentationController?.sourceView = source
+    popoverPresentationController?.sourceRect = rect
+    popoverPresentationController?.permittedArrowDirections = .down
+    popoverPresentationController?.delegate = self
+  }
+  @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+  func adaptivePresentationStyle(for controller: UIPresentationController) -> UIModalPresentationStyle { .none }
+  func adaptivePresentationStyle(for controller: UIPresentationController, traitCollection: UITraitCollection) -> UIModalPresentationStyle { .none }
+}
+
+struct MergeOptionsContent: View {
+  let title: String
+  let preferred: String
+  var onMerge: (String) -> Void
+  private var methods: [String] { [preferred] + ["merge", "squash", "rebase"].filter { $0 != preferred } }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: LodySpacing.xs) {
+        Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(LodyColor.textPrimary).lineLimit(2)
+        Text(String(localized: "bar.merge.message", bundle: .lody))
+          .font(.footnote).foregroundStyle(LodyColor.textSecondary).fixedSize(horizontal: false, vertical: true)
+      }
+      .padding(LodySpacing.md)
+      Divider().padding(.horizontal, LodySpacing.md)
+      ForEach(methods, id: \.self) { method in
+        Button { onMerge(method) } label: {
+          HStack(spacing: LodySpacing.md) {
+            LodyIcon.merge.image.frame(width: LodyIconSize.md).foregroundStyle(LodyColor.iconSecondary)
+            Text(String(localized: String.LocalizationValue("bar.merge." + method), bundle: .lody))
+              .font(.body).frame(maxWidth: .infinity, alignment: .leading)
+            if method == preferred { Image(systemName: "checkmark").font(.footnote.weight(.semibold)).foregroundStyle(LodyColor.iconSecondary) }
+          }
+          .padding(.horizontal, LodySpacing.md)
+          .padding(.vertical, LodySpacing.sm)
+          .frame(minHeight: LodySize.listRow)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).foregroundStyle(LodyColor.textPrimary)
+        .accessibilityIdentifier("merge-method:" + method)
+      }
+    }
+    .padding(LodySpacing.sm)
+    .frame(width: 300)
+    .fixedSize(horizontal: false, vertical: true)
   }
 }

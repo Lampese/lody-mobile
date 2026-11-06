@@ -143,20 +143,14 @@ extension SessionController {
   private func chooseMergeMethod() {
     guard let pr = infoBar?.pullRequest else { return }
     let preferred = UserDefaults.standard.string(forKey: Self.mergeMethodKey) ?? "merge"
-    let methods = ["merge", "squash", "rebase"].sorted { a, _ in a == preferred }
-    let sheet = UIAlertController(
-      title: "\(pr.repository) #\(pr.number)",
-      message: String(localized: "bar.merge.message", bundle: .lody), preferredStyle: .actionSheet
-    )
-    for method in methods {
-      sheet.addAction(UIAlertAction(title: String(localized: String.LocalizationValue("bar.merge." + method), bundle: .lody), style: .default) { [weak self] _ in
-        UserDefaults.standard.set(method, forKey: Self.mergeMethodKey)
-        self?.writePullRequest("merge", method: method)
-      })
+    let anchor = chat.composer.primaryActionAnchor
+    let sheet = MergeOptionsController(
+      title: "\(pr.repository) #\(pr.number)", preferred: preferred,
+      source: anchor.view, rect: anchor.rect
+    ) { [weak self] method in
+      UserDefaults.standard.set(method, forKey: Self.mergeMethodKey)
+      self?.writePullRequest("merge", method: method)
     }
-    sheet.addAction(UIAlertAction(title: String(localized: "common.cancel", bundle: .lody), style: .cancel))
-    sheet.popoverPresentationController?.sourceView = chat.composer
-    sheet.popoverPresentationController?.sourceRect = chat.composer.bounds
     present(sheet, animated: true)
   }
 

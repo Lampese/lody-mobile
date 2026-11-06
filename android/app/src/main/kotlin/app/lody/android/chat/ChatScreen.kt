@@ -1383,11 +1383,12 @@ private fun MergeSheet(title: String, preferred: String, onDismiss: () -> Unit, 
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
                 ) {
-                    Icon(LodyIcons.Merge, contentDescription = null, tint = if (method == preferred) colors.prMerged else colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+                    Icon(LodyIcons.Merge, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(label), style = type.body, color = colors.textPrimary)
                         Text(stringResource(description), style = type.footnote, color = colors.textSecondary)
                     }
+                    if (method == preferred) Icon(LodyIcons.Check, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
                 }
             }
         }
