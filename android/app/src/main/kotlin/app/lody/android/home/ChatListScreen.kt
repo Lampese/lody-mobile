@@ -2,7 +2,7 @@
 //
 // Chats tab: workspace capsule leading, search and view trailing; search expands over the bar and
 // hides the capsule. Connection trouble floats as a centred pill over the bar (web parity). Chats
-// are grouped by time. A row is the status mark, title and age; an optional second line carries
+// are grouped by time. A row leads with its title and trails with status or age; an optional second line carries
 // project, branch and PR state, chosen in the view menu. A floating bar holds labelled Chats /
 // Projects / Settings tabs and a separate new-chat button. This phase is read-only, so new chat
 // explains that it is not available yet.
@@ -85,6 +85,12 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -968,7 +974,7 @@ private fun SectionTitle(text: String) {
  * mark + project, branch, and the PR mark trailing. iOS counterpart: `ChatRowContent`.
  *
  * [expanded] is set on a row with nested chats: whether they are shown. A "⌄ 4 opened chats" line
- * below the row heads the family. Nested rows read one size down and hang off one rail.
+ * below the row heads the family. Nested rows read one size down and have rounded branches.
  */
 @Composable
 private fun ChatRow(
@@ -988,28 +994,24 @@ private fun ChatRow(
     val twoLine = place != null || branch != null
     val nested = chat.nestedUnder != null
     val rail = colors.borderDefault
+    var titleHeight by remember { mutableFloatStateOf(0f) }
     Column(
         Modifier
             .fillMaxWidth()
-            .drawBehind { if (nested) drawRail(rail, chat.lastChild) },
+            .drawBehind { if (nested) drawRail(rail, chat.lastChild, if (twoLine) LodySpacing.sm.toPx() + titleHeight / 2 else size.height / 2) },
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = if (nested) LodySize.controlMd else LodySize.listRow)
                 .clickable(onClick = onClick)
-                .padding(end = LodyLayout.screenPaddingX)
+                .padding(horizontal = LodyLayout.screenPaddingX)
                 .padding(vertical = if (twoLine) LodySpacing.sm else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The status column: the same place on every row, nested or not. iOS: `ChatRowContent`.
-            Box(Modifier.width(LodyLayout.childIndent).heightIn(min = if (nested) LodySize.controlMd else LodySize.listRow), contentAlignment = Alignment.Center) {
-                chat.attention?.let { AttentionGlyph(it) }
-            }
-            // A nested title steps in past the rail.
             if (nested) Spacer(Modifier.width(TreeLevel))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.onSizeChanged { titleHeight = it.height.toFloat() }, verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         chat.title,
                         style = when {
@@ -1022,8 +1024,11 @@ private fun ChatRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
-                    chat.activityAt?.let { at ->
+                    if (chat.attention != null) {
+                        Box(Modifier.padding(start = LodySpacing.sm).size(LodyIconSize.md), contentAlignment = Alignment.Center) { AttentionGlyph(chat.attention) }
+                    }
+                    if (chat.attention == null && pr != null && !twoLine) PullRequestMark(pr, chat.prCi, Modifier.padding(start = LodySpacing.sm))
+                    if (chat.attention == null) chat.activityAt?.let { at ->
                         Text(
                             ageText(at, now),
                             style = type.footnote.copy(fontFeatureSettings = "tnum"),
@@ -1059,25 +1064,30 @@ private fun ChatRow(
 
 /** The family chevron sits at the opener's title edge; the rail runs down its centre (iOS `ChatRowContent`). */
 private val FamilyChevron = LodyIconSize.xs
-private val RailWidth = 2.dp
-private val RailX = LodyLayout.childIndent + FamilyChevron / 2
+private val RailWidth = LodySpacing.xxs / 2
+private val RailX = LodyLayout.screenPaddingX + FamilyChevron / 2
 
 /** One nesting level: how far a nested row's title steps in (iOS `ChatRowContent.childLevel`). */
-private val TreeLevel = LodySpacing.lg
+private val TreeLevel = LodyLayout.childIndent - LodyLayout.screenPaddingX
 
 /**
- * Children hang off one continuous rail under the opener's chevron. Rows sit edge to edge, so
- * each draws its own height and the pieces join; the last stops short with a round end.
+ * Children curve from the family trunk into their title. Intermediate rows continue the trunk;
+ * the final child ends at its branch. Geometry follows the measured title height.
  */
-private fun DrawScope.drawRail(color: Color, last: Boolean) {
-    val width = RailWidth.toPx()
-    val bottom = if (last) size.height - LodySpacing.sm.toPx() else size.height
-    drawRoundRect(
-        color,
-        topLeft = Offset(RailX.toPx() - width / 2, 0f),
-        size = Size(width, bottom),
-        cornerRadius = if (last) CornerRadius(width / 2) else CornerRadius.Zero,
-    )
+private fun DrawScope.drawRail(color: Color, last: Boolean, turn: Float) {
+    val trunk = RailX.toPx()
+    val fork = maxOf(0f, turn - LodySpacing.md.toPx())
+    val path = Path().apply {
+        moveTo(trunk, 0f)
+        lineTo(trunk, fork)
+        cubicTo(trunk, turn - LodyRadius.sm.toPx(), trunk + LodySpacing.xs.toPx(), turn,
+            (LodyLayout.childIndent - LodySpacing.sm).toPx(), turn)
+        if (!last) {
+            moveTo(trunk, fork)
+            lineTo(trunk, size.height)
+        }
+    }
+    drawPath(path, color, style = Stroke(width = RailWidth.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 }
 
 /**
@@ -1104,7 +1114,7 @@ private fun FamilyToggle(count: Int, expanded: Boolean, childAttention: ChatAtte
     ) {
         Row(
             Modifier
-                .padding(start = LodyLayout.childIndent - LodySpacing.xs)
+                .padding(start = LodyLayout.screenPaddingX - LodySpacing.xs)
                 .heightIn(min = LodySize.controlSm)
                 .clip(RoundedCornerShape(LodyRadius.sm))
                 .clickable(role = Role.Button, onClickLabel = action, onClick = onToggle)
@@ -1114,13 +1124,17 @@ private fun FamilyToggle(count: Int, expanded: Boolean, childAttention: ChatAtte
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
         ) {
             Glyph(LodyIcons.Forward, colors.iconSecondary, FamilyChevron, Modifier.rotate(angle))
-            if (!expanded) childAttention?.let { AttentionGlyph(it) }
             Text(
                 label,
                 style = LodyTheme.typography.footnote.copy(fontFeatureSettings = "tnum"),
                 color = colors.textSecondary,
                 maxLines = 1,
             )
+        }
+        if (!expanded && childAttention != null) {
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = LodyLayout.screenPaddingX).size(LodyIconSize.md), contentAlignment = Alignment.Center) {
+                AttentionGlyph(childAttention)
+            }
         }
     }
 }

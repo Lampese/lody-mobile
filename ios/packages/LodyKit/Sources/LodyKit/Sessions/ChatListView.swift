@@ -7,8 +7,8 @@ import UIKit
 //
 // It renders the same `InboxSections` projection as the other list hosts and emits
 // the same `rowPress` / `rowAction` events, so `InboxController` keeps owning state,
-// preferences and actions. Rows are one line; the indent gutter shows a glyph only
-// when a chat needs attention; collapsed groups show their count and most urgent
+// preferences and actions. Status replaces the trailing age when a chat needs
+// attention; collapsed groups show their count and most urgent
 // state. Cells are UIKit list cells (selection, swipe actions, context menus) whose
 // content is SwiftUI on design-system tokens.
 @MainActor
@@ -70,6 +70,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       // Untitled first sections start at the navigation safe area without a blank header.
       if index == 0 && title.isEmpty { sectionConfig.headerMode = .none }
       let section = NSCollectionLayoutSection.list(using: sectionConfig, layoutEnvironment: environment)
+      section.interGroupSpacing = 0
       section.boundarySupplementaryItems.forEach {
         $0.pinToVisibleBounds = self?.pinsGroupLabels == true && !title.isEmpty
         $0.zIndex = 2
@@ -271,7 +272,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       }
     }
     .margins(.all, 0)
-    .minSize(height: LodySize.listRow)
+    .minSize(height: entry.kind == .session && !entry.row.parentId.isEmpty ? LodySize.controlMd : LodySize.listRow)
     cell.accessories = []
     // iOS highlights rows on press; Android uses ripple.
     cell.configurationUpdateHandler = { cell, state in
@@ -545,13 +546,13 @@ extension Notification.Name {
   static let lodyChatRowDetailsChanged = Notification.Name("LodyChatRowDetailsChanged")
 }
 
-/// Line 1: status mark slot · title · updated time. Line 2 (aligned with the title): folder or
+/// Line 1: title · status or updated time. Line 2 (aligned with the title): folder or
 /// repository mark · project · branch, with the pull request mark trailing.
 private struct ChatRowContent: View {
   let row: LodyListRow
   let details: ChatRowDetails
   /// Set on a row with nested chats: whether they are shown. A "⌄ 4 opened chats" line below the
-  /// row heads the family; the status mark stays in the status column.
+  /// row heads the family; both parent and child status marks stay trailing.
   var expanded: Bool?
   var onToggle: () -> Void = {}
 
@@ -560,7 +561,7 @@ private struct ChatRowContent: View {
   private var pullRequest: PullRequestMark? { details.contains(.pullRequest) ? PullRequestMark(row.prStatus, ci: row.prCI) : nil }
   /// The detail line needs a project or branch; a PR mark alone stays on the title line, before the age.
   private var hasDetailLine: Bool { !project.isEmpty || !branch.isEmpty }
-  private var inlinePullRequest: PullRequestMark? { snippet != nil || !hasDetailLine ? pullRequest : nil }
+  private var inlinePullRequest: PullRequestMark? { attention == nil && (snippet != nil || !hasDetailLine) ? pullRequest : nil }
 
   private var attention: Attention? { Attention(tint: row.imageTint, unread: row.unread) }
   private var nested: Bool { !row.parentId.isEmpty }
@@ -575,16 +576,26 @@ private struct ChatRowContent: View {
       content
       if let expanded { familyToggle(expanded) }
     }
-    .background(alignment: .topLeading) {
-      // Children hang off one continuous rail under the opener's chevron: each nested row draws
-      // its own height, so the pieces join; the last one stops short with a round end.
-      if nested {
-        RoundedRectangle(cornerRadius: row.lastChild ? Self.railWidth / 2 : 0)
-          .fill(LodyColor.borderDefault)
-          .frame(width: Self.railWidth)
-          .padding(.bottom, row.lastChild ? LodySpacing.sm : 0)
-          .offset(x: Self.railX - Self.railWidth / 2)
+    .backgroundPreferenceValue(ChatRowTitleBounds.self) { anchor in
+      GeometryReader { geometry in
+        if nested, let anchor {
+          let turn = geometry[anchor].midY
+          Path { path in
+            let fork = max(0, turn - LodySpacing.md)
+            path.move(to: CGPoint(x: Self.railX, y: 0))
+            path.addLine(to: CGPoint(x: Self.railX, y: fork))
+            path.addCurve(to: CGPoint(x: LodyLayout.childIndent - LodySpacing.sm, y: turn),
+              control1: CGPoint(x: Self.railX, y: turn - LodyRadius.sm),
+              control2: CGPoint(x: Self.railX + LodySpacing.xs, y: turn))
+            if !row.lastChild {
+              path.move(to: CGPoint(x: Self.railX, y: fork))
+              path.addLine(to: CGPoint(x: Self.railX, y: geometry.size.height))
+            }
+          }
+          .stroke(LodyColor.borderDefault, style: StrokeStyle(lineWidth: Self.railWidth, lineCap: .round, lineJoin: .round))
+        }
       }
+      .allowsHitTesting(false)
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(row.title)
@@ -601,16 +612,9 @@ private struct ChatRowContent: View {
 
   private var content: some View {
     HStack(alignment: .center, spacing: 0) {
-      // The status column: the same place on every row, nested or not.
-      ZStack {
-        if let attention { AttentionGlyph(attention: attention) }
-      }
-      .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-      .frame(width: LodyLayout.childIndent - LodyLayout.screenPaddingX, alignment: .leading)
-      // A child steps in past the rail and reads one size down.
       if nested { Color.clear.frame(width: Self.childLevel, height: 1) }
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
-        HStack(alignment: .firstTextBaseline, spacing: LodySpacing.sm) {
+        HStack(alignment: .center, spacing: LodySpacing.sm) {
           Text(row.title)
             .lodyTextStyle(nested ? .callout : row.unread ? .bodyEmphasis : .body)
             .fontWeight(nested && row.unread ? .semibold : nil)
@@ -618,7 +622,9 @@ private struct ChatRowContent: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
           // The text inside sets the stack's baseline, so the PR mark centres on the age.
-          if inlinePullRequest != nil || !row.value.isEmpty {
+          if let attention {
+            AttentionGlyph(attention: attention).frame(width: LodyIconSize.md, height: LodyIconSize.md)
+          } else if inlinePullRequest != nil || !row.value.isEmpty {
             HStack(spacing: LodySpacing.xs) {
               inlinePullRequest?.glyph
               if !row.value.isEmpty {
@@ -631,6 +637,7 @@ private struct ChatRowContent: View {
             .fixedSize()
           }
         }
+        .anchorPreference(key: ChatRowTitleBounds.self, value: .bounds) { $0 }
         if let snippet {
           Text(snippet).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textSecondary).lineLimit(2)
         } else if hasDetailLine {
@@ -653,42 +660,45 @@ private struct ChatRowContent: View {
 
   /// The family chevron sits at the opener's title edge; the rail runs down its centre.
   private static let chevronSize = LodyIconSize.xs
-  private static let railWidth: CGFloat = 2
-  private static let railX = LodyLayout.childIndent + chevronSize / 2
+  private static let railWidth = LodySpacing.xxs / 2
+  private static let railX = LodyLayout.screenPaddingX + chevronSize / 2
   /// One nesting level: how far a child's title steps in.
-  static let childLevel = LodySpacing.lg
+  static let childLevel = LodyLayout.childIndent - LodyLayout.screenPaddingX
 
   /// The family's own line under the opener (Slack's "7 replies"): chevron + "7 opened chats",
   /// aligned with the opener's title. Same place folded or open; the chevron turns down when the
   /// family shows and the rail starts beneath it. Only the chevron and count are the target; the
   /// rest of the line opens the parent.
   private func familyToggle(_ expanded: Bool) -> some View {
-    Button(action: onToggle) {
-      HStack(spacing: LodySpacing.xs) {
-        Image(systemName: "chevron.right")
-          .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(LodyColor.iconSecondary)
-          .frame(width: Self.chevronSize, height: Self.chevronSize)
-          .rotationEffect(.degrees(expanded ? 90 : 0))
-          .animation(LodySpring.snappy, value: expanded)
-        if !expanded, let status = Attention(tint: row.collapsedImageTint, unread: false) {
-          AttentionGlyph(attention: status)
+    HStack(spacing: 0) {
+      Button(action: onToggle) {
+        HStack(spacing: LodySpacing.xs) {
+          Image(systemName: "chevron.right")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(LodyColor.iconSecondary)
+            .frame(width: Self.chevronSize, height: Self.chevronSize)
+            .rotationEffect(.degrees(expanded ? 90 : 0))
+            .animation(LodySpring.snappy, value: expanded)
+          Text(String.localizedStringWithFormat(String(localized: "home.tree.count", bundle: .lody), row.childCount))
+            .lodyTextStyle(.footnote)
+            .foregroundStyle(LodyColor.textSecondary)
+            .monospacedDigit()
         }
-        Text(String.localizedStringWithFormat(String(localized: "home.tree.count", bundle: .lody), row.childCount))
-          .lodyTextStyle(.footnote)
-          .foregroundStyle(LodyColor.textSecondary)
-          .monospacedDigit()
+        .padding(.leading, LodySpacing.xs)
+        .padding(.trailing, LodySpacing.md)
+        .frame(minHeight: LodySize.controlSm, alignment: .leading)
+        .contentShape(Rectangle())
       }
-      // Only the chevron and count toggle (with a little room around them); the rest of the
-      // line belongs to the parent row, so a tap meant for the parent opens it.
-      .padding(.leading, LodySpacing.xs)
-      .padding(.trailing, LodySpacing.md)
-      .frame(minHeight: LodySize.controlSm, alignment: .leading)
-      .contentShape(Rectangle())
+      .buttonStyle(.plain)
+      Spacer(minLength: LodySpacing.sm)
+      if !expanded, let status = Attention(tint: row.collapsedImageTint, unread: false) {
+        AttentionGlyph(attention: status)
+          .frame(width: LodyIconSize.md, height: LodyIconSize.md)
+          .allowsHitTesting(false)
+      }
     }
-    .buttonStyle(.plain)
-    .padding(.leading, LodyLayout.childIndent - LodySpacing.xs)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.leading, LodyLayout.screenPaddingX - LodySpacing.xs)
+    .padding(.trailing, LodyLayout.screenPaddingX)
     .padding(.top, -LodySpacing.xs)
     .accessibilityHidden(true)
   }
@@ -712,6 +722,13 @@ private struct ChatRowContent: View {
       pullRequest?.glyph
     }
     .frame(maxWidth: .infinity)
+  }
+}
+
+private struct ChatRowTitleBounds: PreferenceKey {
+  static var defaultValue: Anchor<CGRect>? { nil }
+  static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+    value = nextValue() ?? value
   }
 }
 

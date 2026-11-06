@@ -10,7 +10,9 @@ enum NativeDebug {
       catch { preconditionFailure("Invalid offline fixture: \(error)") }
     }
     let root: UIViewController
-    if LodyUIVerify.has("--ui-review-mentions") {
+    if LodyUIVerify.has("--ui-review-list") {
+      root = ChatListPreviewController()
+    } else if LodyUIVerify.has("--ui-review-mentions") {
       root = SessionPreviewController(scenario: "mentions")
     } else if let review = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--ui-review-bar=") }) {
       root = SessionPreviewController(scenario: "bar-" + String(review.dropFirst("--ui-review-bar=".count)))
