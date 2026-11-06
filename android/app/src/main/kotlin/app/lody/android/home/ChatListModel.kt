@@ -41,6 +41,7 @@ data class ChatItem(
     val childCount: Int = 0,
     /** Hidden children only; never replaces the parent row status. */
     val childAttention: ChatAttention? = null,
+    val ownerId: String? = null,
 ) {
     val unread: Boolean get() = attention == ChatAttention.Unread
 }
@@ -403,6 +404,7 @@ object ChatListModel {
 
     private fun item(session: CatalogSession, place: String = "", placeIsRepo: Boolean = false) = ChatItem(
         id = session.id,
+        ownerId = session.userId,
         title = session.title,
         attention = attention(session),
         place = place,

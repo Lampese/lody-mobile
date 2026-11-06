@@ -31,6 +31,7 @@ final class SessionListView: UIView {
   }
   var scrollView: UIScrollView { regular ? sidebar.scrollView : grouped.collection }
   var sidebarScrollView: UIScrollView { sidebar.scrollView }
+  func setOwners(_ value: [String: WorkspaceMember]) { grouped.owners = value }
   func setContentStyle(_ value: Bool) {}
   func setPreviewUserId(_ value: String) { sidebar.previewUserId = value }
   func setPreviewWorkspaceId(_ value: String) { sidebar.previewWorkspaceId = value }

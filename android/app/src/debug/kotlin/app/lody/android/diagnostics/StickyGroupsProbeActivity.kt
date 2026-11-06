@@ -34,7 +34,8 @@ class StickyGroupsProbeActivity : ComponentActivity() {
         setContent {
             LodyTheme {
                 Surface(color = LodyTheme.colors.bgBase) {
-                    HomeList(sections, if (listReview) setOf(ChatRowDetail.Project, ChatRowDetail.PullRequest) else emptySet(), PaddingValues(top = LodySize.controlLg), empty = null,
+                    HomeList(sections.map { it.copy(chats = it.chats.map { chat -> chat.copy(ownerId = "") }) }, if (listReview) setOf(ChatRowDetail.Project, ChatRowDetail.PullRequest) else emptySet(), PaddingValues(top = LodySize.controlLg), empty = null,
+                        owners = if (intent.getBooleanExtra("owners", false)) mapOf("" to app.lody.android.auth.WorkspaceMember("", "Leon")) else null,
                         pinsLabels = !intent.getBooleanExtra("search", false), onOpenChat = {})
                 }
             }

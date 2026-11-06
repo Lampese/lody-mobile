@@ -18,6 +18,9 @@ final class InboxController: UIViewController {
   private var views: [String: Double] = [:]
   private var viewsKey = ""
   private var viewsLoad = 0
+  private var members: [String: WorkspaceMember] = [:]
+  private var memberScope = ""
+  private var memberTask: Task<Void, Never>?
   private var observers: [NSObjectProtocol] = []
 
   init(source: SessionSource = .live) {
@@ -30,6 +33,7 @@ final class InboxController: UIViewController {
 
   isolated deinit {
     searchTask?.cancel()
+    memberTask?.cancel()
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
   }
 
@@ -74,6 +78,28 @@ final class InboxController: UIViewController {
   func render() {
     guard isViewLoaded else { return }
     let state = source.state
+    if memberScope != state.key {
+      memberTask?.cancel()
+      memberScope = state.key
+      members = [:]
+      if source === SessionSource.live, !LodyUIVerify.enabled, !state.key.isEmpty {
+        memberTask = Task { [weak self] in
+          await WorkspaceMembers.load(userId: state.userId, workspaceId: state.workspaceId) { [weak self] members in
+            guard let self, self.source.state.key == state.key else { return }
+            self.members = members
+            self.render()
+          }
+        }
+      }
+    }
+    var identities = members
+    if let me = AuthSession.shared.snapshot.account?.user, me.id == state.userId {
+      identities[me.id] = identities[me.id] ?? WorkspaceMember(id: me.id, name: me.name, image: me.image)
+    }
+    let owners: [String: WorkspaceMember] = HomeScope.stored == .team ? Dictionary(state.catalog.sessions.map { session in
+      (session.id, identities[session.userId ?? ""] ?? WorkspaceMember(id: session.userId ?? "", name: "", image: nil))
+    }, uniquingKeysWith: { _, new in new }) : [:]
+    list.setOwners(owners)
     loadViews(state)
     guard !state.userId.isEmpty else {
       chrome.update(nil)

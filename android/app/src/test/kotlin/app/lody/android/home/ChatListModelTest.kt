@@ -227,6 +227,8 @@ class ChatListModelTest {
         fun ids(owner: String?) = ChatListModel.home(owned, HomeGrouping.Time, owner, LocalDate.parse("2026-10-06"), ZoneOffset.UTC).flatMap { section -> section.chats.map { it.id } }
         assertEquals(listOf("6", "2"), ids("me"))
         assertEquals(listOf("6", "5", "2", "3", "1"), ids(null))
+        val team = ChatListModel.home(owned, HomeGrouping.Time).flatMap { it.chats }
+        team.forEach { chat -> assertEquals(owned.sessions.first { it.id == chat.id }.userId, chat.ownerId) }
         // Chats without an owner (older caches) are not anyone's.
         assertEquals(emptyList<String>(), ids("nobody"))
     }

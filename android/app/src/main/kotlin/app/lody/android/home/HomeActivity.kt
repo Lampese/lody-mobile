@@ -1,5 +1,7 @@
 package app.lody.android.home
 
+import app.lody.android.auth.WorkspaceMember
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -69,6 +71,10 @@ class HomeActivity : ComponentActivity() {
                 val submissions by app.submissions.state.collectAsState()
                 val activeScope = account.account?.id?.let { userId -> remoteCatalog.workspace?.id?.let { RuntimeScope(userId, it) } }
                 LaunchedEffect(activeScope) { app.submissions.activate(activeScope) }
+                var members by remember(activeScope) { mutableStateOf(emptyMap<String, WorkspaceMember>()) }
+                LaunchedEffect(activeScope) {
+                    activeScope?.let { scope -> app.members.observe(scope).collect { members = it } }
+                }
                 val browsing = remember {
                     val prefs = getSharedPreferences("tab-browsing-v1", MODE_PRIVATE)
                     TabBrowsing({ prefs.getString(it, null) }) { key, value -> prefs.edit().putString(key, value).apply() }
@@ -139,7 +145,7 @@ class HomeActivity : ComponentActivity() {
                             CreateSessionScreen(catalog.snapshot, creator, RuntimeScope(user.id, workspace.id), onSubmit = { request -> app.submissions.submit(RuntimeScope(user.id, workspace.id), request); selectedId = request.sessionId; selectedTitle = request.text.take(200); creating = false }, onBack = { creating = false })
                         } else screens.SaveableStateProvider("list/${user.id}/${workspace?.id}") {
                             ChatListScreen(
-                                state = uiState(account, catalog),
+                                state = uiState(account, catalog).copy(members = members + listOfNotNull(user?.let { it.id to (members[it.id] ?: WorkspaceMember(it.id, it.name, it.image)) }).toMap()),
                                 onSelectWorkspace = { app.cloud.select(it) },
                                 onSignOut = { app.account.logout() },
                                 onOpenChat = { row ->

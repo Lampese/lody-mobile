@@ -9,6 +9,8 @@
 
 package app.lody.android.home
 
+import app.lody.android.auth.WorkspaceMember
+
 import app.lody.android.designsystem.LodyFilledIconButton
 
 import app.lody.android.designsystem.LodyIconButton as IconButton
@@ -154,6 +156,7 @@ data class ChatListUiState(
     val placeholder: String,
     val workspaces: List<Workspace>,
     val workspaceId: String?,
+    val members: Map<String, WorkspaceMember> = emptyMap(),
 )
 
 enum class HomeTab(@StringRes val label: Int) {
@@ -291,8 +294,9 @@ fun ChatListScreen(
                 ChatListModel.searchTimeline(state.timeline, query).map { HomeSection("bucket-${it.bucket}", HomeSection.Header.Bucket(it.bucket), it.chats) },
                 details, padding, empty = stringResource(R.string.home_search_empty, query.trim()).takeIf { query.isNotBlank() },
                 pinsLabels = false, onOpenChat = onOpenChat,
+                owners = state.members.takeIf { homeScope == HomeScope.Team },
             )
-            project != null -> ProjectChatList(project, details - ChatRowDetail.Project, padding, onOpenChat)
+            project != null -> ProjectChatList(project, details - ChatRowDetail.Project, padding, state.members.takeIf { homeScope == HomeScope.Team }, onOpenChat)
             // A project header already names the project, so rows drop it from their detail line.
             tab == HomeTab.Chats -> HomeList(
                 sections,
@@ -300,6 +304,7 @@ fun ChatListScreen(
                 padding,
                 empty = state.placeholder,
                 listState = chatsListState,
+                owners = state.members.takeIf { homeScope == HomeScope.Team },
                 idleExpanded = idleExpanded,
                 onToggleIdle = { idleExpanded = !idleExpanded },
                 onOpenChat = onOpenChat,
@@ -681,6 +686,7 @@ internal fun HomeList(
     listState: LazyListState = rememberLazyListState(),
     idleExpanded: Boolean = false,
     onToggleIdle: () -> Unit = {},
+    owners: Map<String, WorkspaceMember>? = null,
     pinsLabels: Boolean = true,
     onOpenChat: (ChatItem) -> Unit,
 ) {
@@ -719,6 +725,7 @@ internal fun HomeList(
             items(section.visibleChats(idleExpanded), key = { "${section.id}/${it.id}" }) { chat ->
                 ChatRow(
                     chat, if (section.header is HomeSection.Header.Project && chat.nestedUnder == null) details - ChatRowDetail.Project else details, now,
+                    owner = owners?.let { it[chat.ownerId] ?: WorkspaceMember(chat.ownerId.orEmpty(), "") },
                     expanded = if (chat.treeParent) chat.id !in folded else null,
                     onToggle = { toggleOpener(chat.id) },
                 ) { onOpenChat(chat) }
@@ -922,10 +929,10 @@ private val ProjectSource.label: Int
     }
 
 @Composable
-private fun ProjectChatList(project: ChatGroup, details: Set<ChatRowDetail>, padding: PaddingValues, onOpenChat: (ChatItem) -> Unit) {
+private fun ProjectChatList(project: ChatGroup, details: Set<ChatRowDetail>, padding: PaddingValues, owners: Map<String, WorkspaceMember>?, onOpenChat: (ChatItem) -> Unit) {
     val now = rememberNow()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        items(project.chats, key = { it.id }) { chat -> ChatRow(chat, details, now) { onOpenChat(chat) } }
+        items(project.chats, key = { it.id }) { chat -> ChatRow(chat, details, now, owner = owners?.let { it[chat.ownerId] ?: WorkspaceMember(chat.ownerId.orEmpty(), "") }) { onOpenChat(chat) } }
     }
 }
 
@@ -981,6 +988,7 @@ private fun ChatRow(
     chat: ChatItem,
     details: Set<ChatRowDetail>,
     now: Long,
+    owner: WorkspaceMember? = null,
     expanded: Boolean? = null,
     onToggle: () -> Unit = {},
     onClick: () -> Unit,
@@ -1012,6 +1020,10 @@ private fun ChatRow(
             if (nested) Spacer(Modifier.width(TreeLevel))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
                 Row(Modifier.onSizeChanged { titleHeight = it.height.toFloat() }, verticalAlignment = Alignment.CenterVertically) {
+                    if (owner != null) {
+                        Avatar(owner.image, owner.name.ifBlank { "?" }, LodyIconSize.md)
+                        Spacer(Modifier.width(LodySpacing.sm))
+                    }
                     Text(
                         chat.title,
                         style = when {

@@ -36,6 +36,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
   private let placeholder = UILabel()
   private let topBackdrop = ChatHeaderBackdrop()
   private var placeholderText = ""
+  var owners: [String: WorkspaceMember] = [:] { didSet { if owners != oldValue { detailsChanged() } } }
   private var details = ChatRowDetails.stored
   /// The last projection, re-applied when an opener folds or unfolds.
   private var lastSections: [LodyListSection] = []
@@ -265,7 +266,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
       case .link: GroupHeader(row: entry.row, expanded: nil, canToggle: false, onAction: emit)
       case .session:
         ChatRowContent(
-          row: entry.row, details: details, expanded: entry.canToggle ? entry.expanded : nil,
+          row: entry.row, details: details, owner: owners[entry.row.id], expanded: entry.canToggle ? entry.expanded : nil,
           onToggle: { [weak self] in self?.toggleOpener(entry.row.id) }
         )
       case .more: MoreRowContent(title: entry.row.title)
@@ -551,6 +552,7 @@ extension Notification.Name {
 private struct ChatRowContent: View {
   let row: LodyListRow
   let details: ChatRowDetails
+  var owner: WorkspaceMember?
   /// Set on a row with nested chats: whether they are shown. A "⌄ 4 opened chats" line below the
   /// row heads the family; both parent and child status marks stay trailing.
   var expanded: Bool?
@@ -598,7 +600,7 @@ private struct ChatRowContent: View {
       .allowsHitTesting(false)
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(row.title)
+    .accessibilityLabel([owner?.name, row.title].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
     .accessibilityValue(
       [row.badge, project, branch, pullRequest?.label ?? "", familyLabel, row.accessibilityValue].filter { !$0.isEmpty }.joined(separator: ", ")
     )
@@ -615,6 +617,7 @@ private struct ChatRowContent: View {
       if nested { Color.clear.frame(width: Self.childLevel, height: 1) }
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .center, spacing: LodySpacing.sm) {
+          if let owner { ChatOwnerAvatar(member: owner) }
           Text(row.title)
             .lodyTextStyle(nested ? .callout : row.unread ? .bodyEmphasis : .body)
             .fontWeight(nested && row.unread ? .semibold : nil)
@@ -835,6 +838,34 @@ private struct SectionTitle: View {
         .padding(.bottom, LodySpacing.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityAddTraits(.isHeader)
+    }
+  }
+}
+
+/// Compact person identity; shares the native image cache with message avatars.
+private struct ChatOwnerAvatar: View {
+  let member: WorkspaceMember
+  @State private var loaded: UIImage?
+  @State private var loadedURL: URL?
+  private var url: URL? { member.image.flatMap(URL.init(string:)) }
+  private var initial: String { String(member.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased() }
+  var body: some View {
+    Group {
+      if let url, loadedURL == url, let loaded {
+        Image(uiImage: loaded).resizable().scaledToFill()
+      } else {
+        Text(initial.isEmpty ? "?" : initial)
+          .lodyTextStyle(.caption).foregroundStyle(LodyColor.textSecondary)
+          .frame(maxWidth: .infinity, maxHeight: .infinity).background(LodyColor.fillSecondary)
+      }
+    }
+    .frame(width: LodyIconSize.md, height: LodyIconSize.md).clipShape(Circle())
+    .accessibilityLabel(member.name)
+    .task(id: url) {
+      guard let url else { return }
+      if let image = LodyListPhoto.image(for: url, shape: .original, ready: { image in
+        loadedURL = url; loaded = image
+      }) { loadedURL = url; loaded = image }
     }
   }
 }

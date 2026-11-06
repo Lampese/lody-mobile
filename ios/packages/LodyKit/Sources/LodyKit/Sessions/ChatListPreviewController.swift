@@ -25,6 +25,11 @@ final class ChatListPreviewController: UIViewController {
       row("list-review-idle", "Native session synchronization", project: "Lody", pr: "open"),
       row("list-review-plain", "A conversation without extra details"),
     ]
+    if LodyUIVerify.has("--ui-review-owners") {
+      list.owners = Dictionary(rows.enumerated().map { index, row in
+        (row.id, WorkspaceMember(id: "owner-\(index)", name: index % 2 == 0 ? "Leon" : "Alice", image: nil))
+      }, uniquingKeysWith: { _, new in new })
+    }
     list.setSections([LodyListSection(id: "list-review", header: "Conversations", rows: rows)])
   }
 }

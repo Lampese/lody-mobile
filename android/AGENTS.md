@@ -110,3 +110,5 @@
 - Opening a conversation from a list restores its last visited open Tab, persisted locally per account/workspace/root conversation. Explicit Tab selections, new/forked Tabs, notification/deep links and search hits retain their exact target. Missing/closed/archived saved Tabs fall back to an open Tab. Visiting records a message-time watermark only while the page is foreground-visible; the Tab panel consumes that watermark, clears unread dots for viewed output and keeps running/permission status. Later output in an inactive Tab remains unread.
 
 - The shared runtime snapshot includes upstream session read/retry/stall/resume trace events (7028f2bf) and Zod 4 schema generation compatibility (fc9bb555). Native iOS page ownership/reveal fixes do not replace Android's Compose lifecycle or transcript implementation; retain the existing Android session owner boundaries.
+
+- Team conversation lists show a compact circular owner avatar before the title (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
