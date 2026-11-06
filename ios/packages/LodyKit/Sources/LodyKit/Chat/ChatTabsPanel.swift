@@ -88,7 +88,7 @@ struct ChatTabsPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
           if state.busy == tab.id { ProgressView().controlSize(.small) }
           else if closed {
-            LodyIcon.refresh.image.resizable().renderingMode(.template)
+            LodyIcon.undo.image.resizable().renderingMode(.template)
               .frame(width: LodyIconSize.sm, height: LodyIconSize.sm).foregroundStyle(LodyColor.accentFg)
           } else if tab.current {
             LodyIcon.check.image.resizable().renderingMode(.template)

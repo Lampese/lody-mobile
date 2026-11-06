@@ -49,7 +49,7 @@ fun ChatTabsMenu(tabs: List<CatalogSession>, closed: List<CatalogSession>, curre
                     DropdownMenuItem(text = { Text(tab.title.ifBlank { stringResource(R.string.chat_new_tab_title) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         enabled = busy == null,
                         trailingIcon = { if (busy == tab.id) CircularProgressIndicator(Modifier.size(LodyIconSize.md), strokeWidth = 2.dp)
-                            else Icon(LodyIcons.Refresh, stringResource(R.string.chat_restore_tab), tint = LodyTheme.colors.accentFg, modifier = Modifier.size(LodyIconSize.md)) },
+                            else Icon(LodyIcons.Undo, stringResource(R.string.chat_restore_tab), tint = LodyTheme.colors.accentFg, modifier = Modifier.size(LodyIconSize.md)) },
                         onClick = { onRestore(tab.id) })
                 }
             } else {

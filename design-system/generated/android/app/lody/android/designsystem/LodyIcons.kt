@@ -295,6 +295,14 @@ object LodyIcons {
         )
     }
 
+    val Undo: ImageVector by lazy {
+        lodyIcon(
+            "Undo",
+            "M9 14 4 9l5-5",
+            "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11",
+        )
+    }
+
     val Star: ImageVector by lazy {
         lodyIcon(
             "Star",
@@ -652,6 +660,7 @@ object LodyIcons {
             "link" to Link,
             "externalLink" to ExternalLink,
             "refresh" to Refresh,
+            "undo" to Undo,
             "star" to Star,
             "pin" to Pin,
             "bell" to Bell,
