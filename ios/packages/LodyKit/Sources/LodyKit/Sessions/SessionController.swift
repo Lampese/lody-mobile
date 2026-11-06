@@ -247,7 +247,7 @@ class SessionController: UIViewController {
         overlay?.close { self?.titleMenuSelected("newTab") }
       }
     )
-    overlay = ChatTabsOverlay.present(panel, tabs: items.count, in: host)
+    overlay = ChatTabsOverlay.present(panel, tabs: items.count, in: host, source: chat.tabsAnchorView)
   }
 
   private func createTab() {

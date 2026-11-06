@@ -81,7 +81,8 @@ final class ChatMessageActionsCell: UICollectionViewCell {
     super.layoutSubviews()
     let count = CGFloat(actions.arrangedSubviews.filter { !$0.isHidden }.count)
     let width = count * 44 + max(0, count - 1) * actions.spacing
-    label.frame = CGRect(x: 0, y: 0, width: bounds.width, height: 24)
-    actions.frame = CGRect(x: user ? max(0, bounds.width - width - ChatCell.avatarSlot) : 0, y: user ? 0 : 24, width: width, height: 44)
+    let timeX = width + LodySpacing.xs
+    label.frame = CGRect(x: timeX, y: 0, width: max(0, bounds.width - timeX), height: 44)
+    actions.frame = CGRect(x: user ? max(0, bounds.width - width - ChatCell.avatarSlot) : 0, y: 0, width: width, height: 44)
   }
 }

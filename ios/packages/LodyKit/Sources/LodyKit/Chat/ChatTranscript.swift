@@ -670,16 +670,10 @@ struct ChatTranscript {
           header.group = "only"
           result.append(header)
         }
-        // Model, time and the turn's actions always close the turn.
-        let model = entry.modelInfo?.title ?? ""
+        // Time follows the actions; model and reasoning remain in turn information.
         let finishedAt = ChatMetaTime.label(entry.endedAt, now: now)
-        let meta = [model, finishedAt].filter { !$0.isEmpty }.joined(separator: " · ")
-        if !meta.isEmpty || entry.items.contains(where: { $0.type == "text" || $0.isImage }) {
-          var row = ChatRow(id: entry.id + ":meta", entryID: entry.id, kind: "meta", text: meta)
-          row.imageAsset = LodyAgentIcon.asset(
-            modelId: entry.modelInfo?.modelId, name: entry.modelInfo?.name
-          ) ?? ""
-          result.append(row)
+        if !finishedAt.isEmpty || entry.items.contains(where: { $0.type == "text" || $0.isImage }) {
+          result.append(ChatRow(id: entry.id + ":meta", entryID: entry.id, kind: "meta", text: finishedAt))
         }
       }
       return result

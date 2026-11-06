@@ -100,6 +100,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
   var onComposerOptionChange: ([String: Any]) -> Void = { _ in }
   var onMentionBrowse: ([String: Any]) -> Void = { _ in }
   private let titleButton = ChatNavigationTitleButton()
+  var tabsAnchorView: UIView { titleButton }
   private var navigationTitle = ""
   private var navigationSubtitle = ""
   private var navigationMachine = ""

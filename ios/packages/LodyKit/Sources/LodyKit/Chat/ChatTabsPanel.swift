@@ -87,14 +87,14 @@ struct ChatTabsPanel: View {
 final class ChatTabsOverlay: UIView {
   private let card = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
   private let content: UIHostingController<ChatTabsPanel>
-  private var onClose: (() -> Void)?
+  private var collapsedTransform = CGAffineTransform.identity
 
   /// The panel currently shown in `host`, if any.
   static func shown(in host: UIView) -> ChatTabsOverlay? { host.subviews.compactMap { $0 as? ChatTabsOverlay }.first }
 
-  static func present(_ panel: ChatTabsPanel, tabs: Int, in host: UIViewController) -> ChatTabsOverlay {
+  static func present(_ panel: ChatTabsPanel, tabs: Int, in host: UIViewController, source: UIView? = nil) -> ChatTabsOverlay {
     let overlay = ChatTabsOverlay(panel: panel)
-    overlay.show(in: host, height: ChatTabsPanel.height(tabs: tabs))
+    overlay.show(in: host, height: ChatTabsPanel.height(tabs: tabs), source: source)
     return overlay
   }
 
@@ -123,7 +123,7 @@ final class ChatTabsOverlay: UIView {
 
   required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-  private func show(in host: UIViewController, height: CGFloat) {
+  private func show(in host: UIViewController, height: CGFloat, source: UIView?) {
     let root = host.view!
     host.addChild(content)
     translatesAutoresizingMaskIntoConstraints = false
@@ -140,13 +140,21 @@ final class ChatTabsOverlay: UIView {
     content.didMove(toParent: host)
     root.layoutIfNeeded()
     UISelectionFeedbackGenerator().selectionChanged()
-    guard !UIAccessibility.isReduceMotionEnabled else { return }
-    // Drops in from the header: grows from its top edge while fading in.
+    // Grow out of the title, like a menu, rather than dropping down from above.
+    let anchor = source.map { $0.convert($0.bounds, to: self) }
+      ?? CGRect(x: card.frame.midX, y: card.frame.minY, width: 0, height: 0)
+    collapsedTransform = CGAffineTransform(
+      translationX: anchor.midX - card.center.x,
+      y: anchor.midY - card.center.y
+    ).scaledBy(x: 0.55, y: 0.15)
     card.alpha = 0
-    card.transform = CGAffineTransform(translationX: 0, y: -height * 0.08).scaledBy(x: 0.94, y: 0.9)
-    UIView.animate(springDuration: 0.38, bounce: 0.18) {
+    content.view.alpha = 0
+    if !UIAccessibility.isReduceMotionEnabled { card.transform = collapsedTransform }
+    UIView.animate(springDuration: 0.3, bounce: 0, initialSpringVelocity: 0,
+                   options: [.beginFromCurrentState, .allowUserInteraction]) {
       self.card.alpha = 1
       self.card.transform = .identity
+      self.content.view.alpha = 1
     }
   }
 
@@ -164,10 +172,11 @@ final class ChatTabsOverlay: UIView {
       self.removeFromSuperview()
       done?()
     }
-    guard window != nil, !UIAccessibility.isReduceMotionEnabled else { return finish() }
+    guard window != nil else { return finish() }
     UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseIn, .beginFromCurrentState]) {
       self.card.alpha = 0
-      self.card.transform = CGAffineTransform(translationX: 0, y: -8).scaledBy(x: 0.96, y: 0.94)
+      if !UIAccessibility.isReduceMotionEnabled { self.card.transform = self.collapsedTransform }
+      self.content.view.alpha = 0
     } completion: { _ in finish() }
   }
 }
