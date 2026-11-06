@@ -22,6 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.lody.android.designsystem.*
+import app.lody.android.create.PickerOption
+import app.lody.android.create.RunConfigRow
+import androidx.compose.ui.text.input.TextFieldValue
 
 /** Offline design spike. No runtime, network writes, launcher entry or production route. */
 class ExpressivePreviewActivity : ComponentActivity() {
@@ -42,7 +45,7 @@ private fun ExpressivePreview(initial: String, night: Boolean) {
     var method by remember { mutableStateOf(false) }
     var merged by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
-    var prompt by remember { mutableStateOf("") }
+    var prompt by remember { mutableStateOf(TextFieldValue()) }
     val view = LocalView.current
     SideEffect {
         val window = (view.context as android.app.Activity).window
@@ -53,18 +56,9 @@ private fun ExpressivePreview(initial: String, night: Boolean) {
     }
     LodyTheme(darkTheme = dark) {
         val base = MaterialTheme.colorScheme
-        val surface = if (dark) LodyTheme.colors.bgRaised else base.surface
-        val colors = base.copy(
-            surface = surface, background = surface,
-            primary = if (dark) LodyTheme.colors.accentFg else base.primary,
-            onPrimary = if (dark) LodyTheme.colors.bgBase else base.onPrimary,
-            primaryContainer = LodyTheme.colors.accentSubtle.compositeOver(surface),
-            secondaryContainer = LodyTheme.colors.fillSecondary.compositeOver(surface),
-            surfaceContainer = if (dark) LodyTheme.colors.fillSecondary.compositeOver(surface) else LodyTheme.colors.bgGrouped,
-            surfaceContainerLow = if (dark) LodyTheme.colors.fillSecondary.compositeOver(surface) else LodyTheme.colors.bgGrouped,
-            surfaceContainerHigh = LodyTheme.colors.fillSecondary.compositeOver(surface),
-        )
-        MaterialExpressiveTheme(colorScheme = colors, motionScheme = MotionScheme.expressive()) {
+        // Use the production palette and typography; only Material component behavior changes.
+        val colors = base
+        MaterialExpressiveTheme(colorScheme = colors, typography = MaterialTheme.typography, motionScheme = MotionScheme.expressive()) {
             Scaffold(
                 topBar = {
                     Column(Modifier.statusBarsPadding()) {
@@ -103,31 +97,15 @@ private fun ExpressivePreview(initial: String, night: Boolean) {
                                 SplitButtonDefaults.TrailingButton(onClick = { method = true }, colors = ButtonDefaults.filledTonalButtonColors()) { Glyph(LodyIcons.Expand, "合并选项") }
                             })
                         }
-                        Surface(shape = RoundedCornerShape(28.dp), color = colors.surfaceContainerHigh) {
-                            Column(Modifier.padding(8.dp)) {
-                                TextField(value = prompt, onValueChange = { prompt = it }, modifier = Modifier.fillMaxWidth(),
-                                    placeholder = { Text("给 Lody 发消息…") }, minLines = 2, maxLines = 4,
-                                    colors = TextFieldDefaults.colors(focusedContainerColor = colors.surfaceContainerHigh,
-                                        unfocusedContainerColor = colors.surfaceContainerHigh,
-                                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(onClick = { settings = true }) { Glyph(LodyIcons.Plus, "添加附件试样") }
-                                    TextButton(onClick = { settings = true }) {
-                                        Glyph(LodyIcons.Agent); Spacer(Modifier.width(8.dp)); Text("6 Astra · Medium"); Glyph(LodyIcons.Expand)
-                                    }
-                                    Spacer(Modifier.weight(1f))
-                                    FilledIconButton(onClick = { running = !running; prompt = "" }, shapes = IconButtonDefaults.shapes()) {
-                                        Glyph(if (running) LodyIcons.Stop else LodyIcons.Send, if (running) "停止试运行" else "发送试运行")
-                                    }
-                                }
-                            }
-                        }
+                        app.lody.android.chat.ChatComposer(
+                            prompt = prompt, onPromptChange = { prompt = it }, onFocusChange = {}, enabled = true,
+                            agentCliType = "builtin", agentType = "codex", roleEmoji = null, roleName = null,
+                            agentName = "Codex", face = listOf("6 Astra", "Medium"), mode = "default", modeLabel = "Default",
+                            plan = false, fast = true, onRunConfig = { settings = true }, stoppable = running,
+                            stopping = false, attachments = emptyList(), onPickPhotos = {}, onPickFiles = {},
+                            onRemoveAttachment = {}, onSend = { running = true; prompt = TextFieldValue() }, onStop = { running = false },
+                        )
                     }
-                },
-                floatingActionButton = {
-                    if (screen == "home") ExtendedFloatingActionButton(onClick = { screen = "chat" },
-                        icon = { Glyph(LodyIcons.Compose) }, text = { Text("新对话") })
                 },
             ) { padding ->
                 if (screen == "home") PreviewHome(Modifier.padding(padding)) { screen = "chat" }
@@ -153,14 +131,8 @@ private fun ExpressivePreview(initial: String, night: Boolean) {
 }
 
 @Composable private fun PreviewNavigation(open: () -> Unit) {
-    var selected by remember { mutableIntStateOf(0) }
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-        listOf("对话" to LodyIcons.Sessions, "项目" to LodyIcons.Folder, "设置" to LodyIcons.Settings).forEachIndexed { index, (name, icon) ->
-            NavigationBarItem(selected = selected == index, onClick = { selected = index; if (index != 0) open() },
-                icon = { Glyph(icon) }, label = { Text(name) },
-                colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer, selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.primary))
-        }
-    }
+    var selected by remember { mutableStateOf(app.lody.android.home.HomeTab.Chats) }
+    app.lody.android.home.HomeBottomBar(selected, collapsed = false, onSelect = { selected = it }, onCreate = open)
 }
 
 @Composable private fun PreviewHome(modifier: Modifier, open: () -> Unit) {
@@ -222,39 +194,37 @@ private fun ExpressivePreview(initial: String, night: Boolean) {
 }
 
 @Composable private fun RunConfigSheet(close: () -> Unit) {
-    var effort by remember { mutableIntStateOf(1) }
+    var effort by remember { mutableStateOf("Medium") }
+    var model by remember { mutableStateOf("6 Astra") }
+    var mode by remember { mutableStateOf("Default") }
+    var role by remember { mutableStateOf("无") }
     var plan by remember { mutableStateOf(false) }
     var fast by remember { mutableStateOf(true) }
-    ModalBottomSheet(onDismissRequest = close, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("运行配置", style = MaterialTheme.typography.headlineMedium)
-            Text("设置当前对话的 Agent 与思考方式", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Column {
-                    ListItem(headlineContent = { Text("Agent") }, supportingContent = { Text("Codex") }, leadingContent = { Glyph(LodyIcons.Agent) })
-                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    ListItem(headlineContent = { Text("模型") }, supportingContent = { Text("6 Astra") }, trailingContent = { Glyph(LodyIcons.Check) })
-                }
-            }
-            Text("思考强度", style = MaterialTheme.typography.titleSmall)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                listOf("Low", "Medium", "High").forEachIndexed { index, name ->
-                    ToggleButton(checked = effort == index, onCheckedChange = { effort = index }, modifier = Modifier.weight(1f),
-                        colors = ToggleButtonDefaults.toggleButtonColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shapes = when (index) { 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes(); 2 -> ButtonGroupDefaults.connectedTrailingButtonShapes(); else -> ButtonGroupDefaults.connectedMiddleButtonShapes() }) {
-                        Text(name)
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("计划模式"); Text("先梳理步骤，再开始执行", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Switch(checked = plan, onCheckedChange = { plan = it })
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("快速模式"); Text("优先响应速度", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Switch(checked = fast, onCheckedChange = { fast = it })
-            }
-            Button(onClick = close, modifier = Modifier.fillMaxWidth().height(56.dp), shapes = ButtonDefaults.shapes()) { Text("完成") }
-        }
+    fun options(values: List<String>, current: String) = values.map { PickerOption(it, it, it == current) }
+    ModalBottomSheet(
+        onDismissRequest = close,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = LodyTheme.colors.bgBase,
+    ) {
+        app.lody.android.create.RunConfigSheet(
+            rows = listOf(
+                RunConfigRow("role", "角色", options(listOf("无", "代码审阅"), role)),
+                RunConfigRow("agent", "Agent", listOf(PickerOption("codex", "Codex", true, agent = "builtin" to "codex")), locked = true),
+                RunConfigRow("model", "模型", options(listOf("6 Astra", "6.1 Sol"), model)),
+                RunConfigRow("effort", "思考强度", options(listOf("Low", "Medium", "High"), effort)),
+                RunConfigRow("mode", "模式", options(listOf("Default", "Auto", "Read only"), mode)),
+                RunConfigRow("plan", "计划模式", emptyList(), toggle = plan),
+                RunConfigRow("fast", "快速模式", emptyList(), toggle = fast),
+            ),
+            defaultLabel = "默认",
+            onPick = { field, value -> when (field) {
+                "role" -> role = value
+                "model" -> model = value
+                "effort" -> effort = value
+                "mode" -> mode = value
+                "plan" -> plan = value == "on"
+                "fast" -> fast = value == "on"
+            } },
+        )
     }
 }

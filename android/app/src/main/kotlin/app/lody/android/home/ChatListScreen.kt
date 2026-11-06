@@ -595,7 +595,7 @@ private fun SearchTopBar(query: String, onQueryChange: (String) -> Unit, onClose
 
 /** Labelled tabs in a floating capsule plus a separate new-chat button. */
 @Composable
-private fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (HomeTab) -> Unit, adds: Boolean = false, onCreate: () -> Unit) {
+internal fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (HomeTab) -> Unit, adds: Boolean = false, onCreate: () -> Unit) {
     val colors = LodyTheme.colors
     // On Projects the button adds a project ("+"); elsewhere it starts a chat.
     val create = stringResource(if (adds) R.string.projects_add_title else R.string.home_new_chat)

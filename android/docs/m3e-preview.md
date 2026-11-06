@@ -1,23 +1,24 @@
 # Material 3 Expressive preview
 
 Review spike, not an approved production migration. No account access, real sends,
-PR writes, or production navigation replacement. All text and interactions use local
-fixtures; search, project/settings routes, model/agent selection and full composer
-collapse/keyboard transitions are not implemented in this spike.
+PR writes, or production navigation replacement. Interactions use local fixtures.
 
-## Review direction
+## Layout constraint
 
-- Product: mobile coding conversations, with long-form replies and frequent context changes.
-- Character: focused reading, clear actions, tactile controls.
-- Existing language: Lody blue and Lucide; Android uses Material shapes and motion.
-- Emphasis: new conversation, send, selected reasoning level; secondary repository actions stay tonal.
-- Continuity: list/content structure and the transcript → actions → composer order remain recognizable.
+Keep the production layout unchanged. Only replace components with appropriate
+M3E equivalents; preserve field order, grouping, spacing, positioning and interaction
+structure. The first proposal's cards, connected reasoning buttons, extra Done button,
+extended FAB and permanently expanded composer were rejected.
 
-Three review groups cover navigation + extended FAB, conversation composer + split
-PR action, and run configuration + connected toggle shapes. Light/dark screenshots
-and a native recording are in `.ryugi/artifacts/artboard/android-m3e/pages/review`.
-The home FAB placement is a proposed Material adaptation for review; final navigation
-placement and composer collapse need approval before replacing production UI.
+The revised configuration preview directly reuses production `RunConfigSheet`:
+labels on the left, values on the right, and option lists expanding in place. It uses
+the existing sheet configuration, palette and typography under MaterialExpressiveTheme
+and MotionScheme.expressive. The composer and home bottom bar also reuse production
+components. Other fixture content is illustrative, not a proposed page redesign.
+
+The active review board contains only the corrected configuration, collapsed and
+expanded. Earlier page screenshots and recording are withdrawn from review.
+Screenshots are in `.ryugi/artifacts/artboard/android-m3e/pages/review`.
 
 ## Build and run
 
@@ -34,18 +35,16 @@ application IDs, account state and code paths are unchanged. M3E preview alone p
 `androidx.compose.material3:material3:1.5.0-alpha23` for public expressive APIs; normal
 builds keep the BOM's 1.4.0. Do not promote this dependency implicitly.
 
-Official APIs exercised: MaterialExpressiveTheme, MotionScheme.expressive,
-SplitButtonLayout, ToggleButton with ButtonGroupDefaults connected shapes,
-shape-morphing Button and FilledIconButton, ModalBottomSheet, Switch,
-NavigationBar and ExtendedFloatingActionButton. Not every M3 component is new to M3E.
+The configuration trial exercises MaterialExpressiveTheme, MotionScheme.expressive,
+ModalBottomSheet and Switch. Existing custom rows retain their production structure;
+applying the theme alone does not convert every custom control into an M3E component.
 
 ## After review
 
-1. Settle Android-only theme mapping (opaque tonal surfaces, blue accent, type and motion).
-2. Extract approved buttons, selection groups and sheets behind shared native wrappers.
-3. Migrate navigation, creation and chat controls incrementally; preserve state ownership,
-   attachment drafts, keyboard positioning and runtime behavior.
-4. Verify small screens, dark mode, accessibility, long labels and real business flows.
+1. Map M3E components to existing controls without rearranging any page.
+2. Reuse production containers and state ownership rather than rebuilding page layouts.
+3. Verify small screens, dark mode, accessibility, long labels, attachments and keyboard
+   positioning before migrating real business flows.
 
 Sources:
 - https://m3.material.io/blog/building-with-m3-expressive
