@@ -3,6 +3,8 @@
 agp = "9.4.1"
 kotlin = "2.4.21"
 composeBom = "2026.09.00"
+# M3 Expressive APIs used by the approved native component migration.
+material3 = "1.5.0-alpha23"
 activity = "1.13.0"
 
 [libraries]
@@ -10,7 +12,7 @@ kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", v
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
-compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 
 [plugins]

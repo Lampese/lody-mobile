@@ -12,6 +12,13 @@
 
 package app.lody.android.create
 
+import app.lody.android.designsystem.LodyFilledIconButton
+
+import androidx.compose.foundation.selection.toggleable
+
+import app.lody.android.designsystem.LodyIconButton as IconButton
+import app.lody.android.designsystem.LodyTextButton as TextButton
+
 import app.lody.android.chat.PendingAttachment
 import app.lody.android.chat.SessionAttachmentUploads
 import app.lody.android.chat.AttachmentChip
@@ -47,7 +54,6 @@ import androidx.compose.animation.animateContentSize
 import app.lody.android.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.CancellationException
 import java.util.UUID
@@ -83,7 +89,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
@@ -761,21 +766,20 @@ private fun WorktreeChip(on: Boolean, onChange: (Boolean) -> Unit) {
         modifier = Modifier
             .heightIn(min = LodySize.controlMd)
             .clip(RoundedCornerShape(LodyRadius.md))
-            .clickable(role = Role.Checkbox) { onChange(!on) }
-            .semantics { selected = on }
+            .toggleable(value = on, role = Role.Checkbox, onValueChange = onChange)
             .padding(horizontal = LodySpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm),
     ) {
-        Box(
-            Modifier
-                .size(LodyIconSize.md)
-                .clip(RoundedCornerShape(LodyRadius.xs))
-                .background(if (on) colors.accentSolid else Color.Transparent)
-                .border(1.dp, if (on) colors.accentSolid else colors.borderDefault, RoundedCornerShape(LodyRadius.xs)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (on) Icon(LodyIcons.Check, contentDescription = null, tint = colors.textOnAccent, modifier = Modifier.size(LodyIconSize.xs))
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+            androidx.compose.material3.Checkbox(
+                checked = on, onCheckedChange = null,
+                modifier = Modifier.size(LodyIconSize.md),
+                colors = androidx.compose.material3.CheckboxDefaults.colors(
+                    checkedColor = colors.accentSolid, uncheckedColor = colors.borderDefault,
+                    checkmarkColor = colors.textOnAccent,
+                ),
+            )
         }
         Text(stringResource(R.string.create_worktree), style = LodyTheme.typography.subhead, color = colors.textSecondary)
     }
@@ -794,7 +798,7 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
             Icon(LodyIcons.Branch, null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
             Text(state.selected.ifEmpty { stringResource(R.string.create_branch_name) }, style = LodyTheme.typography.body,
                 color = if (state.selected.isEmpty()) colors.textPlaceholder else colors.textPrimary, modifier = Modifier.weight(1f))
-            if (loading && state.page == null) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm))
+            if (loading && state.page == null) app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.sm))
             else PopupIndicator()
         }
         if (open) {
@@ -813,7 +817,7 @@ private fun BranchLine(state: BranchState, loading: Boolean, failed: Boolean, en
             }
             if (failed || state.page?.nextPage != null || (loading && state.page == null)) {
                 TextButton(onClick = { dismissKeyboard(); onMore() }, enabled = enabled && !loading) {
-                    if (loading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm))
+                    if (loading) app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.sm))
                     else Text(stringResource(if (failed) R.string.chat_retry else R.string.create_more_branches))
                 }
             }
@@ -1017,14 +1021,13 @@ private fun Composer(
             }
             val ready = enabled && (prompt.text.isNotBlank() || attachments.isNotEmpty())
             val send = stringResource(R.string.create_send)
-            Box(
-                Modifier
-                    .size(LodySize.controlSm)
-                    .clip(CircleShape)
-                    .background(if (ready) colors.accentSolid else colors.fillSecondary)
-                    .clickable(enabled = ready, role = Role.Button, onClick = onSend)
-                    .semantics { contentDescription = send },
-                contentAlignment = Alignment.Center,
+            LodyFilledIconButton(
+                onClick = onSend, enabled = ready,
+                modifier = Modifier.size(LodySize.controlSm).semantics { contentDescription = send },
+                colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                    containerColor = colors.accentSolid, contentColor = colors.textOnAccent,
+                    disabledContainerColor = colors.fillSecondary, disabledContentColor = colors.iconTertiary,
+                ),
             ) {
                 Icon(LodyIcons.Send, contentDescription = null, tint = if (ready) colors.textOnAccent else colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm))
             }

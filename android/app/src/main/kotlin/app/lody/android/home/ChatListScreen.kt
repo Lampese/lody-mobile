@@ -9,6 +9,10 @@
 
 package app.lody.android.home
 
+import app.lody.android.designsystem.LodyFilledIconButton
+
+import app.lody.android.designsystem.LodyIconButton as IconButton
+
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -59,7 +63,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -643,13 +646,14 @@ internal fun HomeBottomBar(selected: HomeTab, collapsed: Boolean, onSelect: (Hom
                 }
             }
         }
-        Box(
+        LodyFilledIconButton(
+            onClick = onCreate,
             modifier = Modifier.align(Alignment.CenterEnd).size(height)
                 .dropShadow(CircleShape, LodyElevations.md.shadow())
-                .clip(CircleShape).background(colors.bgOverlay)
-                .clickable(role = Role.Button, onClick = onCreate)
                 .semantics { contentDescription = create },
-            contentAlignment = Alignment.Center,
+            colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                containerColor = colors.bgOverlay, contentColor = colors.iconPrimary,
+            ),
         ) {
             androidx.compose.animation.Crossfade(adds, label = "create-glyph") { plus ->
                 Glyph(if (plus) LodyIcons.Plus else LodyIcons.Compose, colors.iconPrimary, LodyIconSize.lg)

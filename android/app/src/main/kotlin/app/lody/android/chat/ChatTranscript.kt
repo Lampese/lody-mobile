@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -392,7 +391,7 @@ private fun DeliveryMark(delivery: Delivery) {
     )
     val mark = Modifier.size(size).semantics { contentDescription = label }
     when (delivery) {
-        Delivery.Sending -> CircularProgressIndicator(mark.padding(LodySpacing.xxs), color = colors.iconTertiary, strokeWidth = 1.5.dp)
+        Delivery.Sending -> app.lody.android.designsystem.LodyLoadingIndicator(mark.padding(LodySpacing.xxs), color = colors.iconTertiary)
         Delivery.Seen -> Icon(LodyIcons.StateDone, contentDescription = label, tint = colors.accentDefault, modifier = Modifier.size(size))
         Delivery.Failed -> Icon(LodyIcons.Alert, contentDescription = label, tint = colors.dangerDefault, modifier = Modifier.size(size))
         Delivery.Queued -> Icon(LodyIcons.StateWaiting, contentDescription = label, tint = colors.iconTertiary, modifier = Modifier.size(size))

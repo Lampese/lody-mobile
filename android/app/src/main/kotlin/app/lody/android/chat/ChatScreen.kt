@@ -7,6 +7,10 @@
 
 package app.lody.android.chat
 
+import app.lody.android.designsystem.LodyIconButton as IconButton
+import app.lody.android.designsystem.LodyTextButton as TextButton
+import app.lody.android.designsystem.LodyButton as Button
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -652,13 +656,9 @@ private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, curre
 @Composable
 private fun RoundButton(icon: ImageVector, label: String, modifier: Modifier = Modifier, visualSize: Dp = LodySize.controlLg, onClick: () -> Unit) {
     val colors = LodyTheme.colors
-    Box(
-        modifier
-            .size(LodySize.controlLg)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.size(LodySize.controlLg).semantics { contentDescription = label },
     ) {
         Box(
             Modifier.size(visualSize)
@@ -802,15 +802,15 @@ internal fun ChatComposer(
         val fill by androidx.compose.animation.animateColorAsState(
             when { showStop -> colors.textPrimary; ready -> colors.accentSolid; else -> colors.fillSecondary }, label = "send-fill",
         )
-        Box(
-            Modifier
-                .padding(LodySpacing.xxs)
-                .size(LodySize.controlSm)
-                .clip(CircleShape)
-                .background(fill)
-                .clickable(enabled = ready, role = Role.Button, onClick = if (showStop) onStop else onSend)
+        LodyFilledIconButton(
+            onClick = if (showStop) onStop else onSend, enabled = ready,
+            modifier = Modifier.padding(LodySpacing.xxs).size(LodySize.controlSm)
                 .semantics { contentDescription = label },
-            contentAlignment = Alignment.Center,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = fill, disabledContainerColor = fill,
+                contentColor = if (showStop) colors.bgBase else colors.textOnAccent,
+                disabledContentColor = colors.iconTertiary,
+            ),
         ) {
             androidx.compose.animation.Crossfade(showStop, label = "send-stop") { stop ->
                 if (stop) Icon(LodyIcons.Stop, contentDescription = null, tint = colors.bgBase, modifier = Modifier.size(LodyIconSize.sm))
@@ -1234,18 +1234,19 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
             Modifier.barCapsule(colors),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .clickable(enabled = !pending, role = Role.Button) {
-                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
-                        onAction(first)
-                    }
-                    .padding(start = LodySpacing.md, end = if (actions.size > 1) LodySpacing.sm else LodySpacing.md),
-                contentAlignment = Alignment.Center,
+            Button(
+                onClick = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                    onAction(first)
+                },
+                enabled = !pending,
+                modifier = Modifier.fillMaxHeight().defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = colors.textPrimary),
+                contentPadding = PaddingValues(start = LodySpacing.md, end = if (actions.size > 1) LodySpacing.sm else LodySpacing.md),
+                elevation = null,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
-                    if (pending) CircularProgressIndicator(modifier = Modifier.size(LodyIconSize.sm), strokeWidth = 2.dp, color = colors.textSecondary)
+                    if (pending) app.lody.android.designsystem.LodyLoadingIndicator(modifier = Modifier.size(LodyIconSize.sm), color = colors.textSecondary)
                     val label = if (pending) stringResource(if (first == SessionInfoBar.Action.Merge) R.string.bar_merge_pending else R.string.bar_ready_pending) else actionTitle(first)
                     Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1)
                     if (!pending && first == SessionInfoBar.Action.Merge && actions.size == 1) {
@@ -1255,13 +1256,13 @@ private fun ActionSplit(actions: List<SessionInfoBar.Action>, onAction: (Session
             }
             if (actions.size > 1) {
                 Box(Modifier.width(0.5.dp).height(LodyIconSize.sm).background(colors.borderStrong))
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .clickable(role = Role.Button, onClickLabel = more) { open = true }
-                        .semantics { contentDescription = more }
-                        .padding(horizontal = LodySpacing.sm),
-                    contentAlignment = Alignment.Center,
+                LodyFilledIconButton(
+                    onClick = { open = true },
+                    modifier = Modifier.fillMaxHeight().width(LodyIconSize.sm + LodySpacing.sm * 2)
+                        .semantics { contentDescription = more },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent, contentColor = colors.iconSecondary,
+                    ),
                 ) {
                     Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
                 }

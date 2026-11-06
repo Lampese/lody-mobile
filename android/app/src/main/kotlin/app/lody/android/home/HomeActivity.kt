@@ -219,16 +219,18 @@ private fun SignInScreen(state: AuthState, onSignIn: () -> Unit, onOpen: (String
 private fun PrimaryButton(label: String, enabled: Boolean, onClick: () -> Unit) {
     val colors = LodyTheme.colors
     val shape = RoundedCornerShape(LodyRadius.md)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(LodySize.controlLg)
-            .clip(shape)
-            .background(if (enabled) colors.accentSolid else colors.fillDisabled, shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
+    app.lody.android.designsystem.LodyButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().height(LodySize.controlLg),
+        shape = shape,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(),
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = colors.accentSolid, contentColor = colors.textOnAccent,
+            disabledContainerColor = colors.fillDisabled, disabledContentColor = colors.textDisabled,
+        ),
     ) {
-        Text(label, style = LodyTheme.typography.subhead, color = if (enabled) colors.textOnAccent else colors.textDisabled)
+        Text(label, style = LodyTheme.typography.subhead)
     }
 }
 

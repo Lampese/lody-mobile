@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -106,7 +105,7 @@ private fun Pill(shown: Shown) {
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
     ) {
         when (shown) {
-            Shown.Syncing -> CircularProgressIndicator(Modifier.size(LodyIconSize.xs), color = colors.textSecondary, strokeWidth = 1.5.dp)
+            Shown.Syncing -> app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.xs), color = colors.textSecondary)
             Shown.Offline -> Box(Modifier.size(LodySpacing.xs + LodySpacing.xxs).background(colors.dangerDefault, CircleShape))
             Shown.Recovered -> Icon(LodyIcons.Check, contentDescription = null, tint = colors.successDefault, modifier = Modifier.size(LodyIconSize.xs))
         }

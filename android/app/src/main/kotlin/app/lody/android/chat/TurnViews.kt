@@ -1,5 +1,7 @@
 package app.lody.android.chat
 
+import app.lody.android.designsystem.LodyIconButton as IconButton
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -414,7 +416,7 @@ private fun StepDetailCard(entryId: String, tool: TurnItem.Tool, details: StepDe
     ) {
         when {
             failed -> Text(stringResource(R.string.chat_step_detail_failed), style = type.footnote, color = colors.textTertiary)
-            detail == null -> androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm), color = colors.iconTertiary, strokeWidth = 1.5.dp)
+            detail == null -> app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.sm), color = colors.iconTertiary)
             detail.blocks.isEmpty() -> Text(stringResource(R.string.chat_step_detail_empty), style = type.footnote, color = colors.textTertiary)
             else -> androidx.compose.foundation.text.selection.SelectionContainer {
                 androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
@@ -677,7 +679,7 @@ private fun DiffPage(
     }
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
         Row(Modifier.padding(end = TranscriptMargin), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.IconButton(onClick = onBack) {
+            IconButton(onClick = onBack) {
                 Icon(LodyIcons.Back, contentDescription = stringResource(R.string.chat_files_back), tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
             }
             androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
@@ -692,7 +694,7 @@ private fun DiffPage(
         androidx.compose.animation.Crossfade(state, label = "diff-state", modifier = Modifier.weight(1f)) { current ->
             when (current) {
                 DiffState.Loading -> androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(LodySpacing.xl), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.md), color = colors.iconTertiary, strokeWidth = 2.dp)
+                    app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.md), color = colors.iconTertiary)
                 }
                 DiffState.Unavailable, DiffState.Binary, DiffState.TooLarge -> Text(
                     stringResource(
@@ -797,7 +799,7 @@ private fun TaskCard(tasks: List<TurnItem.Task>, modifier: Modifier = Modifier, 
         leading = {
             // The mark cross-fades as tasks start and settle.
             androidx.compose.animation.Crossfade(running > 0, label = "tasks-mark") { live ->
-                if (live) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.sm).padding(1.dp), color = colors.iconSecondary, strokeWidth = 1.5.dp)
+                if (live) app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.sm).padding(1.dp), color = colors.iconSecondary)
                 else Icon(LodyIcons.Sessions, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
             }
         },
@@ -865,7 +867,7 @@ private fun TaskMark(state: String) {
     val colors = LodyTheme.colors
     val size = Modifier.size(LodyIconSize.sm)
     when (state) {
-        "running" -> androidx.compose.material3.CircularProgressIndicator(size.padding(2.dp), color = colors.iconSecondary, strokeWidth = 1.5.dp)
+        "running" -> app.lody.android.designsystem.LodyLoadingIndicator(size.padding(2.dp), color = colors.iconSecondary)
         "completed" -> Icon(LodyIcons.Check, contentDescription = null, tint = colors.successDefault, modifier = size)
         "failed" -> Icon(LodyIcons.Alert, contentDescription = null, tint = colors.dangerDefault, modifier = size)
         else -> Icon(LodyIcons.StateWaiting, contentDescription = null, tint = colors.iconTertiary, modifier = size)
@@ -922,7 +924,7 @@ internal fun TasksSheet(tasks: List<TurnItem.Task>, onDismiss: () -> Unit) {
                                 shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, 2),
                                 icon = {
                                     // A live group carries a spinner, like web's tab; no count.
-                                    if (live) androidx.compose.material3.CircularProgressIndicator(Modifier.size(LodyIconSize.xs), strokeWidth = 1.5.dp, color = colors.iconSecondary)
+                                    if (live) app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.xs), color = colors.iconSecondary)
                                 },
                             ) { Text(stringResource(label), style = type.subhead) }
                         }
@@ -969,7 +971,7 @@ private fun TaskRun(task: TurnItem.Task, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(LodySpacing.xs),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack) {
                         Icon(LodyIcons.Back, contentDescription = stringResource(R.string.chat_tasks_back), tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
                     }
                     TaskMark(task.state)

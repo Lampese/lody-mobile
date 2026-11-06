@@ -1,5 +1,9 @@
 package app.lody.android.home
 
+import app.lody.android.designsystem.LodyIconButton as IconButton
+import app.lody.android.designsystem.LodyTextButton as TextButton
+import app.lody.android.designsystem.LodyButton as Button
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
@@ -198,7 +202,7 @@ fun LocalFolderSheet(service: ProjectAdding, scope: RuntimeScope, onDismiss: () 
                 HorizontalDivider(color = colors.borderSubtle, thickness = androidx.compose.ui.unit.Dp.Hairline)
                 Box(Modifier.weight(1f)) {
                     when {
-                        loading && folder == null -> CircularProgressIndicator(Modifier.align(Alignment.Center).size(LodyIconSize.lg))
+                        loading && folder == null -> app.lody.android.designsystem.LodyLoadingIndicator(Modifier.align(Alignment.Center).size(LodyIconSize.lg))
                         folder != null -> LazyColumn(Modifier.fillMaxSize()) {
                             if (folder.entries.isEmpty()) item {
                                 Text(stringResource(R.string.projects_local_empty), style = type.subhead, color = colors.textTertiary,
@@ -251,7 +255,7 @@ fun LocalFolderSheet(service: ProjectAdding, scope: RuntimeScope, onDismiss: () 
                     enabled = listing != null && !loading && !adding,
                     modifier = Modifier.fillMaxWidth().padding(LodyLayout.screenPaddingX).heightIn(min = LodySize.controlLg),
                 ) {
-                    if (adding) CircularProgressIndicator(Modifier.size(LodyIconSize.sm), color = colors.textOnAccent, strokeWidth = LodySpacing.xxs)
+                    if (adding) app.lody.android.designsystem.LodyLoadingIndicator(Modifier.size(LodyIconSize.sm), color = colors.textOnAccent)
                     else Text(stringResource(R.string.projects_local_add, listing?.path?.substringAfterLast('/')?.substringAfterLast('\\')?.ifEmpty { listing?.path } ?: ""))
                 }
             }
@@ -316,7 +320,7 @@ fun GitHubRepoSheet(service: ProjectAdding, scope: RuntimeScope, onDismiss: () -
             Box(Modifier.weight(1f)) {
                 when {
                     failed -> Message(stringResource(R.string.projects_github_load_failed)) { TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.chat_retry)) } }
-                    current == null -> CircularProgressIndicator(Modifier.align(Alignment.Center).size(LodyIconSize.lg))
+                    current == null -> app.lody.android.designsystem.LodyLoadingIndicator(Modifier.align(Alignment.Center).size(LodyIconSize.lg))
                     current.repositories.isNullOrEmpty() -> Message(stringResource(if (current.canManage) R.string.projects_github_none else R.string.projects_github_none_member)) {
                         if (current.canManage) TextButton(onClick = install) { Text(stringResource(R.string.projects_github_install)) }
                     }

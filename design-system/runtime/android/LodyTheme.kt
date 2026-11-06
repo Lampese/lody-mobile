@@ -7,7 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -32,7 +33,7 @@ object LodyTheme {
 }
 
 /**
- * Provides Lody tokens and maps them onto MaterialTheme, so native Material 3
+ * Provides Lody tokens and maps them onto MaterialExpressiveTheme, so native Material 3
  * components (switches, text fields, top app bars) pick up the same palette,
  * type and corner radii. Dynamic color is intentionally off: iOS has no
  * equivalent and the two apps must look the same.
@@ -47,10 +48,11 @@ fun LodyTheme(
         LocalLodyColors provides colors,
         LocalLodyTypography provides LodyDefaultTypography,
     ) {
-        MaterialTheme(
+        MaterialExpressiveTheme(
             colorScheme = colors.toMaterial(darkTheme),
             typography = LodyDefaultTypography.toMaterial(),
             shapes = LodyShapes,
+            motionScheme = MotionScheme.expressive(),
         ) {
             // MaterialTheme derives selection colors from primary; use the Lody tokens instead.
             CompositionLocalProvider(
