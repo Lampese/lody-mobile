@@ -1,4 +1,5 @@
 import UIKit
+import LodyDesignSystem
 
 /// Stable, visible touch targets below each message. Copy feedback belongs to the tapped row.
 final class ChatMessageActionsCell: UICollectionViewCell {
@@ -23,14 +24,14 @@ final class ChatMessageActionsCell: UICollectionViewCell {
     contentView.addSubview(label)
     actions.axis = .horizontal
     actions.spacing = 0
-    for (button, symbol, key) in [
-      (copyButton, "doc.on.doc", "native.chat.message.copy"),
-      (editButton, "pencil", "native.chat.editAction"),
-      (detailsButton, "info.circle", "message.details.title"),
-      (forkButton, "arrow.triangle.branch", "message.fork.title"),
-      (actionButton, "ellipsis", "native.chat.message.actions"),
+    for (button, icon, key) in [
+      (copyButton, LodyIcon.copy, "native.chat.message.copy"),
+      (editButton, LodyIcon.edit, "native.chat.editAction"),
+      (detailsButton, LodyIcon.info, "message.details.title"),
+      (forkButton, LodyIcon.branch, "message.fork.title"),
+      (actionButton, LodyIcon.more, "native.chat.message.actions"),
     ] {
-      button.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 15)), for: .normal)
+      button.setImage(Self.image(icon), for: .normal)
       button.tintColor = .secondaryLabel
       button.accessibilityLabel = String(localized: String.LocalizationValue(key), bundle: .lody)
       button.widthAnchor.constraint(equalToConstant: 44).isActive = true
@@ -42,14 +43,21 @@ final class ChatMessageActionsCell: UICollectionViewCell {
       guard let self else { return }
       self.onCopy?()
       let id = self.identity
-      self.copyButton.setImage(UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15)), for: .normal)
+      self.copyButton.setImage(Self.image(.check), for: .normal)
       Task { [weak self] in
         try? await Task.sleep(for: .seconds(1.6))
         guard let self, self.identity == id else { return }
-        self.copyButton.setImage(UIImage(systemName: "doc.on.doc", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15)), for: .normal)
+        self.copyButton.setImage(Self.image(.copy), for: .normal)
       }
     }, for: .touchUpInside)
     contentView.addSubview(actions)
+  }
+  private static func image(_ icon: LodyIcon) -> UIImage? {
+    guard let source = icon.uiImage else { return nil }
+    let size = CGSize(width: LodyIconSize.sm, height: LodyIconSize.sm)
+    return UIGraphicsImageRenderer(size: size).image { _ in
+      source.draw(in: CGRect(origin: .zero, size: size))
+    }.withRenderingMode(.alwaysTemplate)
   }
   required init?(coder: NSCoder) { fatalError() }
   func configure(_ row: ChatRow, copyable: Bool) {
@@ -58,7 +66,7 @@ final class ChatMessageActionsCell: UICollectionViewCell {
     label.text = row.text
     label.isHidden = user
     copyButton.isEnabled = copyable
-    copyButton.setImage(UIImage(systemName: "doc.on.doc", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15)), for: .normal)
+    copyButton.setImage(Self.image(.copy), for: .normal)
     detailsButton.isHidden = user
     forkButton.isHidden = user
     actionButton.isHidden = user
