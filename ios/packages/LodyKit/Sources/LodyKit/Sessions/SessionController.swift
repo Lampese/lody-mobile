@@ -47,6 +47,12 @@ class SessionController: UIViewController {
   private var findToken = 0
   private var listed = false
   private var moreItem: UIBarButtonItem?
+  private lazy var tabsButton: DirectoryTabsButton = {
+    let button = DirectoryTabsButton()
+    button.addAction(UIAction { [weak self] _ in self?.presentTabs() }, for: .touchUpInside)
+    return button
+  }()
+  private lazy var tabsItem = UIBarButtonItem(customView: tabsButton)
   private var tabViews: [String: Double] = [:]
   private var tabViewsKey = ""
   private var tabViewsLoad = 0
@@ -196,9 +202,15 @@ class SessionController: UIViewController {
     chat.showsThoughts = session.cliType == "builtin" && session.agentType == "deepseek"
     chat.setNavigationTitle(session.title)
     let tabs = DirectoryTabs.sessions(current: session, all: state.catalog.sessions)
-    let caption = tabs.count > 1 ? String(format: String(localized: "session.tabs.count", bundle: .lody), tabs.count) : ""
-    chat.setDirectoryTabs(caption, symbol: DirectoryTabs.symbol(tabs))
-    // The title opens the Tabs panel below the header (a title menu grew over the title).
+    chat.setDirectoryTabs("", symbol: "")
+    let others = tabs.filter { $0.id != sessionId }.map { session in
+      var viewed = session
+      if let at = tabViews[session.id] { viewed.lastViewedMessageAt = max(viewed.lastViewedMessageAt ?? -.infinity, at) }
+      return viewed
+    }
+    tabsButton.setStatus(DirectoryTabs.symbol(others))
+    tabsButton.accessibilityLabel = String(format: String(localized: "session.tabs.count", bundle: .lody), tabs.count)
+    // The trailing directory button opens the panel below the header.
     directoryTabs = tabs
     closedDirectoryTabs = DirectoryTabs.closed(current: session, all: state.catalog.sessions)
     if let panel = ChatTabsOverlay.shown(in: (parent ?? self).view) {
@@ -254,7 +266,7 @@ class SessionController: UIViewController {
 
   private var creatingTab = false
   private var attemptedTab: String?
-  /// The conversation's Tabs (itself first), for the title's panel.
+  /// The conversation's Tabs (itself first), for the directory panel.
   private var directoryTabs: [SessionItem] = []
   private var closedDirectoryTabs: [SessionItem] = []
   private var changingTab = false
@@ -297,8 +309,7 @@ class SessionController: UIViewController {
     }
   }
 
-  /// The title's Tabs panel, opening just below the header: each Tab with the Chats list's
-  /// status mark, the current one checked, then New Tab. Tapping the title again closes it.
+  /// The directory panel grows from its toolbar button; selection, creation and history stay together.
   private func presentTabs() {
     let host: UIViewController = parent ?? self
     if let shown = ChatTabsOverlay.shown(in: host.view) { return shown.close() }
@@ -317,7 +328,7 @@ class SessionController: UIViewController {
       onClose: { [weak self] in self?.setTabClosed($0, closed: true) },
       onRestore: { [weak self] in self?.setTabClosed($0, closed: false) }
     )
-    overlay = ChatTabsOverlay.present(panel, tabs: items.count, in: host, source: chat.tabsAnchorView)
+    overlay = ChatTabsOverlay.present(panel, tabs: items.count, in: host, source: tabsButton)
   }
 
   private func createTab() {
@@ -383,14 +394,16 @@ class SessionController: UIViewController {
     ])
     moreItem = more
     let header = LodyNavigationHeader.of(navigationItem)
-    let items = [more]
+    more.sharesBackground = true
+    tabsItem.sharesBackground = true
+    let items = [more, tabsItem]
     if header.rightItems != items { header.rightItems = items }
   }
 
   private func wireEvents() {
     chat.onReconnect = { [weak self] _ in self?.feed?.reconnect() }
     chat.onTitleMenu = { [weak self] body in self?.titleMenuSelected(body["id"] as? String ?? "") }
-    chat.onTitlePress = { [weak self] _ in self?.presentTabs() }
+    chat.onTitlePress = { _ in }
   }
 
   private func titleMenuSelected(_ id: String) {

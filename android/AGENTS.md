@@ -112,3 +112,5 @@
 - The shared runtime snapshot includes upstream session read/retry/stall/resume trace events (7028f2bf) and Zod 4 schema generation compatibility (fc9bb555). Native iOS page ownership/reveal fixes do not replace Android's Compose lifecycle or transcript implementation; retain the existing Android session owner boundaries.
 
 - Team conversation lists show a compact circular owner avatar before the title (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
+
+- Current-working-directory conversations open from the trailing conversations button joined to More, not the navigation title. Its bottom-right status summarizes only other open conversations, with local read watermarks applied. The panel retains close/history/restore and labels creation “新建当前工作目录对话”.

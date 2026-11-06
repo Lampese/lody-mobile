@@ -4,6 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import app.lody.android.chat.ChatHeader
 import androidx.compose.material3.Surface
 import app.lody.android.designsystem.LodySize
 import app.lody.android.designsystem.LodyTheme
@@ -34,7 +38,13 @@ class StickyGroupsProbeActivity : ComponentActivity() {
         setContent {
             LodyTheme {
                 Surface(color = LodyTheme.colors.bgBase) {
-                    HomeList(sections.map { it.copy(chats = it.chats.map { chat -> chat.copy(ownerId = "") }) }, if (listReview) setOf(ChatRowDetail.Project, ChatRowDetail.PullRequest) else emptySet(), PaddingValues(top = LodySize.controlLg), empty = null,
+                    if (intent.getBooleanExtra("tabs-review", false)) {
+                        val tabs = listOf(
+                            app.lody.android.runtime.CatalogSession("current", "machine", "project", "当前工作目录对话", "idle", false, false, "2026-11-06"),
+                            app.lody.android.runtime.CatalogSession("other", "machine", "project", "检查附件上传", "running", false, false, "2026-11-06"),
+                        )
+                        Box(Modifier.fillMaxSize()) { ChatHeader(tabs[0].title, tabs, emptyList(), "current", false, null, {}, {}, {}, { _, _ -> }) }
+                    } else HomeList(sections.map { it.copy(chats = it.chats.map { chat -> chat.copy(ownerId = "") }) }, if (listReview) setOf(ChatRowDetail.Project, ChatRowDetail.PullRequest) else emptySet(), PaddingValues(top = LodySize.controlLg), empty = null,
                         owners = if (intent.getBooleanExtra("owners", false)) mapOf("" to app.lody.android.auth.WorkspaceMember("", "Leon")) else null,
                         pinsLabels = !intent.getBooleanExtra("search", false), onOpenChat = {})
                 }

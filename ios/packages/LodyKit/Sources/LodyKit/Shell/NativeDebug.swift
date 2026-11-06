@@ -19,7 +19,7 @@ enum NativeDebug {
     } else {
       root = LodyUIVerify.has("--ui-verify-home") ? HomeController() : NativeDebugController()
     }
-    LodyShell.shared.start(in: window, content: root, title: root is NativeDebugController ? "Debug" : "")
+    LodyShell.shared.start(in: window, content: root, title: root is NativeDebugController ? "Debug" : (LodyUIVerify.has("--ui-review-bar=tabs") ? "Tabs" : ""))
     let ready = UIView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
     ready.isAccessibilityElement = true
     ready.accessibilityIdentifier = "ui-verify-ready"

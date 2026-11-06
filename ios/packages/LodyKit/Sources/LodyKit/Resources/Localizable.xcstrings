@@ -24633,13 +24633,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Tab conversation"
+            "value": "New conversation in current working directory"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "新建 Tab 对话"
+            "value": "新建当前工作目录对话"
           }
         }
       }
@@ -24871,13 +24871,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No open Tab. Tap the title to create or restore a conversation."
+            "value": "No open Tab. Tap the conversations button to create or restore a conversation."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "暂无打开的 Tab，点击标题新建或恢复对话。"
+            "value": "暂无打开的 Tab，点击右上角对话按钮新建或恢复对话。"
           }
         }
       }

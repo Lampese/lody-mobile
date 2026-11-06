@@ -140,3 +140,5 @@
 - Team conversation lists show a compact circular owner avatar before the title (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
 
 - The merge-method popover (`MergeOptionsController`) anchors to the measured primary action button in `ChatActionBarView`, never the whole composer. Its compact menu rows keep the irreversible-action explanation and show the last-used method first with a checkmark; selecting a method remains the explicit merge confirmation.
+
+- Current-working-directory conversations open from the trailing conversations button joined to More, not the navigation title. Its bottom-right status summarizes only other open conversations, with local read watermarks applied. The panel retains close/history/restore and labels creation “新建当前工作目录对话”.

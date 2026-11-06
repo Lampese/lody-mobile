@@ -637,7 +637,7 @@ private val RunningStatuses = setOf("running", "initializing", "processing", "in
 
 /** Web's floating header: a round back button, then the title over the repository line. */
 @Composable
-private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, closedTabs: List<CatalogSession>, currentId: String, creating: Boolean, busy: String?, onBack: () -> Unit, onSelectTab: (String) -> Unit, onNewTab: () -> Unit, onChangeTab: (String, Boolean) -> Unit) {
+internal fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, closedTabs: List<CatalogSession>, currentId: String, creating: Boolean, busy: String?, onBack: () -> Unit, onSelectTab: (String) -> Unit, onNewTab: () -> Unit, onChangeTab: (String, Boolean) -> Unit) {
     var expanded by remember(currentId) { mutableStateOf(false) }
     var restoringId by remember(currentId) { mutableStateOf<String?>(null) }
     LaunchedEffect(closedTabs, busy) {
@@ -660,20 +660,36 @@ private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, close
         horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
     ) {
         RoundButton(LodyIcons.Back, stringResource(R.string.chat_back), visualSize = LodySize.controlMd, onClick = onBack)
-        Box(Modifier.weight(1f)) {
-            Column(Modifier.fillMaxWidth().heightIn(min = LodySize.controlLg).clickable(role = Role.Button) { expanded = true }, verticalArrangement = Arrangement.Center) {
-                Text(title, style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (tabs.size > 1) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
-                    Text(androidx.compose.ui.res.pluralStringResource(R.plurals.chat_directory_tabs, tabs.size, tabs.size), modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis, style = LodyTheme.typography.footnote, color = colors.textSecondary)
-                    DirectoryTabs.attention(tabs)?.let { app.lody.android.home.AttentionGlyph(it) }
+        Text(title, modifier = Modifier.weight(1f), style = LodyTheme.typography.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.clip(CircleShape).background(colors.bgOverlay).border(0.5.dp, colors.borderSubtle, CircleShape), verticalAlignment = Alignment.CenterVertically) {
+            Box {
+                IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(LodySize.controlLg)
+                    .semantics { contentDescription = title }) {
+                    Icon(LodyIcons.Sessions, contentDescription = androidx.compose.ui.res.pluralStringResource(R.plurals.chat_directory_tabs, tabs.size, tabs.size), tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
+                }
+                DirectoryTabs.attention(tabs.filter { it.id != currentId })?.let { attention ->
+                    Box(Modifier.align(Alignment.BottomEnd).padding(end = LodySpacing.xs, bottom = LodySpacing.xs).size(LodyIconSize.xs + LodySpacing.xxs)
+                        .background(colors.bgOverlay, CircleShape), contentAlignment = Alignment.Center) { app.lody.android.home.AttentionGlyph(attention) }
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 420.dp)) {
+                    ChatTabsMenu(tabs, closedTabs, currentId, creating, busy,
+                        onSelect = { expanded = false; if (it != currentId) onSelectTab(it) },
+                        onNew = { expanded = false; onNewTab() },
+                        onClose = { onChangeTab(it, true) },
+                        onRestore = { restoringId = it; onChangeTab(it, false) })
                 }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 420.dp)) {
-                ChatTabsMenu(tabs, closedTabs, currentId, creating, busy,
-                    onSelect = { expanded = false; if (it != currentId) onSelectTab(it) },
-                    onNew = { expanded = false; onNewTab() },
-                    onClose = { onChangeTab(it, true) },
-                    onRestore = { restoringId = it; onChangeTab(it, false) })
+            var more by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { more = !more }, modifier = Modifier.size(LodySize.controlLg)) {
+                    Icon(LodyIcons.More, stringResource(R.string.bar_more), tint = colors.iconPrimary, modifier = Modifier.size(LodyIconSize.md))
+                }
+                DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.chat_new_tab)) }, enabled = !creating && busy == null,
+                        leadingIcon = { Icon(LodyIcons.Plus, null) }, onClick = { more = false; onNewTab() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.chat_close_current)) }, enabled = busy == null && tabs.any { it.id == currentId },
+                        onClick = { more = false; onChangeTab(currentId, true) })
+                }
             }
         }
     }

@@ -23,7 +23,7 @@ final class ChatTabsState: ObservableObject {
   }
 }
 
-/// A native swipe-action list inside the title's glass panel.
+/// A native swipe-action list inside the directory button's glass panel.
 struct ChatTabsPanel: View {
   @ObservedObject var state: ChatTabsState
   let creating: Bool
@@ -188,16 +188,16 @@ final class ChatTabsOverlay: UIView {
     NSLayoutConstraint.activate([
       topAnchor.constraint(equalTo: root.topAnchor), bottomAnchor.constraint(equalTo: root.bottomAnchor),
       leadingAnchor.constraint(equalTo: root.leadingAnchor), trailingAnchor.constraint(equalTo: root.trailingAnchor),
-      // Just under the header, centred, as wide as a menu.
+      // Below the directory button, aligned to the trailing controls.
       card.topAnchor.constraint(equalTo: root.safeAreaLayoutGuide.topAnchor, constant: LodySpacing.sm),
-      card.centerXAnchor.constraint(equalTo: root.safeAreaLayoutGuide.centerXAnchor),
+      card.trailingAnchor.constraint(equalTo: root.safeAreaLayoutGuide.trailingAnchor, constant: -LodyLayout.screenPaddingX),
       card.widthAnchor.constraint(equalToConstant: min(320, max(200, root.bounds.width - 2 * LodyLayout.screenPaddingX))),
       heightConstraint!,
     ])
     content.didMove(toParent: host)
     root.layoutIfNeeded()
     UISelectionFeedbackGenerator().selectionChanged()
-    // Grow out of the title, like a menu, rather than dropping down from above.
+    // Grow out of the directory button, like the adjacent More menu.
     let anchor = source.map { $0.convert($0.bounds, to: self) }
       ?? CGRect(x: card.frame.midX, y: card.frame.minY, width: 0, height: 0)
     collapsedTransform = CGAffineTransform(
@@ -235,5 +235,34 @@ final class ChatTabsOverlay: UIView {
       if !UIAccessibility.isReduceMotionEnabled { self.card.transform = self.collapsedTransform }
       self.content.view.alpha = 0
     } completion: { _ in finish() }
+  }
+}
+
+/// Native bar item: shares the More button's glass background.
+final class DirectoryTabsButton: UIButton {
+  private let status = UIImageView()
+  private var isUnread = false
+  init() {
+    super.init(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
+    setImage(UIImage(systemName: "square.on.square", withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)), for: .normal)
+    tintColor = .label
+    accessibilityIdentifier = "chat-directory-tabs"
+    status.contentMode = .scaleAspectFit
+    status.isUserInteractionEnabled = false
+    addSubview(status)
+    NSLayoutConstraint.activate([widthAnchor.constraint(equalToConstant: 44), heightAnchor.constraint(equalToConstant: 44)])
+  }
+  required init?(coder: NSCoder) { fatalError() }
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    let size: CGFloat = isUnread ? 6 : 12
+    status.frame = CGRect(x: bounds.maxX - 11 - size / 2, y: bounds.maxY - 11 - size / 2, width: size, height: size)
+  }
+  func setStatus(_ symbol: String) {
+    isUnread = symbol == "circle.fill"
+    setNeedsLayout()
+    status.isHidden = symbol.isEmpty
+    status.image = UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: symbol == "circle.fill" ? 6 : 11, weight: .semibold))
+    status.tintColor = symbol == "exclamationmark.circle" ? LodyUIColor.dangerDefault : LodyUIColor.accentDefault
   }
 }

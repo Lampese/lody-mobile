@@ -274,7 +274,7 @@
     </plurals>
     <string name="create_no_available_agents">No available assistants on this computer. Choose another computer.</string>
     <string name="create_waiting_agents">Waiting for assistants to sync…</string>
-    <string name="chat_new_tab">New Tab conversation</string>
+    <string name="chat_new_tab">New conversation in current working directory</string>
     <string name="chat_current_tab">Current conversation</string>
     <string name="chat_tab_creation_failed">Could not create a Tab conversation.</string>
     <string name="chat_tab_creation_unknown">Creation result is unknown. Tap again to open the conversation.</string>
@@ -388,6 +388,7 @@
     <string name="chat_close_tab">Close</string>
     <string name="chat_restore_tab">Restore conversation</string>
     <string name="chat_no_closed_tabs">No closed conversations</string>
-    <string name="chat_tabs_all_closed">No open Tab. Tap the title to create or restore a conversation.</string>
+    <string name="chat_tabs_all_closed">No open Tab. Tap the conversations button to create or restore a conversation.</string>
     <string name="chat_tab_change_failed">Could not confirm the change. Check the Tab list before trying again.</string>
+    <string name="chat_close_current">Close current conversation</string>
 </resources>
