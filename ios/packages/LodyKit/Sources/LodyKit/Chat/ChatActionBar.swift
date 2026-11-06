@@ -443,14 +443,14 @@ private struct ContextActionsPopover<Label: View>: View {
             } label: {
               HStack(spacing: LodySpacing.md) {
                 Image(systemName: action.symbol).frame(width: LodyIconSize.md)
-                Text(action.title)
+                Text(action.title).lineLimit(1).truncationMode(.tail)
                 if action.id == "diff", let diff {
                   Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
                   Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
                 }
               }
               .font(.body.monospacedDigit())
-              .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+              .lineLimit(1)
               .padding(LodySpacing.md)
               .frame(maxWidth: .infinity, alignment: .leading)
               .contentShape(Rectangle())
@@ -461,7 +461,8 @@ private struct ContextActionsPopover<Label: View>: View {
           }
         }
         .padding(LodySpacing.sm)
-        .fixedSize(horizontal: true, vertical: true)
+        .frame(width: 280)
+        .fixedSize(horizontal: false, vertical: true)
         .presentationCompactAdaptation(.popover)
       }
   }

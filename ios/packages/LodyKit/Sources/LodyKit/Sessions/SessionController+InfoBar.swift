@@ -83,11 +83,11 @@ extension SessionController {
         if ci == "f" || ci == "e" { tint = "danger" } else if ci == "p" { tint = "warning" }
       }
       if pr.merge == "d" { subtitle += " · " + String(localized: "bar.conflicts", bundle: .lody) }
-      actions.append(["id": "pr", "title": "\(pr.repository) #\(pr.number)", "subtitle": subtitle, "symbol": symbol])
+      actions.append(["id": "pr", "title": String.localizedStringWithFormat(String(localized: "bar.context.viewPR", bundle: .lody), pr.number), "subtitle": subtitle, "symbol": symbol])
       description += [label, subtitle]
     }
     if !bar.branch.isEmpty {
-      actions.append(["id": "branch", "title": String(localized: "session.title.copyBranch", bundle: .lody), "subtitle": bar.branch, "symbol": "doc.on.doc"])
+      actions.append(["id": "branch", "title": bar.branch, "symbol": "doc.on.doc"])
     }
     return [
       "label": label, "symbol": symbol, "tint": tint, "actions": actions,

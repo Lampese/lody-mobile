@@ -24762,6 +24762,23 @@
           }
         }
       }
+    },
+    "bar.context.viewPR": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View #%lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看 #%lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
