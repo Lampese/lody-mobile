@@ -12,6 +12,7 @@ object CatalogJson {
     fun project(base: CatalogProject, json: JSONObject) = base.copy(repoFullName = json.optText("repoFullName"))
 
     fun session(base: CatalogSession, json: JSONObject) = base.copy(
+        isTabClosed = json.opt("isTabClosed") == true,
         branchName = json.optText("branchName"),
         userId = json.optText("userId"),
         openedBySessionId = json.optText("openedBySessionId"),
@@ -51,6 +52,7 @@ object CatalogJson {
     }
 
     fun putSession(json: JSONObject, session: CatalogSession): JSONObject = json.apply {
+        put("isTabClosed", session.isTabClosed)
         session.branchName?.let { put("branchName", it) }
         session.userId?.let { put("userId", it) }
         session.openedBySessionId?.let { put("openedBySessionId", it) }

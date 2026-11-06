@@ -186,6 +186,11 @@ class SessionController: UIViewController {
     chat.setDirectoryTabs(caption, symbol: DirectoryTabs.symbol(tabs))
     // The title opens the Tabs panel below the header (a title menu grew over the title).
     directoryTabs = tabs
+    closedDirectoryTabs = DirectoryTabs.closed(current: session, all: state.catalog.sessions)
+    if let panel = ChatTabsOverlay.shown(in: (parent ?? self).view) {
+      panel.state.tabs = tabItems(directoryTabs)
+      panel.state.closed = tabItems(closedDirectoryTabs)
+    }
     chat.setTitleMenu("[]")
     chat.mentionRepository = session.projectId.hasPrefix("github:") ? String(session.projectId.dropFirst(7)) : ""
     renderMentions(state, session)
@@ -207,6 +212,15 @@ class SessionController: UIViewController {
 
   private func renderFeed(_ session: SessionItem) {
     let state = feed?.state ?? SessionFeedState()
+    if session.isTabClosed {
+      chat.setEntries("[]")
+      renderedEntries = nil
+      chat.setEmptyText(String(localized: "session.tabs.allClosed", bundle: .lody))
+      chat.setTabClosed(true)
+      chat.scheduleUpdate()
+      return
+    }
+    chat.setTabClosed(false)
     renderComposer(session, state)
     renderPermission()
     chat.setEmptyText(String(localized: String.LocalizationValue(state.status == "live" ? "chat.empty.prompt" : "chat.empty.loading"), bundle: .lody))
@@ -228,6 +242,42 @@ class SessionController: UIViewController {
   private var attemptedTab: String?
   /// The conversation's Tabs (itself first), for the title's panel.
   private var directoryTabs: [SessionItem] = []
+  private var closedDirectoryTabs: [SessionItem] = []
+  private var changingTab = false
+
+  private func tabItems(_ tabs: [SessionItem]) -> [ChatTabItem] {
+    tabs.map { ChatTabItem(id: $0.id, title: $0.title, attention: Attention($0), current: $0.id == sessionId) }
+  }
+
+  private func setTabClosed(_ id: String, closed: Bool) {
+    guard !changingTab else { return }
+    let workspace = source.state.workspaceId
+    let before = directoryTabs
+    let index = before.firstIndex { $0.id == id }
+    let next = index.flatMap { index in before.dropFirst(index + 1).first ?? before.prefix(index).last }
+    let overlay = ChatTabsOverlay.shown(in: (parent ?? self).view)
+    changingTab = true
+    overlay?.state.busy = id
+    Task { [weak self] in
+      guard let self else { return }
+      defer { self.changingTab = false; overlay?.state.busy = nil }
+      do {
+        try await self.source.write(workspace, id, .tabClosed(closed))
+        guard self.source.state.workspaceId == workspace, self.view.window != nil, overlay?.window != nil else { return }
+        self.render()
+        if !closed {
+          overlay?.close {
+            if id == self.sessionId { self.render() }
+            else { self.titleMenuSelected("tab:" + id) }
+          }
+        } else if id == self.sessionId, let next {
+          overlay?.close { self.titleMenuSelected("tab:" + next.id) }
+        }
+      } catch {
+        LodyToastOverlay.shared.show(message: String(localized: "session.tabs.changeFailed", bundle: .lody), kind: "error")
+      }
+    }
+  }
 
   /// The title's Tabs panel, opening just below the header: each Tab with the Chats list's
   /// status mark, the current one checked, then New Tab. Tapping the title again closes it.
@@ -235,17 +285,19 @@ class SessionController: UIViewController {
     let host: UIViewController = parent ?? self
     if let shown = ChatTabsOverlay.shown(in: host.view) { return shown.close() }
     guard host.presentedViewController == nil else { return }
-    let tabs = directoryTabs.count > 1 ? directoryTabs : []
-    let items = tabs.map { ChatTabItem(id: $0.id, title: $0.title, attention: Attention($0), current: $0.id == sessionId) }
+    let items = tabItems(directoryTabs)
+    let state = ChatTabsState(tabs: items, closed: tabItems(closedDirectoryTabs))
     weak var overlay: ChatTabsOverlay?
     let panel = ChatTabsPanel(
-      tabs: items, creating: creatingTab,
+      state: state, creating: creatingTab,
       onSelect: { [weak self] id in
         overlay?.close { self?.titleMenuSelected("tab:" + id) }
       },
       onNew: { [weak self] in
         overlay?.close { self?.titleMenuSelected("newTab") }
-      }
+      },
+      onClose: { [weak self] in self?.setTabClosed($0, closed: true) },
+      onRestore: { [weak self] in self?.setTabClosed($0, closed: false) }
     )
     overlay = ChatTabsOverlay.present(panel, tabs: items.count, in: host, source: chat.tabsAnchorView)
   }
@@ -344,6 +396,7 @@ class SessionController: UIViewController {
   private func markViewed() {
     guard UIApplication.shared.applicationState == .active, view.window != nil else { return }
     let state = source.state
+    guard state.catalog.session(sessionId)?.isTabClosed != true else { return }
     SessionSource.markViewed(
       userId: state.userId, workspaceId: state.workspaceId, sessionId: sessionId,
       at: state.catalog.session(sessionId)?.lastMessageAt

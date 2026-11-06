@@ -34,6 +34,10 @@ open class WebViewRuntime internal constructor(
     }
     override suspend fun execute(command: RuntimeCommand): RuntimeResult = when (command) {
         is RuntimeCommand.MessageAction -> RuntimeResult.MessageAction(call("messageAction", JSONArray().put(command.kind).put(command.payload), CommandDeadline.WRITE) as JSONObject)
+        is RuntimeCommand.SetTabClosed -> {
+            call("setTabClosed", JSONArray().put(command.id).put(command.closed), CommandDeadline.WRITE)
+            RuntimeResult.Accepted
+        }
         is RuntimeCommand.CreateTab -> {
             val value = call("createTab", JSONArray().put(command.parentId).put(command.id).put(command.title), CommandDeadline.WRITE) as JSONObject
             RuntimeResult.Created(CreationReceipt(command.id, value.getString("state")))

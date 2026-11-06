@@ -228,3 +228,12 @@ precondition(directoryFamily.map(\.id) == ["root", "tab"])
 precondition(DirectoryTabs.symbol([live, chat]) == "hand.raised")
 precondition(DirectoryTabs.sessions(current: tabRoot, all: [tabRoot, openedChat]).count == 1)
 print("PASS: directory Tabs exclude opened chats and side panels, and waiting outranks running")
+
+var closedRoot = tabRoot
+closedRoot.isTabClosed = true
+precondition(DirectoryTabs.sessions(current: directoryTab, all: [closedRoot, directoryTab]).map(\.id) == ["tab"])
+precondition(DirectoryTabs.closed(current: directoryTab, all: [closedRoot, directoryTab]).map(\.id) == ["root"])
+precondition(!SessionRows.isUnread(closedRoot))
+let decodedClosed = try! JSONDecoder().decode(SessionItem.self, from: Data(#"{"id":"saved","isTabClosed":true}"#.utf8))
+precondition(decodedClosed.isTabClosed)
+print("PASS: closed Tabs remain recoverable without hiding open children")

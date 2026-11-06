@@ -34,7 +34,7 @@ enum SessionRows {
 
   static func isUnread(_ session: SessionItem) -> Bool {
     guard let message = session.lastMessageAt else { return false }
-    return session.lastReadAt.map { message > $0 } ?? true
+    return !session.isTabClosed && (session.lastReadAt.map { message > $0 } ?? true)
   }
 
   static func needsEmphasis(_ session: SessionItem) -> Bool {
@@ -213,6 +213,14 @@ enum SessionRows {
 
 enum DirectoryTabs {
   static func sessions(current: SessionItem, all: [SessionItem]) -> [SessionItem] {
+    family(current: current, all: all).filter { !$0.isTabClosed }
+  }
+
+  static func closed(current: SessionItem, all: [SessionItem]) -> [SessionItem] {
+    family(current: current, all: all).filter { $0.isTabClosed }
+  }
+
+  private static func family(current: SessionItem, all: [SessionItem]) -> [SessionItem] {
     let indexed = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     func root(_ item: SessionItem) -> String {
       var id = item.id

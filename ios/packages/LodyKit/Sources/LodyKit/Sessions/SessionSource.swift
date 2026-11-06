@@ -16,6 +16,7 @@ struct SessionListState: Equatable, Sendable {
 
 enum SessionWrite: Sendable {
   case archive(Bool)
+  case tabClosed(Bool)
   case pin(Bool)
   case read(Double)
   case rename(String)

@@ -68,6 +68,7 @@ data class ChatContext(
     val me: Account? = null,
     /** The GitHub repository (`owner/name`) the session works in; empty without one. */
     val tabs: List<CatalogSession> = emptyList(),
+    val closedTabs: List<CatalogSession> = emptyList(),
     val repository: String = "",
     val machineName: String = "",
     val machineKind: app.lody.android.create.CreateSessionModel.MachineKind = app.lody.android.create.CreateSessionModel.MachineKind.Laptop,
@@ -199,7 +200,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         stringResource(if (creation?.state == "rejected") R.string.create_result_rejected else R.string.create_result_unknown)
     } else null
     val session = context.session
-    val canSend = !creationUnconfirmed && status == "live" && session?.cliType != null && session.agentType != null
+    val canSend = context.session?.isTabClosed != true && !creationUnconfirmed && status == "live" && session?.cliType != null && session.agentType != null
     // The composer's run config (web's mobile run-config chip): the session's provider choices,
     // read once the conversation is live. Until the reader changes it the chip shows the latest
     // turn's config from the snapshot and sends nothing (upstream keeps it); the first change
@@ -270,6 +271,25 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     val newTabTitle = stringResource(R.string.chat_new_tab_title)
     val tabFailure = stringResource(R.string.chat_tab_creation_failed)
     val tabUnknown = stringResource(R.string.chat_tab_creation_unknown)
+    var changingTab by remember(id, scope) { mutableStateOf<String?>(null) }
+    val tabChangeFailure = stringResource(R.string.chat_tab_change_failed)
+    val changeTab: (String, Boolean) -> Unit = { target, closed ->
+        if (changingTab == null) {
+            changingTab = target
+            val index = context.tabs.indexOfFirst { it.id == target }
+            val next = context.tabs.getOrNull(index + 1) ?: context.tabs.getOrNull(index - 1)
+            coroutines.launch {
+                try {
+                    repository.setTabClosed(scope, target, closed)
+                    if (!closed && target != id) onSelectTab(target)
+                    else if (closed && target == id && next != null) onSelectTab(next.id)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { snackbar.showSnackbar(tabChangeFailure) }
+                finally { changingTab = null }
+            }
+        }
+    }
+
     val createTab = {
         if (!creatingTab) {
             creatingTab = true
@@ -455,9 +475,9 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         Column(Modifier.fillMaxSize().padding(padding).imePadding().navigationBarsPadding()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + headerHeight
-                if (all.isEmpty()) {
+                if (context.session?.isTabClosed == true || all.isEmpty()) {
                     Box(Modifier.fillMaxSize().padding(top = top), contentAlignment = Alignment.Center) {
-                        Text(stringResource(if (status == "live") R.string.chat_empty else if (status == "offline") R.string.chat_offline else R.string.chat_loading), style = LodyTheme.typography.body, color = colors.textSecondary)
+                        Text(stringResource(if (context.session?.isTabClosed == true) R.string.chat_tabs_all_closed else if (status == "live") R.string.chat_empty else if (status == "offline") R.string.chat_offline else R.string.chat_loading), style = LodyTheme.typography.body, color = colors.textSecondary)
                     }
                 } else {
                     // The transcript scrolls under the floating header.
@@ -468,7 +488,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                         loadDiff = { entryId, path -> repository.turnDiff(scope, id, entryId, path) },
                     )
                 }
-                ChatHeader(context.title, context.tabs, id, creatingTab, onBack, onSelectTab, createTab)
+                ChatHeader(context.title, context.tabs, context.closedTabs, id, creatingTab, changingTab, onBack, onSelectTab, createTab, changeTab)
                 if (creationNotice != null) {
                     Text(creationNotice,
                         modifier = Modifier.align(Alignment.TopCenter).padding(top = top).padding(horizontal = TranscriptMargin),
@@ -484,7 +504,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     }
                 }
                 // Web's round "scroll to latest" button, shown once the reader has scrolled up.
-                if (!atLatest && all.isNotEmpty()) {
+                if (context.session?.isTabClosed != true && !atLatest && all.isNotEmpty()) {
                     val label = stringResource(R.string.chat_scroll_latest)
                     RoundButton(
                         LodyIcons.Expand, label,
@@ -492,7 +512,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     ) { scrollToLatest++ }
                 }
             }
-            if (bar != null) {
+            if (bar != null && context.session?.isTabClosed != true) {
                 ChatActionBar(
                     bar, context.machineName, context.machineKind,
                     writing = writing,
@@ -509,7 +529,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                 )
             }
             val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name ?: session?.modelName ?: agentName
-            ChatComposer(
+            if (context.session?.isTabClosed != true) ChatComposer(
                 field,
                 onPromptChange = { if (it.text.length <= 32000) { field = it; prompt = it.text } },
                 onFocusChange = { composerFocused = it },
@@ -615,8 +635,16 @@ private val RunningStatuses = setOf("running", "initializing", "processing", "in
 
 /** Web's floating header: a round back button, then the title over the repository line. */
 @Composable
-private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, currentId: String, creating: Boolean, onBack: () -> Unit, onSelectTab: (String) -> Unit, onNewTab: () -> Unit) {
+private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, closedTabs: List<CatalogSession>, currentId: String, creating: Boolean, busy: String?, onBack: () -> Unit, onSelectTab: (String) -> Unit, onNewTab: () -> Unit, onChangeTab: (String, Boolean) -> Unit) {
     var expanded by remember(currentId) { mutableStateOf(false) }
+    var restoringId by remember(currentId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(closedTabs, busy) {
+        val target = restoringId
+        if (target != null && busy == null && closedTabs.none { it.id == target }) {
+            expanded = false
+            restoringId = null
+        }
+    }
     val colors = LodyTheme.colors
     Row(
         Modifier
@@ -638,15 +666,12 @@ private fun BoxScope.ChatHeader(title: String, tabs: List<CatalogSession>, curre
                     DirectoryTabs.attention(tabs)?.let { app.lody.android.home.AttentionGlyph(it) }
                 }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                if (tabs.size > 1) tabs.forEach { tab ->
-                    DropdownMenuItem(text = { Text(tab.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                        leadingIcon = { DirectoryTabs.attention(listOf(tab))?.let { app.lody.android.home.AttentionGlyph(it) } },
-                        trailingIcon = { if (tab.id == currentId) Icon(LodyIcons.Check, contentDescription = stringResource(R.string.chat_current_tab)) },
-                        onClick = { expanded = false; if (tab.id != currentId) onSelectTab(tab.id) })
-                }
-                DropdownMenuItem(text = { Text(stringResource(R.string.chat_new_tab)) }, enabled = !creating,
-                    leadingIcon = { Icon(LodyIcons.Plus, contentDescription = null) }, onClick = { expanded = false; onNewTab() })
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 420.dp)) {
+                ChatTabsMenu(tabs, closedTabs, currentId, creating, busy,
+                    onSelect = { expanded = false; if (it != currentId) onSelectTab(it) },
+                    onNew = { expanded = false; onNewTab() },
+                    onClose = { onChangeTab(it, true) },
+                    onRestore = { restoringId = it; onChangeTab(it, false) })
             }
         }
     }

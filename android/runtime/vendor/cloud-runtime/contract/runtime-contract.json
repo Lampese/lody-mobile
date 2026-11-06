@@ -187,6 +187,11 @@
       "result": "Empty",
       "timeoutMs": 10000
     },
+    "setTabClosed": {
+      "params": "SetTabClosedParams",
+      "result": "Empty",
+      "timeoutMs": 45000
+    },
     "start": { "params": "StartParams", "result": "Empty", "timeoutMs": 10000 },
     "turnDiff": {
       "params": "TurnDiffParams",
@@ -2749,6 +2754,15 @@
       "type": "object",
       "properties": { "active": { "type": "boolean" } },
       "required": ["active"]
+    },
+    "SetTabClosedParams": {
+      "type": "object",
+      "properties": {
+        "workspaceId": { "type": "string", "minLength": 1 },
+        "sessionId": { "type": "string", "minLength": 1 },
+        "closed": { "type": "boolean" }
+      },
+      "required": ["workspaceId", "sessionId", "closed"]
     },
     "ShareEntry": {
       "type": "object",

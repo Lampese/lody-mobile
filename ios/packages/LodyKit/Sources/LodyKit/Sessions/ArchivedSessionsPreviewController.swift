@@ -83,6 +83,8 @@ private final class ArchivedSessionsFixture {
     case .read(let at):
       update(id) { $0.lastReadAt = at }
       record("read:\(id)")
+    case .tabClosed(let closed):
+      update(id) { $0.isTabClosed = closed }
     case .rename(let title):
       update(id) { $0.title = title }
       record("rename:\(id)")

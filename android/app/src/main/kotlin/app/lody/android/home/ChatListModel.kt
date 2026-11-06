@@ -286,6 +286,7 @@ object ChatListModel {
     }
 
     fun isUnread(session: CatalogSession): Boolean {
+        if (session.isTabClosed) return false
         val message = session.lastMessageAt ?: return false
         return session.lastReadAt?.let { message > it } ?: true
     }

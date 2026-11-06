@@ -159,6 +159,10 @@ final class SessionActions {
       throw DataRuntime.failure("not_ready", String(localized: "native.runtime.sessionNotSynced", bundle: .lody))
     }
     switch write {
+    case .tabClosed(let closed):
+      _ = try await runtime.workspaceCall(RuntimeContract.Calls.SetTabClosed.self) { workspace, _ in
+        .init(workspaceId: workspace, sessionId: sessionId, closed: closed)
+      }
     case .archive(let archived):
       _ = try await runtime.workspaceCall(RuntimeContract.Calls.ArchiveSession.self) { workspace, _ in
         .init(workspaceId: workspace, sessionId: sessionId, archived: archived)

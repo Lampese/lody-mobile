@@ -39,6 +39,7 @@ export function contractBridge(runtime, emit) {
   createSession:args=>invoke('createSession',args),
   editSession:args=>invoke('editSession',args),
   forkSession:args=>invoke('forkSession',args),
+  setTabClosed:args=>invoke('setTabClosed',args),
   createTab:args=>invoke('createTab',args),
   // Agent Roles readable by this user, listed for the new-chat Role row.
   agentRoles:args=>invoke('agentRoles',args),

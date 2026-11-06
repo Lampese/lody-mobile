@@ -18,6 +18,7 @@ data class RuntimeScope(val accountId: String, val workspaceId: String) {
     init { require(accountId.isNotBlank() && workspaceId.isNotBlank()); require(accountId.length <= 128 && workspaceId.length <= 128) }
 }
 sealed interface RuntimeCommand {
+    data class SetTabClosed(val id: String, val closed: Boolean) : RuntimeCommand
     data class CreateTab(val parentId: String, val id: String, val title: String) : RuntimeCommand
     data class GetCreationOptions(val projectId: String?, val agentConfigId: String? = null) : RuntimeCommand
     /** The workspace's Agent Roles readable by this user. Read only. */
@@ -98,6 +99,7 @@ data class CatalogSession(
     /** Working tree vs base (`diffStats.allChange`) and git publish state, for the action bar. */
     val diffAdded: Int = 0,
     val diffRemoved: Int = 0,
+    val isTabClosed: Boolean = false,
     val workspaceDirty: Boolean = false,
     val workspaceUnpushed: Boolean = false,
 )

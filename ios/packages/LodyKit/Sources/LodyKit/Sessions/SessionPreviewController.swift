@@ -86,6 +86,13 @@ final class SessionPreviewController: SessionController {
     updateProbe()
   }
 
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    if scenario == "bar-tabs" {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.chat.onTitlePress([:]) }
+    }
+  }
+
   private func updateProbe() {
     probe.accessibilityValue = fixture.log.joined(separator: ",")
   }
@@ -119,6 +126,19 @@ private final class SessionPreviewFixture {
       ],
       machineIds: ["preview-mac"], machineNames: ["preview-mac": "Preview Mac"], machineSimulators: ["preview-mac": "available"]
     )
+    if bar == "bar-tabs", let root = catalog.sessions.first {
+      var tab = root
+      tab.id = "preview-second-tab"
+      tab.title = String(localized: "session.tabs.defaultTitle", bundle: .lody) + " 2"
+      tab.parentSessionId = root.id
+      tab.status = "idle"
+      catalog.sessions.append(tab)
+      var closed = tab
+      closed.id = "preview-closed-tab"
+      closed.title = String(localized: "session.tabs.defaultTitle", bundle: .lody) + " 3"
+      closed.isTabClosed = true
+      catalog.sessions.append(closed)
+    }
     if bar.hasPrefix("bar-") { SessionActionBarPreview.configure(&catalog, scenario: bar) }
   }
 
@@ -149,6 +169,9 @@ private final class SessionPreviewFixture {
   func write(_ id: String, _ change: SessionWrite) async throws {
     guard let index = catalog.sessions.firstIndex(where: { $0.id == id }) else { return }
     switch change {
+    case .tabClosed(let closed):
+      catalog.sessions[index].isTabClosed = closed
+      record(closed ? "close-tab" : "restore-tab")
     case .archive(let archived):
       catalog.sessions[index].archived = archived
       record(archived ? "archive" : "unarchive")

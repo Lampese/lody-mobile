@@ -1010,5 +1010,14 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
     }
   }
   func setComposerOptions(_ json: String) { composer.setComposerOptions(json) }
+  var tabClosed = false
+  func setTabClosed(_ closed: Bool) {
+    if tabClosed != closed { empty.isHidden = !closed }
+    tabClosed = closed
+    composer.isHidden = closed || composerRetired || !processEntryID.isEmpty
+    composer.isUserInteractionEnabled = !closed && !composerRetired
+    if closed { endEditing(true) }
+  }
+
   func setEmptyText(_ text: String) { empty.text = text }
 }

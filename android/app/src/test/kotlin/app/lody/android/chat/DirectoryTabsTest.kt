@@ -14,6 +14,13 @@ class DirectoryTabsTest {
         val hidden = session("hidden", "root").copy(archived = true)
         assertEquals(listOf("root", "child"), DirectoryTabs.sessions(child, listOf(other, hidden, child, root)).map { it.id })
     }
+    @Test fun closedRootDoesNotHideOpenChild() {
+        val root = session("root").copy(isTabClosed = true)
+        val child = session("child", "root")
+        assertEquals(listOf("child"), DirectoryTabs.sessions(child, listOf(root, child)).map { it.id })
+        assertEquals(listOf("root"), DirectoryTabs.closed(child, listOf(root, child)).map { it.id })
+        assertEquals(listOf("root", "child"), DirectoryTabs.sessions(child, listOf(root.copy(isTabClosed = false), child)).map { it.id })
+    }
     @Test fun attentionWinsOverRunningAndUnread() {
         assertEquals(ChatAttention.Waiting, DirectoryTabs.attention(listOf(session("running", status="running"), session("wait", status="requestPermission"))))
     }

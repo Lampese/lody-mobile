@@ -241,3 +241,22 @@ export async function archiveSession(
     }
   }
 }
+
+/** Tab visibility is independent of archive, worktree and agent lifecycle. */
+export async function setTabClosed(
+  args: { sessionId: string; closed: boolean },
+  meta: { flock: Flock; client: StreamsClient },
+) {
+  if (!args.sessionId || typeof args.closed !== 'boolean')
+    throw new Error('invalid_session');
+  const room = `session-${args.sessionId}`;
+  if (!sessionPresent(meta.flock, room)) throw new Error('session_not_found');
+  const staged = new Flock(`lody-tab-${crypto.randomUUID()}`);
+  staged.importFile(meta.flock.exportFile());
+  const version = staged.version();
+  staged.set(['m', room, 'isTabClosed'], args.closed);
+  staged.commit();
+  const update = staged.exportJson(version);
+  await appendJson(meta.client, update);
+  meta.flock.importJson(update);
+}

@@ -318,6 +318,7 @@ extension LodyChatView {
         collapsedMessageHeights[row.entryID] = min(ChatMessageContent.maximumCollapsedHeight, max(68, height))
       }
     }
+    if tabClosed { projected = [] }
     let retainedIDs = Set(projected.map(\.id))
     expandedPlans.formIntersection(retainedIDs)
     projected = prepareHistory(projected)
@@ -422,7 +423,7 @@ extension LodyChatView {
       }
     }
     snapshot.reconfigureItems(projected.filter { previous[$0.id] != nil && previous[$0.id] != $0 }.map(\.id))
-    empty.isHidden = !projected.isEmpty
+    empty.isHidden = !tabClosed && !projected.isEmpty
     let updateLayout = { [self] in
       // Queue/attachment removal changes the composer's intrinsic height and
       // therefore the scroll inset used to calculate the flight destination.

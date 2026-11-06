@@ -15,6 +15,7 @@ struct SessionItem: Equatable, Sendable {
   var title = ""
   var status = "idle"
   var archived = false
+  var isTabClosed = false
   var pinned = false
   /// The owning Lody user; nil from runtimes older than the field.
   var userId: String?
@@ -55,7 +56,7 @@ struct SessionItem: Equatable, Sendable {
 
 extension SessionItem: Decodable {
   private enum CodingKeys: String, CodingKey {
-    case id, title, status, archived, pinned, projectId, createdAt, openedBySessionId, openedByRootSessionId
+    case id, title, status, isTabClosed, archived, pinned, projectId, createdAt, openedBySessionId, openedByRootSessionId
     case childSessionPlacement, parentSessionId, lastMessageAt, lastReadAt, awaitingUserSince, branchName, lastModel, diff, machineId
     case cliType, agentType, resume, pullRequests, iosSimulatorPreviewRequestId, userId, agentConfigId
     case workspaceDirty, workspaceUnpushed
@@ -79,6 +80,7 @@ extension SessionItem: Decodable {
     title = value(.title) ?? ""
     status = value(.status) ?? "idle"
     archived = value(.archived) ?? false
+    isTabClosed = value(.isTabClosed) ?? false
     pinned = value(.pinned) ?? false
     userId = present(value(.userId))
     agentConfigId = present(value(.agentConfigId))

@@ -22,6 +22,10 @@ class ChatRepository(
     suspend fun messageAction(scope: RuntimeScope, kind: String, payload: org.json.JSONObject): org.json.JSONObject =
         owner.use(scope) { (it.execute(RuntimeCommand.MessageAction(kind, payload)) as RuntimeResult.MessageAction).value }
 
+    suspend fun setTabClosed(scope: RuntimeScope, id: String, closed: Boolean) {
+        owner.use(scope) { it.execute(RuntimeCommand.SetTabClosed(id, closed)) }
+    }
+
     suspend fun createTab(scope: RuntimeScope, parentId: String, id: String, title: String): CreationReceipt =
         owner.use(scope) { (it.execute(RuntimeCommand.CreateTab(parentId, id, title)) as RuntimeResult.Created).value }
 

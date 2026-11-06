@@ -5,7 +5,9 @@ import app.lody.android.home.ChatAttention
 import app.lody.android.home.ChatListModel
 
 object DirectoryTabs {
-    fun sessions(current: CatalogSession, all: List<CatalogSession>): List<CatalogSession> {
+    fun sessions(current: CatalogSession, all: List<CatalogSession>) = family(current, all).filter { !it.isTabClosed }
+    fun closed(current: CatalogSession, all: List<CatalogSession>) = family(current, all).filter { it.isTabClosed }
+    private fun family(current: CatalogSession, all: List<CatalogSession>): List<CatalogSession> {
         val byId = all.associateBy { it.id }
         fun root(session: CatalogSession): String {
             var node = session

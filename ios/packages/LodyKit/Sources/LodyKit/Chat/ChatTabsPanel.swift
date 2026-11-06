@@ -2,81 +2,129 @@ import LodyDesignSystem
 import SwiftUI
 import UIKit
 
-/// One Tab of the conversation, as its panel row shows it.
 struct ChatTabItem: Identifiable {
   let id: String
   let title: String
-  /// The Chats list's status mark (failed, waiting, working, unread); nil when quiet.
   let attention: Attention?
   let current: Bool
 }
 
-/// The title's Tabs panel: the conversation's Tabs (each with the Chats list's status mark, the
-/// current one checked), then New Tab.
+@MainActor
+final class ChatTabsState: ObservableObject {
+  @Published var tabs: [ChatTabItem]
+  @Published var closed: [ChatTabItem]
+  @Published var busy: String?
+  @Published var showingClosed = false
+  var resize: ((CGFloat) -> Void)?
+  init(tabs: [ChatTabItem], closed: [ChatTabItem]) { self.tabs = tabs; self.closed = closed }
+  var height: CGFloat {
+    let rows = showingClosed ? max(1, closed.count) + 1 : tabs.count + 2
+    return min(420, CGFloat(rows) * LodySize.listRow + LodySpacing.xs * 2 + 1)
+  }
+}
+
+/// A native swipe-action list inside the title's glass panel.
 struct ChatTabsPanel: View {
-  let tabs: [ChatTabItem]
+  @ObservedObject var state: ChatTabsState
   let creating: Bool
   var onSelect: (String) -> Void
   var onNew: () -> Void
+  var onClose: (String) -> Void
+  var onRestore: (String) -> Void
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  private func text(_ key: String) -> String { String(localized: String.LocalizationValue(key), bundle: .lody) }
 
   var body: some View {
-    VStack(spacing: 0) {
-      ForEach(tabs) { tab in
-        Button { onSelect(tab.id) } label: {
-          HStack(spacing: LodySpacing.md) {
-            // The mark's column stays even when a Tab is quiet, so titles line up.
-            ZStack {
-              if let attention = tab.attention { AttentionGlyph(attention: attention) }
-            }
-            .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-            Text(tab.title.isEmpty ? String(localized: "session.tabs.defaultTitle", bundle: .lody) : tab.title)
-              .lodyTextStyle(.body)
-              .foregroundStyle(LodyColor.textPrimary)
-              .lineLimit(1)
-              .frame(maxWidth: .infinity, alignment: .leading)
-            if tab.current {
-              LodyIcon.check.image.resizable().renderingMode(.template)
-                .frame(width: LodyIconSize.sm, height: LodyIconSize.sm)
-                .foregroundStyle(LodyColor.accentFg)
-            }
+    ZStack {
+      if state.showingClosed {
+        VStack(spacing: 0) {
+          Button { changePage(false) } label: {
+            HStack(spacing: LodySpacing.md) {
+              LodyIcon.back.image.resizable().frame(width: LodyIconSize.md, height: LodyIconSize.md)
+              Text(text("session.tabs.closed")).lodyTextStyle(.body)
+              Spacer()
+            }.foregroundStyle(LodyColor.textSecondary)
+              .padding(.horizontal, LodySpacing.lg).frame(height: LodySize.listRow).contentShape(Rectangle())
+          }.buttonStyle(.plain).accessibilityLabel(text("common.back")).accessibilityIdentifier("tabsBack")
+          Divider().padding(.horizontal, LodySpacing.lg)
+          if state.closed.isEmpty {
+            Text(text("session.tabs.noClosed")).lodyTextStyle(.body).foregroundStyle(LodyColor.textSecondary)
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+          } else {
+            tabList(state.closed, closed: true)
           }
-          .padding(.horizontal, LodySpacing.lg)
-          .frame(minHeight: LodySize.listRow)
-          .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("tab:" + tab.id)
-        .accessibilityAddTraits(tab.current ? [.isButton, .isSelected] : .isButton)
-      }
-      if !tabs.isEmpty { Divider().padding(.leading, LodySpacing.lg) }
-      Button(action: onNew) {
-        HStack(spacing: LodySpacing.md) {
-          Group {
-            if creating { ProgressView().controlSize(.small) } else {
-              LodyIcon.plus.image.resizable().renderingMode(.template).frame(width: LodyIconSize.sm, height: LodyIconSize.sm)
-            }
-          }
-          .frame(width: LodyIconSize.md, height: LodyIconSize.md)
-          .foregroundStyle(LodyColor.accentFg)
-          Text(String(localized: "session.tabs.new", bundle: .lody))
-            .lodyTextStyle(.body)
-            .foregroundStyle(LodyColor.accentFg)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .move(edge: .trailing).combined(with: .opacity)))
+      } else {
+        VStack(spacing: 0) {
+          if !state.tabs.isEmpty { tabList(state.tabs, closed: false) }
+          Divider().padding(.horizontal, LodySpacing.lg)
+          action("session.tabs.new", icon: .plus, secondary: false, action: onNew)
+            .disabled(creating || state.busy != nil).accessibilityIdentifier("newTab")
+          action("session.tabs.closed", icon: .sessions, secondary: true) { changePage(true) }
+            .accessibilityIdentifier("closedTabs")
         }
-        .padding(.horizontal, LodySpacing.lg)
-        .frame(minHeight: LodySize.listRow)
-        .contentShape(Rectangle())
+        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity)))
       }
-      .buttonStyle(.plain)
-      .disabled(creating)
-      .accessibilityIdentifier("newTab")
     }
+    .clipped()
     .padding(.vertical, LodySpacing.xs)
+    .onChange(of: state.height) { _, height in state.resize?(height) }
   }
 
-  /// Height for the popover: one row per Tab, the divider, New Tab.
-  static func height(tabs: Int) -> CGFloat {
-    CGFloat(tabs + 1) * LodySize.listRow + (tabs > 0 ? 1 : 0) + LodySpacing.xs * 2
+  private func changePage(_ closed: Bool) {
+    withAnimation(.easeInOut(duration: reduceMotion ? 0.15 : 0.22)) { state.showingClosed = closed }
+  }
+
+  private func tabList(_ tabs: [ChatTabItem], closed: Bool) -> some View {
+    List(tabs) { tab in
+      Button { closed ? onRestore(tab.id) : onSelect(tab.id) } label: {
+        HStack(spacing: LodySpacing.md) {
+          ZStack { if let attention = tab.attention { AttentionGlyph(attention: attention) } }
+            .frame(width: LodyIconSize.md, height: LodyIconSize.md)
+          Text(tab.title.isEmpty ? text("session.tabs.defaultTitle") : tab.title)
+            .lodyTextStyle(.body).foregroundStyle(LodyColor.textPrimary).lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          if state.busy == tab.id { ProgressView().controlSize(.small) }
+          else if closed {
+            LodyIcon.refresh.image.resizable().renderingMode(.template)
+              .frame(width: LodyIconSize.sm, height: LodyIconSize.sm).foregroundStyle(LodyColor.accentFg)
+          } else if tab.current {
+            LodyIcon.check.image.resizable().renderingMode(.template)
+              .frame(width: LodyIconSize.sm, height: LodyIconSize.sm).foregroundStyle(LodyColor.accentFg)
+          }
+        }.frame(minHeight: LodySize.listRow).contentShape(Rectangle())
+      }
+      .buttonStyle(.plain).disabled(state.busy != nil)
+      .accessibilityIdentifier((closed ? "restoreTab:" : "tab:") + tab.id)
+      .accessibilityHint(closed ? text("session.tabs.restore") : text("session.tabs.swipeClose"))
+      .accessibilityAddTraits(tab.current && !closed ? [.isButton, .isSelected] : .isButton)
+      .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        if !closed {
+          Button(role: .destructive) { onClose(tab.id) } label: { Label(text("session.tabs.close"), systemImage: "xmark") }
+            .disabled(state.busy != nil)
+        }
+      }
+      .listRowInsets(EdgeInsets(top: 0, leading: LodySpacing.lg, bottom: 0, trailing: LodySpacing.lg))
+      .listRowBackground(Color.clear).listRowSeparator(.hidden)
+    }
+    .listStyle(.plain).scrollContentBackground(.hidden).scrollBounceBehavior(.basedOnSize)
+    .environment(\.defaultMinListRowHeight, LodySize.listRow)
+  }
+
+  private func action(_ key: String, icon: LodyIcon, secondary: Bool, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: LodySpacing.md) {
+        icon.image.resizable().renderingMode(.template).frame(width: LodyIconSize.md, height: LodyIconSize.md)
+        Text(text(key)).lodyTextStyle(.body)
+        Spacer()
+        if secondary {
+          LodyIcon.forward.image.resizable().frame(width: LodyIconSize.sm, height: LodyIconSize.sm)
+        }
+      }.foregroundStyle(secondary ? LodyColor.textSecondary : LodyColor.accentFg)
+        .padding(.horizontal, LodySpacing.lg).frame(height: LodySize.listRow).contentShape(Rectangle())
+    }.buttonStyle(.plain)
   }
 }
 
@@ -87,6 +135,8 @@ struct ChatTabsPanel: View {
 final class ChatTabsOverlay: UIView {
   private let card = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
   private let content: UIHostingController<ChatTabsPanel>
+  private var heightConstraint: NSLayoutConstraint?
+  let state: ChatTabsState
   private var collapsedTransform = CGAffineTransform.identity
 
   /// The panel currently shown in `host`, if any.
@@ -94,13 +144,19 @@ final class ChatTabsOverlay: UIView {
 
   static func present(_ panel: ChatTabsPanel, tabs: Int, in host: UIViewController, source: UIView? = nil) -> ChatTabsOverlay {
     let overlay = ChatTabsOverlay(panel: panel)
-    overlay.show(in: host, height: ChatTabsPanel.height(tabs: tabs), source: source)
+    overlay.show(in: host, height: panel.state.height, source: source)
     return overlay
   }
 
   private init(panel: ChatTabsPanel) {
+    state = panel.state
     content = UIHostingController(rootView: panel)
     super.init(frame: .zero)
+    state.resize = { [weak self] height in
+      guard let self else { return }
+      self.heightConstraint?.constant = min(height, max(100, self.bounds.height - self.safeAreaInsets.top - self.safeAreaInsets.bottom - 32))
+      UIView.animate(withDuration: 0.22) { self.layoutIfNeeded() }
+    }
     accessibilityViewIsModal = true
     accessibilityIdentifier = "chat-tabs-panel"
     let dismiss = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped(_:)))
@@ -128,6 +184,7 @@ final class ChatTabsOverlay: UIView {
     host.addChild(content)
     translatesAutoresizingMaskIntoConstraints = false
     root.addSubview(self)
+    heightConstraint = card.heightAnchor.constraint(equalToConstant: min(height, max(100, root.bounds.height - root.safeAreaInsets.top - root.safeAreaInsets.bottom - 32)))
     NSLayoutConstraint.activate([
       topAnchor.constraint(equalTo: root.topAnchor), bottomAnchor.constraint(equalTo: root.bottomAnchor),
       leadingAnchor.constraint(equalTo: root.leadingAnchor), trailingAnchor.constraint(equalTo: root.trailingAnchor),
@@ -135,7 +192,7 @@ final class ChatTabsOverlay: UIView {
       card.topAnchor.constraint(equalTo: root.safeAreaLayoutGuide.topAnchor, constant: LodySpacing.sm),
       card.centerXAnchor.constraint(equalTo: root.safeAreaLayoutGuide.centerXAnchor),
       card.widthAnchor.constraint(equalToConstant: min(320, max(200, root.bounds.width - 2 * LodyLayout.screenPaddingX))),
-      card.heightAnchor.constraint(equalToConstant: height),
+      heightConstraint!,
     ])
     content.didMove(toParent: host)
     root.layoutIfNeeded()

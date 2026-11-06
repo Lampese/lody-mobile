@@ -33,5 +33,18 @@
     "src/protocol/capability.ts",
     "src/runtime/index.ts"
   ],
-  "messageActionsNote": "Adds native fork read/send contract with exact completed-turn validation; keeps Android edit-and-resend on the shared contract."
+  "messageActionsNote": "Adds native fork read/send contract with exact completed-turn validation; keeps Android edit-and-resend on the shared contract.",
+  "tabVisibility": {
+    "commit": "79bd3bb",
+    "files": [
+      "src/runtime/archive-session.ts",
+      "src/runtime/handlers/sessions.ts",
+      "src/contract/methods.ts",
+      "src/contract/sessions.ts",
+      "src/protocol/catalog.ts",
+      "src/models/catalog.ts",
+      "contract/runtime-contract.json"
+    ],
+    "note": "Reviewed shared isTabClosed projection and acknowledged field-only writes. No archive or agent lifecycle changes."
+  }
 }

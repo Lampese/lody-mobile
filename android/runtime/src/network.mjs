@@ -17,6 +17,7 @@ let identity;
 const connect=cloud.connect;cloud.connect=(workspaceId,gateway,userId)=>{const result=connect(workspaceId,gateway,userId);identity={workspaceId,userId};return result;};
 // A tool step's detail (command, output, diff) reads the watched session's local replica only.
 const detail={
+ setTabClosed:(sessionId,closed)=>{if(!identity)throw Error("not_connected");return runtime.setTabClosed({workspaceId:identity.workspaceId,sessionId,closed});},
  messageAction: (kind, input) => {
   if (!identity || !input || !['edit','fork'].includes(kind) || !['read','send'].includes(input.action)) throw Error('invalid_action');
   const args={...input,workspaceId:identity.workspaceId,userId:identity.userId};
@@ -26,4 +27,4 @@ const detail={
  // Stops the watched session's running turn; a write, never retried.
  controlTurn:async(sessionId,machineId,turnId)=>{const result=await controlTurn({action:'stop',sessionId,machineId,turnId});return {state:result?.state??'unknown'};}};
 globalThis.androidDispatch=createDispatcher(core,emit,{...cloud,...createCommands(runtime,sendTurn,()=>identity),...detail});
-emit({type:'hostReady',protocol:HOST_PROTOCOL,capabilities:[...CORE_CAPABILITIES,'connect','grant','watchSession','closeSession','creationOptions','createAndSend','sendText','itemDetail','createTab','turnDiff','controlTurn','agentRoles','mentionCatalog','localProjects','shortcutBody','projectGroups','messageAction']});
+emit({type:'hostReady',protocol:HOST_PROTOCOL,capabilities:[...CORE_CAPABILITIES,'connect','grant','watchSession','closeSession','creationOptions','createAndSend','sendText','itemDetail','createTab','turnDiff','controlTurn','agentRoles','mentionCatalog','localProjects','shortcutBody','projectGroups','messageAction','setTabClosed']});
