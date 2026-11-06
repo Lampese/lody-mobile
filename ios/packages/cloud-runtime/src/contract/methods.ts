@@ -52,6 +52,7 @@ import {
   SessionCacheEvent,
   SessionEvent,
   SessionSubscriptionsEvent,
+  SessionTraceEvent,
 } from './session-events.ts';
 import {
   PromptShortcutsParams,
@@ -111,7 +112,7 @@ export type {
   SendTurnResult,
 } from './sessions.ts';
 export type { CreationOptions } from './projects.ts';
-export type { SessionRuntimeEvent } from './session-events.ts';
+export type { SessionRuntimeEvent, SessionTrace } from './session-events.ts';
 export type { ShareRequestParams } from './sharing.ts';
 export type { ShortcutCloudParams } from './shortcuts.ts';
 
@@ -327,5 +328,6 @@ export const runtimeEvents = {
   sessionSubscriptions: SessionSubscriptionsEvent,
   session: SessionEvent,
   sessionCache: SessionCacheEvent,
+  sessionTrace: SessionTraceEvent,
   diagnostic: DiagnosticEvent,
 } satisfies Record<string, z.ZodType>;
