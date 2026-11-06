@@ -130,6 +130,38 @@ export function presentMessageText(
         label: m[1] ?? (m[0].startsWith('@role:') ? 'Role' : 'Session'),
       });
   }
+  const readable =
+    /(?<!\S)use \/([^\s]+) \[Skill Path\]\(((?:\\.|[^\\)])+)\)|(?<!\S)@(?:"((?:\\.|[^"\\])*)"|([^\s@"`]+))|(?<!\S)(\$[^\s$]+|#[1-9][0-9]*)(?=$|\s|[.,;!?])/g;
+  for (const m of text.matchAll(readable)) {
+    const start = m.index!,
+      end = start + m[0].length;
+    if (spans.some((s) => start < s.end && end > s.start)) continue;
+    if (m[1])
+      spans.push({
+        start,
+        end,
+        kind: 'skill',
+        label: m[1],
+        target: m[2].replace(/\\([\\)])/g, '$1'),
+      });
+    else if (m[3] || m[4]) {
+      const path = (m[3] ?? m[4]).replace(/[.,;!?]+$/, '');
+      if (path.includes(':') || path.startsWith('//')) continue;
+      spans.push({
+        start,
+        end: end - (m[4] ? m[4].length - path.length : 0),
+        kind: path.endsWith('/') ? 'dir' : 'file',
+        label: path,
+        target: path,
+      });
+    } else if (m[5])
+      spans.push({
+        start,
+        end,
+        kind: m[5].startsWith('$') ? 'skill' : 'issue',
+        label: m[5],
+      });
+  }
   let cursor = 0,
     result = '';
   const references: MessageReference[] = [];

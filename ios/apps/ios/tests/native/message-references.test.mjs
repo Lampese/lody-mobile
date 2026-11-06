@@ -74,3 +74,12 @@ test('invalid and overlapping spans cannot hide unrelated text', () => {
     text,
   );
 });
+
+test('legacy skills hide expansion and quoted paths retain readable text', () => {
+  const result = presentMessageText(
+    'use /review [Skill Path](/skills/review/SKILL.md) @"src/My File.ts"',
+  );
+  assert.equal(result.text, '$review @src/My File.ts');
+  assert.equal(result.references[0].target, '/skills/review/SKILL.md');
+  assert.equal(result.references[1].target, 'src/My File.ts');
+});
