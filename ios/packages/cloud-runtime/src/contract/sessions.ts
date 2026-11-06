@@ -94,6 +94,10 @@ export const ArchiveSessionParams = z
   .object({ workspaceId, sessionId, archived: z.boolean() })
   .meta({ id: 'ArchiveSessionParams' });
 
+export const SetTabClosedParams = z
+  .object({ workspaceId, sessionId, closed: z.boolean() })
+  .meta({ id: 'SetTabClosedParams' });
+
 export const PinSessionParams = z
   .object({ workspaceId, sessionId, pinned: z.boolean() })
   .meta({ id: 'PinSessionParams' });

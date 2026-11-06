@@ -179,6 +179,7 @@ export function projectRows(
       status:
         text(value.status) || text(object(value.status).type) || labels.unknown,
       archived: value.isArchived === true,
+      isTabClosed: value.isTabClosed === true,
       pinned: value.isPinned === true,
       userId: text(value.userId) || undefined,
       agentConfigId: text(value.agentConfigId) || undefined,

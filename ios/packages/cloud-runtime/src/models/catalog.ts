@@ -19,6 +19,7 @@ export type Session = {
   childSessionPlacement?: string;
   status: string;
   archived: boolean;
+  isTabClosed?: boolean;
   pinned: boolean;
   /** The Lody user who owns the session (session meta `userId`). */
   userId?: string;

@@ -79,6 +79,7 @@ import {
 import { ItemDetail, ItemDetailParams } from './item-detail.ts';
 import {
   ArchiveSessionParams,
+  SetTabClosedParams,
   CheckTurnQuotaParams,
   CheckTurnQuotaResult,
   ControlTurnParams,
@@ -241,6 +242,11 @@ export const runtimeCalls = {
   },
   archiveSession: {
     params: ArchiveSessionParams,
+    result: Empty,
+    timeoutMs: 45_000,
+  },
+  setTabClosed: {
+    params: SetTabClosedParams,
     result: Empty,
     timeoutMs: 45_000,
   },

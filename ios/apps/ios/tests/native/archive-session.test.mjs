@@ -32,6 +32,7 @@ const bundle = await build({
 });
 const {
   archiveSession,
+  setTabClosed,
   deleteSession,
   pinSession,
   markSessionRead,
@@ -418,5 +419,53 @@ test('rename writes a user-directed title onto the session meta', async () => {
   await assert.rejects(
     renameSession({ sessionId: 's1', title: 'x'.repeat(201) }, replica),
     /invalid_session/,
+  );
+});
+
+test('closing and reopening a Tab changes only that shared flag after acknowledgement', async () => {
+  assert.equal(typeof setTabClosed, 'function');
+  const flock = new Flock('tabs'),
+    remote = new Flock('tabs-remote');
+  for (const id of ['root', 'child']) {
+    flock.set(['e', `session-${id}`], true);
+    flock.set(['m', `session-${id}`], {
+      id,
+      isArchived: false,
+      status: { type: 'running' },
+      ...(id === 'child' ? { parentSessionId: 'root' } : {}),
+    });
+  }
+  flock.commit();
+  remote.importFile(flock.exportFile());
+  let fail = true;
+  const meta = {
+    flock,
+    client: {
+      async append({ part }) {
+        if (fail) throw Error('offline');
+        remote.importJson(unframe(part.body));
+        return { ok: true };
+      },
+    },
+  };
+  await assert.rejects(
+    setTabClosed({ sessionId: 'root', closed: true }, meta),
+    /offline/,
+  );
+  assert.equal(flock.get(['m', 'session-root', 'isTabClosed']), undefined);
+  fail = false;
+  await setTabClosed({ sessionId: 'root', closed: true }, meta);
+  assert.equal(remote.get(['m', 'session-root', 'isTabClosed']), true);
+  assert.equal(flock.get(['m', 'session-child', 'isTabClosed']), undefined);
+  assert.equal(flock.get(['e', 'session-root']), true);
+  assert.equal(flock.get(['m', 'session-root']).isArchived, false);
+  assert.deepEqual(flock.get(['m', 'session-root']).status, {
+    type: 'running',
+  });
+  await setTabClosed({ sessionId: 'root', closed: false }, meta);
+  assert.equal(remote.get(['m', 'session-root', 'isTabClosed']), false);
+  await assert.rejects(
+    setTabClosed({ sessionId: 'missing', closed: true }, meta),
+    /session_not_found/,
   );
 });

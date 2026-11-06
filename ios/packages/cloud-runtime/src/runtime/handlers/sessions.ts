@@ -5,6 +5,7 @@ import { tabOwner } from '../directory-tab';
 import { projectRows } from '../../protocol/catalog.ts';
 import {
   archiveSession,
+  setTabClosed,
   deleteSession,
   markSessionRead,
   pinSession,
@@ -230,6 +231,12 @@ export function registerSessions(
   channel.handle('archiveSession', async (args) => {
     const replica = metaWrite(args);
     await archiveSession(args, replica, state.machineReplicas, getGrant);
+    republish(replica);
+    return {};
+  });
+  channel.handle('setTabClosed', async (args) => {
+    const replica = metaWrite(args);
+    await setTabClosed(args, replica);
     republish(replica);
     return {};
   });

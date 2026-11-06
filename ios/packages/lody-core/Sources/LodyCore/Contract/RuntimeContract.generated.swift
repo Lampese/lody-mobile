@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeContract {
   public static let version = 1
-  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","forkSession","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
+  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","forkSession","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","setTabClosed","start","turnDiff","workspaceChanges"]
 
   public enum AgentRoleItemVisibility: String, Codable, Sendable, Equatable, CaseIterable {
     case `private` = "private"
@@ -5533,6 +5533,29 @@ extension RuntimeContract {
     }
   }
 
+  public struct SetTabClosedParams: Codable, Sendable, Equatable {
+    public var workspaceId: String
+    public var sessionId: String
+    public var closed: Bool
+    public init(workspaceId: String, sessionId: String, closed: Bool) {
+      self.workspaceId = workspaceId
+      self.sessionId = sessionId
+      self.closed = closed
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.workspaceId = try c.decode(String.self, forKey: Key("workspaceId"))
+      self.sessionId = try c.decode(String.self, forKey: Key("sessionId"))
+      self.closed = try c.decode(Bool.self, forKey: Key("closed"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.workspaceId, forKey: Key("workspaceId"))
+      try c.encode(self.sessionId, forKey: Key("sessionId"))
+      try c.encode(self.closed, forKey: Key("closed"))
+    }
+  }
+
   public enum ShareEntryStatus: String, Codable, Sendable, Equatable, CaseIterable {
     case draft = "draft"
     case active = "active"
@@ -7225,6 +7248,16 @@ extension RuntimeContract {
         return nil
       }
     }
+    public enum SetTabClosed: RuntimeCall {
+      public typealias Params = RuntimeContract.SetTabClosedParams
+      public typealias Result = RuntimeContract.Empty
+      public static let method = "setTabClosed"
+      public static let timeout: Double = 45
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .setTabClosed(let result) = value { return result }
+        return nil
+      }
+    }
     public enum Start: RuntimeCall {
       public typealias Params = RuntimeContract.StartParams
       public typealias Result = RuntimeContract.Empty
@@ -7323,6 +7356,7 @@ extension RuntimeContract {
     case sessionPreview(RuntimeContract.SessionPreviewResult)
     case sessionSharing(RuntimeContract.SessionSharingResult)
     case setActive(RuntimeContract.Empty)
+    case setTabClosed(RuntimeContract.Empty)
     case start(RuntimeContract.Empty)
     case turnDiff(RuntimeContract.DiffResult)
     case workspaceChanges(RuntimeContract.WorkspaceChanges)
@@ -7424,6 +7458,7 @@ extension RuntimeContract {
         case "sessionPreview": message = .result(id: id, .sessionPreview(try c.decode(RuntimeContract.SessionPreviewResult.self, forKey: Key("payload"))))
         case "sessionSharing": message = .result(id: id, .sessionSharing(try c.decode(RuntimeContract.SessionSharingResult.self, forKey: Key("payload"))))
         case "setActive": message = .result(id: id, .setActive(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
+        case "setTabClosed": message = .result(id: id, .setTabClosed(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "start": message = .result(id: id, .start(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "turnDiff": message = .result(id: id, .turnDiff(try c.decode(RuntimeContract.DiffResult.self, forKey: Key("payload"))))
         case "workspaceChanges": message = .result(id: id, .workspaceChanges(try c.decode(RuntimeContract.WorkspaceChanges.self, forKey: Key("payload"))))
