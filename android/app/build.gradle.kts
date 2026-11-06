@@ -19,6 +19,12 @@ android {
     buildFeatures { compose = true; buildConfig = true }
 
     buildTypes {
+        create("m3e") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".m3e"
+            versionNameSuffix = "-m3e-preview"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -46,6 +52,8 @@ kotlin {
 }
 
 dependencies {
+    // Review-only variant; normal debug/release retain their existing dependencies.
+    add("m3eImplementation", "androidx.compose.material3:material3:1.5.0-alpha23")
     implementation(libs.okhttp)
     implementation(libs.webkit)
     implementation(libs.coroutines.android)
