@@ -1,3 +1,4 @@
+import type { MessageReference } from '../protocol/message-references.ts';
 import { LoroDoc, LoroMap, LoroList, LoroText } from 'loro-crdt/base64';
 import { StreamsClient } from '@loro-dev/streams-client';
 import { decompress } from 'fzstd';
@@ -625,7 +626,7 @@ export async function sendTurn(
     agentConfigId?: string;
     billingEntitlement?: BillingEntitlement | null;
   },
-  expand: (text: string) => Promise<string> = async (text) => text,
+  expand: (text: string) => Promise<string | { text: string; spans: MessageReference[] }> = async (text) => text,
   selectMcp: (persisted: unknown) => Promise<string[]> = async (ids) =>
     Array.isArray(ids) ? ids : [],
 ): Promise<SendTurnResult> {
@@ -727,7 +728,9 @@ export async function sendTurn(
   let uploaded = false;
   let writeStarted = false;
   try {
-    text = await expand(text);
+    const expanded = await expand(text);
+    text = typeof expanded === 'string' ? expanded : expanded.text;
+    const spans = typeof expanded === 'string' ? undefined : expanded.spans;
     if (sessions.get(state.id) !== state || !state.ready)
       throw new Error('session_not_ready');
     if (text.length > 32000) throw new Error('invalid_message');
@@ -793,7 +796,7 @@ export async function sendTurn(
       prompt: [started ? '' : (role?.promptPrefix ?? ''), text]
         .filter((part) => part.trim())
         .join('\n\n'),
-      inputBlocks: [...(text ? [{ type: 'text', text }] : []), ...attachments],
+      inputBlocks: [...(text ? [{ type: 'text', text, ...(spans?.length ? { spans } : {}) }] : []), ...attachments],
       // An explicit pick wins; otherwise the turn inherits what the session
       // already used, and an unset value leaves the machine on its default.
       modeId: args.modeId ?? previous.modeId,
