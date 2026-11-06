@@ -135,6 +135,7 @@ targets:
           - List/LodyListCellBackground.swift
           - List/LodyFlatRows.swift
           - List/LodyListPhoto.swift
+          - Projects/RepositoryIcon.swift
           - List/PhotoDiskCache.swift
           - List/LodyListRowInteractions.swift
           - List/LodyListSectionAnimation.swift

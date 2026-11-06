@@ -398,6 +398,18 @@ final class LodyGroupedList: LodyAppearanceView, UICollectionViewDelegate, UISea
     #endif
     if let fileIcon {
       content.image = fileIcon
+    } else if !row.repository.isEmpty {
+      content.image = RepositoryImages.image(row.repository) { [weak cell] image in
+        guard let cell, cell.accessibilityIdentifier == row.id,
+              var next = cell.contentConfiguration as? UIListContentConfiguration else { return }
+        next.image = image
+        next.imageProperties.tintColor = nil
+        cell.contentConfiguration = next
+      } ?? LodyIcon.github.uiImage
+      content.imageProperties.maximumSize = CGSize(width: 20, height: 20)
+      content.imageProperties.reservedLayoutSize = LodyListGlyph.reservedSize
+      content.imageProperties.cornerRadius = 4
+      content.imageProperties.tintColor = nil
     } else if let url = LodyListPhoto.url(row.image) {
       if let image = LodyListPhoto.image(for: url, ready: { [weak cell] image in
         guard let cell, cell.accessibilityIdentifier == row.id,

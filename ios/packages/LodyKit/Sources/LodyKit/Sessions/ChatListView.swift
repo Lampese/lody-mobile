@@ -241,7 +241,7 @@ final class ChatListView: UIView, UICollectionViewDelegate {
 
   private static func same(_ a: LodyListRow, _ b: LodyListRow, _ ea: Bool?, _ eb: Bool?) -> Bool {
     a.title == b.title && a.subtitle == b.subtitle && a.unread == b.unread && a.imageTint == b.imageTint
-      && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.branch == b.branch && a.prStatus == b.prStatus && a.prCI == b.prCI
+      && a.value == b.value && a.place == b.place && a.placeIsRepo == b.placeIsRepo && a.repository == b.repository && a.branch == b.branch && a.prStatus == b.prStatus && a.prCI == b.prCI
       && a.collapsedImageTint == b.collapsedImageTint && a.collapsedBadge == b.collapsedBadge
       && a.badge == b.badge && a.pinned == b.pinned && a.parentId == b.parentId && a.lastChild == b.lastChild && a.treeParent == b.treeParent && a.childCount == b.childCount && a.highlight == b.highlight && ea == eb
   }
@@ -696,7 +696,11 @@ private struct ChatRowContent: View {
   private var detailLine: some View {
     HStack(spacing: LodySpacing.xs) {
       if !project.isEmpty {
-        Glyph(icon: row.placeIsRepo ? .github : .folder, size: LodyIconSize.sm, color: LodyColor.iconSecondary)
+        if row.placeIsRepo {
+          RepositoryIcon(repository: row.repository)
+        } else {
+          Glyph(icon: .folder, size: LodyIconSize.sm, color: LodyColor.iconSecondary)
+        }
         Text(project).lodyTextStyle(.footnote).foregroundStyle(LodyColor.textSecondary).lineLimit(1)
       }
       if !branch.isEmpty {

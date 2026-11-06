@@ -20,6 +20,7 @@ import SwiftUI
 
 enum CreateGlyph: Equatable {
   case lody(LodyIcon)
+  case repository(String)
   /// An agent mark from the app's asset catalog, drawn in its own colours.
   case asset(String)
   case symbol(String)
@@ -168,7 +169,7 @@ enum CreateSessionContext {
 
   private static func projectGlyph(_ id: String) -> CreateGlyph {
     if id.hasPrefix(CreateSessionSelection.groupPrefix) { return .lody(.projectGroup) }
-    return CreateProjectPicker.isGithub(id) ? .lody(.github) : .lody(.folder)
+    return CreateProjectPicker.isGithub(id) ? .repository(String(id.dropFirst("github:".count))) : .lody(.folder)
   }
 
   /// A project row's second line: GitHub, the folder, or how many repositories a group holds.
@@ -528,6 +529,8 @@ struct GlyphView: View {
 
   var body: some View {
     switch glyph {
+    case .repository(let name):
+      RepositoryIcon(repository: name, size: size, opacity: 0.8)
     case .lody(let icon):
       icon.image.resizable().renderingMode(.template).frame(width: size, height: size).foregroundStyle(LodyColor.iconSecondary)
     case .asset(let name):

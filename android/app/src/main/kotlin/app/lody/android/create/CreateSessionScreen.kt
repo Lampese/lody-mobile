@@ -537,6 +537,7 @@ private fun ContextPanel(catalog: CatalogSnapshot, target: CreateTarget, onSearc
         searchOptions = listOf(chatOption) + usable.map { it.option(target) },
         searchPlaceholder = stringResource(R.string.create_search_projects),
         scopeLabel = machineName.orEmpty(),
+        repository = project?.repoFullName ?: project?.id?.removePrefix("github:")?.takeIf { CreateSessionModel.isGithub(project.id) },
         open = open == PROJECT,
         onToggle = { toggle(PROJECT) },
         onPick = { id ->
@@ -576,6 +577,7 @@ internal data class PickerOption(
     val agent: Pair<String, String>? = null,
     /** An Agent Role's emoji, shown instead of an icon. */
     val emoji: String? = null,
+    val repository: String? = null,
 )
 
 /** The option's leading mark: the agent's provider mark, else its icon. */
@@ -583,6 +585,7 @@ internal data class PickerOption(
 private fun OptionMark(option: PickerOption, size: androidx.compose.ui.unit.Dp) {
     val tint = LodyTheme.colors.iconSecondary
     when {
+        option.repository != null -> app.lody.android.home.RepositoryIcon(option.repository, size, opacity = 0.8f)
         option.emoji != null -> Box(Modifier.size(size), contentAlignment = Alignment.Center) {
             Text(option.emoji, fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (size * 0.85f).toSp() })
         }
@@ -592,6 +595,7 @@ private fun OptionMark(option: PickerOption, size: androidx.compose.ui.unit.Dp) 
 }
 
 private fun CatalogProject.option(target: CreateTarget) = PickerOption(
+    repository = repoFullName ?: id.removePrefix("github:").takeIf { CreateSessionModel.isGithub(id) },
     id = id,
     title = name,
     selected = !target.chat && id == target.projectId,
@@ -623,6 +627,7 @@ private fun PickerCard(
     expandAllOn: String? = null,
     onSearchFocus: (Boolean) -> Unit = {},
     scopeLabel: String = "",
+    repository: String? = null,
 ) {
     val colors = LodyTheme.colors
     Column {
@@ -637,7 +642,8 @@ private fun PickerCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
         ) {
-            Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
+            if (repository != null) app.lody.android.home.RepositoryIcon(repository, LodyIconSize.md, opacity = 0.8f)
+            else Icon(icon, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md))
             Text(
                 title,
                 style = LodyTheme.typography.body,

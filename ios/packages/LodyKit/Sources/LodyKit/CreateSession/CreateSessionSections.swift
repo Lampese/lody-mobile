@@ -80,12 +80,14 @@ enum CreateProjectPicker {
       image = ""
       imageAsset = "lody-mark-github"
     }
-    return .item(
+    var row = LodyListRow.item(
       project.id, project.name,
       subtitle: [machineNames[project.machineId] ?? project.machineId, project.rootPath]
         .filter { !$0.isEmpty }.joined(separator: " · "),
       image: image, imageAsset: imageAsset,
       selected: project.id == selected, subtitleMono: !project.rootPath.isEmpty)
+    if github { row.repository = String(project.id.dropFirst("github:".count)) }
+    return row
   }
 
   static func githubStatusRows(loaded: Bool, failed: Bool, empty: Bool) -> [LodyListRow] {

@@ -177,12 +177,14 @@ enum InboxSections {
     let now: Double
     let names: [String: String]
     let repos: Set<String>
+    let repositories: [String: String]
     let visible: [SessionItem]
 
     init(_ catalog: SessionCatalog, now: Double) {
       self.catalog = catalog
       self.now = now
       names = InboxSections.projectNames(catalog)
+      repositories = Dictionary(catalog.projects.compactMap { project in project.repoFullName.map { (project.id, $0) } }, uniquingKeysWith: { first, _ in first })
       repos = Set(catalog.projects.filter { !($0.repoFullName ?? "").isEmpty }.map(\.id))
       visible = catalog.sessions.filter { !$0.archived }.sorted { $0.activityAt > $1.activityAt }
     }
@@ -197,6 +199,7 @@ enum InboxSections {
         var row = SessionRows.row(session, projectName: InboxSections.place(session, names), now: now)
         row.place = (showsPlace || !rootProjects.contains(session.projectId)) && !SessionRows.isChat(session.projectId) ? names[session.projectId] ?? "" : ""
         row.placeIsRepo = repos.contains(session.projectId)
+        row.repository = repositories[session.projectId] ?? ""
         return row
       }
     }

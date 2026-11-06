@@ -256,15 +256,8 @@ struct ProjectCardView: View {
 
   /// GitHub: the repository owner's avatar. Otherwise the project name's first letter.
   @ViewBuilder private var mark: some View {
-    if card.github, let avatar = card.avatar, let url = URL(string: avatar) {
-      AsyncImage(url: url) { image in
-        image.resizable().scaledToFill()
-      } placeholder: {
-        monogram
-      }
-      .frame(width: LodySize.avatarLg, height: LodySize.avatarLg)
-      .clipShape(Circle())
-      .accessibilityHidden(true)
+    if card.github {
+      RepositoryIcon(repository: card.title, size: LodySize.avatarLg, opacity: 0.8)
     } else {
       monogram
     }

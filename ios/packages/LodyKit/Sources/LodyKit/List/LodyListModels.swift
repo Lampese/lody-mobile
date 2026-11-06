@@ -65,6 +65,7 @@ struct LodyListRow {
   /// branch, and the latest pull request state (open / merged / closed / draft).
   var place: String = ""
   var placeIsRepo: Bool = false
+  var repository: String = ""
   var branch: String = ""
   var prStatus: String = ""
   /// CI on the PR head: pass / fail / pending, empty when unknown.

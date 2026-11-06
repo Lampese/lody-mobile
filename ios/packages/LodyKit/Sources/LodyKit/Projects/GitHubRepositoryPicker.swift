@@ -143,13 +143,7 @@ struct GitHubRepositoryPicker: View {
   private func row(_ repo: GitHubRepository) -> some View {
     Button { model.add(repo) } label: {
       HStack(spacing: LodySpacing.md) {
-        AsyncImage(url: ProjectCards.ownerAvatar(repo.repoFullName).flatMap(URL.init(string:))) { image in
-          image.resizable().scaledToFill()
-        } placeholder: {
-          Circle().fill(LodyColor.fillSecondary)
-        }
-        .frame(width: LodySize.avatarMd, height: LodySize.avatarMd)
-        .clipShape(Circle())
+        RepositoryIcon(repository: repo.repoFullName, size: LodySize.avatarMd, opacity: 0.8)
         VStack(alignment: .leading, spacing: 2) {
           Text(repo.repoFullName)
             .lodyTextStyle(.body)

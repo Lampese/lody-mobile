@@ -833,7 +833,7 @@ private fun ProjectCardView(card: ProjectCard, now: Long, modifier: Modifier = M
         // project name's first letter.
         val initial = (if (card.github) card.title.substringAfterLast('/') else card.title).take(1).uppercase()
         if (card.github && card.avatar != null) {
-            Avatar(card.avatar, initial, LodySize.avatarLg)
+            RepositoryIcon(card.title, LodySize.avatarLg, opacity = 0.8f)
         } else {
             Box(Modifier.size(LodySize.avatarLg).background(colors.fillSecondary, CircleShape), contentAlignment = Alignment.Center) {
                 Text(initial, style = type.headline, color = colors.textSecondary)
@@ -1039,7 +1039,8 @@ private fun ChatRow(
                         // Project and branch share the leading space so the PR mark stays pinned trailing.
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
                             if (place != null) {
-                                Glyph(if (chat.placeIsRepo) LodyIcons.Github else LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
+                                if (chat.placeIsRepo) RepositoryIcon(chat.repository)
+                                else Glyph(LodyIcons.Folder, colors.iconSecondary, LodyIconSize.sm)
                                 Text(place, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                             }
                             if (branch != null) {

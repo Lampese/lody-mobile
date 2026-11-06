@@ -354,7 +354,7 @@ fun GitHubRepoSheet(service: ProjectAdding, scope: RuntimeScope, onDismiss: () -
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(LodySpacing.md),
                                 ) {
-                                    Avatar(ProjectCards.ownerAvatar(repo.fullName), repo.fullName.take(1), LodySize.avatarMd)
+                                    RepositoryIcon(repo.fullName, LodySize.avatarMd, opacity = 0.8f)
                                     Column(Modifier.weight(1f)) {
                                         Text(repo.fullName, style = type.body, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                             color = if (repo.enabled || !current.canManage) colors.textSecondary else colors.textPrimary)

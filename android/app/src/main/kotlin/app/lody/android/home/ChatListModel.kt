@@ -21,6 +21,7 @@ data class ChatItem(
     val attention: ChatAttention?,
     val place: String = "",
     val placeIsRepo: Boolean = false,
+    val repository: String? = null,
     val branch: String = "",
     val prStatus: String = "",
     val activityAt: Long? = null,
@@ -213,7 +214,7 @@ object ChatListModel {
             .filter { !it.archived && !isTab(it) }
             .map { session ->
                 val project = projects[session.projectId]?.takeUnless { isChat(it.id) }
-                item(session, project?.name.orEmpty(), project?.repoFullName != null).copy(openerId = opener(session, all))
+                item(session, project?.name.orEmpty(), project?.repoFullName != null).copy(openerId = opener(session, all), repository = project?.repoFullName)
             }
             .sortedByDescending { it.activityAt ?: Long.MIN_VALUE }
     }

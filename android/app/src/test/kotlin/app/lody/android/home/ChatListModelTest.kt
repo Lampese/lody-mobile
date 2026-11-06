@@ -161,6 +161,7 @@ class ChatListModelTest {
         val row = sections[0].chats[0]
         assertEquals(activity, row.activityAt)
         assertEquals("Alpha", row.place)
+        assertEquals("lody/alpha", row.repository)
         assertTrue(row.placeIsRepo)
         assertEquals("feat/rows", row.branch)
         assertEquals("merged", row.prStatus)
