@@ -67,6 +67,21 @@ public enum CreateLogic {
     return next
   }
 
+  /// A combined reset is one change; a Fast-only toggle preserves model and effort.
+  public static func applyingComposerChange(_ capability: Capability?, _ choice: ModelChoice, body: [String: Any]) -> ModelChoice {
+    if let permission = body["permissionId"] as? String {
+      return withPermissionMode(capability, choice, value: permission)
+    }
+    var next = choice
+    let fast = body["fast"] as? Bool
+    if let fast { next = withFastMode(capability, next, enabled: fast) }
+    if fast == nil || body["modelId"] != nil || body["effort"] != nil {
+      next.modelId = (body["modelId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+      next.effort = (body["effort"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    }
+    return next
+  }
+
   /// Web's Plan switch (`isAcpPlanModeConfigOption`): Lody's boolean `plan_mode`, or a
   /// collaboration mode whose `plan` value turns it on and `default` off.
   public static func planMode(_ capability: Capability?, _ choice: ModelChoice) -> (id: String, enabled: Bool)? {

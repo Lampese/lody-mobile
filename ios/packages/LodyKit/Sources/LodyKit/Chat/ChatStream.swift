@@ -32,11 +32,12 @@ struct ChatStream {
     let wasRunning = Set(targets.filter(\.isRunning).map(\.id))
     var retained: Set<ID> = []
     for entry in entries where entry.role != "user" {
+      let tailID = entry.textTailID
       for item in entry.items where item.type == "text" || item.type == "thought" {
         let id = ID(entry: entry.id, item: item.itemId)
         retained.insert(id)
         var reveal = reveals[id] ?? CKTextReveal()
-        let shouldAnimate = !initialSnapshot && initialized && animate && !deferredEntries.contains(entry.id) && entry.role == "assistant" && (entry.isRunning || wasRunning.contains(entry.id) || reveal.hasPending)
+        let shouldAnimate = !initialSnapshot && initialized && animate && item.itemId == tailID && !deferredEntries.contains(entry.id) && entry.role == "assistant" && (entry.isRunning || wasRunning.contains(entry.id) || reveal.hasPending)
         reveal.receive(item.text ?? "", animate: shouldAnimate, at: time)
         reveals[id] = reveal
       }
@@ -45,7 +46,7 @@ struct ChatStream {
     targets = entries
     settling.formIntersection(entries.map(\.id))
     if !animate || initialSnapshot { settling.removeAll() }
-    initialized = true
+    initialized = initialized || !entries.isEmpty || !animate || initialSnapshot
   }
 
   private mutating func receiveProcessTimes(_ entries: [ChatEntry], at time: Double) {

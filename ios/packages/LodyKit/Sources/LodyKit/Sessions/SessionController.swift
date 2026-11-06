@@ -240,10 +240,10 @@ class SessionController: UIViewController {
     chat.setEmptyText(String(localized: String.LocalizationValue(state.status == "live" ? "chat.empty.prompt" : "chat.empty.loading"), bundle: .lody))
     guard state.entriesJSON != renderedEntries else { return }
     renderedEntries = state.entriesJSON
-    processPage?.update(state.entriesJSON)
+    processPage?.update(state.entriesJSON, animate: state.isLiveUpdate)
     tasksPage?.update(state.entriesJSON)
     updateDetails(state.entriesJSON)
-    chat.setEntries(state.entriesJSON)
+    chat.setEntries(state.entriesJSON, animate: state.isLiveUpdate)
     chat.scheduleUpdate()
   }
 

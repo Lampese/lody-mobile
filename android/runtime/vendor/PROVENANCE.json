@@ -53,5 +53,19 @@
       "src/runtime/handlers/sessions.ts"
     ],
     "note": "Read authoritative session Agent Config from merged legacy and field-level metadata for Role sends; refuse deleted sessions. Exported from the reviewed iOS source commit."
+  },
+  "sessionDiagnostics": {
+    "commit": "8fb07e9d4cd50683015c4045b4dd4950448e5c22",
+    "files": [
+      "src/runtime/session.ts",
+      "src/runtime/index.ts",
+      "src/runtime/handlers/lifecycle.ts",
+      "src/contract/methods.ts",
+      "src/contract/session-events.ts",
+      "scripts/contract-swift.mjs",
+      "package.json",
+      "contract/runtime-contract.json"
+    ],
+    "note": "Upstream 7028f2bf read/resume tracing and fc9bb555 Zod schema support, preserving local Role and Tab fixes. Exported from reviewed source commit."
   }
 }

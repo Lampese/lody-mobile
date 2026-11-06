@@ -27,6 +27,7 @@ struct SessionFeedState: Equatable, Sendable {
   var composerJSON: String?
   var preview: SessionBrowserPreview?
   var transcript = SessionTranscriptFacts()
+  var isLiveUpdate = false
 }
 
 @MainActor
@@ -41,10 +42,11 @@ struct SessionFeedService {
         let event = SessionRuntimeEvent(note.userInfo ?? [:])
         MainActor.assumeIsolated { receive(event) }
       }
-      DataRuntime.current?.openSession(sessionId)
+      let runtime = DataRuntime.current
+      runtime?.watchSession(sessionId)
       return {
         NotificationCenter.default.removeObserver(observer)
-        DataRuntime.current?.closeSession(sessionId)
+        runtime?.unwatchSession(sessionId)
       }
     },
     reconnect: { DataRuntime.current?.openSession($0) },
@@ -66,6 +68,8 @@ final class SessionFeed {
   private let workspaceId: String
   private var cursor = (generation: -1, revision: -1)
   private var received = false
+  private var awaitingSnapshot = true
+  private var reportedStatus = ""
   private var unwatch: (@MainActor () -> Void)?
   private var token = 0
   private static let parsing = DispatchQueue(label: "ai.lody.mobile.session-feed", qos: .userInitiated)
@@ -85,6 +89,7 @@ final class SessionFeed {
     token += 1
     cursor = (-1, -1)
     received = false
+    awaitingSnapshot = true
     state = SessionFeedState()
     changed?()
     let token = token
@@ -112,6 +117,7 @@ final class SessionFeed {
 
   func reconnect() {
     guard unwatch != nil else { return }
+    awaitingSnapshot = true
     service.reconnect(sessionId)
   }
 
@@ -130,34 +136,54 @@ final class SessionFeed {
             self.apply(envelope, generation: generation)
           } else if ["starting", "background", "failed", "stopped"].contains(phase) {
             self.state.status = phase
+            self.state.isLiveUpdate = false
+            self.awaitingSnapshot = true
             self.changed?()
           }
+          self.reportStatus()
         }
       }
     }
   }
 
+  private func reportStatus() {
+    guard state.status != reportedStatus else { return }
+    reportedStatus = state.status
+    DiagnosticsStore.shared.record("session-sync", "feed_status", fields: [
+      "session": DiagnosticsStore.correlation(sessionId), "syncStatus": state.status,
+    ])
+  }
+
   private func apply(_ envelope: SessionEnvelope?, generation: Int) {
     guard let envelope else {
       state.status = "offline"
+      state.isLiveUpdate = false
+      awaitingSnapshot = true
       changed?()
       return
     }
     if envelope.overflow, envelope.version == 1 {
       state.overflow = true
+      state.isLiveUpdate = false
+      awaitingSnapshot = true
       changed?()
       return
     }
     guard envelope.accepted(generation: generation, after: cursor), let revision = envelope.revision else { return }
+    let isLiveUpdate = !awaitingSnapshot && state.status == "live" && cursor.generation == generation
     cursor = (generation, revision)
     state.overflow = false
     if envelope.status == "live" {
       received = true
+      awaitingSnapshot = false
       state = SessionFeedState(
         status: "live", revision: revision, entriesJSON: envelope.entriesJSON,
         billableTurnCount: envelope.billableTurnCount, composerJSON: envelope.composerJSON, preview: envelope.preview, transcript: envelope.transcript
       )
+      state.isLiveUpdate = isLiveUpdate
     } else {
+      state.isLiveUpdate = false
+      awaitingSnapshot = true
       state.status = envelope.status
     }
     changed?()

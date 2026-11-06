@@ -24,6 +24,7 @@ if args.udid is None:
     raise SystemExit(run_with_simulator(SimulatorPool(), 'Native', command))
 sdk = subprocess.check_output(['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-path'], text=True).strip()
 checks = {
+    'session-subscriptions': ['Cloud/SessionSubscriptions.swift'],
     'home-layout': ['Chrome/LodyHomeLayout.swift'],
     'fold-host': ['Chrome/LodyFoldHost.swift'],
     'session-feed': ['Sessions/SessionFeed.swift', 'Sessions/SessionEnvelope.swift', 'Sessions/SessionPermission.swift'],

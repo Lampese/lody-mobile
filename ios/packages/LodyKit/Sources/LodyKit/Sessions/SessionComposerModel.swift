@@ -306,14 +306,7 @@ final class SessionComposerModel {
 
   func change(_ body: [String: Any]) {
     hydrated = true
-    if let permission = body["permissionId"] as? String {
-      choice = CreateLogic.withPermissionMode(capability, active, value: permission)
-    } else if let fast = body["fast"] as? Bool {
-      choice = CreateLogic.withFastMode(capability, active, enabled: fast)
-    } else {
-      choice.modelId = (body["modelId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-      choice.effort = (body["effort"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-    }
+    choice = CreateLogic.applyingComposerChange(capability, active, body: body)
     changed?()
   }
 

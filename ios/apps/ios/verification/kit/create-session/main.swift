@@ -375,3 +375,17 @@ do {
   draft = form.draft(sessionId: "s3")
   check(form.current.roleId.isEmpty && draft?.agentRoleId == nil, "another computer clears the Role")
 }
+
+// Upstream combined reset regression: Fast must not swallow model/effort clears.
+do {
+  let capability = Capability(machineId: "m", cliType: "builtin", agentType: "codex", configOptions: [
+    ConfigOption(id: "fast", name: "Fast", type: "boolean", currentValue: .bool(false)),
+  ])
+  let choice = ModelChoice(modelId: "a", effort: "high", modeId: "ask", configOptionValues: ["fast": .bool(true), "verbosity": .string("detailed")])
+  let toggled = CreateLogic.applyingComposerChange(capability, choice, body: ["fast": false])
+  check(toggled.modelId == "a" && toggled.effort == "high", "Fast-only toggles preserve model and effort")
+  let reset = CreateLogic.applyingComposerChange(capability, choice, body: ["modelId": "", "effort": "", "fast": false])
+  check(reset.modelId == nil && reset.effort == nil, "Combined reset clears both overrides")
+  check(reset.configOptionValues?["fast"] == .bool(false), "Combined reset also resets Fast")
+  check(reset.modeId == "ask" && reset.configOptionValues?["verbosity"] == .string("detailed"), "Unrelated options survive a reset")
+}

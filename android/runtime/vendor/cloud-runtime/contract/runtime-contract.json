@@ -230,12 +230,13 @@
     "session": "SessionEvent",
     "sessionCache": "SessionCacheEvent",
     "sessionSubscriptions": "SessionSubscriptionsEvent",
+    "sessionTrace": "SessionTraceEvent",
     "shareProgress": "ShareProgressEvent",
     "synced": "SyncedEvent",
     "syncError": "SyncErrorEvent"
   },
   "envelope": {
-    "anyOf": [
+    "oneOf": [
       {
         "type": "object",
         "properties": {
@@ -302,7 +303,6 @@
     ],
     "$defs": {
       "RuntimeError": {
-        "id": "RuntimeError",
         "type": "object",
         "properties": {
           "code": { "type": "string", "minLength": 1 },
@@ -402,7 +402,7 @@
       "required": ["roles", "agents"]
     },
     "AgentRolesParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -573,7 +573,7 @@
       "required": ["sessionId", "billingEntitlement"]
     },
     "CheckTurnQuotaResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": { "state": { "type": "string", "const": "allowed" } },
@@ -591,13 +591,11 @@
     },
     "ClearableString": {
       "type": "object",
-      "properties": {
-        "value": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
-      },
+      "properties": { "value": { "type": ["string", "null"] } },
       "required": ["value"]
     },
     "ConfigOption": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -645,7 +643,7 @@
       "required": ["action", "sessionId", "machineId", "turnId"]
     },
     "ControlTurnResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": { "state": { "type": "string", "const": "stopped" } },
@@ -711,7 +709,7 @@
         "projectGroupId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "billingEntitlement": {
           "anyOf": [{ "$ref": "BillingEntitlement" }, { "type": "null" }]
@@ -728,7 +726,7 @@
       ]
     },
     "CreateSessionResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -762,7 +760,7 @@
         "sessionId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "parentSessionId": { "type": "string", "minLength": 1 },
         "title": { "type": "string", "minLength": 1, "maxLength": 200 }
@@ -845,7 +843,7 @@
     },
     "DiffBase": { "type": "string", "enum": ["turn", "current"] },
     "DiffResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -910,7 +908,7 @@
       "required": ["entries", "truncated"]
     },
     "EditAttachment": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -948,7 +946,7 @@
       ]
     },
     "EditSessionParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -1003,7 +1001,7 @@
       ]
     },
     "EditSessionResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -1050,7 +1048,7 @@
       "required": ["sessionId"]
     },
     "FileContent": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -1098,7 +1096,7 @@
         "targetSessionId": {
           "type": "string",
           "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$"
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": ["workspaceId", "sourceSessionId", "sourceTurnId", "action"]
@@ -1182,7 +1180,7 @@
       "required": ["protocol", "methods"]
     },
     "HistoryRequest": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": { "kind": { "type": "string", "const": "targets" } },
@@ -1256,7 +1254,7 @@
         "sessionId": { "type": "string", "minLength": 1 },
         "userId": { "type": "string" },
         "command": {
-          "anyOf": [
+          "oneOf": [
             {
               "type": "object",
               "properties": { "action": { "type": "string", "const": "list" } },
@@ -1473,7 +1471,7 @@
       "required": ["workspaceId", "sessionId", "relativePath", "userId"]
     },
     "LocalProjectsParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -1539,7 +1537,7 @@
       ]
     },
     "LocalProjectsResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -1613,9 +1611,7 @@
           "properties": {
             "outcome": { "type": "string", "const": "directory" },
             "path": { "type": "string", "minLength": 1 },
-            "parentPath": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }]
-            },
+            "parentPath": { "type": ["string", "null"] },
             "entries": {
               "type": "array",
               "items": {
@@ -1686,7 +1682,7 @@
       "required": ["machineId", "providerId", "memoryId", "name"]
     },
     "MemorySettingsParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -1875,7 +1871,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string" },
-        "machineId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "machineId": { "type": ["string", "null"] },
         "conflict": { "type": "boolean" },
         "members": {
           "type": "array",
@@ -2023,7 +2019,7 @@
       "required": ["start", "end", "label", "target"]
     },
     "PromptShortcutProject": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2055,7 +2051,7 @@
       }
     },
     "PromptShortcutsParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2102,7 +2098,7 @@
       ]
     },
     "PromptShortcutsResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2133,7 +2129,7 @@
       ]
     },
     "PromptShortcutTarget": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2210,7 +2206,7 @@
       ]
     },
     "PublishedSharesParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2312,7 +2308,7 @@
       ]
     },
     "PublishedSharesResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2563,7 +2559,7 @@
       "required": ["sessionId", "machineId", "text", "billingEntitlement"]
     },
     "SendTurnResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -2689,7 +2685,7 @@
       "required": ["workspaceId", "sessionId", "editorId", "action"]
     },
     "SessionSharingResult": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": { "outcome": { "type": "string", "const": "closed" } },
@@ -2749,6 +2745,22 @@
         }
       },
       "required": ["ids", "reserved"]
+    },
+    "SessionTraceEvent": {
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "minLength": 1 },
+        "event": {
+          "type": "string",
+          "enum": ["retry", "slow", "stalled", "status", "resume"]
+        },
+        "stage": { "type": "string", "enum": ["bootstrap", "catchup", "poll"] },
+        "status": { "type": "string" },
+        "code": { "type": "string" },
+        "ageMs": { "type": "number" },
+        "attempts": { "type": "number" }
+      },
+      "required": ["sessionId", "event"]
     },
     "SetActiveParams": {
       "type": "object",
@@ -2822,14 +2834,14 @@
       "required": ["editorId", "phase"]
     },
     "ShareRequestParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
             "workspaceId": { "type": "string", "minLength": 1 },
             "operation": { "type": "string", "const": "api" },
             "args": {
-              "anyOf": [
+              "oneOf": [
                 {
                   "type": "object",
                   "properties": {
@@ -3059,15 +3071,13 @@
             "workspaceId": { "type": "string", "minLength": 1 },
             "operation": { "type": "string", "const": "management" },
             "args": {
-              "anyOf": [
+              "oneOf": [
                 {
                   "type": "object",
                   "properties": {
                     "workspaceId": { "type": "string", "minLength": 1 },
                     "action": { "type": "string", "const": "list" },
-                    "cursor": {
-                      "anyOf": [{ "type": "string" }, { "type": "null" }]
-                    }
+                    "cursor": { "type": ["string", "null"] }
                   },
                   "required": ["workspaceId", "action", "cursor"]
                 },
@@ -3164,7 +3174,7 @@
       "required": ["value"]
     },
     "ShortcutCloudParams": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {
@@ -3186,7 +3196,7 @@
               "type": "object",
               "properties": {
                 "target": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "type": "object",
                       "properties": {
@@ -3346,7 +3356,7 @@
       "required": ["sessionId", "entryId", "path"]
     },
     "WorkspaceChanges": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "properties": {

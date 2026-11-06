@@ -33,24 +33,25 @@ extension LodyChatView {
     applyRows()
   }
 
-  func setEntries(_ json: String) {
+  func setEntries(_ json: String, animate: Bool = true) {
     if historyLoadStarted == 0 { historyLoadStarted = CACurrentMediaTime() }
-    pendingEntries = json
+    pendingEntries = (json, animate && (pendingEntries?.animate ?? true))
   }
 
   func scheduleUpdate() {
     // All props have arrived. Cached first content is already decoded before push.
-    guard !decoding, let json = pendingEntries else { return }
+    guard !decoding, let input = pendingEntries else { return }
+    let json = input.json
     pendingEntries = nil
     if let prepared = preparedEntries {
       preparedEntries = nil
       if prepared.json == json {
-        receiveEntries(prepared.entries)
+        receiveEntries(prepared.entries, animate: false)
         return
       }
       // Live props can overtake mounting. Keep the prepared first frame while
       // decoding that newer snapshot, just as an already-visible chat would.
-      if !hasPositionedContent { receiveEntries(prepared.entries) }
+      if !hasPositionedContent { receiveEntries(prepared.entries, animate: false) }
     }
     decoding = true
     preparation.async { [weak self] in
@@ -59,7 +60,7 @@ extension LodyChatView {
         guard let self else { return }
         self.decoding = false
         switch decoded {
-        case .success(let entries): self.receiveEntries(entries)
+        case .success(let entries): self.receiveEntries(entries, animate: input.animate)
         case .failure: self.displayError = String(localized: "native.chat.error.transcript", bundle: .lody)
         }
         self.scheduleUpdate()
@@ -67,7 +68,8 @@ extension LodyChatView {
     }
   }
 
-  private func receiveEntries(_ received: [ChatEntry]) {
+  private func receiveEntries(_ received: [ChatEntry], animate: Bool) {
+    if !animate { pendingSnapshotEntries.formUnion(received.map(\.id)) }
     // Web shows reasoning only for builtin DSH; other providers' thoughts and `think` steps
     // never reach the transcript.
     let entries = showsThoughts ? received : received.map { entry in
@@ -92,7 +94,7 @@ extension LodyChatView {
       followsBottom = true
     }
     lastUserID = userID
-    stream.receive(entries, animate: window != nil && !UIAccessibility.isReduceMotionEnabled, deferredEntries: Set(deferredRows.keys), initialSnapshot: !hasPositionedContent)
+    stream.receive(entries, animate: animate && window != nil && !UIAccessibility.isReduceMotionEnabled, deferredEntries: Set(deferredRows.keys), initialSnapshot: !hasPositionedContent)
     if hasPositionedContent { startFrameTimer() }
     else { renderFrame() }
   }
@@ -123,9 +125,12 @@ extension LodyChatView {
     let animating = Set(rows.values.filter { store.isAnimating(id: $0.id) }.map(\.entryID))
     stream.advance(animatingEntries: animating)
     let entries = stream.presentation
+    let snapshots = pendingSnapshotEntries
+    pendingSnapshotEntries.removeAll()
     if !hasPositionedContent {
       // The first snapshot belongs to this layout transaction, not a later timer.
       transcript.entries = entries
+      snapshotEntries.formUnion(snapshots)
       applyRows()
       rendering = false
       // The first layout may receive another snapshot while its diff is committing.
@@ -142,12 +147,13 @@ extension LodyChatView {
     preparation.async { [weak self] in
       for entry in entries where prepareIDs.contains(entry.id) && !deferred.contains(entry.id) {
         for item in entry.items where item.type == "text" || item.type == "thought" {
-          _ = parser.parse(item.text ?? "", streaming: entry.isRunning)
+          _ = parser.parse(item.text ?? "", streaming: entry.isRunning && item.itemId == entry.textTailID)
         }
       }
       DispatchQueue.main.async { [weak self] in
         guard let self else { return }
         self.transcript.entries = entries
+        self.snapshotEntries.formUnion(snapshots)
         self.applyRows()
         self.rendering = false
         self.updateDeferredStreams()
@@ -192,6 +198,8 @@ extension LodyChatView {
     if let pendingSend, LodyComposerView.relays[pendingSend.id] != nil { return }
     applyOverlay()
     guard !applying else { needsApply = true; return }
+    catchingUpEntries.formUnion(snapshotEntries)
+    snapshotEntries.removeAll()
     applying = true
     let commitStart = CACurrentMediaTime()
     let previousOffset = collection.contentOffset.y

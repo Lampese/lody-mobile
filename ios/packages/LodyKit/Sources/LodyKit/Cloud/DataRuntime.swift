@@ -11,6 +11,7 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
   var sessionId: String?
   private(set) var sessionSnapshot: (generation: Int, json: String)?
   private var retainedSessions: [String] = []
+  private var sessionWatchers = SessionSubscriptions()
   var reservedSessions: [String] = []
   var userId = ""
   private let localStore: LocalStore
@@ -64,6 +65,10 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
       MainActor.assumeIsolated {
         guard let self, self.workspace != nil, self.backgrounded else { return }
         self.backgrounded = false
+        self.recordRuntime("runtime_resume", phase: self.phase, reason: self.reason, extra: [
+          "hasView": String(self.webView != nil), "contractReady": String(self.contractReady),
+          "handshakeDeferred": String(self.handshakeDeferred),
+        ])
         self.health.resume(at: self.now)
         if self.webView == nil { self.build(reason: "foreground") }
         else {
@@ -103,6 +108,7 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     return value
   }
   private func publish(_ state: String, reason: String, catalog: String? = nil) {
+    if state != phase { recordRuntime("runtime_phase", phase: state, reason: reason) }
     self.phase = state; self.reason = reason
     emitStatus()
     onCatalogUpdate?(owner, state, catalog)
@@ -158,6 +164,7 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
   }
   func recover(_ reason: String) {
     guard workspace != nil else { return }
+    recordRuntime("runtime_recover", phase: phase, reason: reason, extra: ["hasView": String(webView != nil)])
     if backgrounded { disposeView(); publish("background", reason: reason); return }
     if health.allowRestart(at: now) { build(reason: reason) }
     else { disposeView(); publish("failed", reason: "restart_limit") }
@@ -224,6 +231,14 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     if sessionId != id { sessionSnapshot = nil }
     sessionId = id
     dispatch(RuntimeContract.Calls.OpenSession.self, .init(sessionId: id))
+  }
+  func watchSession(_ id: String) {
+    sessionWatchers.retain(id)
+    openSession(id)
+  }
+  // A replaced chat page can deinit after its successor opened the same session.
+  func unwatchSession(_ id: String) {
+    if sessionWatchers.release(id) { closeSession(id) }
   }
   func closeSession(_ id: String) {
     ContentStore.shared.clear(session: id)
@@ -310,6 +325,8 @@ final class DataRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     case .sessionCache(let value):
       receiveSession(value.sessionId, session: value.session, synced: value.synced,
         work: value.backgroundWork.map { ($0.id, $0.state.rawValue) }, active: false)
+    case .sessionTrace(let value):
+      recordSessionTrace(value)
     #if DEBUG
     case .diagnostic(let value):
       NSLog("LodyRuntime stage=%@ stream=%@", value.stage, value.stream)
