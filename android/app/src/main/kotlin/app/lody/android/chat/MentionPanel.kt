@@ -135,7 +135,7 @@ object Mentions {
 
     /** Replaces the trigger with the reference and a trailing space, caret after it. */
     fun insert(value: TextFieldValue, trigger: Trigger, item: MentionCandidate): TextFieldValue =
-        insertText(value, trigger, shown(item))
+        insertText(value, trigger, token(item))
 
     /** Replaces the trigger with [text] and a trailing space, caret after it. */
     fun insertText(value: TextFieldValue, trigger: Trigger, text: String): TextFieldValue {
@@ -146,7 +146,7 @@ object Mentions {
 
     /** What the prompt shows for a reference: an Agent Role reads as its emoji and name (web). */
     fun shown(item: MentionCandidate): String =
-        if (item.kind == "role") roleLabel(item.emoji, item.name) else item.insertText ?: "@${item.path}"
+        if (item.kind == "role") roleLabel(item.emoji, item.name) else if (item.kind == "session") "@${item.name}" else item.insertText ?: "@${item.path}"
 
     fun token(item: MentionCandidate): String = item.insertText ?: "@${item.path}"
 
@@ -180,8 +180,7 @@ object Mentions {
                         val id = target.optString("agentRoleId")
                         val item = roles.firstOrNull { it.path == id || it.path.startsWith("$id@") }
                         val shown = item?.let { roleLabel(it.emoji, it.name) } ?: label
-                        role(shown, "@role:$id")
-                        shown
+                        item?.let { token(it) } ?: "@role:$id"
                     }
                     else -> label
                 },
@@ -355,6 +354,8 @@ class MentionState {
         return result
     }
 
+    internal fun presentation(color: androidx.compose.ui.graphics.Color) = MentionPresentation(catalogs.values.flatMap { it.items }, color)
+
     /** Reads every category in parallel; a category that fails stays empty. */
     suspend fun load(fetch: suspend (String) -> MentionCatalogPage) = coroutineScope {
         pending = Mentions.categories.toSet()
@@ -437,7 +438,6 @@ fun MentionDock(
                 } else if (current != null) {
                     val next = Mentions.insert(field, current, item)
                     if (next.text.length <= 32000) {
-                        if (item.kind == "role") state.labels = state.labels + (Mentions.shown(item) to Mentions.token(item))
                         onFieldChange(next)
                     }
                 }

@@ -17,6 +17,7 @@ struct ChatPendingSend: Decodable {
   let text: String
   let attachments: [Attachment]
   let status: String
+  var displayText: String? = nil
   var startedAt: Double? = nil
   var failed: Bool? = nil
   var reconnect: Bool? = nil

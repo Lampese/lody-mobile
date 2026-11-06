@@ -1,3 +1,5 @@
+import {expandMentions} from '../vendor/cloud-runtime/src/runtime/mention-expansion.ts';
+import {referenceSpans} from '../vendor/cloud-runtime/src/protocol/message-references.ts';
 import {contractBridge} from './contract-bridge.mjs';
 import '../vendor/cloud-runtime/src/runtime/index.ts';
 import {createDispatcher,HOST_PROTOCOL,CORE_CAPABILITIES} from './dispatch.mjs';
@@ -26,5 +28,14 @@ const detail={
  createTab:(parentSessionId,sessionId,title)=>{const scope=identity;if(!scope)throw Error('not_connected');return runtime.createTab({workspaceId:scope.workspaceId,parentSessionId,sessionId,title});},itemDetail:(sessionId,entryId,itemId)=>itemDetail({sessionId,entryId,itemId}),turnDiff:(sessionId,entryId,path)=>runtime.turnDiff({sessionId,entryId,path}),
  // Stops the watched session's running turn; a write, never retried.
  controlTurn:async(sessionId,machineId,turnId)=>{const result=await controlTurn({action:'stop',sessionId,machineId,turnId});return {state:result?.state??'unknown'};}};
-globalThis.androidDispatch=createDispatcher(core,emit,{...cloud,...createCommands(runtime,sendTurn,()=>identity),...detail});
+const sendWithReferences = args => sendTurn(args, async text => {
+ const items = [];
+ const expanded = await expandMentions(text, async category => {
+  const catalog = await runtime.mentionCatalog({workspaceId:identity.workspaceId,sessionId:args.sessionId,machineId:args.machineId,userId:args.userId,cliType:args.cliType,agentType:args.agentType,category});
+  items.push(...catalog.items);
+  return catalog;
+ });
+ return {text:expanded,spans:referenceSpans(expanded,items)};
+});
+globalThis.androidDispatch=createDispatcher(core,emit,{...cloud,...createCommands(runtime,sendWithReferences,()=>identity),...detail});
 emit({type:'hostReady',protocol:HOST_PROTOCOL,capabilities:[...CORE_CAPABILITIES,'connect','grant','watchSession','closeSession','creationOptions','createAndSend','sendText','itemDetail','createTab','turnDiff','controlTurn','agentRoles','mentionCatalog','localProjects','shortcutBody','projectGroups','messageAction','setTabClosed']});

@@ -257,16 +257,12 @@ final class ChatComposerInput: TextView {
 
   /// The text sent: each labelled chip's token restored in place, chip by chip in order.
   var markdown: String {
-    let exported = (try? MarkdownExporter.gfm.export(editor)) ?? (text ?? "")
-    guard !labelledReferences.isEmpty else { return exported }
-    var result = exported
-    var cursor = result.startIndex
-    for label in referenceLabels {
-      guard let token = labelledReferences[label], let found = result.range(of: label, range: cursor..<result.endIndex) else { continue }
-      result.replaceSubrange(found, with: token)
-      cursor = result.index(found.lowerBound, offsetBy: token.count, limitedBy: result.endIndex) ?? result.endIndex
-    }
-    return result
+    let legacy = labelledReferences
+    let exporter = MarkdownExporter(transformers: [.textMatch { node, _, _ in
+      guard let reference = node as? ChatReferenceNode else { return nil }
+      return reference.referenceToken ?? legacy[reference.getTextContent()] ?? reference.getTextContent()
+    }] + MarkdownExporter.gfm.transformers, escapesText: false, preservesNewlines: true)
+    return (try? exporter.export(editor)) ?? (text ?? "")
   }
 
   /// The labels of the chips in the editor, in document order.
@@ -280,6 +276,38 @@ final class ChatComposerInput: TextView {
       getRoot().map(collect)
     }
     return labels
+  }
+
+  func hydrateReferences(_ items: [ChatMentionItem]) {
+    let labels = Dictionary(items.filter { $0.kind == "session" || $0.kind == "role" }.map { item in
+      (item.insertText ?? "@" + item.path, item.kind == "session" ? "@" + item.name : ChatRoleLabel(emoji: item.emoji ?? "🪼", name: item.name).text)
+    }, uniquingKeysWith: { first, _ in first })
+    var needsUpdate = false
+    try? editor.read {
+      func inspect(_ node: Node) {
+        if let reference = node as? ChatReferenceNode {
+          let token = reference.referenceToken ?? labelledReferences[reference.getTextContent()] ?? reference.getTextContent()
+          if let label = labels[token], label != reference.getTextContent() { needsUpdate = true }
+        }
+        (node as? ElementNode)?.getChildren().forEach(inspect)
+      }
+      getRoot().map(inspect)
+    }
+    guard needsUpdate else { return }
+    try? editor.update {
+      func visit(_ node: Node) throws {
+        if let reference = node as? ChatReferenceNode {
+          let token = reference.referenceToken ?? labelledReferences[reference.getTextContent()] ?? reference.getTextContent()
+          if let label = labels[token], label != reference.getTextContent() {
+            let writable: ChatReferenceNode = try reference.getWritable()
+            writable.referenceToken = token
+            try writable.setText(label)
+          }
+        }
+        for child in (node as? ElementNode)?.getChildren() ?? [] { try visit(child) }
+      }
+      if let root = getRoot() { try visit(root) }
+    }
   }
 
   var serializedState: String? {
@@ -348,7 +376,9 @@ final class ChatComposerInput: TextView {
       var nodes: [Node] = []
       for segment in segments where !segment.text.isEmpty {
         if segment.reference {
-          nodes.append(ChatReferenceNode(text: segment.text, key: nil))
+          let node = ChatReferenceNode(text: segment.text, key: nil)
+          node.referenceToken = segment.token ?? segment.text
+          nodes.append(node)
           continue
         }
         // A body's newlines become line breaks.
@@ -1465,6 +1495,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     updateComposer()
   }
   private func updateComposer() {
+    input.hydrateReferences(activeMentionItems ?? [])
     mentionPanel.update(input: input, items: activeMentionItems ?? [], enabled: activeMentionItems != nil)
     let dockChanged = mentionHeight.constant != mentionPanel.panelHeight
     mentionHeight.constant = mentionPanel.panelHeight
@@ -1925,7 +1956,7 @@ final class ChatComposerView: UIView, UITextViewDelegate {
     let id = UUID().uuidString.lowercased()
     let body = input.markdown
     let payload: [String: Any] = [
-      "id": id, "queue": queued, "guide": guiding, "text": body,
+      "id": id, "queue": queued, "guide": guiding, "text": body, "displayText": input.text ?? body,
       "startedAt": Date().timeIntervalSince1970 * 1000,
       "attachments": attachments.map {
         ["id": $0.id, "name": $0.name, "uri": $0.url.absoluteString, "kind": $0.isImage ? "image" : "file"]

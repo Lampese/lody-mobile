@@ -74,7 +74,15 @@ struct ChatMessageAttachment: Decodable, Equatable {
   var sizeBytes: Int? = nil
 }
 
+struct ChatTextReference: Decodable, Equatable {
+  var start: Int
+  var end: Int
+  let kind: String
+  let target: String?
+}
+
 struct ChatItem: Decodable {
+  var references: [ChatTextReference]? = nil
   struct Permission: Decodable { let requestId: String; let pending: Bool }
   struct Plan: Decodable { let content: String; let status: String }
   struct NoticeMeta: Decodable, Equatable { let reason: String?; let code: String?; let message: String? }
@@ -123,6 +131,7 @@ struct ChatRow: Equatable {
   let entryID: String
   var kind: String
   var text: String
+  var references: [ChatTextReference] = []
   var errorMeta: ChatItem.NoticeMeta? = nil
   var errorRetry: ChatErrorRetryState? = nil
   var planIsLatest = true
@@ -463,9 +472,21 @@ struct ChatTranscript {
         if !attachments.isEmpty {
           result.append(ChatRow(id: entry.id + ":user", entryID: entry.id, kind: "attachments", text: "", attachments: attachments))
         }
-        let text = entry.items.compactMap { $0.type == "text" ? $0.text : nil }.joined(separator: "\n\n")
+        var text = ""
+        var references: [ChatTextReference] = []
+        for item in entry.items where item.type == "text" {
+          guard let value = item.text else { continue }
+          if !text.isEmpty { text += "\n\n" }
+          let offset = (text as NSString).length
+          references += (item.references ?? []).map { reference in
+            var shifted = reference
+            shifted.start += offset; shifted.end += offset
+            return shifted
+          }
+          text += value
+        }
         if !text.isEmpty {
-          result.append(ChatRow(id: entry.id + (result.isEmpty ? ":user" : ":user-text"), entryID: entry.id, kind: "user", text: text))
+          result.append(ChatRow(id: entry.id + (result.isEmpty ? ":user" : ":user-text"), entryID: entry.id, kind: "user", text: text, references: references))
         }
         // The turn's first bubble carries its sender, time and read state (web's header).
         if let first = result.firstIndex(where: { $0.kind == "user" }) {
@@ -887,7 +908,7 @@ extension ChatPendingSend {
           running: failed != true && reconnect != true && !["accepted", "uploaded", "unknown"].contains(phase ?? ""),
           attachments: media, uploadProgress: uploadProgress ?? [:]))
       }
-      let body = text
+      let body = displayText ?? text
       if !body.isEmpty {
         var row = ChatRow(id: id + (result.isEmpty ? ":user" : ":user-text"), entryID: id, kind: "user", text: body)
         // A local send in flight is the signed-in user's own turn.

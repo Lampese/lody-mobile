@@ -18,13 +18,27 @@ class ComposerMotionProbeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val mentions = intent.getBooleanExtra("mentions", false)
         setContent {
             LodyTheme {
-                var prompt by remember { mutableStateOf(TextFieldValue()) }
+                var prompt by remember { mutableStateOf(TextFieldValue(if (mentions) "@session:fixture-session @role:fixture-role " else "")) }
                 Surface(color = LodyTheme.colors.bgBase) {
-                    Box(Modifier.fillMaxSize().navigationBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
+                    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.Bottom) {
+                        if (mentions) {
+                            val body = "Please review @Fix sign-in with 🧪 Reviewer and @src/auth/login.ts."
+                            val ranges = listOf("@Fix sign-in", "🧪 Reviewer", "@src/auth/login.ts").map { label ->
+                                val start = body.indexOf(label)
+                                app.lody.android.runtime.MessageReference(start, start + label.length)
+                            }
+                            app.lody.android.chat.ChatTranscript(listOf(app.lody.android.chat.ChatEntry.User("mentions", body, app.lody.android.chat.TurnIdentity("You"), references = ranges)), Modifier.weight(1f))
+                        }
+
                         ChatComposer(
-                            prompt = prompt, onPromptChange = { prompt = it }, onFocusChange = {}, enabled = true,
+                            prompt = prompt, onPromptChange = { prompt = app.lody.android.chat.MentionPresentation.edit(prompt, it) },
+                            referencePresentation = app.lody.android.chat.MentionPresentation(listOf(
+                                app.lody.android.runtime.MentionCandidate("fixture-session", "Fix sign-in", "session", insertText = "@session:fixture-session"),
+                                app.lody.android.runtime.MentionCandidate("fixture-role", "Reviewer", "role", insertText = "@role:fixture-role", emoji = "🧪"),
+                            ), LodyTheme.colors.accentDefault), onFocusChange = {}, enabled = true,
                             agentCliType = "builtin", agentType = "codex", roleEmoji = null, roleName = null,
                             agentName = "Codex", face = listOf("6.1 Sol", "Medium"), mode = null, modeLabel = null,
                             plan = false, fast = false, onRunConfig = {}, stoppable = false, stopping = false,

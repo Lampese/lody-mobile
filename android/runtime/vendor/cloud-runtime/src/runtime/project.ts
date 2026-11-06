@@ -1,3 +1,4 @@
+import { presentMessageText } from '../protocol/message-references.ts';
 import {
   readTurnMetadata,
   type TurnMetadata,
@@ -215,6 +216,7 @@ function summarizeItem(
       rev: bump(projection, key, text),
       type,
       text,
+      ...(raw.references?.length ? { references: raw.references } : {}),
     } as ItemSummary;
   }
 
@@ -445,7 +447,9 @@ function summarizeEntry(
   const summarizedItems: ItemSummary[] = list.map((item: any, i: number) =>
     summarizeItem(
       projection,
-      item,
+      entry.role === 'user' && item?.type === 'text'
+        ? { ...item, ...presentMessageText(item.text ?? '', item.spans) }
+        : item,
       id,
       items && typeof items.getIdAt === 'function'
         ? identityAt(items, i)
@@ -614,7 +618,8 @@ export function projectSession(
             ...(Object.keys(composerValues).length
               ? { configOptionValues: composerValues }
               : {}),
-            ...(typeof input.agentRoleId === 'string' || input.agentRoleId === null
+            ...(typeof input.agentRoleId === 'string' ||
+            input.agentRoleId === null
               ? { agentRoleId: input.agentRoleId }
               : {}),
           },
@@ -646,7 +651,12 @@ export function projectSession(
           ).map((block: any, index: number) =>
             summarizeItem(
               projectionFor(doc),
-              block,
+              block?.type === 'text'
+                ? {
+                    ...block,
+                    ...presentMessageText(block.text ?? '', block.spans),
+                  }
+                : block,
               item.userTurnId,
               `queue:${index}`,
             ),
@@ -666,5 +676,7 @@ function taskGroup(raw: any): 'subagents' | 'tasks' {
   if (raw?.taskKind === 'scheduled') return 'tasks';
   if (raw?.subagentType || raw?.run) return 'subagents';
   const type = raw?.taskType ?? raw?.actor;
-  return typeof type === 'string' && NON_AGENT_TASK_TYPES.has(type) ? 'tasks' : 'subagents';
+  return typeof type === 'string' && NON_AGENT_TASK_TYPES.has(type)
+    ? 'tasks'
+    : 'subagents';
 }

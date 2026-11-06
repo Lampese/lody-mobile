@@ -119,11 +119,14 @@ data class CatalogSnapshot(
  * picked a user turn up, `pending` / `queued` before); [userId] is a user turn's sender;
  * [startedAt] / [endedAt] (epoch ms) time an agent turn; [model] names its model.
  */
+data class MessageReference(val start: Int, val end: Int)
+
 data class SessionMessage(
     val id: String,
     val role: String,
     val text: String,
     val streaming: Boolean,
+    val references: List<MessageReference> = emptyList(),
     val timestamp: String? = null,
     val status: String = "",
     val userId: String? = null,

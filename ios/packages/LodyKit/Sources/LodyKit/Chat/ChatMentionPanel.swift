@@ -359,7 +359,7 @@ final class ChatMentionPanel: UIView {
     applyingEdit = true
     if let composer = input as? ChatComposerInput {
       // An Agent Role reads as its emoji and name; it still sends `@role:<id>` (web).
-      let label = item.kind == "role" ? ChatRoleLabel(emoji: item.emoji.flatMap { $0.isEmpty ? nil : $0 } ?? "🪼", name: item.name).text : nil
+      let label = item.kind == "role" ? ChatRoleLabel(emoji: item.emoji.flatMap { $0.isEmpty ? nil : $0 } ?? "🪼", name: item.name).text : item.kind == "session" ? "@" + item.name : nil
       composer.insertReference(String(text.dropLast()), label: label, replacing: range)
       applyingEdit = false
       onChange?()

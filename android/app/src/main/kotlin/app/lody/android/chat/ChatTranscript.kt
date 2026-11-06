@@ -82,6 +82,7 @@ sealed interface ChatEntry {
     data class User(
         override val id: String, val text: String, val who: TurnIdentity, val delivery: Delivery = Delivery.Sent,
         val attachments: List<app.lody.android.runtime.MessageAttachment> = emptyList(),
+        val references: List<app.lody.android.runtime.MessageReference> = emptyList(),
     ) : ChatEntry
     /**
      * An agent turn laid out like web's: prose, thought / tool groups, and for a finished turn
@@ -333,7 +334,13 @@ private fun UserTurn(entry: ChatEntry.User, actions: MessageActionState) {
                 }
             }
             if (entry.text.isNotBlank()) Text(
-                entry.text,
+                androidx.compose.ui.text.buildAnnotatedString {
+                    append(entry.text)
+                    entry.references.forEach { reference ->
+                        if (reference.start >= 0 && reference.end <= length && reference.end > reference.start)
+                            addStyle(androidx.compose.ui.text.SpanStyle(color = colors.accentDefault), reference.start, reference.end)
+                    }
+                },
                 style = LodyTheme.typography.reading,
                 color = colors.textPrimary,
                 modifier = Modifier

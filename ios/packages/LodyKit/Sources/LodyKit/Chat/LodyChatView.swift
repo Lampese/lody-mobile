@@ -840,6 +840,7 @@ final class LodyChatView: LodyAppearanceView, UICollectionViewDelegateFlowLayout
 
   func setPendingSend(_ pending: ChatPendingSend) {
     var value = pending
+    if value.displayText == nil, pendingSend?.id == value.id { value.displayText = pendingSend?.displayText }
     var start = turnStartedAt[value.id]
     if start == nil, let supplied = value.startedAt, supplied.isFinite {
       start = supplied

@@ -1491,3 +1491,16 @@ bigComposer.onSend = { bigAttachments = $0["attachments"] as! [[String: String]]
 tapSend(on: bigComposer)
 precondition(bigAttachments.first?["name"] == "Text.txt", "Undo that cannot insert must keep the file, got \(bigAttachments)")
 print("Rich composer: huge logs become Text.txt and a refused undo keeps the file")
+
+// Friendly labels must never replace ordinary prose or confuse equal display names.
+let (_, referenceInput) = makeRichComposer()
+referenceInput.text = "@Same title "
+referenceInput.insertReference("@session:first", label: "@Same title", replacing: NSRange(location: (referenceInput.text as NSString).length, length: 0))
+referenceInput.insertReference("@session:second", label: "@Same title", replacing: NSRange(location: (referenceInput.text as NSString).length, length: 0))
+precondition(referenceInput.markdown == "@Same title @session:first @session:second ")
+let savedReferences = referenceInput.draftEnvelope
+referenceInput.text = ""
+referenceInput.restoreDraft(savedReferences)
+precondition(referenceInput.markdown == "@Same title @session:first @session:second ")
+precondition(!referenceInput.text.contains("session:"))
+print("Mention labels: identical titles retain distinct tokens across draft restoration")

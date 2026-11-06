@@ -6,6 +6,25 @@ import UIKit
   private static let pattern = try! NSRegularExpression(pattern:
     #"(?s:`{3,}.*?(?:`{3,}|$))|`+[^`\n]*`+|https?://[^\s]+|\\[@#$]|(?<!\S)use /([^\s]+) \[Skill Path\]\(((?:\\.|[^\\)])+)\)|(?<!\S)@(?:"((?:\\.|[^"\\])*)"|([^\s@"`]+))|(?<!\S)#([1-9][0-9]*)(?=$|\s|[.,;:!?\)\]])"#)
 
+  static func decorate(_ source: NSAttributedString, references: [ChatTextReference], repository: String, traits: UITraitCollection) -> NSAttributedString {
+    guard !references.isEmpty else { return decorate(source, repository: repository, traits: traits) }
+    let result = NSMutableAttributedString(string: "")
+    var cursor = 0
+    for reference in references.sorted(by: { $0.start < $1.start }) {
+      guard reference.start >= cursor, reference.end > reference.start, reference.end <= source.length else { continue }
+      result.append(decorate(source.attributedSubstring(from: NSRange(location: cursor, length: reference.start - cursor)), repository: repository, traits: traits))
+      let label = NSMutableAttributedString(attributedString: source.attributedSubstring(from: NSRange(location: reference.start, length: reference.end - reference.start)))
+      label.addAttribute(.foregroundColor, value: UIColor.lodyAccent, range: NSRange(location: 0, length: label.length))
+      if ["file", "dir", "skill"].contains(reference.kind), let path = reference.target.flatMap(fileTarget) {
+        label.addAttribute(.link, value: path, range: NSRange(location: 0, length: label.length))
+      }
+      result.append(label)
+      cursor = reference.end
+    }
+    result.append(decorate(source.attributedSubstring(from: NSRange(location: cursor, length: source.length - cursor)), repository: repository, traits: traits))
+    return result
+  }
+
   static func decorate(_ source: NSAttributedString, repository: String, traits: UITraitCollection) -> NSAttributedString {
     let result = NSMutableAttributedString(attributedString: source)
     let text = source.string as NSString
@@ -42,13 +61,13 @@ import UIKit
         symbol = "link"
       } else { continue }
       var attributes = source.attributes(at: match.range.location, effectiveRange: nil)
-      attributes[.foregroundColor] = UIColor.systemBlue
+      attributes[.foregroundColor] = UIColor.lodyAccent
       attributes[.link] = target
       let font = attributes[.font] as? UIFont ?? .preferredFont(forTextStyle: .body)
       let size = font.pointSize * 0.85
       let attachment = NSTextAttachment()
       attachment.image = UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: size))?
-        .withTintColor(UIColor.systemBlue.resolvedColor(with: traits), renderingMode: .alwaysOriginal)
+        .withTintColor(UIColor.lodyAccent.resolvedColor(with: traits), renderingMode: .alwaysOriginal)
       attachment.bounds = CGRect(x: 0, y: font.descender / 2, width: size, height: size)
       let node = NSMutableAttributedString(attachment: attachment)
       node.append(NSAttributedString(string: "\u{00a0}" + label))

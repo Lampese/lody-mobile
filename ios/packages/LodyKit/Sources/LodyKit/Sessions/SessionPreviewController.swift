@@ -81,6 +81,28 @@ final class SessionPreviewController: SessionController {
         else { action(body) }
       }
     }
+    if scenario == "mentions" {
+      // Offline fixture: input and bubble exercise the production native renderers.
+      chat.onSend = { _ in }
+      func findInput(_ view: UIView) -> ChatComposerInput? {
+        if let input = view as? ChatComposerInput { return input }
+        return view.subviews.lazy.compactMap(findInput).first
+      }
+      if let input = findInput(chat.composer) {
+        input.text = "@Same title "
+        input.insertReference("@session:first", label: "@Same title", replacing: NSRange(location: (input.text as NSString).length, length: 0))
+        input.insertReference("@session:second", label: "@Same title", replacing: NSRange(location: (input.text as NSString).length, length: 0))
+        let expected = input.markdown
+        precondition(expected.contains("@Same title @session:first @session:second"))
+        let draft = input.draftEnvelope
+        input.text = ""
+        input.restoreDraft(draft)
+        precondition(input.markdown == expected && !input.text.contains("session:"))
+        input.text = ""
+        input.insertReference("@session:fixture-session", label: "@Fix sign-in", replacing: NSRange(location: 0, length: 0))
+        input.insertReference("@role:fixture-role", label: "🧪 Reviewer", replacing: NSRange(location: (input.text as NSString).length, length: 0))
+      }
+    }
     view.addSubview(probe)
     fixture.changed = { [weak self] in self?.updateProbe() }
     updateProbe()
@@ -203,6 +225,20 @@ private final class SessionPreviewFixture {
         }
         entries[1]["items"] = items
       }
+      object["entries"] = entries
+      session = SessionController.json(object)
+    }
+    if bar == "mentions", let data = session?.data(using: .utf8),
+       var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       var entries = object["entries"] as? [[String: Any]] {
+      let text = "Please review @Fix sign-in with 🧪 Reviewer and @src/auth/login.ts."
+      let source = text as NSString
+      let refs = ["@Fix sign-in", "🧪 Reviewer"].enumerated().map { index, label -> [String: Any] in
+        let range = source.range(of: label)
+        return ["start": range.location, "end": NSMaxRange(range), "kind": index == 0 ? "session" : "agent_role"]
+      }
+      entries[0]["items"] = [["itemId": "text", "type": "text", "text": text, "references": refs]]
+      entries[1]["items"] = [["itemId": "reply", "type": "text", "text": "References keep their readable names in the conversation."]]
       object["entries"] = entries
       session = SessionController.json(object)
     }

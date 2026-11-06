@@ -129,6 +129,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                 TurnIdentity("", time = turnTime(message.timestamp)),
                                 delivery(message.status),
                                 message.attachments,
+                                message.references,
                             )
                             else -> {
                                 val items = message.items.ifEmpty { listOf(TurnItem.Text(message.id, message.text)) }
@@ -185,14 +186,14 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
         (listOfNotNull(firstTurn) + outgoing).filter { it.turnId !in authorsByMessage }
     }
     // Composer focus / IME animation must not rebuild every sender row in a long chat.
-    val all = remember(entries, authorsByMessage, members, context.me, memberLabel, pending) {
+    val all = remember(entries, authorsByMessage, members, context.me, memberLabel, pending, mentions.catalogs) {
         entries.map { entry ->
             if (entry is ChatEntry.User) {
                 val userId = authorsByMessage[entry.id]
                 entry.copy(who = senderIdentity(userId, context.me, members[userId ?: context.me?.id], memberLabel, entry.who.time))
             } else entry
         } + pending.map {
-            ChatEntry.User(it.turnId, it.text, senderIdentity(null, context.me, members[context.me?.id], memberLabel, turnTime(it.at)), it.delivery, it.attachments)
+            ChatEntry.User(it.turnId, mentions.presentation(androidx.compose.ui.graphics.Color.Unspecified).filter(androidx.compose.ui.text.AnnotatedString(it.text)).text.text, senderIdentity(null, context.me, members[context.me?.id], memberLabel, turnTime(it.at)), it.delivery, it.attachments)
         }
     }
     val creationUnconfirmed = creation != null && creation.state !in setOf("accepted", "queued") && creation.request.turnId !in authorsByMessage
@@ -531,8 +532,9 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             val modelName = capability?.models?.firstOrNull { it.id == modelId }?.name ?: session?.modelName ?: agentName
             if (context.session?.isTabClosed != true) ChatComposer(
                 field,
-                onPromptChange = { if (it.text.length <= 32000) { field = it; prompt = it.text } },
+                onPromptChange = { if (it.text.length <= 32000) { field = app.lody.android.chat.MentionPresentation.edit(field, it); prompt = field.text } },
                 onFocusChange = { composerFocused = it },
+                referencePresentation = mentions.presentation(LodyTheme.colors.accentDefault),
                 enabled = canSend,
                 agentCliType = session?.cliType,
                 agentType = session?.agentType,
@@ -750,6 +752,7 @@ internal fun ChatComposer(
     prompt: androidx.compose.ui.text.input.TextFieldValue,
     onPromptChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    referencePresentation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
     enabled: Boolean,
     agentCliType: String?,
     agentType: String?,
@@ -887,6 +890,7 @@ internal fun ChatComposer(
                 if (!expanded) Plus()
                 BasicTextField(
                     value = prompt,
+                    visualTransformation = referencePresentation,
                     onValueChange = onPromptChange,
                     enabled = enabled,
                     textStyle = type.body.copy(color = colors.textPrimary),

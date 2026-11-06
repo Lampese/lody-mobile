@@ -29,6 +29,16 @@ internal object RuntimeProtocol {
                         else -> null
                     }
                 }.joinToString("\n\n")
+                var referenceOffset = 0
+                val references = rawItems.filter { it.optString("type") == "text" }.flatMap { item ->
+                    val value = item.optString("text")
+                    val ranges = item.optJSONArray("references")?.objects().orEmpty().mapNotNull { span ->
+                        val start = span.optInt("start", -1); val end = span.optInt("end", -1)
+                        if (start < 0 || end <= start || end > value.length) null else MessageReference(start + referenceOffset, end + referenceOffset)
+                    }
+                    referenceOffset += value.length + 2
+                    ranges
+                }
                 val items = rawItems.mapNotNull(::turnItem)
                 val files = entry.optJSONArray("fileDiffs")?.objects()?.mapNotNull { file ->
                     val path = file.optString("path").takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -47,6 +57,7 @@ internal object RuntimeProtocol {
                     id = entry.text("id"),
                     role = role,
                     text = text,
+                    references = references,
                     streaming = role == "assistant" && !entry.optBoolean("finished", true),
                     timestamp = (entry.opt("timestamp") as? String)?.takeIf { it.isNotBlank() },
                     status = entry.optString("status"),

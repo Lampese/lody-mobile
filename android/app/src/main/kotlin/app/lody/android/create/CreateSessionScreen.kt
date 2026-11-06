@@ -381,8 +381,9 @@ fun CreateSessionScreen(snapshot: CatalogSnapshot?, repository: CreationService,
                 }
                 Composer(
                     field,
-                    onPromptChange = { if (!attempted && it.text.length <= 32000) { field = it; prompt = it.text } },
+                    onPromptChange = { if (!attempted && it.text.length <= 32000) { field = app.lody.android.chat.MentionPresentation.edit(field, it); prompt = field.text } },
                     onFocusChange = { composerFocused = it },
+                referencePresentation = mentions.presentation(LodyTheme.colors.accentDefault),
                     attachments = attachments,
                     onRemoveAttachment = { id -> if (!busy) attachments = attachments.filterNot { it.id == id } },
                     busy = busy,
@@ -917,6 +918,7 @@ private fun Composer(
     prompt: androidx.compose.ui.text.input.TextFieldValue,
     onPromptChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    referencePresentation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
     attachments: List<PendingAttachment>,
     onRemoveAttachment: (String) -> Unit,
     busy: Boolean,
@@ -969,6 +971,7 @@ private fun Composer(
         BasicTextField(
             readOnly = busy,
             value = prompt,
+            visualTransformation = referencePresentation,
             onValueChange = onPromptChange,
             textStyle = type.body.copy(color = colors.textPrimary),
             cursorBrush = SolidColor(colors.accentDefault),

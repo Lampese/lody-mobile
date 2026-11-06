@@ -1,3 +1,5 @@
+import { referenceSpans } from '../../protocol/message-references.ts';
+import type { MentionItem } from '../../models/mentions.ts';
 import { forkableTurn, forkOnce, sessionActionMeta } from '../fork-session';
 import { machineRpc } from '../machine-rpc';
 import type { Value } from '@loro-dev/flock-wasm/base64';
@@ -320,12 +322,21 @@ export function registerSessions(
     };
     return sendTurn(
       args,
-      (text) =>
-        expandShortcuts(text, access.list, access.read, (part) =>
-          expandMentions(part, (category) =>
-            getMentions({ ...source, category }),
-          ),
-        ),
+      async (text) => {
+        const items: MentionItem[] = [];
+        const expanded = await expandShortcuts(
+          text,
+          access.list,
+          access.read,
+          (part) =>
+            expandMentions(part, async (category) => {
+              const catalog = await getMentions({ ...source, category });
+              items.push(...catalog.items);
+              return catalog;
+            }),
+        );
+        return { text: expanded, spans: referenceSpans(expanded, items) };
+      },
       async (persisted) => {
         scoped();
         const ids = await sessionMcpSelection(

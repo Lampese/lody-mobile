@@ -182,7 +182,7 @@ extension LodyChatView {
       .paragraphStyle: paragraph,
       .baselineOffset: (lineHeight - font.lineHeight) / 2,
     ])
-    if row.kind == "user" { return ChatUserMentions.decorate(text, repository: mentionRepository, traits: traitCollection) }
+    if row.kind == "user" { return ChatUserMentions.decorate(text, references: row.references, repository: mentionRepository, traits: traitCollection) }
     return text
   }
 
@@ -221,7 +221,7 @@ extension LodyChatView {
        !transcript.entries.contains(where: { $0.id == pendingSend.id }) {
       queue.append(ChatQueuedDraft(
         id: pendingSend.id,
-        text: pendingSend.text,
+        text: pendingSend.displayText ?? pendingSend.text,
         canSteer: false,
         attachments: pendingSend.attachments.map(\.name)
       ))
