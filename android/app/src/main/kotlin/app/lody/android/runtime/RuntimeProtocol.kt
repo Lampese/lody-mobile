@@ -53,6 +53,18 @@ internal object RuntimeProtocol {
                     userId = (entry.opt("userId") as? String)?.takeIf { it.isNotBlank() },
                     startedAt = (entry.opt("startedAt") as? Number)?.toLong(),
                     endedAt = (entry.opt("endedAt") as? Number)?.toLong(),
+                    permissionWaitMs = (entry.opt("permissionWaitMs") as? Number)?.toLong()?.coerceAtLeast(0) ?: 0,
+                    metadata = buildMap {
+                        entry.optJSONObject("modelInfo")?.let { info ->
+                            listOf("modelId", "name", "thoughtLevel").forEach { key -> (info.opt(key) as? String)?.takeIf { it.isNotBlank() }?.let { put(key, it) } }
+                        }
+                        entry.optJSONObject("inputConfig")?.let { info -> (info.opt("modeId") as? String)?.let { put("modeId", it) } }
+                        entry.optJSONObject("tokenUsage")?.let { usage ->
+                            listOf("inputTokens", "outputTokens", "reasoningOutputTokens", "cacheReadInputTokens", "cacheCreationInputTokens").forEach { key ->
+                                (usage.opt(key) as? Number)?.toDouble()?.takeIf { it.isFinite() && it >= 0 && it % 1 == 0.0 }?.let { put(key, it.toLong().toString()) }
+                            }
+                        }
+                    },
                     model = entry.optJSONObject("modelInfo")?.let { info -> info.optString("name").ifBlank { info.optString("modelId") }.ifBlank { null } },
                     items = if (role == "assistant") items else emptyList(),
                     files = if (role == "assistant") files else emptyList(),

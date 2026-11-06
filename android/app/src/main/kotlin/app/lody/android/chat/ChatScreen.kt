@@ -103,6 +103,8 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
     }
     val memberLabel = stringResource(R.string.chat_member)
     val workedFormat = stringResource(R.string.chat_worked_for)
+    val durationSeconds = stringResource(R.string.message_seconds)
+    val durationMinutes = stringResource(R.string.message_minutes_seconds)
     LaunchedEffect(scope, id, retry, creation?.state) {
         if (creation?.state in setOf("sending", "rejected")) return@LaunchedEffect
         val repair = QuickJsMarkdownRepair.fromAssets(appContext)
@@ -144,7 +146,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                                     TurnLayout.build(message.id, items, finished = !message.streaming, showThoughts),
                                     prose,
                                     TurnIdentity(message.model?.let { "$agentName · $it" } ?: agentName, time = turnTime(message.timestamp)),
-                                    worked(message, workedFormat),
+                                    worked(message, workedFormat, durationSeconds, durationMinutes),
                                     working = message.streaming,
                                     files = message.files,
                                     agentCliType = context.session?.cliType,
@@ -287,6 +289,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
             }
         }
     }
+    val messageActions = rememberMessageActions(repository, scope, id, messages, canSend && session?.status !in RunningStatuses, onSelectTab)
     val running = session?.status in RunningStatuses || pending.any { it.delivery == Delivery.Sending }
     // One send path for typed turns and the action bar's prompts: optimistic bubble, never resent.
     // Attachments upload first; a failed upload fails the turn before anything is written and
@@ -456,6 +459,7 @@ fun ChatScreen(repository: ChatRepository, scope: RuntimeScope, id: String, cont
                     // The transcript scrolls under the floating header.
                     ChatTranscript(
                         all, Modifier.fillMaxSize(), contentPadding = PaddingValues(top = top + if (creationNotice != null) LodySize.controlLg else LodySpacing.none, bottom = LodySpacing.md), state = listState, scrollToLatest = scrollToLatest,
+                        actions = messageActions,
                         loadDetail = { entryId, itemId -> repository.detail(scope, id, entryId, itemId) },
                         loadDiff = { entryId, path -> repository.turnDiff(scope, id, entryId, path) },
                     )
@@ -693,12 +697,9 @@ private fun agentLabel(session: CatalogSession?): String =
         ?: session?.modelName ?: "Agent"
 
 /** "Worked for 8s" / "1m 5s" once the turn finished; [format] holds one `%1$s`. */
-private fun worked(message: SessionMessage, format: String): String {
-    val start = message.startedAt ?: return ""
-    val end = message.endedAt ?: return ""
-    if (message.streaming || end < start) return ""
-    val seconds = (end - start) / 1000
-    val span = if (seconds < 60) "${seconds}s" else "${seconds / 60}m ${seconds % 60}s"
+private fun worked(message: SessionMessage, format: String, secondsFormat: String, minutesFormat: String): String {
+    val seconds = messageWorkSeconds(message) ?: return ""
+    val span = if (seconds < 60) String.format(secondsFormat, seconds) else String.format(minutesFormat, seconds / 60, seconds % 60)
     return String.format(format, span)
 }
 

@@ -125,6 +125,7 @@ fun ChatTranscript(
     contentPadding: PaddingValues = PaddingValues(),
     state: LazyListState = rememberLazyListState(initialFirstVisibleItemIndex = Int.MAX_VALUE),
     scrollToLatest: Int = 0,
+    actions: MessageActionState = MessageActionState(),
     /** Opens a step's detail; null where there is no runtime (previews, the stream probe). */
     loadDetail: (suspend (entryId: String, itemId: String) -> StepDetail)? = null,
     /** Opens a changed file's diff for a turn; null where there is no runtime. */
@@ -210,7 +211,7 @@ fun ChatTranscript(
     }
     LazyColumn(modifier, state = state, contentPadding = contentPadding) content@{
         keys.reset()
-        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFiles) }
+        with(KeyRecorder(this@content, keys)) { transcriptRows(entries, open, toggle, details, openTasks, openFiles, actions) }
         // A small stable end anchor avoids enormous scroll offsets and measuring the
         // whole final Markdown block merely to discover its bottom.
         item(key = "transcript-end", contentType = "end") { Spacer(Modifier.height(LodySpacing.xxs)) }
@@ -259,10 +260,11 @@ private fun LazyListScope.transcriptRows(
     details: StepDetails,
     onOpenTasks: (String) -> Unit,
     onOpenFiles: (String) -> Unit,
+    actions: MessageActionState,
 ) {
         entries.forEach { entry ->
             when (entry) {
-                is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry) }
+                is ChatEntry.User -> item(key = entry.id, contentType = "user") { UserTurn(entry, actions) }
                 is ChatEntry.Assistant -> {
                     val layout = entry.layout
                     if (layout.folded) {
@@ -285,7 +287,7 @@ private fun LazyListScope.transcriptRows(
                         item(key = "${entry.id}#live", contentType = "live") { LiveStatus(thinking, Modifier.animateItem()) }
                     }
                     turnOutput(entry, onOpenTasks, onOpenFiles)
-                    turnFooter(entry)
+                    turnFooter(entry, actions)
                     item(key = "${entry.id}#end", contentType = "turn-end") { Spacer(Modifier.height(LodySpacing.lg)) }
                 }
             }
@@ -300,7 +302,7 @@ val TranscriptMargin = LodySpacing.lg
  * rounded bubble, with the sender's avatar beside the bubble's top.
  */
 @Composable
-private fun UserTurn(entry: ChatEntry.User) {
+private fun UserTurn(entry: ChatEntry.User, actions: MessageActionState) {
     val colors = LodyTheme.colors
     Row(
         modifier = Modifier
@@ -340,6 +342,10 @@ private fun UserTurn(entry: ChatEntry.User) {
                     .background(colors.fillSecondary, RoundedCornerShape(UserBubbleRadius))
                     .padding(horizontal = LodySpacing.xl, vertical = LodySpacing.lg),
             )
+            Row {
+                if (entry.id == actions.editable) MessageActionButton(LodyIcons.Edit, stringResource(R.string.message_edit)) { actions.edit(entry.id) }
+                MessageCopyButton(entry.text)
+            }
         }
         // Beside the bubble's top: past the header line and the gap under it.
         Avatar(entry.who.image, entry.who.name, UserAvatarSize, Modifier.padding(top = UserHeaderHeight + LodySpacing.xs))

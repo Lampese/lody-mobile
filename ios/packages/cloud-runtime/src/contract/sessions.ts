@@ -281,3 +281,18 @@ export type CheckTurnQuotaResult = z.input<typeof CheckTurnQuotaResult>;
 export type SendTurnResult = z.input<typeof SendTurnResult>;
 export type EditSessionResult = z.input<typeof EditSessionResult>;
 export type ControlTurnResult = z.input<typeof ControlTurnResult>;
+
+export const ForkSessionParams = z
+  .object({
+    workspaceId,
+    sourceSessionId: sessionId,
+    sourceTurnId: z.string().min(1),
+    action: z.enum(['read', 'send']),
+    targetSessionId: z.string().uuid().optional(),
+  })
+  .meta({ id: 'ForkSessionParams' });
+export const ForkSessionResult = z
+  .object({
+    state: z.enum(['ready', 'created', 'rejected', 'unknown']),
+  })
+  .meta({ id: 'ForkSessionResult' });

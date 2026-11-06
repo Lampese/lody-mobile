@@ -43,10 +43,12 @@ sealed interface RuntimeCommand {
     data class ShortcutBody(val id: String) : RuntimeCommand
     /** Stops the watched session's running turn (upstream `controlTurn`). A write, never retried. */
     data class StopTurn(val sessionId: String, val machineId: String, val turnId: String) : RuntimeCommand
+    data class MessageAction(val kind: String, val payload: org.json.JSONObject) : RuntimeCommand
     data object Ping : RuntimeCommand
     data object InspectSchema : RuntimeCommand
 }
 sealed interface RuntimeResult {
+    data class MessageAction(val value: org.json.JSONObject) : RuntimeResult
     data class Options(val value: CreationOptions) : RuntimeResult
     data class Roles(val value: List<AgentRole>) : RuntimeResult
     data class Mentions(val value: MentionCatalogPage) : RuntimeResult
@@ -125,6 +127,8 @@ data class SessionMessage(
     val userId: String? = null,
     val startedAt: Long? = null,
     val endedAt: Long? = null,
+    val permissionWaitMs: Long = 0,
+    val metadata: Map<String, String> = emptyMap(),
     val model: String? = null,
     /** The turn's items in order (text, thought, tool steps, plans, notices) for the process view. */
     val items: List<TurnItem> = emptyList(),

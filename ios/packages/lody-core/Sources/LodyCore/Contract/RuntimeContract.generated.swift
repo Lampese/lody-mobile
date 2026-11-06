@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeContract {
   public static let version = 1
-  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
+  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","forkSession","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","start","turnDiff","workspaceChanges"]
 
   public enum AgentRoleItemVisibility: String, Codable, Sendable, Equatable, CaseIterable {
     case `private` = "private"
@@ -1823,6 +1823,64 @@ extension RuntimeContract {
       var c = encoder.container(keyedBy: Key.self)
       try c.encode(self.sessionId, forKey: Key("sessionId"))
       try c.encode(self.path, forKey: Key("path"))
+    }
+  }
+
+  public enum ForkSessionParamsAction: String, Codable, Sendable, Equatable, CaseIterable {
+    case read = "read"
+    case send = "send"
+  }
+
+  public struct ForkSessionParams: Codable, Sendable, Equatable {
+    public var workspaceId: String
+    public var sourceSessionId: String
+    public var sourceTurnId: String
+    public var action: ForkSessionParamsAction
+    public var targetSessionId: String?
+    public init(workspaceId: String, sourceSessionId: String, sourceTurnId: String, action: ForkSessionParamsAction, targetSessionId: String? = nil) {
+      self.workspaceId = workspaceId
+      self.sourceSessionId = sourceSessionId
+      self.sourceTurnId = sourceTurnId
+      self.action = action
+      self.targetSessionId = targetSessionId
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.workspaceId = try c.decode(String.self, forKey: Key("workspaceId"))
+      self.sourceSessionId = try c.decode(String.self, forKey: Key("sourceSessionId"))
+      self.sourceTurnId = try c.decode(String.self, forKey: Key("sourceTurnId"))
+      self.action = try c.decode(ForkSessionParamsAction.self, forKey: Key("action"))
+      self.targetSessionId = try c.decodeIfPresent(String.self, forKey: Key("targetSessionId"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.workspaceId, forKey: Key("workspaceId"))
+      try c.encode(self.sourceSessionId, forKey: Key("sourceSessionId"))
+      try c.encode(self.sourceTurnId, forKey: Key("sourceTurnId"))
+      try c.encode(self.action, forKey: Key("action"))
+      try c.encodeIfPresent(self.targetSessionId, forKey: Key("targetSessionId"))
+    }
+  }
+
+  public enum ForkSessionResultState: String, Codable, Sendable, Equatable, CaseIterable {
+    case ready = "ready"
+    case created = "created"
+    case rejected = "rejected"
+    case unknown = "unknown"
+  }
+
+  public struct ForkSessionResult: Codable, Sendable, Equatable {
+    public var state: ForkSessionResultState
+    public init(state: ForkSessionResultState) {
+      self.state = state
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.state = try c.decode(ForkSessionResultState.self, forKey: Key("state"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.state, forKey: Key("state"))
     }
   }
 
@@ -6907,6 +6965,16 @@ extension RuntimeContract {
         return nil
       }
     }
+    public enum ForkSession: RuntimeCall {
+      public typealias Params = RuntimeContract.ForkSessionParams
+      public typealias Result = RuntimeContract.ForkSessionResult
+      public static let method = "forkSession"
+      public static let timeout: Double = 130
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .forkSession(let result) = value { return result }
+        return nil
+      }
+    }
     public enum Hello: RuntimeCall {
       public typealias Params = RuntimeContract.HelloParams
       public typealias Result = RuntimeContract.HelloResult
@@ -7229,6 +7297,7 @@ extension RuntimeContract {
     case editSession(RuntimeContract.EditSessionResult)
     case ensureSession(RuntimeContract.Empty)
     case fileDiff(RuntimeContract.DiffResult)
+    case forkSession(RuntimeContract.ForkSessionResult)
     case hello(RuntimeContract.HelloResult)
     case iosSimulatorControl(RuntimeContract.IosSimulatorControlResult)
     case itemDetail(RuntimeContract.ItemDetail)
@@ -7329,6 +7398,7 @@ extension RuntimeContract {
         case "editSession": message = .result(id: id, .editSession(try c.decode(RuntimeContract.EditSessionResult.self, forKey: Key("payload"))))
         case "ensureSession": message = .result(id: id, .ensureSession(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "fileDiff": message = .result(id: id, .fileDiff(try c.decode(RuntimeContract.DiffResult.self, forKey: Key("payload"))))
+        case "forkSession": message = .result(id: id, .forkSession(try c.decode(RuntimeContract.ForkSessionResult.self, forKey: Key("payload"))))
         case "hello": message = .result(id: id, .hello(try c.decode(RuntimeContract.HelloResult.self, forKey: Key("payload"))))
         case "iosSimulatorControl": message = .result(id: id, .iosSimulatorControl(try c.decode(RuntimeContract.IosSimulatorControlResult.self, forKey: Key("payload"))))
         case "itemDetail": message = .result(id: id, .itemDetail(try c.decode(RuntimeContract.ItemDetail.self, forKey: Key("payload"))))

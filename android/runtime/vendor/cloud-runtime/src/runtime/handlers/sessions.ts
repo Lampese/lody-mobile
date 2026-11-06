@@ -1,3 +1,5 @@
+import { forkableTurn, forkOnce, sessionActionMeta } from '../fork-session';
+import { machineRpc } from '../machine-rpc';
 import type { Value } from '@loro-dev/flock-wasm/base64';
 import { tabOwner } from '../directory-tab';
 import { projectRows } from '../../protocol/catalog.ts';
@@ -17,6 +19,7 @@ import {
   checkTurnQuota,
   controlTurn,
   editSession,
+  sessionDoc,
   releaseDeletedSessions,
   respondPermission,
   sendTurn,
@@ -51,6 +54,53 @@ export function registerSessions(
     state.catalogs.set('meta', projectRows(replica.flock.scan(), 'meta'));
     ctx.publish();
   }
+  const forkAttempts = new Map<string, 'created' | 'rejected' | 'unknown'>();
+  channel.handle('forkSession', async (args) => {
+    const replica = metaWrite(args, true);
+    if (!state.userId) return { state: 'rejected' };
+    const room = `session-${args.sourceSessionId}`;
+    const meta = sessionActionMeta(
+      replica.flock.get(['m', room]),
+      replica.flock.scan({ prefix: ['m', room] }),
+      replica.flock.get(['e', room]),
+    );
+    const capability =
+      meta &&
+      (state.machineReplicas
+        .get(meta.machineId)
+        ?.get(['acpCapability', meta.agentConfigId]) as
+        Record<string, any> | undefined);
+    const history = sessionDoc(args.sourceSessionId)
+      ?.getList('history')
+      .toJSON() as Record<string, any>[] | undefined;
+    if (
+      !meta ||
+      !history ||
+      !forkableTurn(history, meta, capability, args.sourceTurnId)
+    )
+      return { state: 'rejected' };
+    if (args.action === 'read') return { state: 'ready' };
+    const target = args.targetSessionId;
+    if (!target || target === args.sourceSessionId)
+      return { state: 'rejected' };
+    const key = `${state.workspace}:${target}`;
+    const request = {
+      sourceSessionId: args.sourceSessionId,
+      sourceTurnId: args.sourceTurnId,
+      targetSessionId: target,
+      requestedByUserId: state.userId,
+    };
+    return forkOnce(forkAttempts, key, request, () =>
+      machineRpc(
+        state.workspace,
+        meta.machineId,
+        'session/fork',
+        request,
+        getGrant,
+        AbortSignal.timeout(120_000),
+      ),
+    );
+  });
   channel.handle('createTab', async (args) => {
     const replica = metaWrite(args, true);
     if (creating || !state.userId) return { state: 'rejected' };
@@ -207,10 +257,13 @@ export function registerSessions(
   channel.handle('editSession', (args) => {
     if (!state.metaReplica || state.unhealthy.size)
       return { state: 'not_sent', reason: 'metadata_not_ready' };
-    const meta = state.metaReplica.flock.get([
-      'm',
-      `session-${args.sessionId}`,
-    ]) as Record<string, any> | undefined;
+    const room = `session-${args.sessionId}`;
+    const flock = state.metaReplica.flock;
+    const meta = sessionActionMeta(
+      flock.get(['m', room]),
+      flock.scan({ prefix: ['m', room] }),
+      flock.get(['e', room]),
+    );
     if (!meta) return { state: 'not_sent', reason: 'session_not_ready' };
     const capability = state.machineReplicas
       .get(meta.machineId)

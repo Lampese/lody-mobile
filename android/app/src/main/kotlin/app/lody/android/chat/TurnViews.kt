@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.drawBehind
 import app.lody.android.runtime.StepBlock
 import app.lody.android.runtime.StepDetail
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -526,18 +527,20 @@ private fun OutputRow(
  * The line that closes a finished turn, always last: the agent mark, model and finish time (web's
  * footer shows config, not author identity).
  */
-internal fun LazyListScope.turnFooter(entry: ChatEntry.Assistant) {
+internal fun LazyListScope.turnFooter(entry: ChatEntry.Assistant, actions: MessageActionState) {
     if (entry.working) return
     val text = listOf(entry.who.name, entry.who.time).filter { it.isNotBlank() }.joinToString(" · ")
-    if (text.isEmpty()) return
     item(key = "${entry.id}#footer", contentType = "footer") {
-        Row(
-            Modifier.animateItem().fillMaxWidth().padding(horizontal = TranscriptMargin, vertical = LodySpacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs),
-        ) {
-            app.lody.android.home.AgentMark(entry.agentCliType, entry.agentType, LodyTheme.colors.iconTertiary, Modifier.size(LodyIconSize.sm))
-            Text(text, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.animateItem().fillMaxWidth().padding(horizontal = TranscriptMargin, vertical = LodySpacing.xs)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.xs)) {
+                app.lody.android.home.AgentMark(entry.agentCliType, entry.agentType, LodyTheme.colors.iconTertiary, Modifier.size(LodyIconSize.sm))
+                Text(text, style = LodyTheme.typography.footnote, color = LodyTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row {
+                MessageCopyButton(entry.layout.visible.filterIsInstance<TurnLayout.Content>().mapNotNull { (it.item as? app.lody.android.runtime.TurnItem.Text)?.text }.joinToString("\n\n"))
+                MessageActionButton(LodyIcons.Info, stringResource(R.string.message_info)) { actions.info(entry.id) }
+                MessageActionButton(LodyIcons.Branch, stringResource(R.string.message_fork)) { actions.fork(entry.id) }
+            }
         }
     }
 }

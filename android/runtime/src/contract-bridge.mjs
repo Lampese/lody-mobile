@@ -5,7 +5,7 @@ export function contractBridge(runtime, emit) {
  function call(method,payload={}) {
   const id=`android-${++serial}`;
   return new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{pending.delete(id);reject(Error('runtime_timeout'));},45000);
+   const timer=setTimeout(()=>{pending.delete(id);reject(Error('runtime_timeout'));},method==='editSession' || method==='forkSession' ? 130000 : 45000);
    pending.set(id,{resolve,reject,timer,method});
    receive({v:1,gen:1,kind:'request',id,method,payload});
   });
@@ -37,6 +37,8 @@ export function contractBridge(runtime, emit) {
   ensureSession:args=>invoke('ensureSession',args),
   creationOptions:args=>invoke('creationOptions',args),
   createSession:args=>invoke('createSession',args),
+  editSession:args=>invoke('editSession',args),
+  forkSession:args=>invoke('forkSession',args),
   createTab:args=>invoke('createTab',args),
   // Agent Roles readable by this user, listed for the new-chat Role row.
   agentRoles:args=>invoke('agentRoles',args),

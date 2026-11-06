@@ -24694,6 +24694,74 @@
           }
         }
       }
+    },
+    "message.fork.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fork conversation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分叉对话"
+          }
+        }
+      }
+    },
+    "message.fork.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue from this reply in a new tab, using the same project and working directory."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从这条回复开始，在新标签中继续对话，沿用当前项目和工作目录。"
+          }
+        }
+      }
+    },
+    "message.action.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This message cannot be used for this action. Refresh the conversation and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前消息暂不支持此操作，请刷新对话后重试。"
+          }
+        }
+      }
+    },
+    "message.action.unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The result is not yet confirmed. Check the conversation before trying again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作结果尚未确认，请先检查对话，避免重复提交。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

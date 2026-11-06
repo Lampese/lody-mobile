@@ -85,6 +85,8 @@ import {
   ControlTurnResult,
   CreateSessionParams,
   CreateTabParams,
+  ForkSessionParams,
+  ForkSessionResult,
   CreateSessionResult,
   DeleteSessionParams,
   DeleteSessionResult,
@@ -262,6 +264,11 @@ export const runtimeCalls = {
     params: SendTurnParams,
     result: SendTurnResult,
     timeoutMs: 45_000,
+  },
+  forkSession: {
+    params: ForkSessionParams,
+    result: ForkSessionResult,
+    timeoutMs: 130_000,
   },
   editSession: {
     params: EditSessionParams,

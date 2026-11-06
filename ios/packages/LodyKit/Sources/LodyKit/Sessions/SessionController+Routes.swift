@@ -2,6 +2,11 @@ import UIKit
 
 extension SessionController {
   func wireRouteEvents() {
+    chat.onForkMessage = { [weak self] body in
+      guard let self, let id = body["entryId"] as? String else { return }
+      let page = MessageForkController(sessionId: self.sessionId, entryId: id)
+      LodyShell.shared.presentNative(page, title: String(localized: "message.fork.title", bundle: .lody), detents: [0.5, 1], grabber: true)
+    }
     chat.turnInfoEnabled = true
     chat.imageSharingEnabled = true
     chat.onShareImage = { [weak self] body in
