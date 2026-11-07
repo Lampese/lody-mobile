@@ -391,4 +391,5 @@
     <string name="chat_tabs_all_closed">No open Tab. Tap the conversations button to create or restore a conversation.</string>
     <string name="chat_tab_change_failed">Could not confirm the change. Check the Tab list before trying again.</string>
     <string name="chat_close_current">Close current conversation</string>
+    <string name="home_group_pinned">Pinned</string>
 </resources>

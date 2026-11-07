@@ -66,16 +66,14 @@ class ProjectController: UIViewController {
     if (page.navigationItem.rightBarButtonItems ?? []) != items { page.navigationItem.rightBarButtonItems = items }
     let now = LodyRelativeTime.now()
     let sessions = catalog.sessions.filter { $0.projectId == projectId }.sorted(by: SessionRows.byActivity)
-    let sections = [false, true].compactMap { archived -> LodyListSection? in
-      let rows = SessionRows.treeRows(sessions.filter { $0.archived == archived }, all: catalog.sessions) {
-        SessionRows.row($0, now: now)
-      }
-      guard !rows.isEmpty else { return nil }
-      var section = LodyListSection()
-      section.id = archived ? "archived" : "sessions"
-      section.header = archived ? String(localized: "session.state.archived", bundle: .lody) : ""
-      section.rows = rows
-      return section
+    var scoped = catalog
+    scoped.sessions = sessions
+    var sections = InboxSections.home(scoped, grouping: .time, now: now)
+    let archivedRows = SessionRows.treeRows(sessions.filter(\.archived), all: catalog.sessions) {
+      SessionRows.row($0, now: now)
+    }
+    if !archivedRows.isEmpty {
+      sections.append(LodyListSection(id: "archived", header: String(localized: "session.state.archived", bundle: .lody), rows: archivedRows))
     }
     var placeholder = "project.empty"
     if state.loading {

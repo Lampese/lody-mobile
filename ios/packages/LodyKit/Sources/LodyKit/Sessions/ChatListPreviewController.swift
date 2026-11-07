@@ -30,6 +30,14 @@ final class ChatListPreviewController: UIViewController {
         (row.id, WorkspaceMember(id: "owner-\(index)", name: index % 2 == 0 ? "Leon" : "Alice", image: nil))
       }, uniquingKeysWith: { _, new in new })
     }
+    if LodyUIVerify.has("--ui-review-pins") {
+      let catalog = SessionCatalog(sessions: [
+        SessionItem(id: "pinned", title: "Pinned conversation", status: "running", pinned: true, projectId: "p"),
+        SessionItem(id: "regular", title: "Other conversation", projectId: "p"),
+      ])
+      list.setSections(InboxSections.home(catalog, grouping: .status))
+      return
+    }
     list.setSections([LodyListSection(id: "list-review", header: "Conversations", rows: rows)])
   }
 }

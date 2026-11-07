@@ -22,7 +22,14 @@ class StickyGroupsProbeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val listReview = intent.getBooleanExtra("list-review", false)
-        val sections = if (listReview) listOf(HomeSection("list-review", HomeSection.Header.Bucket(app.lody.android.home.TimeBucket.Today), listOf(
+        val sections = if (intent.getBooleanExtra("pins-review", false)) {
+            app.lody.android.home.ChatListModel.home(app.lody.android.runtime.CatalogSnapshot(
+                revision = 1, projects = emptyList(), machineIds = emptyList(), sessions = listOf(
+                    app.lody.android.runtime.CatalogSession("pinned", "m", "p", "Pinned conversation", "running", false, true, "2026-11-07T00:00:00Z"),
+                    app.lody.android.runtime.CatalogSession("regular", "m", "p", "Other conversation", "idle", false, false, "2026-11-07T00:00:00Z"),
+                ),
+            ), app.lody.android.home.HomeGrouping.Status)
+        } else if (listReview) listOf(HomeSection("list-review", HomeSection.Header.Bucket(app.lody.android.home.TimeBucket.Today), listOf(
             ChatItem("list-review-unread", "Lody E2E improvements", ChatAttention.Unread, place = "Lody", prStatus = "merged", activityAt = System.currentTimeMillis() - 3_600_000),
             ChatItem("list-review-parent", "Local-first attachments", ChatAttention.Running, place = "Lody", prStatus = "open", prCi = "s", activityAt = System.currentTimeMillis() - 3_600_000, treeParent = true, childCount = 3, childAttention = ChatAttention.Waiting),
             ChatItem("list-review-child-idle", "Review attachments PR", null, prStatus = "merged", activityAt = System.currentTimeMillis() - 3_600_000, nestedUnder = "list-review-parent"),

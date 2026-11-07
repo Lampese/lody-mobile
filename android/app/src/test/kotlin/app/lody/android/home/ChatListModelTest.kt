@@ -17,6 +17,22 @@ class ChatListModelTest {
     private fun session(id: String, project: String, status: String = "idle", archived: Boolean = false, pinned: Boolean = false, at: String) =
         CatalogSession(id, "m", project, "Chat $id", status, archived, pinned, at)
 
+    @Test fun pinnedGroupLeadsEveryViewWithoutDuplicates() {
+        for (grouping in HomeGrouping.entries) {
+            val sections = ChatListModel.home(snapshot, grouping)
+            assertEquals("pinned", sections.first().id)
+            assertEquals(listOf("5"), sections.first().chats.map { it.id })
+            assertEquals(1, sections.flatMap { it.chats }.count { it.id == "5" })
+        }
+        val mine = snapshot.copy(sessions = snapshot.sessions.map { it.copy(userId = if (it.pinned) "other" else "me") })
+        assertFalse(ChatListModel.home(mine, HomeGrouping.Time, "me").any { it.id == "pinned" })
+        val family = snapshot.copy(sessions = listOf(
+            session("parent", "p-zed", pinned = true, at = "2026-10-01T00:00:00Z"),
+            session("child", "p-alpha", at = "2026-10-06T00:00:00Z").copy(openedBySessionId = "parent"),
+        ))
+        assertEquals(listOf("parent", "child"), ChatListModel.home(family, HomeGrouping.Status).single().chats.map { it.id })
+    }
+
     @Test fun childrenAlwaysFollowParentBucketAcrossProjectsDatesAndStatuses() {
         val parent = session("parent", "p-zed", at = "2026-10-01T00:00:00Z")
         val child = session("child", "p-alpha", status = "running", at = "2026-10-06T00:00:00Z").copy(openedBySessionId = "parent")
@@ -226,7 +242,7 @@ class ChatListModelTest {
         val owned = snapshot.copy(sessions = snapshot.sessions.map { if (it.id in setOf("2", "6")) it.copy(userId = "me") else it.copy(userId = "teammate") })
         fun ids(owner: String?) = ChatListModel.home(owned, HomeGrouping.Time, owner, LocalDate.parse("2026-10-06"), ZoneOffset.UTC).flatMap { section -> section.chats.map { it.id } }
         assertEquals(listOf("6", "2"), ids("me"))
-        assertEquals(listOf("6", "5", "2", "3", "1"), ids(null))
+        assertEquals(listOf("5", "6", "2", "3", "1"), ids(null))
         val team = ChatListModel.home(owned, HomeGrouping.Time).flatMap { it.chats }
         team.forEach { chat -> assertEquals(owned.sessions.first { it.id == chat.id }.userId, chat.ownerId) }
         // Chats without an owner (older caches) are not anyone's.

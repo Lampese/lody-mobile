@@ -142,3 +142,5 @@
 - The merge-method popover (`MergeOptionsController`) anchors to the measured primary action button in `ChatActionBarView`, never the whole composer. Its compact menu rows keep the irreversible-action explanation and show the last-used method first with a checkmark; selecting a method remains the explicit merge confirmation.
 
 - Current-working-directory conversations open from the trailing conversations button joined to More, not the navigation title. Its bottom-right status summarizes only other open conversations, with local read watermarks applied. The panel retains close/history/restore and labels creation “新建当前工作目录对话”.
+
+- Every Home grouping (time/project/status) starts with a separate Pinned group when nonempty, within the current owner/project scope. Partition whole visible families before bucketing, so pinned families appear once and retain child folding. Project conversation lists use the same projection; archived chats and hidden Tabs never enter Pinned.

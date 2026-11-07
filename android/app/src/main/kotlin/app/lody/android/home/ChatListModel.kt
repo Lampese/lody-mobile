@@ -87,6 +87,7 @@ data class HomeSection(val id: String, val header: Header, val chats: List<ChatI
     sealed interface Header {
         data class Bucket(val bucket: TimeBucket) : Header
         data class Project(val name: String) : Header
+        data object Pinned : Header
         data object Chats : Header
         data class Status(val group: StatusGroup) : Header
     }
@@ -175,7 +176,11 @@ object ChatListModel {
             val included = families(snapshot).filter { family -> family.any { it.id in mine } }.flatten().mapTo(mutableSetOf()) { it.id }
             snapshot.copy(sessions = snapshot.sessions.filter { it.id in included })
         } ?: snapshot
-        return grouped(scoped, grouping, today, zone)
+        val pinnedIds = scoped.sessions.filter { it.pinned }.mapTo(mutableSetOf()) { it.id }
+        val pinned = families(scoped).filter { family -> family.any { it.id in pinnedIds } }.flatten()
+        val lifted = pinned.mapTo(mutableSetOf()) { it.id }
+        val rest = grouped(scoped.copy(sessions = scoped.sessions.filterNot { it.id in lifted }), grouping, today, zone)
+        return if (pinned.isEmpty()) rest else listOf(HomeSection(PINNED_ID, HomeSection.Header.Pinned, pinned)) + rest
     }
 
     private fun grouped(snapshot: CatalogSnapshot, grouping: HomeGrouping, today: LocalDate, zone: ZoneId): List<HomeSection> =

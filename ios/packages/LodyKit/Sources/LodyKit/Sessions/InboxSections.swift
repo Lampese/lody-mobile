@@ -17,7 +17,7 @@ enum InboxSort: String, CaseIterable, Sendable {
 enum InboxSections {
   static let chatId = "chat"
   static let pinnedId = "pinned"
-  private static let groups = ["attention", "pinned", "live", "unread", "today", "yesterday", "week", "month", "older"]
+  private static let groups = ["pinned", "attention", "live", "unread", "today", "yesterday", "week", "month", "older"]
   private static let day = 86_400_000.0
 
   static func inbox(
@@ -96,11 +96,18 @@ enum InboxSections {
   ) -> [LodyListSection] {
     var catalog = catalog
     if let owner { catalog.sessions = owned(catalog.sessions, by: owner) }
-    return switch grouping {
+    let home = HomeRows(catalog, now: now)
+    let pinned = home.families.filter { ([$0.session] + $0.children).contains(where: \.pinned) }
+      .flatMap { [$0.session] + $0.children }
+    let pinnedIds = Set(pinned.map(\.id))
+    catalog.sessions.removeAll { pinnedIds.contains($0.id) }
+    let sections: [LodyListSection] = switch grouping {
     case .time: timeline(catalog, now: now)
     case .project: byProject(catalog, now: now)
     case .status: byStatus(catalog, idleExpanded: idleExpanded, now: now)
     }
+    guard !pinned.isEmpty else { return sections }
+    return [section(pinnedId, header: String(localized: "inbox.section.pinned", bundle: .lody), rows: home.rows(pinned))] + sections
   }
 
   /// Keep complete families containing the owner's chats, including parent context.
@@ -318,11 +325,11 @@ enum InboxSections {
   }
 
   private static func group(_ session: SessionItem, now: Double) -> String {
+    if session.pinned { return pinnedId }
     let state = SessionState(session)
     if state == .attention || state == .failed { return "attention" }
     if state == .live { return "live" }
     if SessionRows.isUnread(session) { return "unread" }
-    if session.pinned { return pinnedId }
     return activityBucket(session.activityAt, now: now)
   }
 

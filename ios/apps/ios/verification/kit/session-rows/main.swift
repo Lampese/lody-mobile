@@ -24,6 +24,28 @@ for grouping in [HomeGrouping.time, .status, .project] {
 precondition(InboxSections.home(bucketCatalog, grouping: .time, now: now)[0].id == "week")
 precondition(InboxSections.home(bucketCatalog, grouping: .status, now: now)[0].id == "idle")
 
+var pinnedParent = bucketParent
+pinnedParent.pinned = true
+let pinnedCatalog = SessionCatalog(sessions: [bucketChild, bucketTab, pinnedParent, SessionItem(id: "ordinary", projectId: "p")])
+for grouping in [HomeGrouping.time, .status, .project] {
+  let sections = InboxSections.home(pinnedCatalog, grouping: grouping, now: now)
+  precondition(sections.first?.id == "pinned", "Pin group leads every view")
+  precondition(sections[0].rows.map(\.id) == ["bucket-parent", "bucket-child"], "Pinned families stay together")
+  precondition(sections.flatMap(\.rows).filter { $0.id == "bucket-parent" }.count == 1)
+}
+
+var archivedPin = pinnedParent
+archivedPin.id = "archived-pin"
+archivedPin.archived = true
+var hiddenPin = bucketTab
+hiddenPin.pinned = true
+precondition(InboxSections.home(SessionCatalog(sessions: [archivedPin, hiddenPin, bucketParent]), grouping: .time).allSatisfy { $0.id != "pinned" })
+var ownedPin = pinnedParent
+ownedPin.userId = "other"
+var mine = SessionItem(id: "mine", projectId: "p")
+mine.userId = "me"
+precondition(InboxSections.home(SessionCatalog(sessions: [ownedPin, mine]), grouping: .time, owner: "me").flatMap(\.rows).map(\.id) == ["mine"])
+
 let saved = """
 {"catalog":{"projects":[{"id":"p","name":"Lody","rootPath":"/Users/me/lody","machineId":"m"},{"broken":true}],
 "machineIds":["m"],"sessions":[
@@ -132,12 +154,12 @@ let inboxCatalog = SessionCatalog(projects: [SessionProject(id: "p", name: "lody
   item("older", at: midday - 60 * day), item("archived") { $0.archived = true },
 ])
 let inbox = InboxSections.inbox(inboxCatalog, now: midday)
-precondition(inbox.map(\.id) == ["attention", "pinned", "live", "unread", "today", "yesterday", "week", "month", "older"], "\(inbox.map(\.id))")
-precondition(inbox[0].rows.map(\.id) == ["waiting", "failed"] && inbox[0].header == "inbox.section.attention")
+precondition(inbox.map(\.id) == ["pinned", "attention", "live", "unread", "today", "yesterday", "week", "month", "older"], "\(inbox.map(\.id))")
+precondition(inbox[1].rows.map(\.id) == ["waiting", "failed"] && inbox[1].header == "inbox.section.attention")
 precondition(!inbox.flatMap(\.rows).contains { $0.id == "archived" }, "Archived sessions stay out until searched")
 precondition(InboxSections.inbox(inboxCatalog, keyword: "archived", now: midday).flatMap(\.rows).map(\.id) == ["archived"])
-precondition(inbox[2].rows[0].imageTint == "blue" && inbox[4].rows[0].imageTint.isEmpty && inbox[0].rows[1].imageTint == "danger")
-precondition(inbox[0].rows[0].subtitle == "lody-ios" && inbox.flatMap(\.rows).allSatisfy { $0.diff.isEmpty })
+precondition(inbox[2].rows[0].imageTint == "blue" && inbox[4].rows[0].imageTint.isEmpty && inbox[1].rows[1].imageTint == "danger")
+precondition(inbox[1].rows[0].subtitle == "lody-ios" && inbox.flatMap(\.rows).allSatisfy { $0.diff.isEmpty })
 precondition(InboxSections.inbox(inboxCatalog, chatOnly: true, now: midday).isEmpty)
 
 let many = SessionCatalog(projects: [SessionProject(id: "p", name: "lody-ios", rootPath: "/Users/me/git/lody-ios"), SessionProject(id: "empty", name: "Empty")],

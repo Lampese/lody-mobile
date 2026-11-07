@@ -296,7 +296,13 @@ fun ChatListScreen(
                 pinsLabels = false, onOpenChat = onOpenChat,
                 owners = state.members.takeIf { homeScope == HomeScope.Team },
             )
-            project != null -> ProjectChatList(project, details - ChatRowDetail.Project, padding, state.members.takeIf { homeScope == HomeScope.Team }, onOpenChat)
+            project != null -> HomeList(
+                state.snapshot?.let { catalog ->
+                    ChatListModel.home(catalog.copy(sessions = catalog.sessions.filter { it.projectId == project.id }), HomeGrouping.Time, owner)
+                }.orEmpty(),
+                details - ChatRowDetail.Project, padding, state.placeholder,
+                owners = state.members.takeIf { homeScope == HomeScope.Team }, onOpenChat = onOpenChat,
+            )
             // A project header already names the project, so rows drop it from their detail line.
             tab == HomeTab.Chats -> HomeList(
                 sections,
@@ -746,6 +752,7 @@ internal fun HomeList(
 private fun HomeSection.Header.title(): String = when (this) {
     is HomeSection.Header.Bucket -> stringResource(bucket.label)
     is HomeSection.Header.Project -> name
+    HomeSection.Header.Pinned -> stringResource(R.string.home_group_pinned)
     HomeSection.Header.Chats -> stringResource(R.string.home_group_chats)
     is HomeSection.Header.Status -> stringResource(
         when (group) {
@@ -927,14 +934,6 @@ private val ProjectSource.label: Int
         ProjectSource.GitHub -> R.string.home_projects_source_github
         ProjectSource.Local -> R.string.home_projects_source_local
     }
-
-@Composable
-private fun ProjectChatList(project: ChatGroup, details: Set<ChatRowDetail>, padding: PaddingValues, owners: Map<String, WorkspaceMember>?, onOpenChat: (ChatItem) -> Unit) {
-    val now = rememberNow()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
-        items(project.chats, key = { it.id }) { chat -> ChatRow(chat, details, now, owner = owners?.let { it[chat.ownerId] ?: WorkspaceMember(chat.ownerId.orEmpty(), "") }) { onOpenChat(chat) } }
-    }
-}
 
 @Composable
 private fun SettingsList(state: ChatListUiState, padding: PaddingValues, onSelectWorkspace: (Workspace) -> Unit, onSignOut: () -> Unit) {
