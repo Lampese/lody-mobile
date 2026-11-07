@@ -617,7 +617,6 @@ private struct ChatRowContent: View {
       if nested { Color.clear.frame(width: Self.childLevel, height: 1) }
       VStack(alignment: .leading, spacing: LodySpacing.xxs) {
         HStack(alignment: .center, spacing: LodySpacing.sm) {
-          if let owner { ChatOwnerAvatar(member: owner) }
           Text(row.title)
             .lodyTextStyle(nested ? .callout : row.unread ? .bodyEmphasis : .body)
             .fontWeight(nested && row.unread ? .semibold : nil)
@@ -639,6 +638,7 @@ private struct ChatRowContent: View {
             }
             .fixedSize()
           }
+          if let owner { ChatOwnerAvatar(member: owner) }
         }
         .anchorPreference(key: ChatRowTitleBounds.self, value: .bounds) { $0 }
         if let snippet {

@@ -1019,10 +1019,6 @@ private fun ChatRow(
             if (nested) Spacer(Modifier.width(TreeLevel))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LodySpacing.xxs)) {
                 Row(Modifier.onSizeChanged { titleHeight = it.height.toFloat() }, verticalAlignment = Alignment.CenterVertically) {
-                    if (owner != null) {
-                        Avatar(owner.image, owner.name.ifBlank { "?" }, LodyIconSize.md)
-                        Spacer(Modifier.width(LodySpacing.sm))
-                    }
                     Text(
                         chat.title,
                         style = when {
@@ -1048,6 +1044,10 @@ private fun ChatRow(
                             textAlign = TextAlign.End,
                             modifier = Modifier.padding(start = if (pr != null && !twoLine) LodySpacing.xs else LodySpacing.sm),
                         )
+                    }
+                    if (owner != null) {
+                        Spacer(Modifier.width(LodySpacing.sm))
+                        Avatar(owner.image, owner.name.ifBlank { "?" }, LodyIconSize.md)
                     }
                 }
                 if (twoLine) {

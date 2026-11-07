@@ -137,7 +137,7 @@
 
 - Upstream reliability ports (e31a146e/f02b58ea/3f484e53/7028f2bf): `SessionFeed` retains a subscription on its captured runtime and releases only the final page owner (`SessionSubscriptions`). Cache/bootstrap/recovery snapshots set `isLiveUpdate = false`; the transcript suppresses reveal/fade for those snapshots and only the current visible text tail streams. Combined Fast/model/effort changes use `CreateLogic.applyingComposerChange` atomically. Session sync diagnostics hash session IDs and allow only bounded status/code fields, never message bodies. Native checks: session-subscriptions, session-feed, chat-opening, create-session and diagnostics.
 
-- Team conversation lists show a compact circular owner avatar before the title (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
+- Team conversation lists show a compact circular owner avatar after the trailing time/status (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
 
 - The merge-method popover (`MergeOptionsController`) anchors to the measured primary action button in `ChatActionBarView`, never the whole composer. Its compact menu rows keep the irreversible-action explanation and show the last-used method first with a checkmark; selecting a method remains the explicit merge confirmation.
 
@@ -146,3 +146,5 @@
 - Every Home grouping (time/project/status) starts with a separate Pinned group when nonempty, within the current owner/project scope. Partition whole visible families before bucketing, so pinned families appear once and retain child folding. Project conversation lists use the same projection; archived chats and hidden Tabs never enter Pinned.
 
 - The repository context popover leads with repository name and a small one-line branch plus trailing copy button. Its aligned action columns show View PR / #number (never localized digit grouping) and All changes / coloured ±counts. Compact capsules omit diff counts without substituting an unexplained dot; short PR labels use intrinsic width.
+
+- Team list owner avatars sit after the first-line time/status at the trailing edge, including child rows; titles and project details share the leading edge. My tasks still omit owner avatars.

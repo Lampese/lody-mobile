@@ -111,10 +111,12 @@
 
 - The shared runtime snapshot includes upstream session read/retry/stall/resume trace events (7028f2bf) and Zod 4 schema generation compatibility (fc9bb555). Native iOS page ownership/reveal fixes do not replace Android's Compose lifecycle or transcript implementation; retain the existing Android session owner boundaries.
 
-- Team conversation lists show a compact circular owner avatar before the title (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
+- Team conversation lists show a compact circular owner avatar after the trailing time/status (including children), resolved from the workspace member cache with a name-initial fallback. My tasks omit this avatar; special status stays trailing.
 
 - Current-working-directory conversations open from the trailing conversations button joined to More, not the navigation title. Its bottom-right status summarizes only other open conversations, with local read watermarks applied. The panel retains close/history/restore and labels creation “新建当前工作目录对话”.
 
 - Every Home grouping (time/project/status) starts with a separate Pinned group when nonempty, within the current owner/project scope. Partition whole visible families before bucketing, so pinned families appear once and retain child folding. Project conversation lists use the same projection; archived chats and hidden Tabs never enter Pinned.
 
 - The repository context popover leads with repository name and a small one-line branch plus trailing copy button. Its aligned action columns show View PR / #number (never localized digit grouping) and All changes / coloured ±counts. Compact capsules omit diff counts without substituting an unexplained dot; short PR labels use intrinsic width.
+
+- Team list owner avatars sit after the first-line time/status at the trailing edge, including child rows; titles and project details share the leading edge. My tasks still omit owner avatars.
