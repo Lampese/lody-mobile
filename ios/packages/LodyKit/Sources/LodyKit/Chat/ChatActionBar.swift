@@ -7,6 +7,7 @@ struct ChatMenuAction: Decodable, Equatable, Identifiable {
   let id: String
   let title: String
   let symbol: String
+  var value: String?
   var subtitle: String?
   var destructive: Bool?
   var disabled: Bool?
@@ -69,7 +70,7 @@ struct ChatActionBarState: Decodable, Equatable {
 /// Three glass capsules grouped by purpose, so the composer stays the only full-width shape:
 /// environment (computer and live resources), context (PR or branch with ±diff) and the
 /// repository action, pinned trailing. Never scrolls: `ViewThatFits` takes the first stage that
-/// fits on one line — long labels capped, then the diff as a dot, then the environment folded
+/// fits on one line — long labels capped, then the diff hidden, then the environment folded
 /// into one icon with a "+n" badge — and only at very large text moves the action to its own row.
 struct ChatActionBarContent: View {
   var state = ChatActionBarState()
@@ -215,7 +216,7 @@ struct ChatActionBarContent: View {
   // MARK: Context
 
   /// PR or branch with the ±diff. Long labels are capped; once space runs short the diff becomes
-  /// a dot and its counts move to the top of the menu.
+  /// hidden counts that remain available in the menu.
   private func contextCapsule(diffDot: Bool) -> some View {
     let context = state.context
     var actions = context?.actions ?? []
@@ -228,12 +229,10 @@ struct ChatActionBarContent: View {
       if let context {
           Image(systemName: context.symbol).foregroundStyle(Self.tint(context.tint))
           Text(context.label).lineLimit(1).truncationMode(.middle).foregroundStyle(LodyColor.textPrimary)
-            .frame(maxWidth: 140, alignment: .leading).fixedSize(horizontal: !diffDot, vertical: false)
+            .frame(maxWidth: 140, alignment: .leading).fixedSize(horizontal: true, vertical: false)
         }
         if let diff = state.diff {
-          if diffDot {
-            Circle().fill(LodyColor.diffAddedText).frame(width: 6, height: 6)
-          } else {
+          if !diffDot || context == nil {
             HStack(spacing: 4) {
               Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
               Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
@@ -431,6 +430,13 @@ private struct ContextActionsPopover<Label: View>: View {
   let label: Label
   @State private var presented = false
 
+  private var actionLabelWidth: CGFloat {
+    let font = UIFont.preferredFont(forTextStyle: .body)
+    return ceil(actions.filter { $0.id != "branch" }.map {
+      ($0.title as NSString).size(withAttributes: [.font: font]).width
+    }.max() ?? 0)
+  }
+
   var body: some View {
     label
       .accessibilityElement(children: .ignore)
@@ -444,32 +450,56 @@ private struct ContextActionsPopover<Label: View>: View {
               .lineLimit(1).padding(.horizontal, LodySpacing.md)
               .padding(.vertical, LodySpacing.sm)
           }
-          ForEach(actions) { action in
+          if let branch = actions.first(where: { $0.id == "branch" }) {
+            HStack(spacing: LodySpacing.xs) {
+              Text(branch.title).font(.footnote).foregroundStyle(LodyColor.textSecondary)
+                .lineLimit(1).truncationMode(.middle)
+              Spacer(minLength: 0)
+              Button {
+                presented = false
+                onAction(branch.id)
+              } label: {
+                Image(systemName: branch.symbol).font(.footnote)
+                  .frame(width: 44, height: 44)
+                  .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
+              .foregroundStyle(LodyColor.iconSecondary)
+              .accessibilityLabel(String(localized: "session.title.copyBranch", bundle: .lody))
+            }
+            .padding(.leading, LodySpacing.md)
+          }
+          ForEach(actions.filter { $0.id != "branch" }) { action in
             Button {
               presented = false
               onAction(action.id)
             } label: {
               HStack(spacing: LodySpacing.md) {
                 Image(systemName: action.symbol).frame(width: LodyIconSize.md)
-                Text(action.title).lineLimit(1).truncationMode(.tail)
-                if action.id == "diff", let diff {
-                  Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
-                  Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
+                Text(action.title).lineLimit(1)
+                  .frame(width: actionLabelWidth, alignment: .leading)
+                HStack(spacing: LodySpacing.xs) {
+                  if let value = action.value { Text(verbatim: value) }
+                  if action.id == "diff", let diff {
+                    Text("+\(diff.added)").foregroundStyle(LodyColor.diffAddedText)
+                    Text("−\(diff.removed)").foregroundStyle(LodyColor.diffRemovedText)
+                  }
                 }
+                .fixedSize()
+                Spacer(minLength: 0)
               }
               .font(.body.monospacedDigit())
-              .lineLimit(1)
-              .padding(LodySpacing.md)
-              .frame(maxWidth: .infinity, alignment: .leading)
+              .frame(minHeight: 44)
+              .padding(.horizontal, LodySpacing.md)
               .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(LodyColor.textPrimary)
             .disabled(action.disabled == true)
+            .foregroundStyle(LodyColor.textPrimary)
           }
         }
         .padding(LodySpacing.sm)
-        .frame(width: 280)
+        .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
         .presentationCompactAdaptation(.popover)
       }

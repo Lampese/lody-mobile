@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
@@ -45,7 +48,18 @@ class StickyGroupsProbeActivity : ComponentActivity() {
         setContent {
             LodyTheme {
                 Surface(color = LodyTheme.colors.bgBase) {
-                    if (intent.getBooleanExtra("tabs-review", false)) {
+                    if (intent.getBooleanExtra("context-review", false)) {
+                        Box(Modifier.fillMaxSize().padding(16.dp)) {
+                            Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp)) {
+                                app.lody.android.chat.ChatActionBar(
+                                    app.lody.android.chat.SessionInfoBar("loro-dev/lody", "investigate-billing-cycle",
+                                        app.lody.android.runtime.CatalogPullRequest("loro-dev/lody", 4223, "open"), 3338, 249,
+                                        listOf(app.lody.android.chat.SessionInfoBar.Action.CommitAndPush)),
+                                    "Mac", app.lody.android.create.CreateSessionModel.MachineKind.Desktop, {}, {},
+                                )
+                            }
+                        }
+                    } else if (intent.getBooleanExtra("tabs-review", false)) {
                         val tabs = listOf(
                             app.lody.android.runtime.CatalogSession("current", "machine", "project", "当前工作目录对话", "idle", false, false, "2026-11-06"),
                             app.lody.android.runtime.CatalogSession("other", "machine", "project", "检查附件上传", "running", false, false, "2026-11-06"),

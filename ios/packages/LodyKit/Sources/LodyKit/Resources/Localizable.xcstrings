@@ -17486,13 +17486,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "变更"
+            "value": "所有变更"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Changes"
+            "value": "All changes"
           }
         }
       }
@@ -24769,13 +24769,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "View #%lld"
+            "value": "View PR"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "查看 #%lld"
+            "value": "查看 PR"
           }
         }
       }

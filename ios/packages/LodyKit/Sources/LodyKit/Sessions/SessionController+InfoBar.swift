@@ -83,7 +83,7 @@ extension SessionController {
         if ci == "f" || ci == "e" { tint = "danger" } else if ci == "p" { tint = "warning" }
       }
       if pr.merge == "d" { subtitle += " · " + String(localized: "bar.conflicts", bundle: .lody) }
-      actions.append(["id": "pr", "title": String.localizedStringWithFormat(String(localized: "bar.context.viewPR", bundle: .lody), pr.number), "subtitle": subtitle, "symbol": symbol])
+      actions.append(["id": "pr", "title": String(localized: "bar.context.viewPR", bundle: .lody), "value": "#\(pr.number)", "subtitle": subtitle, "symbol": symbol])
       description += [label, subtitle]
     }
     if !bar.branch.isEmpty {

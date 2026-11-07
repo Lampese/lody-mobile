@@ -1016,11 +1016,11 @@ internal fun ChatComposer(
  * full-width shape: the computer (menu names it), the context (PR or branch with ±diff; menu
  * opens the PR or copies the branch) and, pinned trailing, the repository action as a neutral
  * split capsule. Colour is for status only, so Send stays the one accent. It never scrolls: the
- * first stage that fits on one line wins — labels capped, then the diff as a dot — and only at
+ * first stage that fits on one line wins — labels capped, then the diff hidden — and only at
  * very large text does the action move to its own row. iOS: `ChatActionBarView`.
  */
 @Composable
-private fun ChatActionBar(
+internal fun ChatActionBar(
     bar: SessionInfoBar,
     machine: String,
     machineKind: app.lody.android.create.CreateSessionModel.MachineKind,
@@ -1186,9 +1186,7 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
                     // Not weighted: the fitting probe measures unbounded, where a weight would read as zero.
                     modifier = Modifier.widthIn(max = 160.dp))
             }
-            if (diff && diffDot) {
-                Box(Modifier.size(6.dp).clip(CircleShape).background(colors.diffAddedText))
-            } else if (diff) {
+            if (diff && (!diffDot || !showsContext)) {
                 val style = type.subhead.copy(fontFeatureSettings = "tnum")
                 Text("+${bar.added}", style = style, color = colors.diffAddedText, maxLines = 1)
                 Text("−${bar.removed}", style = style, color = colors.diffRemovedText, maxLines = 1)
@@ -1198,63 +1196,54 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
                 Icon(LodyIcons.Expand, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
             }
         }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
+        DropdownMenu(open, onDismissRequest = { open = false }, modifier = Modifier.width(320.dp)) {
+            if (bar.repository.isNotEmpty()) {
+                Text(bar.repository, style = type.subhead, color = colors.textSecondary,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = LodySpacing.md, vertical = LodySpacing.xs))
+            }
+            if (bar.branch.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().padding(start = LodySpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                    Text(bar.branch, style = type.footnote, color = colors.textSecondary, maxLines = 1,
+                        overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
+                    IconButton(onClick = {
+                        open = false
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(bar.branch))
+                        onCopied(copied)
+                    }) {
+                        Icon(LodyIcons.Copy, contentDescription = stringResource(R.string.bar_copy_branch),
+                            tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
+                    }
+                }
+            }
+            if (pr != null) {
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.bar_view_pr), style = type.body, modifier = Modifier.width(100.dp))
+                            Text("#${pr.number}", style = type.body.copy(fontFeatureSettings = "tnum"))
+                        }
+                    },
+                    leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.md)) },
+                    onClick = { open = false; panel = true },
+                )
+            }
             if (diff) {
                 // Display only until Android has a workspace changes page.
                 DropdownMenuItem(
                     text = {
-                        Text(
-                            buildAnnotatedString {
-                                append(stringResource(R.string.bar_workspace_changes))
-                                append(" ")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.bar_workspace_changes), style = type.body, modifier = Modifier.width(100.dp))
+                            Text(buildAnnotatedString {
                                 withStyle(SpanStyle(color = colors.diffAddedText)) { append("+${bar.added}") }
                                 append(" ")
                                 withStyle(SpanStyle(color = colors.diffRemovedText)) { append("−${bar.removed}") }
-                            },
-                            style = type.body.copy(fontFeatureSettings = "tnum"),
-                            color = colors.textPrimary,
-                        )
+                            }, style = type.body.copy(fontFeatureSettings = "tnum"), maxLines = 1)
+                        }
                     },
                     leadingIcon = { Icon(LodyIcons.Diff, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
                     onClick = { open = false },
                     enabled = false,
-                )
-            }
-            if (pr != null) {
-                val state = stringResource(
-                    when (pr.status) {
-                        "merged" -> R.string.home_pr_merged
-                        "closed" -> R.string.home_pr_closed
-                        "draft" -> R.string.home_pr_draft
-                        else -> R.string.home_pr_open
-                    },
-                )
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text("${pr.repository} #${pr.number}", style = type.body, color = colors.textPrimary)
-                            Text(listOfNotNull(state, verdict, if (pr.merge == "d") stringResource(R.string.bar_conflicts) else null).joinToString(" · "), style = type.footnote, color = colors.textSecondary)
-                        }
-                    },
-                    leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.md)) },
-                    trailingIcon = { Icon(LodyIcons.Forward, contentDescription = null, tint = colors.iconTertiary, modifier = Modifier.size(LodyIconSize.sm)) },
-                    onClick = { open = false; panel = true },
-                )
-            }
-            if (bar.branch.isNotEmpty()) {
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(stringResource(R.string.bar_copy_branch), style = type.body, color = colors.textPrimary)
-                            Text(bar.branch, style = type.footnote, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                        }
-                    },
-                    leadingIcon = { Icon(LodyIcons.Copy, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.md)) },
-                    onClick = {
-                        open = false
-                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(bar.branch))
-                        onCopied(copied)
-                    },
                 )
             }
         }

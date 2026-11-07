@@ -48,7 +48,7 @@ enum SessionActionBarPreview {
       "bar-open": ("open", nil, nil), "bar-ci-pending": ("open", "p", "b"),
       "bar-ci-failed": ("open", "f", "u"), "bar-ci-error": ("open", "e", "u"),
       "bar-conflict": ("open", "s", "d"), "bar-conflict-ci": ("open", "f", "d"),
-      "bar-merge": ("open", "s", "c"), "bar-unpushed": ("open", "s", "c"),
+      "bar-context": ("open", "s", "c"), "bar-merge": ("open", "s", "c"), "bar-unpushed": ("open", "s", "c"),
       "bar-merged": ("merged", "s", "c"), "bar-closed": ("closed", nil, nil),
       "bar-ready-pending": ("open", nil, nil), "bar-merge-pending": ("merged", "s", "c"),
       "bar-crowded": ("open", "f", "d"),
@@ -58,6 +58,12 @@ enum SessionActionBarPreview {
     }
     if scenario == "bar-draft-dirty" || scenario == "bar-crowded" { session.workspaceDirty = true }
     if scenario == "bar-unpushed" { session.workspaceUnpushed = true }
+    if scenario == "bar-context" {
+      session.pullRequests = [.init(repository: repo, number: 4223, status: "open", ci: "s", merge: "c")]
+      session.branchName = "investigate-billing-cycle"
+      session.diff = ["add": 3338, "del": 249]
+      session.workspaceDirty = true
+    }
     catalog.sessions[0] = session
   }
 
