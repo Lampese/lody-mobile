@@ -244,7 +244,7 @@ final class DirectoryTabsButton: UIButton {
   private var isUnread = false
   init() {
     super.init(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
-    setImage(UIImage(systemName: "square.on.square", withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)), for: .normal)
+    setImage(LodyIcon.sessions.uiImage?.preparingThumbnail(of: CGSize(width: LodyIconSize.md, height: LodyIconSize.md))?.withRenderingMode(.alwaysTemplate), for: .normal)
     tintColor = .label
     accessibilityIdentifier = "chat-directory-tabs"
     status.contentMode = .scaleAspectFit
