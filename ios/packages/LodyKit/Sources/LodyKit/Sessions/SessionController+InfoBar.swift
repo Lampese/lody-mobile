@@ -78,9 +78,9 @@ extension SessionController {
       symbol = pr.status == "merged" ? "arrow.triangle.merge" : "arrow.triangle.pull"
       tint = pr.status
       var subtitle = String(localized: String.LocalizationValue("pr.state." + pr.status), bundle: .lody)
-      if ["open", "draft"].contains(pr.status), let ci = pr.ci, ["s", "f", "e", "p"].contains(ci) {
-        subtitle += " · " + String(localized: String.LocalizationValue("bar.ci." + ci), bundle: .lody)
-        if ci == "f" || ci == "e" { tint = "danger" } else if ci == "p" { tint = "warning" }
+      if let ci = pr.ci, ["s", "f", "e", "p", "x"].contains(ci) {
+        let key = ci == "x" ? "home.ci.expected" : "bar.ci." + ci
+        subtitle += " · " + String(localized: String.LocalizationValue(key), bundle: .lody)
       }
       if pr.merge == "d" { subtitle += " · " + String(localized: "bar.conflicts", bundle: .lody) }
       actions.append(["id": "pr", "title": String(localized: "bar.context.viewPR", bundle: .lody), "value": "#\(pr.number)", "subtitle": subtitle, "symbol": symbol])
@@ -93,6 +93,7 @@ extension SessionController {
       "label": label, "symbol": symbol, "tint": tint, "actions": actions,
       "accessibilityLabel": description.filter { !$0.isEmpty }.joined(separator: ", "),
       "menuTitle": bar.repository,
+      "prStatus": bar.pullRequest?.status ?? "", "prCI": bar.pullRequest?.ci ?? "",
     ]
   }
 

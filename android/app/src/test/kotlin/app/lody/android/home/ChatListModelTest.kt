@@ -234,7 +234,7 @@ class ChatListModelTest {
 
     @Test
     fun ciLettersMatchWeb() {
-        assertEquals(listOf("pass", "fail", "fail", "pending", "pending", ""), listOf("s", "f", "e", "p", "x", null).map(ChatListModel::ci))
+        assertEquals(listOf("pass", "fail", "fail", "pending", "expected", ""), listOf("s", "f", "e", "p", "x", null).map(ChatListModel::ci))
     }
 
     @Test

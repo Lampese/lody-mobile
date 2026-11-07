@@ -29,7 +29,7 @@ Principles and integration steps: [README.md](README.md).
   enforces a minimum lightness separation from each surface.
 - Icons: Lucide only, pinned by `lucideVersion`. Both platforms are emitted from
   the same path data (`scripts/lib/svg.mjs`), so geometry matches exactly. Icon
-  stroke width (`stroke.icon`) is baked into the generated assets.
+  stroke width (`stroke.icon`, with `icons/manifest.json` `strokeWidths` overrides for Web PR marks) is baked into the generated assets.
 - Fonts live once in `fonts/font/` under Android resource names (`lody_*`); the
   Android app adds `fonts/` as a res dir and iOS registers the same files by
   `LodyFontFiles.all`. iOS addresses faces by PostScript name.
@@ -57,3 +57,5 @@ Principles and integration steps: [README.md](README.md).
   suspension pauses updates when the host is stopped. Session status marks follow web
   `SessionRowStatusIndicator` (alert / hand / grid / unread dot) and PR marks
   web `SessionPrIcon`, coloured by the `pr.*` tokens.
+
+- `runtime/{ios,android}/LodyPullRequestIcon` ports Web SessionPrIcon / MaskedPrCiIcon using the shared Lucide paths: PR base 14/16 with stroke 2.25, verdict at (7,7) sized 10/16 with stroke 3; cutout centred (12,12), radius 5 (3.75 for running). CI x is an expected circle-dot, not the running solid dot; verdicts do not replace PR status colour.

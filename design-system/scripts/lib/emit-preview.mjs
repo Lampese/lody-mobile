@@ -19,10 +19,10 @@ const CODE = [
   [['keyword', 'await'], ['variable', ' session'], ['punctuation', '.'], ['function', 'send'], ['punctuation', '('], ['string', "'Run the test suite'"], ['punctuation', ')']],
 ]
 
-export function emitPreview({ palette, colors, typography, dimensions, elevation, iconPaths, iconStroke }) {
+export function emitPreview({ palette, colors, typography, dimensions, elevation, iconPaths, iconStroke, iconStrokeWidths }) {
   const byId = new Map(colors.map((c) => [c.id, c]))
   const vars = (mode) => colors.map((c) => `${cssVar(c.id)}: ${cssHex(c[mode])};`).join(' ')
-  const icon = (name) => pathsToSvg(iconPaths.get(name), iconStroke, 'currentColor')
+  const icon = (name) => pathsToSvg(iconPaths.get(name), iconStrokeWidths[name] ?? iconStroke, 'currentColor')
   const style = (name) => typography.styles.find((s) => s.name === name)
   const typeCss = (s) =>
     `font-family:lody-${s.family};font-weight:${s.weight};font-size:${s.size}px;line-height:${s.lineHeight}px;letter-spacing:${s.tracking}px`
@@ -190,7 +190,7 @@ export function emitPreview({ palette, colors, typography, dimensions, elevation
     .join('\n')
 
   const iconCells = [...iconPaths]
-    .map(([name, paths]) => `<div class="icon">${pathsToSvg(paths, iconStroke, 'currentColor')}<code>${name}</code></div>`)
+    .map(([name, paths]) => `<div class="icon">${pathsToSvg(paths, iconStrokeWidths[name] ?? iconStroke, 'currentColor')}<code>${name}</code></div>`)
     .join('\n')
 
   const list = (items, unit = '') => `<div class="dims">${items.map((t) => `<div><code>${t.name}</code> ${t.value}${unit}</div>`).join('')}</div>`

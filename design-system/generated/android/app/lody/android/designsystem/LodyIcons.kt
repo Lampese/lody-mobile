@@ -441,6 +441,7 @@ object LodyIcons {
             "M3 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
             "M13 6h3a2 2 0 0 1 2 2v7",
             "M6 9L6 21",
+            strokeWidth = 2.25f,
         )
     }
 
@@ -453,6 +454,7 @@ object LodyIcons {
             "m21 9-6-6",
             "M18 11.5V15",
             "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+            strokeWidth = 2.25f,
         )
     }
 
@@ -464,6 +466,7 @@ object LodyIcons {
             "M18 6V5",
             "M18 11v-1",
             "M6 9L6 21",
+            strokeWidth = 2.25f,
         )
     }
 
@@ -491,6 +494,7 @@ object LodyIcons {
             "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
             "M3 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
             "M6 21V9a9 9 0 0 0 9 9",
+            strokeWidth = 2.25f,
         )
     }
 
@@ -700,7 +704,7 @@ object LodyIcons {
     }
 }
 
-private fun lodyIcon(name: String, vararg paths: String): ImageVector =
+private fun lodyIcon(name: String, vararg paths: String, strokeWidth: Float = 1.75f): ImageVector =
     ImageVector.Builder(
         name = "Lody.$name",
         defaultWidth = 24.dp,
@@ -712,7 +716,7 @@ private fun lodyIcon(name: String, vararg paths: String): ImageVector =
             addPath(
                 pathData = addPathNodes(d),
                 stroke = SolidColor(Color.Black),
-                strokeLineWidth = 1.75f,
+                strokeLineWidth = strokeWidth,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,
             )

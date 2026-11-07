@@ -183,13 +183,13 @@ ${cases}
 `
 }
 
-function assetCatalog(iconPaths, strokeWidth) {
+function assetCatalog(iconPaths, strokeWidth, overrides) {
   const out = {}
   const info = { author: 'xcode', version: 1 }
   out['generated/ios/LodyIcons.xcassets/Contents.json'] = JSON.stringify({ info }, null, 2) + '\n'
   for (const [name, paths] of iconPaths) {
     const dir = `generated/ios/LodyIcons.xcassets/lody.icon.${name}.imageset`
-    out[`${dir}/${name}.svg`] = pathsToSvg(paths, strokeWidth)
+    out[`${dir}/${name}.svg`] = pathsToSvg(paths, overrides[name] ?? strokeWidth)
     out[`${dir}/Contents.json`] =
       JSON.stringify(
         {
@@ -204,7 +204,7 @@ function assetCatalog(iconPaths, strokeWidth) {
   return out
 }
 
-export function emitSwift({ colors: colorList, typography: type, dimensions, elevation: levels, iconPaths, iconStroke }) {
+export function emitSwift({ colors: colorList, typography: type, dimensions, elevation: levels, iconPaths, iconStroke, iconStrokeWidths }) {
   const dir = 'generated/ios/LodyDesignSystem'
   return {
     [`${dir}/LodyColor.swift`]: colors(colorList),
@@ -212,6 +212,6 @@ export function emitSwift({ colors: colorList, typography: type, dimensions, ele
     [`${dir}/LodyMetrics.swift`]: metrics(dimensions),
     [`${dir}/LodyElevation.swift`]: elevation(levels),
     [`${dir}/LodyIcon.swift`]: icons([...iconPaths.keys()]),
-    ...assetCatalog(iconPaths, iconStroke),
+    ...assetCatalog(iconPaths, iconStroke, iconStrokeWidths),
   }
 }

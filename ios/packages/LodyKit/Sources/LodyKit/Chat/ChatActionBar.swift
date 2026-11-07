@@ -38,6 +38,8 @@ struct ChatActionBarState: Decodable, Equatable {
     var tint: String?
     let accessibilityLabel: String
     var menuTitle: String?
+    var prStatus: String?
+    var prCI: String?
     let actions: [ChatMenuAction]
   }
 
@@ -227,7 +229,11 @@ struct ChatActionBarContent: View {
     }
     let label = HStack(spacing: 6) {
       if let context {
-          Image(systemName: context.symbol).foregroundStyle(Self.tint(context.tint))
+          if let status = context.prStatus, !status.isEmpty {
+            LodyPullRequestIcon(status: status, ci: context.prCI)
+          } else {
+            Image(systemName: context.symbol).foregroundStyle(Self.tint(context.tint))
+          }
           Text(context.label).lineLimit(1).truncationMode(.middle).foregroundStyle(LodyColor.textPrimary)
             .frame(maxWidth: 140, alignment: .leading).fixedSize(horizontal: true, vertical: false)
         }
@@ -251,7 +257,7 @@ struct ChatActionBarContent: View {
       .frame(minHeight: ChatActionBarView.rowHeight)
       .contentShape(Capsule())
     return ContextActionsPopover(
-      actions: actions, title: context?.menuTitle, diff: state.diff,
+      actions: actions, title: context?.menuTitle, diff: state.diff, prStatus: context?.prStatus, prCI: context?.prCI,
       onAction: { onAction("context:" + $0) }, label: label
     )
     .buttonStyle(.plain)
@@ -426,6 +432,8 @@ private struct ContextActionsPopover<Label: View>: View {
   let actions: [ChatMenuAction]
   let title: String?
   let diff: ChatActionBarState.Diff?
+  let prStatus: String?
+  let prCI: String?
   let onAction: (String) -> Void
   let label: Label
   @State private var presented = false
@@ -475,7 +483,11 @@ private struct ContextActionsPopover<Label: View>: View {
               onAction(action.id)
             } label: {
               HStack(spacing: LodySpacing.md) {
-                Image(systemName: action.symbol).frame(width: LodyIconSize.md)
+                if action.id == "pr", let status = prStatus {
+                  LodyPullRequestIcon(status: status, ci: prCI, size: LodyIconSize.md)
+                } else {
+                  Image(systemName: action.symbol).frame(width: LodyIconSize.md)
+                }
                 Text(action.title).lineLimit(1)
                   .frame(width: actionLabelWidth, alignment: .leading)
                 HStack(spacing: LodySpacing.xs) {

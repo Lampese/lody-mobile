@@ -386,4 +386,5 @@
     <string name="chat_close_current">关闭当前对话</string>
     <string name="home_group_pinned">置顶</string>
     <string name="bar_view_pr">查看 PR</string>
+    <string name="home_ci_expected">等待检查</string>
 </resources>

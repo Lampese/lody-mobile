@@ -72,5 +72,11 @@
     "permissionWarning": "shield-alert",
     "permissionPlan": "compass",
     "permissionDefault": "shield"
+  },
+  "strokeWidths": {
+    "pullRequest": 2.25,
+    "pullRequestClosed": 2.25,
+    "pullRequestDraft": 2.25,
+    "merge": 2.25
   }
 }

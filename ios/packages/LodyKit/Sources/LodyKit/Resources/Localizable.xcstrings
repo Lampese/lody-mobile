@@ -23083,6 +23083,23 @@
         }
       }
     },
+    "home.ci.expected": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checks expected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待检查"
+          }
+        }
+      }
+    },
     "home.ci.pending": {
       "extractionState": "manual",
       "localizations": {

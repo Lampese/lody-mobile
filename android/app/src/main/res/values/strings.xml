@@ -393,4 +393,5 @@
     <string name="chat_close_current">Close current conversation</string>
     <string name="home_group_pinned">Pinned</string>
     <string name="bar_view_pr">View PR</string>
+    <string name="home_ci_expected">Checks expected</string>
 </resources>

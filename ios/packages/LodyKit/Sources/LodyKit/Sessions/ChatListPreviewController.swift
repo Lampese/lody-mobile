@@ -1,9 +1,26 @@
 import UIKit
+import SwiftUI
+import LodyDesignSystem
 
 /// Offline fixture for the production list, including the family's real fold action.
 @MainActor
 final class ChatListPreviewController: UIViewController {
   override func loadView() {
+    if LodyUIVerify.has("--ui-review-pr-icons") {
+      let host = UIHostingController(rootView: PullRequestIconPreview())
+      view = UIView()
+      addChild(host)
+      host.view.translatesAutoresizingMaskIntoConstraints = false
+      view.addSubview(host.view)
+      NSLayoutConstraint.activate([
+        host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+        host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        host.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+        host.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      ])
+      host.didMove(toParent: self)
+      return
+    }
     let list = ChatListView(frame: .zero)
     view = list
     func row(_ id: String, _ title: String, tint: String = "", unread: Bool = false, project: String = "", pr: String = "", parent: String = "", last: Bool = false) -> LodyListRow {
@@ -39,5 +56,25 @@ final class ChatListPreviewController: UIViewController {
       return
     }
     list.setSections([LodyListSection(id: "list-review", header: "Conversations", rows: rows)])
+  }
+}
+
+private struct PullRequestIconPreview: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 28) {
+      Text("PR / CI · Web parity").font(.headline)
+      Text("None · Pass · Fail · Running · Expected").font(.caption)
+      ForEach(["open", "draft", "merged", "closed"], id: \.self) { status in
+        VStack(alignment: .leading, spacing: 12) {
+          Text(status).font(.subheadline)
+          HStack(spacing: 36) {
+            ForEach(["", "s", "f", "p", "x"], id: \.self) { ci in
+              LodyPullRequestIcon(status: status, ci: ci, size: 24)
+            }
+          }
+        }
+      }
+      Spacer()
+    }.padding(24)
   }
 }

@@ -25,6 +25,7 @@ export function loadAll() {
     elevation: loadElevation(colors),
     iconPaths,
     iconStroke,
+    iconStrokeWidths: loadIconManifest().strokeWidths ?? {},
   }
 }
 

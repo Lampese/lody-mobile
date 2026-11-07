@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
@@ -48,7 +52,22 @@ class StickyGroupsProbeActivity : ComponentActivity() {
         setContent {
             LodyTheme {
                 Surface(color = LodyTheme.colors.bgBase) {
-                    if (intent.getBooleanExtra("context-review", false)) {
+                    if (intent.getBooleanExtra("pr-review", false)) {
+                        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+                            Text("PR / CI · Web parity")
+                            Text("None · Pass · Fail · Running · Expected")
+                            listOf("open", "draft", "merged", "closed").forEach { status ->
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(status)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(36.dp)) {
+                                        listOf("", "s", "f", "p", "x").forEach { ci ->
+                                            app.lody.android.designsystem.LodyPullRequestIcon(status, ci, size = 24.dp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if (intent.getBooleanExtra("context-review", false)) {
                         Box(Modifier.fillMaxSize().padding(16.dp)) {
                             Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp)) {
                                 app.lody.android.chat.ChatActionBar(

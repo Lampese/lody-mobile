@@ -139,7 +139,8 @@ object ChatListModel {
     fun ci(letter: String?): String = when (letter) {
         "s" -> "pass"
         "f", "e" -> "fail"
-        "p", "x" -> "pending"
+        "p" -> "pending"
+        "x" -> "expected"
         else -> ""
     }
 

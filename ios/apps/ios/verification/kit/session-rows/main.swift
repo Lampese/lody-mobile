@@ -283,3 +283,5 @@ readTab.lastMessageAt = 101
 precondition(SessionRows.needsEmphasis(SessionCatalog(sessions: [readTab]).viewed([readTab.id: 100]).sessions[0]))
 preferences.removePersistentDomain(forName: preferenceSuite)
 print("PASS: remembered Tabs survive reload, respect scope and fall back from closed/deleted Tabs; viewed watermarks preserve new unread output")
+
+precondition(PullRequestCI("x")?.rawValue == "expected", "Expected checks must differ from running CI, as Web SessionPrIcon")

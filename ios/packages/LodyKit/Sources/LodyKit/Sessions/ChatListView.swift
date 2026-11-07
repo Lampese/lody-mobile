@@ -737,76 +737,18 @@ private struct ChatRowTitleBounds: PreferenceKey {
 
 /// The web `SessionPrIcon` states: open, merged, closed, draft.
 private struct PullRequestMark {
-  let icon: LodyIcon
-  let color: Color
+  let status: String
   let label: String
-  /// Shown only while the PR is open or a draft, as in the web sidebar.
   let ci: PullRequestCI?
 
-  /// Always the trailing mark of the line that carries it.
-  var glyph: some View { PullRequestGlyph(icon: icon, color: color, ci: ci).fixedSize() }
+  var glyph: some View { LodyPullRequestIcon(status: status, ci: ci?.rawValue).fixedSize() }
 
   init?(_ status: String, ci: String = "") {
-    switch status {
-    case "open":
-      icon = .pullRequest
-      color = LodyColor.prOpen
-    case "merged":
-      icon = .merge
-      color = LodyColor.prMerged
-    case "closed":
-      icon = .pullRequestClosed
-      color = LodyColor.prClosed
-    case "draft":
-      icon = .pullRequestDraft
-      color = LodyColor.prDraft
-    default:
-      return nil
-    }
-    self.ci = ["open", "draft"].contains(status) ? PullRequestCI(rawValue: ci) : nil
+    guard ["open", "merged", "closed", "draft"].contains(status) else { return nil }
+    self.status = status
+    self.ci = PullRequestCI(rawValue: ci)
     let pr = String(localized: String.LocalizationValue("home.pr." + status), bundle: .lody)
     label = self.ci.map { pr + ", " + String(localized: String.LocalizationValue("home.ci." + $0.rawValue), bundle: .lody) } ?? pr
-  }
-}
-
-/// Web `MaskedPrCiIcon` geometry on a 16-unit box: the verdict sits in the bottom-trailing
-/// 10-unit slot and a circular cutout clears the PR stroke beneath it, so no backdrop is
-/// painted. Pending is a static dot with a tighter cutout.
-private struct PullRequestGlyph: View {
-  let icon: LodyIcon
-  let color: Color
-  let ci: PullRequestCI?
-  private let size = LodyIconSize.sm
-
-  var body: some View {
-    if let ci {
-      let unit = size / 16
-      ZStack(alignment: .bottomTrailing) {
-        Glyph(icon: icon, size: size, color: color)
-          .mask {
-            Rectangle()
-              .overlay(alignment: .topLeading) {
-                let radius = (ci == .pending ? 3.75 : 5) * unit
-                Circle().frame(width: radius * 2, height: radius * 2)
-                  .offset(x: 12 * unit - radius, y: 12 * unit - radius)
-                  .blendMode(.destinationOut)
-              }
-              .compositingGroup()
-          }
-        verdict(ci, unit: unit).frame(width: 10 * unit, height: 10 * unit).offset(x: unit, y: unit)
-      }
-      .frame(width: size, height: size)
-    } else {
-      Glyph(icon: icon, size: size, color: color)
-    }
-  }
-
-  @ViewBuilder private func verdict(_ ci: PullRequestCI, unit: CGFloat) -> some View {
-    switch ci {
-    case .pass: Glyph(icon: .check, size: 10 * unit, color: LodyColor.successDefault)
-    case .fail: Glyph(icon: .close, size: 10 * unit, color: LodyColor.dangerDefault)
-    case .pending: Circle().fill(LodyColor.warningDefault).frame(width: 5 * unit, height: 5 * unit)
-    }
   }
 }
 

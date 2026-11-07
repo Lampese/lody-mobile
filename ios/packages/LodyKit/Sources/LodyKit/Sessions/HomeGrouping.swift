@@ -67,15 +67,16 @@ enum HomeStatusGroup: String, CaseIterable, Sendable {
   }
 }
 
-/// The catalog's CI letters as web reads them: s pass; f / e fail; p / x pending.
+/// The catalog's CI letters as web reads them: s pass; f / e fail; p pending; x expected.
 enum PullRequestCI: String, Sendable {
-  case pass, fail, pending
+  case pass, fail, pending, expected
 
   init?(_ letter: String?) {
     switch letter {
     case "s": self = .pass
     case "f", "e": self = .fail
-    case "p", "x": self = .pending
+    case "p": self = .pending
+    case "x": self = .expected
     default: return nil
     }
   }

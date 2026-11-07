@@ -1155,49 +1155,21 @@ private val PrStatuses = setOf("open", "merged", "closed", "draft")
 /** Web `SessionPrIcon`: open, merged, closed and draft each have their own Lucide mark and colour. */
 @Composable
 private fun PullRequestMark(status: String, ci: String, modifier: Modifier = Modifier) {
-    val colors = LodyTheme.colors
-    val (icon, tint, label) = when (status) {
-        "merged" -> Triple(LodyIcons.Merge, colors.prMerged, R.string.home_pr_merged)
-        "closed" -> Triple(LodyIcons.PullRequestClosed, colors.prClosed, R.string.home_pr_closed)
-        "draft" -> Triple(LodyIcons.PullRequestDraft, colors.prDraft, R.string.home_pr_draft)
-        else -> Triple(LodyIcons.PullRequest, colors.prOpen, R.string.home_pr_open)
+    val label = when (status) {
+        "merged" -> R.string.home_pr_merged
+        "closed" -> R.string.home_pr_closed
+        "draft" -> R.string.home_pr_draft
+        else -> R.string.home_pr_open
     }
-    // CI shows only while the PR is open or a draft, as in the web sidebar.
-    val verdict = ci.takeIf { (status == "open" || status == "draft") && it.isNotEmpty() }
-    val ciLabel = when (verdict) {
+    val ciLabel = when (ci) {
         "pass" -> stringResource(R.string.home_ci_pass)
         "fail" -> stringResource(R.string.home_ci_fail)
         "pending" -> stringResource(R.string.home_ci_pending)
+        "expected" -> stringResource(R.string.home_ci_expected)
         else -> null
     }
     val description = listOfNotNull(stringResource(label), ciLabel).joinToString(", ")
-    val size = LodyIconSize.sm
-    val unit = size / 16
-    Box(modifier.size(size).semantics { contentDescription = description }) {
-        if (verdict == null) {
-            Glyph(icon, tint, size)
-        } else {
-            // Web `MaskedPrCiIcon` on a 16-unit box: a circular cutout clears the PR stroke under
-            // the bottom-trailing verdict slot, so no backdrop is painted. Pending is a dot.
-            val radius = unit * if (verdict == "pending") 3.75f else 5f
-            Glyph(
-                icon, tint, size,
-                Modifier
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawCircle(Color.Black, radius.toPx(), Offset((unit * 12).toPx(), (unit * 12).toPx()), blendMode = BlendMode.Clear)
-                    },
-            )
-            Box(Modifier.offset(unit * 7, unit * 7).size(unit * 10), contentAlignment = Alignment.Center) {
-                when (verdict) {
-                    "pass" -> Glyph(LodyIcons.Check, colors.successDefault, unit * 10)
-                    "fail" -> Glyph(LodyIcons.Close, colors.dangerDefault, unit * 10)
-                    else -> Box(Modifier.size(unit * 5).background(colors.warningDefault, CircleShape))
-                }
-            }
-        }
-    }
+    app.lody.android.designsystem.LodyPullRequestIcon(status, ci, modifier.semantics { contentDescription = description })
 }
 
 /** Wall clock for row ages, refreshed each minute while the list is on screen. */

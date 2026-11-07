@@ -177,10 +177,12 @@ ${vals}
 `
 }
 
-function icons(iconPaths, strokeWidth) {
+function icons(iconPaths, strokeWidth, overrides) {
   const vals = [...iconPaths]
     .map(([name, paths]) => {
-      const args = [pascal(name), ...paths].map((arg) => `            "${arg}",`).join('\n')
+      const args =
+        [pascal(name), ...paths].map((arg) => `            "${arg}",`).join('\n') +
+        (overrides[name] === undefined ? '' : `\n            strokeWidth = ${float(overrides[name])},`)
       return `    val ${pascal(name)}: ImageVector by lazy {\n        lodyIcon(\n${args}\n        )\n    }`
     })
     .join('\n\n')
@@ -207,7 +209,7 @@ ${[...iconPaths.keys()].map((n) => `            "${n}" to ${pascal(n)},`).join('
     }
 }
 
-private fun lodyIcon(name: String, vararg paths: String): ImageVector =
+private fun lodyIcon(name: String, vararg paths: String, strokeWidth: Float = ${float(strokeWidth)}): ImageVector =
     ImageVector.Builder(
         name = "Lody.$name",
         defaultWidth = 24.dp,
@@ -219,7 +221,7 @@ private fun lodyIcon(name: String, vararg paths: String): ImageVector =
             addPath(
                 pathData = addPathNodes(d),
                 stroke = SolidColor(Color.Black),
-                strokeLineWidth = ${float(strokeWidth)},
+                strokeLineWidth = strokeWidth,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,
             )
@@ -228,13 +230,13 @@ private fun lodyIcon(name: String, vararg paths: String): ImageVector =
 `
 }
 
-export function emitKotlin({ colors: colorList, typography: type, dimensions: dims, elevation: levels, iconPaths, iconStroke }) {
+export function emitKotlin({ colors: colorList, typography: type, dimensions: dims, elevation: levels, iconPaths, iconStroke, iconStrokeWidths }) {
   const dir = `generated/android/${ANDROID_PACKAGE.replaceAll('.', '/')}`
   return {
     [`${dir}/LodyColors.kt`]: colors(colorList),
     [`${dir}/LodyTypography.kt`]: typography(type),
     [`${dir}/LodyDimens.kt`]: dimensions(dims),
     [`${dir}/LodyElevation.kt`]: elevation(levels),
-    [`${dir}/LodyIcons.kt`]: icons(iconPaths, iconStroke),
+    [`${dir}/LodyIcons.kt`]: icons(iconPaths, iconStroke, iconStrokeWidths),
   }
 }

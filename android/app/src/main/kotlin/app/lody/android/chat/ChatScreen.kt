@@ -1143,24 +1143,13 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var open by remember { mutableStateOf(false) }
     val pr = bar.pullRequest
-    val ci = pr?.ci?.takeIf { pr.status == "open" || pr.status == "draft" }
-    val (icon, statusTint) = when (pr?.status) {
-        null -> LodyIcons.Branch to colors.iconSecondary
-        "merged" -> LodyIcons.Merge to colors.prMerged
-        "closed" -> LodyIcons.PullRequestClosed to colors.prClosed
-        "draft" -> LodyIcons.PullRequestDraft to colors.prDraft
-        else -> LodyIcons.PullRequest to colors.prOpen
-    }
-    val tint = when (ci) {
-        "f", "e" -> colors.dangerDefault
-        "p" -> colors.warningDefault
-        else -> statusTint
-    }
+    val ci = pr?.ci
     val verdict = when (ci) {
         "s" -> stringResource(R.string.bar_ci_s)
         "f" -> stringResource(R.string.bar_ci_f)
         "e" -> stringResource(R.string.bar_ci_e)
         "p" -> stringResource(R.string.bar_ci_p)
+        "x" -> stringResource(R.string.home_ci_expected)
         else -> null
     }
     val label = pr?.let { "#${it.number}" } ?: bar.branch.ifEmpty { bar.repository.substringAfterLast('/') }
@@ -1171,7 +1160,7 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
     val description = listOfNotNull(bar.repository, bar.branch, label, verdict, counts.takeIf { diff })
         .filter { it.isNotEmpty() }.distinct().joinToString(", ")
     var panel by remember { mutableStateOf(false) }
-    if (panel && pr != null) PullRequestSheet(bar, pr, icon, tint, verdict, onCopied) { panel = false }
+    if (panel && pr != null) PullRequestSheet(bar, pr, verdict, onCopied) { panel = false }
     Box(modifier.barCapsule(colors)) {
         // Always choose a destination before opening the PR or inspecting changes.
         BarCell(
@@ -1181,7 +1170,8 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
             onLongClick = if (pr != null) ({ open = true }) else null,
         ) {
             if (showsContext) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.sm))
+                if (pr != null) app.lody.android.designsystem.LodyPullRequestIcon(pr.status, pr.ci)
+                else Icon(LodyIcons.Branch, contentDescription = null, tint = colors.iconSecondary, modifier = Modifier.size(LodyIconSize.sm))
                 Text(label, style = type.subhead, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.MiddleEllipsis,
                     // Not weighted: the fitting probe measures unbounded, where a weight would read as zero.
                     modifier = Modifier.widthIn(max = 160.dp))
@@ -1224,7 +1214,7 @@ private fun ContextItem(bar: SessionInfoBar, diffDot: Boolean, onCopied: (String
                             Text("#${pr.number}", style = type.body.copy(fontFeatureSettings = "tnum"))
                         }
                     },
-                    leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.md)) },
+                    leadingIcon = { app.lody.android.designsystem.LodyPullRequestIcon(pr.status, pr.ci, size = LodyIconSize.md) },
                     onClick = { open = false; panel = true },
                 )
             }
@@ -1410,8 +1400,6 @@ private fun MergeSheet(title: String, preferred: String, onDismiss: () -> Unit, 
 private fun PullRequestSheet(
     bar: SessionInfoBar,
     pr: CatalogPullRequest,
-    icon: ImageVector,
-    tint: androidx.compose.ui.graphics.Color,
     verdict: String?,
     onCopied: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -1432,7 +1420,7 @@ private fun PullRequestSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.bgBase) {
         Column(Modifier.padding(horizontal = LodySpacing.lg).padding(bottom = LodySpacing.xl), verticalArrangement = Arrangement.spacedBy(LodySpacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LodySpacing.sm)) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(LodyIconSize.lg))
+                app.lody.android.designsystem.LodyPullRequestIcon(pr.status, pr.ci, size = LodyIconSize.lg)
                 Column(Modifier.weight(1f)) {
                     Text("${pr.repository} #${pr.number}", style = type.headline, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(listOfNotNull(state, verdict, if (pr.merge == "d") stringResource(R.string.bar_conflicts) else null).joinToString(" · "),
