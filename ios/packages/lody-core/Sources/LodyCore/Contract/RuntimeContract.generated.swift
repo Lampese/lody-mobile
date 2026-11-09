@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeContract {
   public static let version = 1
-  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","forkSession","hello","iosSimulatorControl","itemDetail","listDir","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","sendTurn","sessionPreview","sessionSharing","setActive","setTabClosed","start","turnDiff","workspaceChanges"]
+  public static let runtimeMethods: [String] = ["agentRoles","archiveSession","checkTurnQuota","closeSession","controlTurn","createSession","createTab","creationOptions","deleteSession","editSession","ensureSession","fileDiff","forgetPendingInput","forkSession","hello","iosSimulatorControl","itemDetail","listDir","loadOlderSession","localProjects","markSessionRead","memorySettings","mentionCatalog","openSession","ping","pinSession","probeSchema","projectGroups","promptShortcuts","publishedShares","readFile","releaseReserve","remoteSettings","renameSession","respondPermission","restoreSessions","retryPendingInput","sendTurn","sessionPreview","sessionSharing","setActive","setTabClosed","start","turnDiff","workspaceChanges"]
 
   public enum AgentRoleItemVisibility: String, Codable, Sendable, Equatable, CaseIterable {
     case `private` = "private"
@@ -874,19 +874,21 @@ extension RuntimeContract {
     public var machineId: String
     public var agentConfigId: String
     public var userId: String
+    public var preferRoost: Bool?
     public var title: String
     public var branch: String?
     public var agentRoleId: String?
     public var agentRoleRevision: Int?
     public var projectGroupId: String?
     public var billingEntitlement: BillingEntitlement?
-    public init(workspaceId: String, projectId: String? = nil, sessionId: String, machineId: String, agentConfigId: String, userId: String, title: String, branch: String? = nil, agentRoleId: String? = nil, agentRoleRevision: Int? = nil, projectGroupId: String? = nil, billingEntitlement: BillingEntitlement?) {
+    public init(workspaceId: String, projectId: String? = nil, sessionId: String, machineId: String, agentConfigId: String, userId: String, preferRoost: Bool? = nil, title: String, branch: String? = nil, agentRoleId: String? = nil, agentRoleRevision: Int? = nil, projectGroupId: String? = nil, billingEntitlement: BillingEntitlement?) {
       self.workspaceId = workspaceId
       self.projectId = projectId
       self.sessionId = sessionId
       self.machineId = machineId
       self.agentConfigId = agentConfigId
       self.userId = userId
+      self.preferRoost = preferRoost
       self.title = title
       self.branch = branch
       self.agentRoleId = agentRoleId
@@ -902,6 +904,7 @@ extension RuntimeContract {
       self.machineId = try c.decode(String.self, forKey: Key("machineId"))
       self.agentConfigId = try c.decode(String.self, forKey: Key("agentConfigId"))
       self.userId = try c.decode(String.self, forKey: Key("userId"))
+      self.preferRoost = try c.decodeIfPresent(Bool.self, forKey: Key("preferRoost"))
       self.title = try c.decode(String.self, forKey: Key("title"))
       self.branch = try c.decodeIfPresent(String.self, forKey: Key("branch"))
       self.agentRoleId = try c.decodeIfPresent(String.self, forKey: Key("agentRoleId"))
@@ -917,6 +920,7 @@ extension RuntimeContract {
       try c.encode(self.machineId, forKey: Key("machineId"))
       try c.encode(self.agentConfigId, forKey: Key("agentConfigId"))
       try c.encode(self.userId, forKey: Key("userId"))
+      try c.encodeIfPresent(self.preferRoost, forKey: Key("preferRoost"))
       try c.encode(self.title, forKey: Key("title"))
       try c.encodeIfPresent(self.branch, forKey: Key("branch"))
       try c.encodeIfPresent(self.agentRoleId, forKey: Key("agentRoleId"))
@@ -1005,11 +1009,13 @@ extension RuntimeContract {
     public var workspaceId: String
     public var sessionId: String
     public var parentSessionId: String
+    public var preferRoost: Bool?
     public var title: String
-    public init(workspaceId: String, sessionId: String, parentSessionId: String, title: String) {
+    public init(workspaceId: String, sessionId: String, parentSessionId: String, preferRoost: Bool? = nil, title: String) {
       self.workspaceId = workspaceId
       self.sessionId = sessionId
       self.parentSessionId = parentSessionId
+      self.preferRoost = preferRoost
       self.title = title
     }
     public init(from decoder: any Decoder) throws {
@@ -1017,6 +1023,7 @@ extension RuntimeContract {
       self.workspaceId = try c.decode(String.self, forKey: Key("workspaceId"))
       self.sessionId = try c.decode(String.self, forKey: Key("sessionId"))
       self.parentSessionId = try c.decode(String.self, forKey: Key("parentSessionId"))
+      self.preferRoost = try c.decodeIfPresent(Bool.self, forKey: Key("preferRoost"))
       self.title = try c.decode(String.self, forKey: Key("title"))
     }
     public func encode(to encoder: any Encoder) throws {
@@ -1024,6 +1031,7 @@ extension RuntimeContract {
       try c.encode(self.workspaceId, forKey: Key("workspaceId"))
       try c.encode(self.sessionId, forKey: Key("sessionId"))
       try c.encode(self.parentSessionId, forKey: Key("parentSessionId"))
+      try c.encodeIfPresent(self.preferRoost, forKey: Key("preferRoost"))
       try c.encode(self.title, forKey: Key("title"))
     }
   }
@@ -1823,6 +1831,25 @@ extension RuntimeContract {
       var c = encoder.container(keyedBy: Key.self)
       try c.encode(self.sessionId, forKey: Key("sessionId"))
       try c.encode(self.path, forKey: Key("path"))
+    }
+  }
+
+  public struct ForgetPendingInputParams: Codable, Sendable, Equatable {
+    public var sessionId: String
+    public var inputId: String
+    public init(sessionId: String, inputId: String) {
+      self.sessionId = sessionId
+      self.inputId = inputId
+    }
+    public init(from decoder: any Decoder) throws {
+      let c = try decoder.container(keyedBy: Key.self)
+      self.sessionId = try c.decode(String.self, forKey: Key("sessionId"))
+      self.inputId = try c.decode(String.self, forKey: Key("inputId"))
+    }
+    public func encode(to encoder: any Encoder) throws {
+      var c = encoder.container(keyedBy: Key.self)
+      try c.encode(self.sessionId, forKey: Key("sessionId"))
+      try c.encode(self.inputId, forKey: Key("inputId"))
     }
   }
 
@@ -7041,6 +7068,16 @@ extension RuntimeContract {
         return nil
       }
     }
+    public enum ForgetPendingInput: RuntimeCall {
+      public typealias Params = RuntimeContract.ForgetPendingInputParams
+      public typealias Result = RuntimeContract.Empty
+      public static let method = "forgetPendingInput"
+      public static let timeout: Double = 30
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .forgetPendingInput(let result) = value { return result }
+        return nil
+      }
+    }
     public enum ForkSession: RuntimeCall {
       public typealias Params = RuntimeContract.ForkSessionParams
       public typealias Result = RuntimeContract.ForkSessionResult
@@ -7088,6 +7125,16 @@ extension RuntimeContract {
       public static let timeout: Double = 45
       public static func result(_ value: RuntimeContract.CallResult) -> Result? {
         if case .listDir(let result) = value { return result }
+        return nil
+      }
+    }
+    public enum LoadOlderSession: RuntimeCall {
+      public typealias Params = RuntimeContract.OpenSessionParams
+      public typealias Result = RuntimeContract.Empty
+      public static let method = "loadOlderSession"
+      public static let timeout: Double = 45
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .loadOlderSession(let result) = value { return result }
         return nil
       }
     }
@@ -7261,6 +7308,16 @@ extension RuntimeContract {
         return nil
       }
     }
+    public enum RetryPendingInput: RuntimeCall {
+      public typealias Params = RuntimeContract.ForgetPendingInputParams
+      public typealias Result = RuntimeContract.Empty
+      public static let method = "retryPendingInput"
+      public static let timeout: Double = 30
+      public static func result(_ value: RuntimeContract.CallResult) -> Result? {
+        if case .retryPendingInput(let result) = value { return result }
+        return nil
+      }
+    }
     public enum SendTurn: RuntimeCall {
       public typealias Params = RuntimeContract.SendTurnParams
       public typealias Result = RuntimeContract.SendTurnResult
@@ -7383,11 +7440,13 @@ extension RuntimeContract {
     case editSession(RuntimeContract.EditSessionResult)
     case ensureSession(RuntimeContract.Empty)
     case fileDiff(RuntimeContract.DiffResult)
+    case forgetPendingInput(RuntimeContract.Empty)
     case forkSession(RuntimeContract.ForkSessionResult)
     case hello(RuntimeContract.HelloResult)
     case iosSimulatorControl(RuntimeContract.IosSimulatorControlResult)
     case itemDetail(RuntimeContract.ItemDetail)
     case listDir(RuntimeContract.DirectoryListing)
+    case loadOlderSession(RuntimeContract.Empty)
     case localProjects(RuntimeContract.LocalProjectsResult)
     case markSessionRead(RuntimeContract.Empty)
     case memorySettings(RuntimeContract.MemorySnapshot)
@@ -7405,6 +7464,7 @@ extension RuntimeContract {
     case renameSession(RuntimeContract.Empty)
     case respondPermission(RuntimeContract.RespondPermissionResult)
     case restoreSessions(RuntimeContract.Empty)
+    case retryPendingInput(RuntimeContract.Empty)
     case sendTurn(RuntimeContract.SendTurnResult)
     case sessionPreview(RuntimeContract.SessionPreviewResult)
     case sessionSharing(RuntimeContract.SessionSharingResult)
@@ -7486,11 +7546,13 @@ extension RuntimeContract {
         case "editSession": message = .result(id: id, .editSession(try c.decode(RuntimeContract.EditSessionResult.self, forKey: Key("payload"))))
         case "ensureSession": message = .result(id: id, .ensureSession(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "fileDiff": message = .result(id: id, .fileDiff(try c.decode(RuntimeContract.DiffResult.self, forKey: Key("payload"))))
+        case "forgetPendingInput": message = .result(id: id, .forgetPendingInput(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "forkSession": message = .result(id: id, .forkSession(try c.decode(RuntimeContract.ForkSessionResult.self, forKey: Key("payload"))))
         case "hello": message = .result(id: id, .hello(try c.decode(RuntimeContract.HelloResult.self, forKey: Key("payload"))))
         case "iosSimulatorControl": message = .result(id: id, .iosSimulatorControl(try c.decode(RuntimeContract.IosSimulatorControlResult.self, forKey: Key("payload"))))
         case "itemDetail": message = .result(id: id, .itemDetail(try c.decode(RuntimeContract.ItemDetail.self, forKey: Key("payload"))))
         case "listDir": message = .result(id: id, .listDir(try c.decode(RuntimeContract.DirectoryListing.self, forKey: Key("payload"))))
+        case "loadOlderSession": message = .result(id: id, .loadOlderSession(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "localProjects": message = .result(id: id, .localProjects(try c.decode(RuntimeContract.LocalProjectsResult.self, forKey: Key("payload"))))
         case "markSessionRead": message = .result(id: id, .markSessionRead(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "memorySettings": message = .result(id: id, .memorySettings(try c.decode(RuntimeContract.MemorySnapshot.self, forKey: Key("payload"))))
@@ -7508,6 +7570,7 @@ extension RuntimeContract {
         case "renameSession": message = .result(id: id, .renameSession(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "respondPermission": message = .result(id: id, .respondPermission(try c.decode(RuntimeContract.RespondPermissionResult.self, forKey: Key("payload"))))
         case "restoreSessions": message = .result(id: id, .restoreSessions(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
+        case "retryPendingInput": message = .result(id: id, .retryPendingInput(try c.decode(RuntimeContract.Empty.self, forKey: Key("payload"))))
         case "sendTurn": message = .result(id: id, .sendTurn(try c.decode(RuntimeContract.SendTurnResult.self, forKey: Key("payload"))))
         case "sessionPreview": message = .result(id: id, .sessionPreview(try c.decode(RuntimeContract.SessionPreviewResult.self, forKey: Key("payload"))))
         case "sessionSharing": message = .result(id: id, .sessionSharing(try c.decode(RuntimeContract.SessionSharingResult.self, forKey: Key("payload"))))

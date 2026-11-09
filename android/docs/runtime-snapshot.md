@@ -11,6 +11,25 @@ For an intentional update:
 
 The production lockfile remains pinned. Phase 1 reported Zod advisory **GHSA-mrhx-c7xc-m3w5** against 3.25.76. Phase 2 pins **4.6.7** and verifies real shared schemas: accepted identities, strict extra-field rejection, shortcut variants, share object validation, and oversized constrained collections failing before per-item error allocation. The oversized-input test failed on v3 and passes on the patched version. `npm audit --omit=dev` reports zero known vulnerabilities for this lockfile. No source snapshot changes or v3 compatibility shim were needed.
 
+The Roost update in `PROVENANCE.json` copies the shared iOS runtime, its pinned
+upstream Roost bridge, input coordinator and storage, and the reproducible
+browser bundle. Developer Mode and the Roost History beta preference select the
+upstream policy for new conversations and Tabs: a compatible owner uses Roost;
+otherwise it uses Loro. The choice is frozen in session metadata.
+
+Roost sessions use the owner machine's encrypted v3 history RPC while Loro carries
+the control document and queue. The upstream coordinator persists pending inputs
+in IndexedDB under the account and workspace, recovers the original input after
+restart, and serializes inputs for a session. Sign-out does not clear the pending
+input database. Queue-to-guide conversion preserves the queue item when local input
+saving fails. Archiving or deleting a Roost session cancels its pending inputs before changing metadata.
+A user can retry the original input after a failure, or cancel a pending
+input while its session is syncing,
+although an owner may already
+have accepted it. The native transcript opens at the latest page and requests
+older pages when needed. The Android runtime test exercises the bundled production
+session module with a synthetic Streams peer.
+
 References: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5 and https://zod.dev/v4/changelog. Audit evidence is retained separately for each phase.
 
 Bridge protocol 2 adds an explicit command capability handshake, `$cancel`, native command deadlines, and ordered message chunks. It wraps the original JS runtime; it does not change the upstream cloud protocol. Fixtures use synthetic catalog data matching the vendored event shapes, not captured user data. The offline document exposes `ping`, `setActive`, and `probeSchema`. The network document additionally advertises `connect`, `grant`, `watchSession`, `closeSession`, `creationOptions`, and `createAndSend`, used through the native scoped runtime. Session reads reuse the upstream Loro projection and emit typed text messages to Compose. Both network gates restrict reads and the creation/dispatch writes described below to the current workspace; returning to the list stops the session subscription.

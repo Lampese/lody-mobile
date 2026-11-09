@@ -1,6 +1,8 @@
 import { verifySnapshot } from './snapshot.mjs';
+import { buildUpstreamRoost } from './vendor/cloud-runtime/scripts/build-upstream-roost.mjs';
 import { buildMarkdownRepair } from './src/markdown-repair.mjs';
 await verifySnapshot();
+await buildUpstreamRoost();
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile, readdir, copyFile, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -16,12 +18,13 @@ for (const variant of Object.keys(documents)) {
     plugins:[{name:'inline-loro-wasm',setup(b){b.onResolve({filter:/^loro-crdt$/},()=>b.resolve('loro-crdt/base64',{resolveDir:root,kind:'import-statement'}));}}]});
   const dir=path.join(output,variant==='network'?'main':variant,'runtime');await mkdir(dir,{recursive:true});
   const script=result.outputFiles[0].text.replaceAll('</script','<\\/script');
-  // Offline probe: no network access, external scripts, frames or persistent web storage.
+  // Offline probe: no network access, external scripts or frames.
   const html=`<!doctype html><meta charset="utf-8"><title>Lody Runtime</title><meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src ${variant==='network'?'__LODY_STREAM_ORIGIN__':"'none'"}; script-src 'unsafe-inline' 'wasm-unsafe-eval'; base-uri 'none'; form-action 'none'"><script>${prelude}</script><script type="module">${script}</script>`;
   await writeFile(path.join(dir,documents[variant]),html);
 }
 const licenses=path.join(output,'main/runtime/licenses');await rm(licenses,{recursive:true,force:true});await mkdir(licenses,{recursive:true});
 await copyFile(path.join(root,'vendor/cloud-runtime/LICENSE'),path.join(licenses,'CloudRuntime-LICENSE.txt'));
+await copyFile(path.join(root,'vendor/cloud-runtime/vendor/upstream-roost/DSH-LICENSE'),path.join(licenses,'acp-extension-dsh-LICENSE.txt'));
 const lock=JSON.parse(await readFile(path.join(root,'package-lock.json')));
 const inventory=[];
 for (const [location, info] of Object.entries(lock.packages)) {
@@ -30,8 +33,11 @@ for (const [location, info] of Object.entries(lock.packages)) {
  const version=info.version;
  const dir=path.join(root,location);
  const file=(await readdir(dir)).find(name=>/^LICENSE(?:\.|$)/i.test(name));
- if(!file) throw Error(`Missing license: ${name}@${version}`);
- const text=await readFile(path.join(dir,file));
+ // loro-mirror declares MIT but its npm tarball omits the text; this is the
+ // same canonical notice used by iOS for the upstream package metadata.
+ const fallback=name==='loro-mirror'&&version==='2.3.2' ? path.join(root,'vendor/licenses/loro-mirror-2.3.2-LICENSE.txt') : undefined;
+ if(!file&&!fallback) throw Error(`Missing license: ${name}@${version}`);
+ const text=await readFile(file?path.join(dir,file):fallback);
  await writeFile(path.join(licenses,name.replaceAll('/','-')+'-'+version+'-LICENSE.txt'),text);
  inventory.push({name,version,licenseSha256:createHash('sha256').update(text).digest('hex')});
 }

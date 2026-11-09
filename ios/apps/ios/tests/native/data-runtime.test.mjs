@@ -4,6 +4,8 @@ import { build } from 'esbuild';
 import { Flock } from '@loro-dev/flock-wasm/base64';
 
 test('persistent runtime applies live increments to the existing replica and advances the cursor', async () => {
+  const previousBroadcastChannel = globalThis.BroadcastChannel;
+  globalThis.BroadcastChannel = undefined;
   const flock = new Flock('synthetic');
   flock.set(['e', 'session-s1'], true, 1);
   flock.set(['e', 'machine-m1'], true, 1);
@@ -186,6 +188,7 @@ test('persistent runtime applies live increments to the existing replica and adv
         'setActive',
         'ping',
         'openSession',
+        'loadOlderSession',
         'closeSession',
         'releaseReserve',
         'restoreSessions',
@@ -207,10 +210,14 @@ test('persistent runtime applies live increments to the existing replica and adv
         'fileDiff',
         'readFile',
         'listDir',
+        'forgetPendingInput',
+        'retryPendingInput',
+        'forkSession',
         'createTab',
         'createSession',
         'deleteSession',
         'archiveSession',
+        'setTabClosed',
         'pinSession',
         'markSessionRead',
         'renameSession',
@@ -451,4 +458,5 @@ test('persistent runtime applies live increments to the existing replica and adv
   delete globalThis.webkit;
   delete globalThis.__runtimeTestClient;
   delete globalThis.dataRuntime;
+  globalThis.BroadcastChannel = previousBroadcastChannel;
 });

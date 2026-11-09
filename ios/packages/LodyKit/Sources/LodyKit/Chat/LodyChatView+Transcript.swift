@@ -534,18 +534,19 @@ extension LodyChatView {
     let entryIDs = projected.reduce(into: [String]()) { ids, row in
       if ids.last != row.entryID { ids.append(row.entryID) }
     }
+    historyFirstID = entryIDs.first
     guard !entryIDs.isEmpty else {
       historyStartID = nil
       historyTargetID = nil
       preparingHistory = false
-      hasEarlierHistory = false
-      hasPagedHistory = false
+      hasEarlierHistory = remoteHasEarlierHistory
+      hasPagedHistory = remoteHasEarlierHistory
       return projected
     }
     let retainedStart = historyStartID.flatMap { entryIDs.firstIndex(of: $0) }
     let start = retainedStart ?? max(0, entryIDs.count - 50)
     historyStartID = entryIDs[start]
-    hasEarlierHistory = start > 0
+    hasEarlierHistory = start > 0 || remoteHasEarlierHistory
     hasPagedHistory = hasEarlierHistory || (retainedStart != nil && hasPagedHistory)
     let width = ChatReadingColumn.itemWidth(in: collection.bounds.width)
     if width != historyWidth {
@@ -562,7 +563,7 @@ extension LodyChatView {
         historyTargetID = nil
         preparingHistory = false
         preparedHistory.removeAll()
-        hasEarlierHistory = target > 0
+        hasEarlierHistory = target > 0 || remoteHasEarlierHistory
       } else if !remaining.isEmpty, window != nil {
         prepareHistorySlice(remaining, index: 0, width: width)
       }
@@ -581,6 +582,11 @@ extension LodyChatView {
 
   func loadEarlierHistory() {
     guard hasEarlierHistory, !preparingHistory, !applying, window != nil else { return }
+    if historyStartID == historyFirstID, remoteHasEarlierHistory {
+      guard !remoteHistoryLoading else { return }
+      onLoadEarlierHistory()
+      return
+    }
     pauseTracking()
     preparingHistory = true
     applyRows()
@@ -594,7 +600,7 @@ extension LodyChatView {
 
   func updateHistoryHeader() {
     for case let header as ChatHistoryHeader in collection.visibleSupplementaryViews(ofKind: UICollectionView.elementKindSectionHeader) {
-      header.configure(loading: preparingHistory, hasEarlier: hasEarlierHistory)
+      header.configure(loading: preparingHistory || remoteHistoryLoading, hasEarlier: hasEarlierHistory)
     }
   }
 
