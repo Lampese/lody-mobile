@@ -1,8 +1,6 @@
 import { verifySnapshot } from './snapshot.mjs';
-import { buildUpstreamRoost } from './vendor/cloud-runtime/scripts/build-upstream-roost.mjs';
 import { buildMarkdownRepair } from './src/markdown-repair.mjs';
 await verifySnapshot();
-await buildUpstreamRoost();
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile, readdir, copyFile, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -24,7 +22,7 @@ for (const variant of Object.keys(documents)) {
 }
 const licenses=path.join(output,'main/runtime/licenses');await rm(licenses,{recursive:true,force:true});await mkdir(licenses,{recursive:true});
 await copyFile(path.join(root,'vendor/cloud-runtime/LICENSE'),path.join(licenses,'CloudRuntime-LICENSE.txt'));
-await copyFile(path.join(root,'vendor/cloud-runtime/vendor/upstream-roost/DSH-LICENSE'),path.join(licenses,'acp-extension-dsh-LICENSE.txt'));
+await copyFile(path.join(root,'vendor/cloud-runtime/licenses/acp-extension-dsh-LICENSE.txt'),path.join(licenses,'acp-extension-dsh-LICENSE.txt'));
 const lock=JSON.parse(await readFile(path.join(root,'package-lock.json')));
 const inventory=[];
 for (const [location, info] of Object.entries(lock.packages)) {

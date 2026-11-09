@@ -102,15 +102,13 @@
       "src/runtime/upstream-roost-history.ts",
       "src/runtime/upstream-roost.d.ts",
       "src/runtime/upstream-roost.js",
-      "scripts/build-upstream-roost.mjs",
-      "scripts/build.mjs",
-      "vendor/upstream-roost",
+      "licenses/acp-extension-dsh-LICENSE.txt",
       "src/contract/sessions.ts",
       "src/runtime/create-session.ts",
       "contract/fixtures/to-host.json",
       "contract/fixtures/to-runtime.json"
     ],
-    "note": "The upstream base plus the shared Lody workspace input refactor build reproducibly. Android copies the iOS runtime verbatim.",
+    "note": "The iOS asset build verifies the Roost browser module against the pinned source and shared input refactor. Android snapshots the generated module and licenses verbatim. The authoring source and generator stay in iOS.",
     "upstream": {
       "repository": "https://github.com/LodyAI/Lody",
       "commit": "8c27d5a2a5fdfb722ef84bf719dd889f5e5c79c7",

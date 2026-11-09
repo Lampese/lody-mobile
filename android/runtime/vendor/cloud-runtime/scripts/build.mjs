@@ -1,11 +1,9 @@
 import { build } from 'esbuild';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { buildUpstreamRoost } from './build-upstream-roost.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 export async function buildDataRuntime(output) {
-  await buildUpstreamRoost();
   const result = await build({
     plugins: [
       {

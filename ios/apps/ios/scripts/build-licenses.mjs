@@ -31,7 +31,7 @@ const nativeComponents = [
     name: 'acp-extension-dsh',
     license: 'Apache-2.0',
     url: 'https://github.com/LodyAI/acp-extension-dsh',
-    file: '../../packages/cloud-runtime/vendor/upstream-roost/DSH-LICENSE',
+    file: '../../packages/cloud-runtime/licenses/acp-extension-dsh-LICENSE.txt',
   },
   {
     name: 'libdatachannel',

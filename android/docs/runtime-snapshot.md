@@ -1,21 +1,27 @@
 # Shared runtime source and dependency updates
 
-`runtime/vendor/cloud-runtime` is a 98-file snapshot of this monorepo's `ios/packages/cloud-runtime`, commit `216d24ee8163821783f6cbd41604c761fc61ee74` (`git archive <commit> ios/packages/cloud-runtime`). It additionally includes the reviewed, capability-refresh and directory Tab source from e7df50f files listed in PROVENANCE.json, copied verbatim from the iOS runtime. Its license is retained. `vendor/PROVENANCE.json` identifies the source and `vendor/SHA256.json` records every file. `npm --prefix runtime run snapshot:check` and every asset build reject changed, added or missing files and symlinks. The drift test modifies a disposable copy, never the actual snapshot.
+`runtime/vendor/cloud-runtime` snapshots this monorepo's `ios/packages/cloud-runtime`
+verbatim. `vendor/PROVENANCE.json` records the base commit and reviewed updates.
+`vendor/SHA256.json` records every mirrored file. Each asset build checks the
+snapshot for changed, added or missing files and symlinks.
+
+For Roost, snapshot the generated `src/runtime/upstream-roost.js` and the runtime
+licenses. Keep `vendor/upstream-roost/` and `scripts/build-upstream-roost.mjs` in
+the iOS package, where the iOS asset build verifies the generated module.
 
 For an intentional update:
 
-1. Select and record a reviewed upstream commit. Export only `packages/cloud-runtime` into a temporary directory using `git archive <commit> packages/cloud-runtime`; do not copy a live checkout wholesale.
+1. Select and record a reviewed upstream commit. Export `ios/packages/cloud-runtime` into a temporary directory using `git archive <commit> ios/packages/cloud-runtime` and omit the two Roost authoring paths above.
 2. Compare that export against the current snapshot. Review protocol changes, licensing and browser dependencies. Preserve Android adaptation in `runtime/src`, outside the snapshot.
 3. Replace the snapshot only after reviewing the diff; update PROVENANCE and SHA256 together. Generate hashes with the exported `hashes()` function in `runtime/snapshot.mjs`, directed at the reviewed source directory. No build regenerates the manifest automatically.
 4. Run snapshot verification, `npm ci`, JS tests, asset build, JVM and Android bridge tests. Update `runtime/contract/fixtures.json` only for an intentional contract change. Capture actual WebView/WASM results and verify release assets contain no diagnostics.
 
 The production lockfile remains pinned. Phase 1 reported Zod advisory **GHSA-mrhx-c7xc-m3w5** against 3.25.76. Phase 2 pins **4.6.7** and verifies real shared schemas: accepted identities, strict extra-field rejection, shortcut variants, share object validation, and oversized constrained collections failing before per-item error allocation. The oversized-input test failed on v3 and passes on the patched version. `npm audit --omit=dev` reports zero known vulnerabilities for this lockfile. No source snapshot changes or v3 compatibility shim were needed.
 
-The Roost update in `PROVENANCE.json` copies the shared iOS runtime, its pinned
-upstream Roost bridge, input coordinator and storage, and the reproducible
-browser bundle. Developer Mode and the Roost History beta preference select the
-upstream policy for new conversations and Tabs: a compatible owner uses Roost;
-otherwise it uses Loro. The choice is frozen in session metadata.
+The Roost update in `PROVENANCE.json` records the upstream bridge, input
+coordinator and storage packaged in the browser module. With Developer Mode and
+the Roost History beta preference enabled, new conversations and Tabs use Roost
+on compatible owners and Loro on other owners. Session metadata stores the choice.
 
 Roost sessions use the owner machine's encrypted v3 history RPC while Loro carries
 the control document and queue. The upstream coordinator persists pending inputs

@@ -31,10 +31,14 @@ The session's metadata selects its history backend. For Roost, the runtime waits
 for the owner and its `sessionHistory` v3 capability, and negotiates incremental
 reads, watches and patches separately. An existing nonempty Loro history can open
 without metadata after control-stream catchup; an explicitly Roost session or a
-retired Roost cursor never takes that fallback. The pinned upstream Roost bridge and history
-cache in `vendor/upstream-roost` read and observe history, capture sharing snapshots,
-and submit permission responses through the encrypted owner RPC. The control document carries the
-shared queue and human-input receipts.
+retired Roost cursor never takes that fallback. The pinned upstream Roost bridge
+and history cache read and observe history, capture sharing snapshots, and submit
+permission responses through the encrypted owner RPC. The control document
+carries the shared queue and human-input receipts.
+
+The iOS runtime package holds the authoring source in `vendor/upstream-roost`.
+The iOS asset build verifies the generated `src/runtime/upstream-roost.js` against
+that source. Android's runtime snapshot carries the verified module and licenses.
 Ready Roost inputs use the same workspace input coordinator as Lody and its
 account/workspace-scoped IndexedDB storage. It persists the exact input before
 handoff, orders inputs by session and checks the owner after an uncertain
